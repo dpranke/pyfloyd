@@ -1,0 +1,211 @@
+#!/usr/bin/env python3
+
+import argparse
+import os
+import shutil
+import subprocess
+import sys
+
+
+class Runner:
+    def __init__(self):
+        self.args = None
+        self.no_execute = False
+        self.parser = None
+        self.quiet = False
+        self.subps = None
+        self.verbose = False
+
+    def add_parser(self, cmd, help):  # pylint: disable=redefined-builtin
+        method = getattr(self, 'run_' + cmd)
+        subp = self.subps.add_parser(cmd, help=help)
+        subp.add_argument(
+            '-n',
+            '--no-execute',
+            action='store_true',
+            help="Don't do anything that causes effects.",
+        )
+        subp.add_argument(
+            '-q',
+            '--quiet',
+            action='store_true',
+            help='Suppress output unless something fails.',
+        )
+        subp.add_argument(
+            '-v',
+            '--verbose',
+            action='store_true',
+            help='Echo commands as they are run.',
+        )
+        subp.set_defaults(func=lambda _: method())
+        return subp
+
+    def call(self, *args, **kwargs):
+        cmd = ' '.join(*args)
+        if self.verbose:
+            print(f'`{cmd}`')
+        if self.no_execute:
+            return None
+        capture_output = kwargs.get('capture_output', self.quiet)
+        if 'capture_output' in kwargs:
+            del kwargs['capture_output']
+
+        proc = subprocess.run(
+            *args, capture_output=capture_output, check=False, **kwargs
+        )
+        if proc.returncode != 0:
+            if self.quiet:
+                print(proc.stdout)
+                print(proc.stderr, file=sys.stderr)
+            sys.exit(proc.returncode)
+        return proc
+
+    def main(self, argv):
+        self.parser = argparse.ArgumentParser(prog='run')
+
+        # These flags are repeated for each command as well so that
+        # you can specify them before or after the command.
+        self.parser.add_argument(
+            '-n',
+            '--no-execute',
+            action='store_true',
+            help="Don't do anything that causes effects.",
+        )
+        self.parser.add_argument(
+            '-q',
+            '--quiet',
+            action='store_true',
+            help='Suppress output unless something fails.',
+        )
+        self.parser.add_argument(
+            '-v',
+            '--verbose',
+            action='store_true',
+            help='Echo commands as they are run.',
+        )
+        self.subps = self.parser.add_subparsers()
+
+        self.add_parser('build', help='Build the package.')
+        self.add_parser('check', help='Lint the source code with ruff.')
+        self.add_parser('clean', help='Remove any local files.')
+        self.add_parser(
+            'devenv',
+            help='Set up a dev venv at //.venv with all the needed packages.',
+        )
+        self.add_parser('coverage', help='Run tests and report code coverage.')
+        self.add_parser('format', help='Format the source code with ruff.')
+
+        subp = self.add_parser('help', help='Get help on a subcommand.')
+        subp.add_argument(
+            nargs='?',
+            action='store',
+            dest='subcommand',
+            help='The command to get help for.',
+        )
+
+        self.add_parser('lint', help='Lint the source code with pylint.')
+
+        subp = self.add_parser('publish', help='Upload packages to PyPI.')
+        subp.add_argument(
+            '--test',
+            action='store_true',
+            help='Upload to the PyPI test instance.',
+        )
+        subp.add_argument(
+            '--prod',
+            action='store_true',
+            help='Upload to the real PyPI instance.',
+        )
+
+        self.add_parser('tests', help='run the tests')
+
+        self.args = self.parser.parse_args(argv)
+        self.no_execute = self.args.no_execute
+        self.verbose = self.args.verbose
+        self.quiet = self.args.quiet
+
+        self.args.func(self.args)
+
+    def run_build(self):
+        self.call([sys.executable, '-m', 'build'])
+
+    def run_check(self):
+        self.call([sys.executable, '-m', 'ruff', 'check'])
+
+    def run_clean(self):
+        path = shutil.which('git')
+        if path is None:
+            print('You must have git installed to clean out the right files.')
+            sys.exit(1)
+
+        self.call([path, 'clean', '-fxd'])
+
+    def run_coverage(self):
+        self.call(
+            [
+                sys.executable,
+                '-m',
+                'coverage',
+                'run',
+                '-m',
+                'unittest',
+                'discover',
+                '-p',
+                '*_test.py',
+            ],
+        )
+        self.call(
+            [sys.executable, '-m', 'coverage', 'report', '--show-missing']
+        )
+
+    def run_devenv(self):
+        path = shutil.which('uv')
+        if path is None:
+            print('You need to have `uv` installed to set up a dev env.')
+            sys.exit(2)
+
+        self.call([path, 'venv'])
+        self.call([path, 'pip', 'install', '-e', '.[dev]'])
+        print('Run `source .venv/bin/activate` to finish devenv setup.')
+
+    def run_format(self):
+        self.call([sys.executable, '-m', 'ruff', 'format'])
+
+    def run_help(self):
+        if self.args.subcommand:
+            self.main([self.args.subcommand, '--help'])
+        self.main(['--help'])
+
+    def run_lint(self):
+        self.call(sys.executable + ' -m pylint run */*.py', shell=True)
+
+    def run_publish(self):
+        if not self.args.test or self.args.prod:
+            print('You must specify either --test or --prod to upload.')
+            sys.exit(2)
+
+        proc = self.call([sys.executable, '-m', 'floyd', '--version'],
+                         capture_output=True, text=True)
+        if proc:
+            version = proc.stdout.strip()
+        else:
+            version = '0.0.0'
+
+        cmd = [sys.executable, '-m', 'twine', 'upload']
+        if self.args.test:
+            cmd.extend(['--repository', 'testpypi'])
+        cmd.append('dist' + os.sep + f'floyd-{version}-py3-none-any.whl')
+        cmd.append('dist' + os.sep + f'floyd-{version}.tar.gz')
+        self.call(cmd)
+
+    def run_tests(self):
+        self.call(
+            [sys.executable, '-m', 'unittest', 'discover', '-p', '*_test.py']
+        )
+
+    def set_func(self, subp, method):
+        subp.set_defaults(func=lambda _: method())
+
+
+if __name__ == '__main__':
+    sys.exit(Runner().main(sys.argv[1:]))

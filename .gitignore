@@ -1,0 +1,8 @@
+.coverage
+.ruff_cache
+build
+dist
+*.pyc
+*.pyc.d
+*.py,cover
+floyd.egg-info

@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "floyd"
+description = "A parser generator and interpreter framework for Python."
+authors = [
+    {name = "Dirk Pranke", email = "dpranke@chromium.org"},
+]
+license = {file = "LICENSE"}
+readme = "README.md"
+requires-python = ">= 3.8"
+classifiers= [
+    'Development Status :: 3 - Alpha',
+    'Intended Audience :: Developers',
+    'License :: OSI Approved :: Apache Software License',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+]
+dynamic = [ "version" ]
+
+[project.optional-dependencies]
+dev = [
+    'build==1.1.1',
+    'coverage==7.4.4',
+    'pip==24.0',
+    'pylint==3.1.0',
+    'ruff==0.3.4',
+    'twine==5.0.0',
+]
+
+[project.urls]
+Repository = "https://github.com/dpranke/floyd-python"
+Issues = "https://github.com/dpranke/floyd-python/issues"
+Changelog = "https://github.com/dpranke/floyd-python/blob/master/README.md"
+
+[project.scripts]
+floyd = "floyd.tool:main"
+
+[tool.ruff]
+include = [ "run", "*/*.py" ]
+line-length = 79
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.setuptools.dynamic]
+version = {attr = "floyd.__version__"}
