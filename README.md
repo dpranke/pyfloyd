@@ -28,6 +28,8 @@ format the code. `./run --help` is your friend to find out more.
 
 ## Version History / Release Notes
 
+* v0.0.2 (2024-03-24)
+    * Fix typos found after v0.0.1 was released :).
 * v0.0.1 (2024-03-24)
     * Initial skeleton of the project uploaded to GitHub. There is nothing
       project-specific about this project except for the name and description.
