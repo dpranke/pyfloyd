@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "floyd"
+name = "floyd-python"
 description = "A parser generator and interpreter framework for Python."
 authors = [
     {name = "Dirk Pranke", email = "dpranke@chromium.org"},

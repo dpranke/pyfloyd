@@ -194,8 +194,8 @@ class Runner:
         cmd = [sys.executable, '-m', 'twine', 'upload']
         if self.args.test:
             cmd.extend(['--repository', 'testpypi'])
-        cmd.append('dist' + os.sep + f'floyd-{version}-py3-none-any.whl')
-        cmd.append('dist' + os.sep + f'floyd-{version}.tar.gz')
+        cmd.append('dist' + os.sep + f'floyd_python-{version}-py3-none-any.whl')
+        cmd.append('dist' + os.sep + f'floyd-python-{version}.tar.gz')
         self.call(cmd)
 
     def run_tests(self):
