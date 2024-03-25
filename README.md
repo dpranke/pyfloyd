@@ -1,6 +1,9 @@
-# floyd
+# floyd-python
 
 A parser generator and interpreter framework for Python.
+
+**Note the Python package name is `floyd`, not `floyd-python`.
+`floyd-python` is the name on PyPI.**
 
 ## Getting set up.
 
@@ -28,6 +31,8 @@ format the code. `./run --help` is your friend to find out more.
 
 ## Version History / Release Notes
 
+* v0.0.5 (2024-03-24)
+    * There's a pattern forming.
 * v0.0.4 (2024-03-24)
     * Actually bump the version this time.
 * v0.0.3 (2024-03-24)
