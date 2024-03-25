@@ -28,6 +28,8 @@ format the code. `./run --help` is your friend to find out more.
 
 ## Version History / Release Notes
 
+* v0.0.3 (2024-03-24)
+    * Fix typos and bugs found after v0.0.2 was released :).
 * v0.0.2 (2024-03-24)
     * Fix typos found after v0.0.1 was released :).
 * v0.0.1 (2024-03-24)

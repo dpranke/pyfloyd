@@ -180,7 +180,7 @@ class Runner:
         self.call(sys.executable + ' -m pylint run */*.py', shell=True)
 
     def run_publish(self):
-        if not self.args.test or self.args.prod:
+        if not self.args.test and not self.args.prod:
             print('You must specify either --test or --prod to upload.')
             sys.exit(2)
 
