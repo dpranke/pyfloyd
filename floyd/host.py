@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import sys
 
 
@@ -21,6 +22,26 @@ class Host:
         self.stdout = sys.stdout
         self.stderr = sys.stderr
 
+    def basename(self, path):
+        return os.path.basename(path)
+
+    def exists(self, path):
+        return os.path.exists(path)
+
+    def make_executable(self, path):
+        os.chmod(path, 0o755)
+
     def print(self, *args, end='\n', file=None, flush=True):
         file = file or self.stdout
         print(*args, end=end, file=file, flush=flush)
+
+    def splitext(self, path):
+        return os.path.splitext(path)
+
+    def read_text_file(self, path):
+        with open(path) as f:
+            return f.read()
+
+    def write_text_file(self, path, contents):
+        with open(path, 'w') as f:
+            f.write(contents)

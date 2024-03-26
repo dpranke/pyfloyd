@@ -31,6 +31,15 @@ format the code. `./run --help` is your friend to find out more.
 
 ## Version History / Release Notes
 
+* v0.1.0 (2024-03-25)
+    * Copy over working code from glop v0.7.0. This copies only the code
+      needed to run things, and a couple of grammars that can be used
+      for hand-testing things. This does not add any tests, since I'm
+      likely going to rework all of that. The code is as-is as close to
+      the working glop code as I can keep it, except for updated formatting
+      and copyright info. `check` and `lint` are unhappy, the `coverage`
+      numbers are terrible, and we probably need to regenerate the floyd
+      parser as well.
 * v0.0.5 (2024-03-24)
     * There's a pattern forming.
 * v0.0.4 (2024-03-24)

@@ -138,7 +138,7 @@ class Runner:
             print('You must have git installed to clean out the right files.')
             sys.exit(1)
 
-        self.call([path, 'clean', '-fxd'])
+        self.call([path, 'clean', '-fd'])
 
     def run_coverage(self):
         self.call(
@@ -184,8 +184,11 @@ class Runner:
             print('You must specify either --test or --prod to upload.')
             sys.exit(2)
 
-        proc = self.call([sys.executable, '-m', 'floyd', '--version'],
-                         capture_output=True, text=True)
+        proc = self.call(
+            [sys.executable, '-m', 'floyd', '--version'],
+            capture_output=True,
+            text=True,
+        )
         if proc:
             version = proc.stdout.strip()
         else:
@@ -194,7 +197,9 @@ class Runner:
         cmd = [sys.executable, '-m', 'twine', 'upload']
         if self.args.test:
             cmd.extend(['--repository', 'testpypi'])
-        cmd.append('dist' + os.sep + f'floyd_python-{version}-py3-none-any.whl')
+        cmd.append(
+            'dist' + os.sep + f'floyd_python-{version}-py3-none-any.whl'
+        )
         cmd.append('dist' + os.sep + f'floyd-python-{version}.tar.gz')
         self.call(cmd)
 

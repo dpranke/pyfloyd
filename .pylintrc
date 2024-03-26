@@ -15,9 +15,14 @@
 # This file is taken from the suggested pylint configuration in 
 # Google's Python Style Guide, specifically
 # https://github.com/google/styleguide/blob/28d10d1/pylintrc
-# The only changes are to comment out the disabling of no-self-use, to
-# get rid of the "useless option value" warning from pylint, and to
-# turn off the score message.
+#
+# The only changes are:
+# - Commented out the disabling of no-self-use in order to get rid of
+#   the "useless option value" warning.
+# - Disabled the duplicate-code check because there's too much unavoidable
+#   code similarity between compiler.py and printer.py.
+# - Turned off the score message in the [REPORTS] section.
+
 [MAIN]
 
 persistent=yes
@@ -26,6 +31,7 @@ persistent=yes
 
 disable=
     broad-except,
+    duplicate-code,  # Too much is duplicated between printer and compiler.
     global-statement,
     locally-disabled,
     missing-docstring,

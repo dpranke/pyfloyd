@@ -34,9 +34,10 @@ class ToolTest(unittest.TestCase):
         self.assertEqual(proc.returncode, 0)
         self.assertNotEqual(proc.stdout, '')
 
-    def test_do_nothing(self):
+    def test_usage(self):
         host = FakeHost()
-        self.assertEqual(floyd.tool.main([], host=host), 0)
+        # This should fail because we're not specifying a grammar.
+        self.assertEqual(floyd.tool.main([], host=host), 2)
 
     def test_version(self):
         host = FakeHost()
