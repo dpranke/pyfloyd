@@ -5,4 +5,4 @@ dist
 *.pyc
 *.pyc.d
 *.py,cover
-floyd.egg-info
+floyd_python.egg-info
