@@ -16,7 +16,15 @@
 
 import argparse
 import json
+import pathlib
 import sys
+
+# If necessary, add ../.. to sys.path so that we can run floyd even when
+# it's not installed.
+try:
+    import floyd
+except ImportError:
+    sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 from floyd.analyzer import Analyzer
 from floyd.compiler import Compiler
