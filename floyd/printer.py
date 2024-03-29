@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import string_literal
+from floyd import string_literal
 
 
-class Printer(object):
+class Printer:
     def __init__(self, grammar):
         self.grammar = grammar
 
@@ -46,8 +46,7 @@ class Printer(object):
     def _split_action(self, node):
         if node[0] != 'seq' or node[1][-1][0] != 'action':
             return (self._proc(node), '')
-        else:
-            return (self._proc(['seq', node[1][:-1]]), self._proc(node[1][-1]))
+        return (self._proc(['seq', node[1][:-1]]), self._proc(node[1][-1]))
 
     def _format_rules(self, rules, max_rule_len, max_choice_len):
         line_fmt = (
@@ -83,6 +82,7 @@ class Printer(object):
         return ' | '.join(self._proc(e) for e in node[1])
 
     def _empty_(self, node):
+        del node
         return ''
 
     def _label_(self, node):
@@ -136,6 +136,7 @@ class Printer(object):
         return ' '.join(self._proc(e) for e in node[1])
 
     def _sp_(self, node):
+        del node
         return ' '
 
     def _paren_(self, node):

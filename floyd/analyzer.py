@@ -15,14 +15,14 @@
 import collections
 
 
-class Grammar(object):
+class Grammar:
     def __init__(self, ast):
         self.ast = ast
         self.starting_rule = ast[1][0][1]
         self.rules = collections.OrderedDict((n[1], n[2]) for n in ast[1])
 
 
-class Analyzer(object):
+class Analyzer:
     def __init__(self):
         pass
 
@@ -43,15 +43,14 @@ class Analyzer(object):
     def rewrite_singles(self, node):
         if node[0] == 'rules':
             return [node[0], [self.rewrite_singles(n) for n in node[1]]]
-        elif node[0] == 'rule':
+        if node[0] == 'rule':
             return [node[0], node[1], self.rewrite_singles(node[2])]
-        elif node[0] in ('choice', 'seq'):
+        if node[0] in ('choice', 'seq'):
             if len(node[1]) == 1:
                 return self.rewrite_singles(node[1][0])
             return [node[0], [self.rewrite_singles(n) for n in node[1]]]
-        elif node[0] == 'paren':
+        if node[0] == 'paren':
             return self.rewrite_singles(node[1])
-        elif node[0] in ('label', 'post'):
+        if node[0] in ('label', 'post'):
             return [node[0], self.rewrite_singles(node[1]), node[2]]
-        else:
-            return node
+        return node

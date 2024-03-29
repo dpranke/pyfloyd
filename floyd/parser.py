@@ -1,6 +1,6 @@
 # pylint: disable=line-too-long,too-many-lines,unnecessary-lambda
 
-import unicodedata  # noqa: F401
+import unicodedata  # noqa: F401 pylint:disable=unused-import
 
 
 class Parser:

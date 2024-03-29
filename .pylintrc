@@ -15,8 +15,8 @@
 # This file is taken from the suggested pylint configuration in 
 # Google's Python Style Guide, specifically
 # https://github.com/google/styleguide/blob/28d10d1/pylintrc
-#
-# The only changes are:
+# with some changes:
+# - suppress consider-using-f-string as too noisy
 # - Commented out the disabling of no-self-use in order to get rid of
 #   the "useless option value" warning.
 # - Disabled the duplicate-code check because there's too much unavoidable
@@ -31,6 +31,7 @@ persistent=yes
 
 disable=
     broad-except,
+    consider-using-f-string,  # over-sensitive
     duplicate-code,  # Too much is duplicated between printer and compiler.
     global-statement,
     locally-disabled,

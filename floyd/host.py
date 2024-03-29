@@ -39,9 +39,9 @@ class Host:
         return os.path.splitext(path)
 
     def read_text_file(self, path):
-        with open(path) as f:
+        with open(path, encoding='utf-8') as f:
             return f.read()
 
     def write_text_file(self, path, contents):
-        with open(path, 'w') as f:
+        with open(path, 'w', encoding='utf-8') as f:
             f.write(contents)

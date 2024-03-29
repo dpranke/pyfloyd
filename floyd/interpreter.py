@@ -15,7 +15,7 @@
 from floyd.compiler import Compiler
 
 
-class Interpreter(object):
+class Interpreter:
     def __init__(self, grammar, memoize):
         self.memoize = memoize
         self.grammar = grammar
@@ -25,12 +25,15 @@ class Interpreter(object):
         if not self.parser_cls:
             scope = {}
             comp = Compiler(
-                self.grammar, 'Parser', main_wanted=False, memoize=self.memoize
+                self.grammar,
+                'Parser', 
+                main_wanted=False,
+                memoize=self.memoize
             )
             compiled_text, err = comp.compile()
             if err:
                 return None, err, 0
-            exec(compiled_text, scope)
+            exec(compiled_text, scope)  # pylint: disable=exec-used
             self.parser_cls = scope['Parser']
 
         parser = self.parser_cls(contents, path)

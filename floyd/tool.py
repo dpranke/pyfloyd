@@ -26,6 +26,7 @@ if ('floyd' not in sys.modules and
     importlib.util.find_spec('floyd') is None):
     sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
+# pylint: disable=wrong-import-position
 from floyd.analyzer import Analyzer
 from floyd.compiler import Compiler
 from floyd.host import Host
@@ -149,7 +150,7 @@ def _read_grammar(host, args):
         return None, 1
 
     parser = Parser(grammar_txt, args.grammar)
-    ast, err, nextpos = parser.parse()
+    ast, err, _ = parser.parse()
     if err:
         host.print(err, file=host.stderr)
         return None, 1

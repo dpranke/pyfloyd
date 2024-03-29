@@ -43,7 +43,7 @@ UN = Whitespace.Unindent
 _DEFAULT_HEADER = """\
 # pylint: disable=line-too-long,too-many-lines,unnecessary-lambda
 
-import unicodedata  # noqa: F401
+import unicodedata  # noqa: F401 pylint: disable=unused-import
 
 """
 
@@ -316,7 +316,7 @@ _DEFAULT_RULES = {
 }
 
 
-class Compiler(object):
+class Compiler:
     def __init__(self, grammar, classname, main_wanted, memoize=True):
         self.grammar = grammar
         self.classname = classname
@@ -408,33 +408,31 @@ class Compiler(object):
 
     def _compile(self, node, rule, sub_type='', index=0, top_level=False):
         assert node
-        assert self._method_lines == []
+        assert not self._method_lines
         if node[0] == 'apply':
             if node[1] not in self.grammar.rules:
                 self._builtin_rules_needed.add(node[1])
             return 'self._%s_' % node[1]
-        elif node[0] == 'lit' and not top_level:
+        if node[0] == 'lit' and not top_level:
             self._expect_needed = True
             expr = string_literal.encode(node[1])
             if len(node[1]) == 1:
                 return 'lambda: self._ch(%s)' % (expr,)
-            else:
-                return 'lambda: self._str(%s)' % (expr,)
+            return 'lambda: self._str(%s)' % (expr,)
+        if sub_type:
+            sub_rule = '%s__%s%d' % (rule, sub_type, index)
         else:
-            if sub_type:
-                sub_rule = '%s__%s%d' % (rule, sub_type, index)
-            else:
-                sub_rule = rule
-            fn = getattr(self, '_%s_' % node[0])
-            if top_level and node[0] in ('seq', 'choice'):
-                fn(sub_rule, node, top_level)
-            else:
-                fn(sub_rule, node)
+            sub_rule = rule
+        fn = getattr(self, '_%s_' % node[0])
+        if top_level and node[0] in ('seq', 'choice'):
+            fn(sub_rule, node, top_level)
+        else:
+            fn(sub_rule, node)
 
-            assert sub_rule not in self._methods
-            self._methods[sub_rule] = self._method_lines
-            self._method_lines = []
-            return 'self._%s_' % sub_rule
+        assert sub_rule not in self._methods
+        self._methods[sub_rule] = self._method_lines
+        self._method_lines = []
+        return 'self._%s_' % sub_rule
 
     def _fits(self, line):
         return len(line) < 72
@@ -454,6 +452,7 @@ class Compiler(object):
         for line in lines[:-1]:
             self._ext(line.rstrip())
 
+        # pylint: disable=fixme
         # TODO: Figure out how to handle blank lines at the end of a method
         # better. There will be a blank line if obj[-1] == UN.
         if lines[-1].rstrip():
@@ -507,7 +506,6 @@ class Compiler(object):
                         lines.append(s)
                         lines.extend(new_lines[1:-1])
                         s = new_lines[-1]
-                pass
 
             lines.append(s)
             if all(self._fits(line) for line in lines):
@@ -547,7 +545,7 @@ class Compiler(object):
 
     def _chain(self, name, args):
         obj = ['self._', name, '(', IN, '[', IN]
-        for i in range(len(args)):
+        for i in range(len(args)):  # pylint: disable=consider-using-enumerate
             obj.append(args[i])
             if i < len(args) - 1:
                 obj.append(',')
