@@ -117,7 +117,8 @@ class Runner:
             help='Upload to the real PyPI instance.',
         )
 
-        self.add_parser('tests', help='run the tests')
+        self.add_parser('regen', help='Regenerate floyd/parser.py.')
+        self.add_parser('tests', help='Run the tests.')
 
         self.args = self.parser.parse_args(argv)
         self.no_execute = self.args.no_execute
@@ -202,6 +203,22 @@ class Runner:
         )
         cmd.append('dist' + os.sep + f'floyd-python-{version}.tar.gz')
         self.call(cmd)
+
+    def run_regen(self):
+        self.call(
+            [
+                sys.executable,
+                '-m',
+                'floyd',
+                '-o',
+                'parser.py',
+                '-c',
+                '--no-main',
+                '--no-memoize',
+                'grammars/floyd.g',
+            ]
+        )
+        os.rename('parser.py', 'floyd/parser.py')
 
     def run_tests(self):
         self.call(
