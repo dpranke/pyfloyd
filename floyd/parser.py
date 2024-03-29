@@ -1,15 +1,5 @@
 # pylint: disable=line-too-long
 
-import sys
-
-
-if sys.version_info[0] < 3:
-    # pylint: disable=redefined-builtin
-    chr = unichr
-    range = xrange
-    str = unicode
-
-
 class Parser(object):
     def __init__(self, msg, fname):
         self.msg = str(msg)
@@ -131,10 +121,10 @@ class Parser(object):
         else:
             self._fail()
 
-    def _str(self, s, l):
+    def _str(self, s, len_):
         p = self.pos
-        if (p + l <= self.end) and self.msg[p : p + l] == s:
-            self._succeed(s, self.pos + l)
+        if (p + len_ <= self.end) and self.msg[p : p + len_] == s:
+            self._succeed(s, self.pos + len_)
         else:
             self._fail()
 
@@ -1126,20 +1116,6 @@ class Parser(object):
 
     def _hex__c2_(self):
         self._range('A', 'F')
-
-    def _hex_esc_(self):
-        self._push('hex_esc')
-        self._seq(
-            [
-                lambda: self._ch('x'),
-                lambda: self._bind(self._hex_, 'h1'),
-                lambda: self._bind(self._hex_, 'h2'),
-                lambda: self._succeed(
-                    self._xtou(self._get('h1') + self._get('h2'))
-                ),
-            ]
-        )
-        self._pop('hex_esc')
 
     def _digit_(self):
         r = self._cache.get(('digit', self.pos))

@@ -15,15 +15,15 @@
 """A Parser generator and interpreter framework for Python."""
 
 import argparse
+import importlib.util
 import json
 import pathlib
 import sys
 
 # If necessary, add ../.. to sys.path so that we can run floyd even when
 # it's not installed.
-try:
-    import floyd
-except ImportError:
+if ('floyd' not in sys.modules and
+    importlib.util.find_spec('floyd') is None):
     sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 from floyd.analyzer import Analyzer

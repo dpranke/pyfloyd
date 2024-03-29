@@ -436,8 +436,8 @@ class Compiler(object):
             self._method_lines = []
             return 'self._%s_' % sub_rule
 
-    def _fits(self, l):
-        return len(l) < 72
+    def _fits(self, line):
+        return len(line) < 72
 
     def _eval_rule(self, rule, node):
         fn = getattr(self, '_' + node[0] + '_')
@@ -451,8 +451,8 @@ class Compiler(object):
 
     def _flatten(self, obj):
         lines = self._flatten_rec(obj, 0, self._max_depth(obj) + 1)
-        for l in lines[:-1]:
-            self._ext(l.rstrip())
+        for line in lines[:-1]:
+            self._ext(line.rstrip())
 
         # TODO: Figure out how to handle blank lines at the end of a method
         # better. There will be a blank line if obj[-1] == UN.
@@ -510,7 +510,7 @@ class Compiler(object):
                 pass
 
             lines.append(s)
-            if all(self._fits(l) for l in lines):
+            if all(self._fits(line) for line in lines):
                 break
         return lines
 
@@ -673,22 +673,22 @@ class Compiler(object):
     #
 
     def _ll_arr_(self, rule, node):
-        l = ['[', OI]
+        line = ['[', OI]
         if len(node[1]):
-            l.append(self._eval_rule(rule, node[1][0]))
+            line.append(self._eval_rule(rule, node[1][0]))
             for e in node[1][1:]:
-                l.extend([',', SN, self._eval_rule(rule, e)])
-        l.extend([OU, ']'])
-        return l
+                line.extend([',', SN, self._eval_rule(rule, e)])
+        line.extend([OU, ']'])
+        return line
 
     def _ll_call_(self, rule, node):
-        l = ['(', OI]
+        line = ['(', OI]
         if len(node[1]):
-            l.append(self._eval_rule(rule, node[1][0]))
+            line.append(self._eval_rule(rule, node[1][0]))
             for e in node[1][1:]:
-                l.extend([',', SN, self._eval_rule(rule, e)])
-        l.extend([OU, ')'])
-        return l
+                line.extend([',', SN, self._eval_rule(rule, e)])
+        line.extend([OU, ')'])
+        return line
 
     def _ll_getattr_(self, _rule, node):
         return '.' + node[1]

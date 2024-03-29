@@ -14,8 +14,6 @@
 
 import io
 import pathlib
-import subprocess
-import sys
 import textwrap
 import unittest
 
