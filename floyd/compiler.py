@@ -43,7 +43,7 @@ UN = Whitespace.Unindent
 _DEFAULT_HEADER = """\
 # pylint: disable=line-too-long,too-many-lines,unnecessary-lambda
 
-import unicodedata
+import unicodedata  # noqa: F401
 
 """
 
