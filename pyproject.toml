@@ -49,5 +49,7 @@ line-length = 79
 [tool.ruff.format]
 quote-style = "single"
 
+[tool.setuptools]
+packages = ["floyd"]
 [tool.setuptools.dynamic]
 version = {attr = "floyd.__version__"}
