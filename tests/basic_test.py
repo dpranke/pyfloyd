@@ -37,7 +37,7 @@ class BasicTest(unittest.TestCase):
         self.assertEqual(ret, 0)
         self.assertEqual(
             host.stdout.getvalue(),
-            textwrap.dedent('''\
+            textwrap.dedent("""\
                 [
                   "object",
                   [
@@ -49,4 +49,5 @@ class BasicTest(unittest.TestCase):
                       ]
                     ]
                   ]
-                ]'''))
+                ]"""),
+        )

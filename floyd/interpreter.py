@@ -25,10 +25,7 @@ class Interpreter:
         if not self.parser_cls:
             scope = {}
             comp = Compiler(
-                self.grammar,
-                'Parser', 
-                main_wanted=False,
-                memoize=self.memoize
+                self.grammar, 'Parser', main_wanted=False, memoize=self.memoize
             )
             compiled_text, err = comp.compile()
             if err:

@@ -22,8 +22,7 @@ import sys
 
 # If necessary, add ../.. to sys.path so that we can run floyd even when
 # it's not installed.
-if ('floyd' not in sys.modules and
-    importlib.util.find_spec('floyd') is None):
+if 'floyd' not in sys.modules and importlib.util.find_spec('floyd') is None:
     sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 # pylint: disable=wrong-import-position
@@ -113,9 +112,12 @@ def _parse_args(host, argv):
         help='generate a main() wrapper (on by default)',
     )
     ap.add_argument('--no-main', dest='main', action='store_false')
-    ap.add_argument('grammar', nargs='?',
-                    help='grammar file to interpret or compiled. '
-                         'Usually a required argument.')
+    ap.add_argument(
+        'grammar',
+        nargs='?',
+        help='grammar file to interpret or compiled. '
+        'Usually a required argument.',
+    )
 
     args = ap.parse_args(argv)
 
