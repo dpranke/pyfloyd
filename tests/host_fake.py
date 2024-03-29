@@ -17,6 +17,7 @@ import io
 
 class FakeHost:
     def __init__(self):
+        self.stdin = io.StringIO()
         self.stdout = io.StringIO()
 
     def print(self, *args, end='\n', file=None):

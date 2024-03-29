@@ -56,7 +56,7 @@ def main(argv=None, host=None):
         return _interpret_grammar(host, args, grammar)
 
     except KeyboardInterrupt:
-        host.print('Interrupted, exiting ...', stream=host.stderr)
+        host.print('Interrupted, exiting ...', file=host.stderr)
         return 130  # SIGINT
 
     return 0
@@ -138,25 +138,25 @@ def _parse_args(host, argv):
 def _read_grammar(host, args):
     if not host.exists(args.grammar):
         host.print(
-            'Error: no such file: "%s"' % args.grammar, stream=host.stderr
+            'Error: no such file: "%s"' % args.grammar, file=host.stderr
         )
         return None, 1
 
     try:
         grammar_txt = host.read_text_file(args.grammar)
     except Exception as e:
-        host.print('Error: %s' % str(e), stream=host.stderr)
+        host.print('Error: %s' % str(e), file=host.stderr)
         return None, 1
 
     parser = Parser(grammar_txt, args.grammar)
     ast, err, nextpos = parser.parse()
     if err:
-        host.print(err, stream=host.stderr)
+        host.print(err, file=host.stderr)
         return None, 1
 
     grammar, err = Analyzer().analyze(ast)
     if err:
-        host.print(err, stream=host.stderr)
+        host.print(err, file=host.stderr)
         return None, 1
     return grammar, 0
 
@@ -164,7 +164,7 @@ def _read_grammar(host, args):
 def _pretty_print_grammar(host, args, grammar):
     contents, err = Printer(grammar).dumps(), None
     if err:
-        host.print(err, stream=host.stderr)
+        host.print(err, file=host.stderr)
         return 1
     _write(host, args.output, contents)
     return 0
@@ -174,7 +174,7 @@ def _write_compiled_grammar(host, args, grammar):
     comp = Compiler(grammar, args.class_name, args.main, args.memoize)
     contents, err = comp.compile()
     if err:
-        host.print(err, stream=host.stderr)
+        host.print(err, file=host.stderr)
         return 1
     _write(host, args.output, contents)
     if args.main:
@@ -190,7 +190,7 @@ def _interpret_grammar(host, args, grammar):
 
     out, err = Interpreter(grammar, args.memoize).interpret(contents, path)[:2]
     if err:
-        host.print(err, stream=host.stderr)
+        host.print(err, file=host.stderr)
         return 1
 
     if out is None:
