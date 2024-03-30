@@ -14,7 +14,7 @@
 
 """A parser generator and interpreter framework for Python."""
 
-from floyd.api import parse, compile
+from floyd.api import parse, compile, pretty_print
 from floyd.version import __version__
 from floyd import tool
 
@@ -22,5 +22,6 @@ __all__ = [
     '__version__',
     'compile',
     'parse',
+    'pretty_print',
     'tool',
 ]

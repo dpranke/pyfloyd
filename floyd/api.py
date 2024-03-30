@@ -25,13 +25,16 @@ def parse(
     c, err = compile(grammar, grammar_path, memoize=memoize)
     if err:
         return c, err
-    val, err, _ = c.parse(path, string)
+    val, err = c.parse(input, path)
+    return val, err
 
 
 def compile(grammar, path='<string>', memoize=False):
     p = CompiledParser()
-    p.compile(grammar, path=path, memoize=memoize)
-    return p
+    _, err = p.compile(grammar, path=path, memoize=memoize)
+    if err:
+        return None, err
+    return p, None
 
 
 class CompiledParser:
@@ -46,14 +49,18 @@ class CompiledParser:
         if err:
             return None, err
         grammar, err = Analyzer().analyze(ast)
-        if err:
-            return None, err
+        assert err is None  # .analyze() can't fail given a legal ast.
+
         comp = Compiler(grammar, 'Parser', main_wanted=False, memoize=memoize)
         compiled_text, err = comp.compile()
-        if err:
-            return None, err, 0
-        exec(compiled_text, scope)  # pylint: disable=exec-used
+        assert err is None  # comp.compile() can't currently fail.
+
+        try:
+            exec(compiled_text, scope)  # pylint: disable=exec-used
+        except Exception as e:
+            return None, 'Error compiling grammar.'
         self.parser_cls = scope['Parser']
+        return None, None
 
     def parse(self, input, path='<string>'):
         parser = self.parser_cls(input, path)

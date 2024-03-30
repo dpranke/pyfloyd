@@ -47,7 +47,7 @@ class GrammarTest(unittest.TestCase):
 
     def test_json5(self):
         h = floyd.host.Host()
-        g = floyd.compile(
+        g, _ = floyd.compile(
             h.read_text_file(THIS_DIR / '../grammars/json5.g'),
             path=str(THIS_DIR / '../grammars/json5.g'),
         )
