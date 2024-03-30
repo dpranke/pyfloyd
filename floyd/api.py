@@ -18,17 +18,6 @@ from floyd.parser import Parser
 from floyd.printer import Printer
 
 
-def parse(
-    grammar, text, grammar_path='<string>', path='<string>', memoize=False
-):
-    """Match an input text against the specified grammar."""
-    c, err = compile_parser(grammar, grammar_path, memoize=memoize)
-    if err:
-        return c, err
-    val, err = c.parse(text, path)
-    return val, err
-
-
 def compile_parser(grammar, path='<string>', memoize=False):
     p = CompiledParser()
     _, err = p.compile(grammar, path=path, memoize=memoize)
@@ -65,6 +54,27 @@ class CompiledParser:
         parser = self.parser_cls(text, path)
         obj, err, _ = parser.parse()
         return obj, err
+
+
+def generate_parser(
+    grammar, class_name='Parser', main=False, memoize=False, path='<string>'
+):
+    ast, err, _ = Parser(grammar, path).parse()
+    if err:
+        return None, err
+    ast = Analyzer().analyze(ast)
+    return Compiler(ast, class_name, main, memoize).compile()
+
+
+def parse(
+    grammar, text, grammar_path='<string>', path='<string>', memoize=False
+):
+    """Match an input text against the specified grammar."""
+    c, err = compile_parser(grammar, grammar_path, memoize=memoize)
+    if err:
+        return c, err
+    val, err = c.parse(text, path)
+    return val, err
 
 
 def pretty_print(grammar):

@@ -22,15 +22,30 @@ class APITest(unittest.TestCase):
 
     def test_compile(self):
         parser, err = floyd.compile_parser('grammar = "foo" "bar"')
-        self.assertEqual(err, None)
+        self.assertIsNone(err)
 
         val, err = parser.parse('baz')
-        self.assertEqual(val, None)
+        self.assertIsNone(val)
         self.assertEqual(err, '<string>:1 Unexpected "b" at column 1')
 
     def test_compile_bad_grammar(self):
         parser, err = floyd.compile_parser('xyz')
-        self.assertEqual(parser, None)
+        self.assertIsNone(parser)
+        self.assertEqual(err, '<string>:1 Unexpected end of input at column 4')
+
+    def test_generate_parser(self):
+        txt, err = floyd.generate_parser('grammar = "Hello" end -> true')
+        self.assertIsNone(err)
+        scope = {}
+        exec(txt, scope)  # pylint: disable=exec-used
+        parser_cls = scope['Parser']
+        obj, err, _ = parser_cls('Hello', '<string>').parse()
+        self.assertIsNone(err)
+        self.assertEqual(obj, True)
+
+    def test_generate_parser_fails(self):
+        txt, err = floyd.generate_parser('xyz')
+        self.assertIsNone(txt)
         self.assertEqual(err, '<string>:1 Unexpected end of input at column 4')
 
     def test_parse(self):

@@ -26,13 +26,8 @@ if 'floyd' not in sys.modules and importlib.util.find_spec('floyd') is None:
     sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 # pylint: disable=wrong-import-position
-from floyd.analyzer import Analyzer
-from floyd.compiler import Compiler
+import floyd
 from floyd.host import Host
-from floyd.printer import Printer
-from floyd.interpreter import Interpreter
-from floyd.parser import Parser
-from floyd.version import __version__
 
 
 def main(argv=None, host=None):
@@ -46,13 +41,21 @@ def main(argv=None, host=None):
         grammar, err = _read_grammar(host, args)
         if err:
             return err
+
         if args.pretty_print:
-            return _pretty_print_grammar(host, args, grammar)
-        if args.ast:
-            _write(host, args.output, json.dumps(grammar.ast, indent=2) + '\n')
-            return 0
+            contents, err = floyd.pretty_print(grammar)
+            if err:
+                return err
+            _write(host, args.output, contents)
+
         if args.compile:
-            return _write_compiled_grammar(host, args, grammar)
+            contents, err = floyd.generate_parser(
+                grammar, args.class_name, args.main, args.memoize
+            )
+            if err:
+                return err
+            _write(host, args.output, contents)
+
         return _interpret_grammar(host, args, grammar)
 
     except KeyboardInterrupt:
@@ -64,12 +67,6 @@ def main(argv=None, host=None):
 
 def _parse_args(host, argv):
     ap = argparse.ArgumentParser(prog='floyd')
-    ap.add_argument(
-        '-a',
-        '--ast',
-        action='store_true',
-        help='dump the ast of the parsed input',
-    )
     ap.add_argument(
         '-c',
         '--compile',
@@ -90,7 +87,7 @@ def _parse_args(host, argv):
         '-V',
         '--version',
         action='store_true',
-        help='print current version (%s)' % __version__,
+        help='print current version (%s)' % floyd.__version__,
     )
     ap.add_argument(
         '--class-name',
@@ -122,7 +119,7 @@ def _parse_args(host, argv):
     args = ap.parse_args(argv)
 
     if args.version:
-        host.print(__version__)
+        host.print(floyd.__version__)
         return None, 0
 
     if not args.grammar:
@@ -147,35 +144,19 @@ def _read_grammar(host, args):
 
     try:
         grammar_txt = host.read_text_file(args.grammar)
+        return grammar_txt, None
     except Exception as e:
         host.print('Error: %s' % str(e), file=host.stderr)
         return None, 1
 
-    parser = Parser(grammar_txt, args.grammar)
-    ast, err, _ = parser.parse()
-    if err:
-        host.print(err, file=host.stderr)
-        return None, 1
-
-    grammar, err = Analyzer().analyze(ast)
-    if err:
-        host.print(err, file=host.stderr)
-        return None, 1
-    return grammar, 0
-
-
-def _pretty_print_grammar(host, args, grammar):
-    contents, err = Printer(grammar).dumps(), None
-    if err:
-        host.print(err, file=host.stderr)
-        return 1
-    _write(host, args.output, contents)
-    return 0
-
 
 def _write_compiled_grammar(host, args, grammar):
-    comp = Compiler(grammar, args.class_name, args.main, args.memoize)
-    contents, err = comp.compile()
+    contents, err = floyd.generate_parser(
+        grammar,
+        class_name=args.class_name,
+        main=args.main,
+        memoize=args.memoize,
+    )
     if err:
         host.print(err, file=host.stderr)
         return 1
@@ -191,7 +172,7 @@ def _interpret_grammar(host, args, grammar):
     else:
         path, contents = (args.input, host.read_text_file(args.input))
 
-    out, err = Interpreter(grammar, args.memoize).interpret(contents, path)[:2]
+    out, err = floyd.parse(grammar, contents, path=path, memoize=args.memoize)
     if err:
         host.print(err, file=host.stderr)
         return 1

@@ -17,6 +17,7 @@ import sys
 import unittest
 
 import floyd
+import floyd.tool
 
 from .host_fake import FakeHost
 

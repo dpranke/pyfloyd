@@ -14,14 +14,13 @@
 
 """A parsing framework and parser generator for Python."""
 
-from floyd.api import parse, compile_parser, pretty_print
+from floyd.api import parse, compile_parser, generate_parser, pretty_print
 from floyd.version import __version__
-from floyd import tool
 
 __all__ = [
     '__version__',
     'compile_parser',
+    'generate_parser',
     'parse',
     'pretty_print',
-    'tool',
 ]
