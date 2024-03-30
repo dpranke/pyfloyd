@@ -97,8 +97,8 @@ class Printer:
     def _ll_call_(self, node):
         return '(%s)' % ', '.join(self._proc(arg) for arg in node[1])
 
-    def _ll_getattr_(self, node):
-        return '.%s' % node[1]
+    def _ll_const_(self, node):
+        return node[1]
 
     def _ll_getitem_(self, node):
         return '[%s]' % self._proc(node[1])

@@ -1222,7 +1222,6 @@ class Parser:
             [
                 self._ll_post_op__c0_,
                 self._ll_post_op__c1_,
-                self._ll_post_op__c2_,
             ]
         )
 
@@ -1265,23 +1264,6 @@ class Parser:
 
     def _ll_post_op__c1__s5_(self):
         self._succeed(['ll_call', self._get('es')])
-
-    def _ll_post_op__c2_(self):
-        self._push('ll_post_op__c2')
-        self._seq(
-            [
-                lambda: self._ch('.'),
-                self._ll_post_op__c2__s1_,
-                self._ll_post_op__c2__s2_,
-            ]
-        )
-        self._pop('ll_post_op__c2')
-
-    def _ll_post_op__c2__s1_(self):
-        self._bind(self._ident_, 'i')
-
-    def _ll_post_op__c2__s2_(self):
-        self._succeed(['ll_getattr', self._get('i')])
 
     def _ll_prim_(self):
         self._choose(

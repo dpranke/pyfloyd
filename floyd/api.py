@@ -77,8 +77,8 @@ def parse(
     return val, err
 
 
-def pretty_print(grammar):
-    parser = Parser(grammar, '<string>')
+def pretty_print(grammar, path='<string>'):
+    parser = Parser(grammar, path)
     ast, err, _ = parser.parse()
     if err:
         return None, err

@@ -17,9 +17,31 @@ import io
 
 class FakeHost:
     def __init__(self):
+        self.stderr = io.StringIO()
         self.stdin = io.StringIO()
         self.stdout = io.StringIO()
+        self.files = {}
+        self.written_files = {}
+
+    def basename(self, path):
+        parts = path.rsplit('/')
+        assert len(parts) == 1
+        return path
+
+    def exists(self, path):
+        return path in self.files
 
     def print(self, *args, end='\n', file=None):
         file = file or self.stdout
         print(*args, end=end, file=file, flush=True)
+
+    def read_text_file(self, path):
+        return self.files[path]
+
+    def splitext(self, path):
+        return path.rsplit('.')
+
+    def write_text_file(self, path, contents):
+        self.files[path] = contents
+        self.written_files[path] = contents
+

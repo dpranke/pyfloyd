@@ -84,7 +84,6 @@ ll_qual     = ll_prim:e ll_post_op+:ps            -> ['ll_qual', e, ps]
 
 ll_post_op  = '[' sp ll_expr:e sp ']'             -> ['ll_getitem', e]
             | '(' sp ll_exprs:es sp ')'           -> ['ll_call', es]
-            | '.' ident:i                         -> ['ll_getattr', i]
 
 ll_prim     = 'false'                             -> ['ll_const', 'false']
             | 'null'                              -> ['ll_const', 'null']

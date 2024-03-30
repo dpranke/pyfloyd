@@ -23,7 +23,8 @@ import sys
 # If necessary, add ../.. to sys.path so that we can run floyd even when
 # it's not installed.
 if 'floyd' not in sys.modules and importlib.util.find_spec('floyd') is None:
-    sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
+    sys.path.insert(
+        0, str(pathlib.Path(__file__).parent.parent))  # pragma: no cover
 
 # pylint: disable=wrong-import-position
 import floyd
@@ -36,27 +37,31 @@ def main(argv=None, host=None):
     try:
         args, err = _parse_args(host, argv)
         if err is not None:
-            return err
+            return err 
 
         grammar, err = _read_grammar(host, args)
         if err:
-            return err
+            host.print(err, file=host.stderr)
+            return 1 
 
         if args.pretty_print:
-            contents, err = floyd.pretty_print(grammar)
-            if err:
-                return err
-            _write(host, args.output, contents)
-
-        if args.compile:
+            contents, err = floyd.pretty_print(grammar, args.grammar)
+        elif args.compile:
             contents, err = floyd.generate_parser(
-                grammar, args.class_name, args.main, args.memoize
+                grammar,
+                class_name=args.class_name,
+                main=args.main, 
+                memoize=args.memoize,
+                path=args.grammar
             )
-            if err:
-                return err
-            _write(host, args.output, contents)
-
-        return _interpret_grammar(host, args, grammar)
+        else:
+            contents, err = _interpret_grammar(host, args, grammar)
+            
+        if err:
+            host.print(err, file=host.stderr)
+            return 1
+        _write(host, args.output, contents)
+        return 0
 
     except KeyboardInterrupt:
         host.print('Interrupted, exiting ...', file=host.stderr)
@@ -150,22 +155,6 @@ def _read_grammar(host, args):
         return None, 1
 
 
-def _write_compiled_grammar(host, args, grammar):
-    contents, err = floyd.generate_parser(
-        grammar,
-        class_name=args.class_name,
-        main=args.main,
-        memoize=args.memoize,
-    )
-    if err:
-        host.print(err, file=host.stderr)
-        return 1
-    _write(host, args.output, contents)
-    if args.main:
-        host.make_executable(args.output)
-    return 0
-
-
 def _interpret_grammar(host, args, grammar):
     if args.input == '-':
         path, contents = ('<stdin>', host.stdin.read())
@@ -174,13 +163,10 @@ def _interpret_grammar(host, args, grammar):
 
     out, err = floyd.parse(grammar, contents, path=path, memoize=args.memoize)
     if err:
-        host.print(err, file=host.stderr)
-        return 1
+        return None, err
 
-    out = json.dumps(out, indent=2, sort_keys=True)
-
-    _write(host, args.output, out + '\n')
-    return 0
+    out = json.dumps(out, indent=2, sort_keys=True) + '\n'
+    return out, None
 
 
 def _write(host, path, contents):

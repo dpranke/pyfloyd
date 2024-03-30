@@ -663,10 +663,6 @@ class Compiler:
         line.extend([OU, ')'])
         return line
 
-    def _ll_getattr_(self, rule, node):
-        del rule
-        return '.' + node[1]
-
     def _ll_getitem_(self, rule, node):
         return ['['] + self._eval_rule(rule, node[1]) + [']']
 
