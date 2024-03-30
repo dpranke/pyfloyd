@@ -1135,6 +1135,7 @@ class Parser:
         self._choose(
             [
                 self._ll_expr__c0_,
+                self._ll_expr__c1_,
                 self._ll_qual_,
             ]
         )
@@ -1161,6 +1162,29 @@ class Parser:
 
     def _ll_expr__c0__s5_(self):
         self._succeed(['ll_plus', self._get('e1'), self._get('e2')])
+
+    def _ll_expr__c1_(self):
+        self._push('ll_expr__c1')
+        self._seq(
+            [
+                self._ll_expr__c1__s0_,
+                self._sp_,
+                lambda: self._ch('-'),
+                self._sp_,
+                self._ll_expr__c1__s4_,
+                self._ll_expr__c1__s5_,
+            ]
+        )
+        self._pop('ll_expr__c1')
+
+    def _ll_expr__c1__s0_(self):
+        self._bind(self._ll_qual_, 'e1')
+
+    def _ll_expr__c1__s4_(self):
+        self._bind(self._ll_expr_, 'e2')
+
+    def _ll_expr__c1__s5_(self):
+        self._succeed(['ll_minus', self._get('e1'), self._get('e2')])
 
     def _ll_qual_(self):
         self._choose(
@@ -1268,113 +1292,173 @@ class Parser:
                 self._ll_prim__c3_,
                 self._ll_prim__c4_,
                 self._ll_prim__c5_,
+                self._ll_prim__c6_,
+                self._ll_prim__c7_,
+                self._ll_prim__c8_,
+                self._ll_prim__c9_,
+                self._ll_prim__c10_,
             ]
         )
 
     def _ll_prim__c0_(self):
-        self._push('ll_prim__c0')
         self._seq(
             [
-                self._ll_prim__c0__s0_,
+                lambda: self._str('false'),
                 self._ll_prim__c0__s1_,
             ]
         )
-        self._pop('ll_prim__c0')
-
-    def _ll_prim__c0__s0_(self):
-        self._bind(self._ident_, 'i')
 
     def _ll_prim__c0__s1_(self):
-        self._succeed(['ll_var', self._get('i')])
+        self._succeed(['ll_const', 'false'])
 
     def _ll_prim__c1_(self):
-        self._push('ll_prim__c1')
         self._seq(
             [
-                self._ll_prim__c1__s0_,
+                lambda: self._str('null'),
                 self._ll_prim__c1__s1_,
             ]
         )
-        self._pop('ll_prim__c1')
 
-    def _ll_prim__c1__s0_(self):
-        self._bind(self._digits_, 'ds')
-
-    def _ll_prim__c1__s1_(self):
-        self._succeed(['ll_num', self._get('ds')])
-
-    def _ll_prim__c2_(self):
-        self._push('ll_prim__c2')
+    def _ll_prim__c10_(self):
+        self._push('ll_prim__c10')
         self._seq(
             [
-                lambda: self._str('0x'),
-                self._ll_prim__c2__s1_,
-                self._ll_prim__c2__s2_,
+                lambda: self._ch('['),
+                self._sp_,
+                self._ll_prim__c10__s2_,
+                self._sp_,
+                lambda: self._ch(']'),
+                self._ll_prim__c10__s5_,
             ]
         )
-        self._pop('ll_prim__c2')
+        self._pop('ll_prim__c10')
 
-    def _ll_prim__c2__s1_(self):
-        self._bind(self._hexdigits_, 'hs')
+    def _ll_prim__c10__s2_(self):
+        self._bind(self._ll_exprs_, 'es')
 
-    def _ll_prim__c2__s2_(self):
-        self._succeed(['ll_num', '0x' + self._get('hs')])
+    def _ll_prim__c10__s5_(self):
+        self._succeed(['ll_arr', self._get('es')])
 
-    def _ll_prim__c3_(self):
-        self._push('ll_prim__c3')
+    def _ll_prim__c1__s1_(self):
+        self._succeed(['ll_const', 'null'])
+
+    def _ll_prim__c2_(self):
         self._seq(
             [
-                self._ll_prim__c3__s0_,
+                lambda: self._str('true'),
+                self._ll_prim__c2__s1_,
+            ]
+        )
+
+    def _ll_prim__c2__s1_(self):
+        self._succeed(['ll_const', 'true'])
+
+    def _ll_prim__c3_(self):
+        self._seq(
+            [
+                lambda: self._str('Infinity'),
                 self._ll_prim__c3__s1_,
             ]
         )
-        self._pop('ll_prim__c3')
-
-    def _ll_prim__c3__s0_(self):
-        self._bind(self._lit_, 'l')
 
     def _ll_prim__c3__s1_(self):
-        self._succeed(['ll_lit', self._get('l')[1]])
+        self._succeed(['ll_const', 'Infinity'])
 
     def _ll_prim__c4_(self):
-        self._push('ll_prim__c4')
         self._seq(
             [
-                lambda: self._ch('('),
-                self._sp_,
-                self._ll_prim__c4__s2_,
-                self._sp_,
-                lambda: self._ch(')'),
-                self._ll_prim__c4__s5_,
+                lambda: self._str('NaN'),
+                self._ll_prim__c4__s1_,
             ]
         )
-        self._pop('ll_prim__c4')
 
-    def _ll_prim__c4__s2_(self):
-        self._bind(self._ll_expr_, 'e')
-
-    def _ll_prim__c4__s5_(self):
-        self._succeed(['ll_paren', self._get('e')])
+    def _ll_prim__c4__s1_(self):
+        self._succeed(['ll_const', 'NaN'])
 
     def _ll_prim__c5_(self):
         self._push('ll_prim__c5')
         self._seq(
             [
-                lambda: self._ch('['),
-                self._sp_,
-                self._ll_prim__c5__s2_,
-                self._sp_,
-                lambda: self._ch(']'),
-                self._ll_prim__c5__s5_,
+                self._ll_prim__c5__s0_,
+                self._ll_prim__c5__s1_,
             ]
         )
         self._pop('ll_prim__c5')
 
-    def _ll_prim__c5__s2_(self):
-        self._bind(self._ll_exprs_, 'es')
+    def _ll_prim__c5__s0_(self):
+        self._bind(self._ident_, 'i')
 
-    def _ll_prim__c5__s5_(self):
-        self._succeed(['ll_arr', self._get('es')])
+    def _ll_prim__c5__s1_(self):
+        self._succeed(['ll_var', self._get('i')])
+
+    def _ll_prim__c6_(self):
+        self._push('ll_prim__c6')
+        self._seq(
+            [
+                self._ll_prim__c6__s0_,
+                self._ll_prim__c6__s1_,
+            ]
+        )
+        self._pop('ll_prim__c6')
+
+    def _ll_prim__c6__s0_(self):
+        self._bind(self._digits_, 'ds')
+
+    def _ll_prim__c6__s1_(self):
+        self._succeed(['ll_num', self._get('ds')])
+
+    def _ll_prim__c7_(self):
+        self._push('ll_prim__c7')
+        self._seq(
+            [
+                lambda: self._str('0x'),
+                self._ll_prim__c7__s1_,
+                self._ll_prim__c7__s2_,
+            ]
+        )
+        self._pop('ll_prim__c7')
+
+    def _ll_prim__c7__s1_(self):
+        self._bind(self._hexdigits_, 'hs')
+
+    def _ll_prim__c7__s2_(self):
+        self._succeed(['ll_num', '0x' + self._get('hs')])
+
+    def _ll_prim__c8_(self):
+        self._push('ll_prim__c8')
+        self._seq(
+            [
+                self._ll_prim__c8__s0_,
+                self._ll_prim__c8__s1_,
+            ]
+        )
+        self._pop('ll_prim__c8')
+
+    def _ll_prim__c8__s0_(self):
+        self._bind(self._lit_, 'l')
+
+    def _ll_prim__c8__s1_(self):
+        self._succeed(['ll_lit', self._get('l')[1]])
+
+    def _ll_prim__c9_(self):
+        self._push('ll_prim__c9')
+        self._seq(
+            [
+                lambda: self._ch('('),
+                self._sp_,
+                self._ll_prim__c9__s2_,
+                self._sp_,
+                lambda: self._ch(')'),
+                self._ll_prim__c9__s5_,
+            ]
+        )
+        self._pop('ll_prim__c9')
+
+    def _ll_prim__c9__s2_(self):
+        self._bind(self._ll_expr_, 'e')
+
+    def _ll_prim__c9__s5_(self):
+        self._succeed(['ll_paren', self._get('e')])
 
     def _digits_(self):
         self._push('digits')

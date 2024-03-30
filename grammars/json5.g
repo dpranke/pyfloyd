@@ -12,16 +12,16 @@ eol            = '\u000D' '\u000A' | '\u000D' | '\u000A'
 comment        = '//' (~eol anything)*
                | '/*' (~'*/' anything)* '*/'
 
-value          = 'null'                               -> 'None'
-               | 'true'                               -> 'True'
-               | 'false'                              -> 'False'
-               | object:v                             -> ['object', v]
-               | array:v                              -> ['array', v]
-               | string:v                             -> ['string', v]
-               | num_literal:v                        -> ['number', v]
+value          = 'null'                               -> null
+               | 'true'                               -> true
+               | 'false'                              -> false
+               | num_literal:v                        -> v
+               | object:v                             -> v
+               | array:v                              -> v
+               | string:v                             -> v
 
-object         = '{' sp member_list:v sp '}'          -> v
-               | '{' sp '}'                           -> []
+object         = '{' sp member_list:v sp '}'          -> dict(v)
+               | '{' sp '}'                           -> dict([])
 
 array          = '[' sp element_list:v sp ']'         -> v
                | '[' sp ']'                           -> []
@@ -97,12 +97,12 @@ id_continue    = ascii_id_start
                | '\u200C'
                | '\u200D'
 
-num_literal    = '-' num_literal:n                   -> '-' + n
-               | '+' num_literal:n                   -> n
-               | dec_literal:d ~id_start             -> d
-               | hex_literal
-               | 'Infinity'
-               | 'NaN'
+num_literal    = '-' num_literal:n                   -> 0 - n
+               | '+' num_literal:n                   -> float(n)
+               | dec_literal:d ~id_start             -> float(d) 
+               | hex_literal:h                       -> hex(h)
+               | 'Infinity'                          -> Infinity
+               | 'NaN'                               -> NaN
 
 dec_literal    = dec_int_lit:d frac:f exp:e          -> d + f + e
                | dec_int_lit:d frac:f                -> d + f

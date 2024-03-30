@@ -76,6 +76,7 @@ ll_exprs    = ll_expr:e (sp ',' sp ll_expr)*:es   -> [e] + es
             |                                     -> []
 
 ll_expr     = ll_qual:e1 sp '+' sp ll_expr:e2     -> ['ll_plus', e1, e2]
+            | ll_qual:e1 sp '-' sp ll_expr:e2     -> ['ll_minus', e1, e2]
             | ll_qual
 
 ll_qual     = ll_prim:e ll_post_op+:ps            -> ['ll_qual', e, ps]
@@ -85,7 +86,12 @@ ll_post_op  = '[' sp ll_expr:e sp ']'             -> ['ll_getitem', e]
             | '(' sp ll_exprs:es sp ')'           -> ['ll_call', es]
             | '.' ident:i                         -> ['ll_getattr', i]
 
-ll_prim     = ident:i                             -> ['ll_var', i]
+ll_prim     = 'false'                             -> ['ll_const', 'false']
+            | 'null'                              -> ['ll_const', 'null']
+            | 'true'                              -> ['ll_const', 'true']
+            | 'Infinity'                          -> ['ll_const', 'Infinity']
+            | 'NaN'                               -> ['ll_const', 'NaN']
+            | ident:i                             -> ['ll_var', i]
             | digits:ds                           -> ['ll_num', ds]
             | '0x' hexdigits:hs                   -> ['ll_num', '0x' + hs]
             | lit:l                               -> ['ll_lit', l[1]]

@@ -83,7 +83,7 @@ def main(argv=sys.argv[1:], stdin=sys.stdin, stdout=sys.stdout,
     if err:
         print(err, file=stderr)
         return 1
-    print(json.dumps(obj), file=stdout)
+    print(json.dumps(obj, indent=2))
     return 0
 """
 
@@ -263,6 +263,18 @@ _DEFAULT_FUNCTIONS = {
     'cat': d("""\
         def _cat(self, strs):
             return ''.join(strs)
+        """),
+    'dict': d("""\
+        def _dict(self, pairs):
+              return dict(pairs)
+        """),
+    'float': d("""\
+        def _float(self, str):
+              return float(str)
+        """),
+    'hex': d("""\
+        def _hex(self, str):
+             return int(str, base=16)
         """),
     'is_unicat': d("""\
         def _is_unicat(self, var, cat):
@@ -697,6 +709,13 @@ class Compiler:
     def _ll_lit_(self, _rule, node):
         return [string_literal.encode(node[1])]
 
+    def _ll_minus_(self, rule, node):
+        return (
+            self._eval_rule(rule, node[1])
+            + [SN, '- ']
+            + self._eval_rule(rule, node[2])
+        )
+
     def _ll_num_(self, _rule, node):
         return [node[1]]
 
@@ -720,3 +739,16 @@ class Compiler:
         if node[1] in self.builtin_identifiers:
             return self.builtin_identifiers[node[1]]
         return ["self._get('%s')" % node[1]]
+
+    def _ll_const_(self, rule, node):
+        if node[1] == 'false':
+            return 'False'
+        if node[1] == 'null':
+            return 'None'
+        if node[1] == 'true':
+            return 'True'
+        if node[1] == 'Infinity':
+            return "float('inf')"
+        if node[1] == 'NaN':
+            return "float('NaN')"
+        assert False

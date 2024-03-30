@@ -196,12 +196,9 @@ def _interpret_grammar(host, args, grammar):
         host.print(err, file=host.stderr)
         return 1
 
-    if out is None:
-        out = ''
-    if not isinstance(out, str):
-        out = json.dumps(out, indent=2, sort_keys=True)
+    out = json.dumps(out, indent=2, sort_keys=True)
 
-    _write(host, args.output, out)
+    _write(host, args.output, out + '\n')
     return 0
 
 
