@@ -15,6 +15,7 @@
 from floyd.analyzer import Analyzer
 from floyd.compiler import Compiler
 from floyd.parser import Parser
+from floyd.printer import Printer
 
 
 def parse(
@@ -47,8 +48,7 @@ class CompiledParser:
         ast, err, _ = parser.parse()
         if err:
             return None, err
-        grammar, err = Analyzer().analyze(ast)
-        assert err is None  # .analyze() can't fail given a legal ast.
+        grammar = Analyzer().analyze(ast)
 
         comp = Compiler(grammar, 'Parser', main_wanted=False, memoize=memoize)
         compiled_text, err = comp.compile()
@@ -68,4 +68,9 @@ class CompiledParser:
 
 
 def pretty_print(grammar):
-    raise NotImplementedError
+    parser = Parser(grammar, '<string>')
+    ast, err, _ = parser.parse()
+    if err:
+        return None, err
+    grammar = Analyzer().analyze(ast)
+    return Printer(grammar).dumps(), None

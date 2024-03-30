@@ -42,3 +42,13 @@ class APITest(unittest.TestCase):
         obj, err = floyd.parse('grammar =', '')
         self.assertEqual(obj, None)
         self.assertEqual(err, 'Error compiling grammar.')
+
+    def test_pretty_print(self):
+        s, err = floyd.pretty_print('grammar = end')
+        self.assertIsNone(err)
+        self.assertEqual(s, 'grammar = end\n')
+
+    def test_pretty_print_fails(self):
+        s, err = floyd.pretty_print('gram')
+        self.assertIsNone(s)
+        self.assertEqual(err, '<string>:1 Unexpected end of input at column 5')

@@ -29,16 +29,9 @@ class Analyzer:
     def analyze(self, ast):
         if ast[0] != 'rules':
             ast = ['rules', ast]
-        ast, err = self._check_ast_is_a_list_of_rules(ast)
-        if err:
-            return None, err
+        assert ast[0] == 'rules' and any(n[0] == 'rule' for n in ast[1])
         ast = self.rewrite_singles(ast)
-        return Grammar(ast), None
-
-    def _check_ast_is_a_list_of_rules(self, ast):
-        if ast[0] != 'rules' or any(n[0] != 'rule' for n in ast[1]):
-            return None, 'malformed ast'
-        return ast, None
+        return Grammar(ast)
 
     def rewrite_singles(self, node):
         if node[0] == 'rules':
