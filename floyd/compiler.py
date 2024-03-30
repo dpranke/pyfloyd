@@ -35,7 +35,6 @@ IN = Whitespace.Indent
 NL = Whitespace.Newline
 OI = Whitespace.OptionalIndent
 OU = Whitespace.OptionalUnindent
-SI = Whitespace.SpaceOrIndent
 SN = Whitespace.SpaceOrNewline
 UN = Whitespace.Unindent
 
@@ -303,13 +302,6 @@ _DEFAULT_FUNCTIONS = {
 }
 
 
-_DEFAULT_IDENTIFIERS = {
-    'null': 'None',
-    'true': 'True',
-    'false': 'False',
-}
-
-
 _DEFAULT_RULES = {
     'anything': d("""\
         def _anything_(self):
@@ -340,7 +332,6 @@ class Compiler:
             self.header = _DEFAULT_HEADER
             self.footer = _DEFAULT_FOOTER
         self.builtin_functions = _DEFAULT_FUNCTIONS
-        self.builtin_identifiers = _DEFAULT_IDENTIFIERS
         self.builtin_rules = _DEFAULT_RULES
         self.memoize = memoize
 
@@ -494,13 +485,6 @@ class Compiler:
                         lines.append(self._indent(s))
                         self._depth -= 1
                         s = ''
-                elif el == SI:
-                    if i == 0:
-                        s += ' '
-                    else:
-                        lines.append(self._indent(s))
-                        self._depth += 1
-                        s = ''
                 elif el == SN:
                     if i == 0:
                         s += ' '
@@ -536,24 +520,6 @@ class Compiler:
             if isinstance(n, list) and self._has_labels(n):
                 return True
         return False
-
-    def _rule_can_fail(self, node):
-        if node[0] == 'post':
-            if node[2] in ('?', '*'):
-                return False
-            return True
-        if node[0] == 'label':
-            return self._rule_can_fail(node[1])
-        if node[0] in ('choice', 'seq'):
-            if any(self._rule_can_fail(n) for n in node[1]):
-                return True
-            return False
-        if node[0] == 'apply':
-            if node[1] in self.grammar.rules:
-                return self._rule_can_fail(self.grammar.rules[node[1]])
-            # This must be a builtin, and all of the builtin rules can fail.
-            return True
-        return True
 
     def _chain(self, name, args):
         obj = ['self._', name, '(', IN, '[', IN]
@@ -591,12 +557,6 @@ class Compiler:
         self._chain('seq', sub_rules)
         if needs_scope:
             self._flatten(["self._pop('", rule, "')"])
-
-    def _apply_(self, _rule, node):
-        sub_rule = node[1]
-        if sub_rule not in self.grammar.rules:
-            self._builtin_rules_needed.add(sub_rule)
-        self._flatten(['self._', sub_rule, '_()'])
 
     def _lit_(self, _rule, node):
         self._expect_needed = True
@@ -736,8 +696,6 @@ class Compiler:
         if node[1] in self.builtin_functions:
             self._builtin_functions_needed.add(node[1])
             return ['self._%s' % node[1]]
-        if node[1] in self.builtin_identifiers:
-            return self.builtin_identifiers[node[1]]
         return ["self._get('%s')" % node[1]]
 
     def _ll_const_(self, rule, node):
@@ -749,6 +707,5 @@ class Compiler:
             return 'True'
         if node[1] == 'Infinity':
             return "float('inf')"
-        if node[1] == 'NaN':
-            return "float('NaN')"
-        assert False
+        assert node[1] == 'NaN'
+        return "float('NaN')"
