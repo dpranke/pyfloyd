@@ -14,22 +14,21 @@
 
 from floyd.analyzer import Analyzer
 from floyd.compiler import Compiler
-from floyd.interpreter import Interpreter
 from floyd.parser import Parser
 
 
 def parse(
-    grammar, input, grammar_path='<string>', path='<string>', memoize=False
+    grammar, text, grammar_path='<string>', path='<string>', memoize=False
 ):
-    """Match an input string against the specified grammar."""
-    c, err = compile(grammar, grammar_path, memoize=memoize)
+    """Match an input text against the specified grammar."""
+    c, err = compile_parser(grammar, grammar_path, memoize=memoize)
     if err:
         return c, err
-    val, err = c.parse(input, path)
+    val, err = c.parse(text, path)
     return val, err
 
 
-def compile(grammar, path='<string>', memoize=False):
+def compile_parser(grammar, path='<string>', memoize=False):
     p = CompiledParser()
     _, err = p.compile(grammar, path=path, memoize=memoize)
     if err:
@@ -42,9 +41,9 @@ class CompiledParser:
         self.parser_cls = None
         self.grammar_obj = None
 
-    def compile(self, input, path='<string>', memoize=False):
+    def compile(self, grammar, path='<string>', memoize=False):
         scope = {}
-        parser = Parser(input, path)
+        parser = Parser(grammar, path)
         ast, err, _ = parser.parse()
         if err:
             return None, err
@@ -57,13 +56,13 @@ class CompiledParser:
 
         try:
             exec(compiled_text, scope)  # pylint: disable=exec-used
-        except Exception as e:
+        except Exception:
             return None, 'Error compiling grammar.'
         self.parser_cls = scope['Parser']
         return None, None
 
-    def parse(self, input, path='<string>'):
-        parser = self.parser_cls(input, path)
+    def parse(self, text, path='<string>'):
+        parser = self.parser_cls(text, path)
         obj, err, _ = parser.parse()
         return obj, err
 

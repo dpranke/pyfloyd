@@ -12,10 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import io
 import math
 import pathlib
-import textwrap
 import unittest
 import json
 
@@ -28,18 +26,18 @@ THIS_DIR = pathlib.Path(__file__).parent
 class GrammarTest(unittest.TestCase):
     maxDiff = None
 
-    def check(self, grammar, input, output=None, error=None):
+    def check(self, grammar, text, output=None, error=None):
         assert output or error
 
         host = floyd.host.Host()
-        if host.exists(THIS_DIR / input):
-            input = host.read_text_file(THIS_DIR / input)
+        if host.exists(THIS_DIR / text):
+            text = host.read_text_file(THIS_DIR / text)
         if output:
             if host.exists(THIS_DIR / output):
                 output = host.read_text_file(THIS_DIR / output)
             expected_obj = json.loads(output)
 
-        actual_obj, actual_err = grammar.parse(input)
+        actual_obj, actual_err = grammar.parse(text)
         if error:
             self.assertEqual(error, actual_err)
         else:
@@ -47,7 +45,7 @@ class GrammarTest(unittest.TestCase):
 
     def test_json5(self):
         h = floyd.host.Host()
-        g, _ = floyd.compile(
+        g, _ = floyd.compile_parser(
             h.read_text_file(THIS_DIR / '../grammars/json5.g'),
             path=str(THIS_DIR / '../grammars/json5.g'),
         )

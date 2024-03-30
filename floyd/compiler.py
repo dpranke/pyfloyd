@@ -558,7 +558,8 @@ class Compiler:
         if needs_scope:
             self._flatten(["self._pop('", rule, "')"])
 
-    def _lit_(self, _rule, node):
+    def _lit_(self, rule, node):
+        del rule
         self._expect_needed = True
         expr = string_literal.encode(node[1])
         if len(node[1]) == 1:
@@ -584,8 +585,9 @@ class Compiler:
         obj = self._eval_rule(rule, node[1])
         self._flatten(['self._succeed(', OI, obj, OU, ')'])
 
-    def _empty_(self, _rule, _node):
-        return
+    def _empty_(self, rule, node):
+        del rule
+        del node
 
     def _not_(self, rule, node):
         sub_rule = self._compile(node[1], rule + '_n')
@@ -626,7 +628,8 @@ class Compiler:
             ]
         )
 
-    def _range_(self, _rule, node):
+    def _range_(self, rule, node):
+        del rule
         self._range_needed = True
         self._flatten(
             [
@@ -660,13 +663,15 @@ class Compiler:
         line.extend([OU, ')'])
         return line
 
-    def _ll_getattr_(self, _rule, node):
+    def _ll_getattr_(self, rule, node):
+        del rule
         return '.' + node[1]
 
     def _ll_getitem_(self, rule, node):
         return ['['] + self._eval_rule(rule, node[1]) + [']']
 
-    def _ll_lit_(self, _rule, node):
+    def _ll_lit_(self, rule, node):
+        del rule
         return [string_literal.encode(node[1])]
 
     def _ll_minus_(self, rule, node):
@@ -676,7 +681,8 @@ class Compiler:
             + self._eval_rule(rule, node[2])
         )
 
-    def _ll_num_(self, _rule, node):
+    def _ll_num_(self, rule, node):
+        del rule
         return [node[1]]
 
     def _ll_plus_(self, rule, node):
@@ -692,13 +698,15 @@ class Compiler:
             v += self._eval_rule(rule, p)
         return [v]
 
-    def _ll_var_(self, _rule, node):
+    def _ll_var_(self, rule, node):
+        del rule
         if node[1] in self.builtin_functions:
             self._builtin_functions_needed.add(node[1])
             return ['self._%s' % node[1]]
         return ["self._get('%s')" % node[1]]
 
     def _ll_const_(self, rule, node):
+        del rule
         if node[1] == 'false':
             return 'False'
         if node[1] == 'null':
