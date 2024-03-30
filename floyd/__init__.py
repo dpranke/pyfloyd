@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""A parser generator and interpreter framework for Python."""
+"""A parsing framework and parser generator for Python."""
 
 from floyd.api import parse, compile_parser, pretty_print
 from floyd.version import __version__

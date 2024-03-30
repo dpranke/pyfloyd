@@ -1,6 +1,6 @@
 # floyd-python
 
-A parser generator and interpreter framework for Python.
+A parsing framework and parser generator for Python.
 
 **Note the Python package name is `floyd`, not `floyd-python`.
 `floyd-python` is the name on PyPI.**
