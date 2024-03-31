@@ -6,8 +6,8 @@ ws          = '\x20' | '\x09' | eol | comment
 
 eol         = '\x0D' '\x0A' | '\x0D' | '\x0A'
 
-comment     = '//' (~eol anything)* 
-            | '/*' (~'*/' anything)* '*/'
+comment     = '//' (~eol any)*
+            | '/*' (~'*/' any)* '*/'
 
 rule        = ident:i sp '=' sp choice:cs sp ','? -> ['rule', i, cs]
 
@@ -42,10 +42,10 @@ lit         = squote sqchar*:cs squote            -> ['lit', cat(cs)]
             | dquote dqchar*:cs dquote            -> ['lit', cat(cs)]
 
 sqchar      = bslash esc_char:c                   -> c
-            | ~squote anything:c                  -> c
+            | ~squote any:c                       -> c
 
 dqchar      = bslash esc_char:c                   -> c
-            | ~dquote anything:c                  -> c
+            | ~dquote any:c                       -> c
 
 bslash      = '\x5C'
 

@@ -171,6 +171,9 @@ class Parser:
         self._star(self._grammar__s0_l_p_)
 
     def _grammar__s0_l_p_(self):
+        (self._grammar__s0_l_p_g_)()
+
+    def _grammar__s0_l_p_g_(self):
         self._seq(
             [
                 self._sp_,
@@ -243,14 +246,17 @@ class Parser:
         self._star(self._comment__c0__s1_p_)
 
     def _comment__c0__s1_p_(self):
+        (self._comment__c0__s1_p_g_)()
+
+    def _comment__c0__s1_p_g_(self):
         self._seq(
             [
-                self._comment__c0__s1_p__s0_,
-                self._anything_,
+                self._comment__c0__s1_p_g__s0_,
+                self._any_,
             ]
         )
 
-    def _comment__c0__s1_p__s0_(self):
+    def _comment__c0__s1_p_g__s0_(self):
         self._not(self._eol_)
 
     def _comment__c1_(self):
@@ -266,14 +272,17 @@ class Parser:
         self._star(self._comment__c1__s1_p_)
 
     def _comment__c1__s1_p_(self):
+        (self._comment__c1__s1_p_g_)()
+
+    def _comment__c1__s1_p_g_(self):
         self._seq(
             [
-                self._comment__c1__s1_p__s0_,
-                self._anything_,
+                self._comment__c1__s1_p_g__s0_,
+                self._any_,
             ]
         )
 
-    def _comment__c1__s1_p__s0_(self):
+    def _comment__c1__s1_p_g__s0_(self):
         self._not(lambda: self._str('*/'))
 
     def _rule_(self):
@@ -374,6 +383,9 @@ class Parser:
         self._star(self._choice__s1_l_p_)
 
     def _choice__s1_l_p_(self):
+        (self._choice__s1_l_p_g_)()
+
+    def _choice__s1_l_p_g_(self):
         self._seq(
             [
                 self._sp_,
@@ -415,6 +427,9 @@ class Parser:
         self._star(self._seq__c0__s1_l_p_)
 
     def _seq__c0__s1_l_p_(self):
+        (self._seq__c0__s1_l_p_g_)()
+
+    def _seq__c0__s1_l_p_g_(self):
         self._seq(
             [
                 self._ws_,
@@ -759,7 +774,7 @@ class Parser:
         self._not(self._squote_)
 
     def _sqchar__c1__s1_(self):
-        self._bind(self._anything_, 'c')
+        self._bind(self._any_, 'c')
 
     def _sqchar__c1__s2_(self):
         self._succeed(self._get('c'))
@@ -804,7 +819,7 @@ class Parser:
         self._not(self._dquote_)
 
     def _dqchar__c1__s1_(self):
-        self._bind(self._anything_, 'c')
+        self._bind(self._any_, 'c')
 
     def _dqchar__c1__s2_(self):
         self._succeed(self._get('c'))
@@ -1116,6 +1131,9 @@ class Parser:
         self._star(self._ll_exprs__c0__s1_l_p_)
 
     def _ll_exprs__c0__s1_l_p_(self):
+        (self._ll_exprs__c0__s1_l_p_g_)()
+
+    def _ll_exprs__c0__s1_l_p_g_(self):
         self._seq(
             [
                 self._sp_,
@@ -1498,7 +1516,7 @@ class Parser:
     def _digit_(self):
         self._range('0', '9')
 
-    def _anything_(self):
+    def _any_(self):
         if self.pos < self.end:
             self._succeed(self.msg[self.pos], self.pos + 1)
         else:
