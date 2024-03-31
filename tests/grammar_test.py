@@ -46,32 +46,40 @@ class FloydTest(unittest.TestCase):
 class GrammarTest(unittest.TestCase):
     maxDiff = None
 
-    def check(self, grammar, inp, out=None, err=None):
+    def check(self, grammar, text, out=None, err=None):
         p, err = floyd.compile_parser(grammar)
         self.assertIsNone(err)
-        actual_out, actual_err = p.parse(inp)
+        actual_out, actual_err = p.parse(text)
         self.assertEqual(out, actual_out)
         self.assertEqual(err, actual_err)
 
     def test_any_fails(self):
         p, err = floyd.compile_parser("grammar = '")
-        self.assertEqual(err, '<string>:1 Unexpected end of input at column 12')
+        self.assertEqual(
+            err, '<string>:1 Unexpected end of input at column 12'
+        )
         self.assertIsNone(p)
 
     def test_c_style_comment(self):
-        self.check('grammar = /* foo */ end -> true', inp='', out=True)
+        self.check('grammar = /* foo */ end -> true', text='', out=True)
 
     def test_cpp_style_comment(self):
-        self.check(textwrap.dedent("""\
+        self.check(
+            """\
             grammar = // ignore this line
                       end -> true
-            """), inp='', out=True)
+            """,
+            text='',
+            out=True,
+        )
 
     def test_error_on_second_line(self):
-        p, err = floyd.compile_parser(textwrap.dedent("""\
+        p, err = floyd.compile_parser(
+            textwrap.dedent("""\
             grammar = 'foo'
                       4
-            """))
+            """)
+        )
         self.assertIsNone(p)
         self.assertEqual(err, '<string>:2 Unexpected "4" at column 11')
 
@@ -82,35 +90,34 @@ class GrammarTest(unittest.TestCase):
 
     def test_escapes_in_string(self):
         self.check(
-            'grammar = "\\n\\\'\\\"foo" -> true',
-            inp = '\n\'"foo',
-            out=True
+            'grammar = "\\n\\\'\\"foo" -> true', text='\n\'"foo', out=True
         )
 
     def test_hex_digits_in_value(self):
-        self.check('grammar = -> 0x20', inp='', out=32)
+        self.check('grammar = -> 0x20', text='', out=32)
 
     def test_lit_str(self):
-        self.check("grammar = ('foo')* -> true", inp='foofoo', out=True)
+        self.check("grammar = ('foo')* -> true", text='foofoo', out=True)
 
     def test_long_unicode_literals(self):
-        self.check("grammar = '\\U00000020' -> true", inp=' ', out=True)
+        self.check("grammar = '\\U00000020' -> true", text=' ', out=True)
 
     def test_optional_comma(self):
-        self.check('grammar = end -> true,', inp='', out=True)
+        self.check('grammar = end -> true,', text='', out=True)
 
     def test_paren_in_value(self):
-        self.check('grammar = -> (true)', inp='', out=True)
+        self.check('grammar = -> (true)', text='', out=True)
 
     def test_rule_with_lit_str(self):
-        self.check(textwrap.dedent("""\
-                grammar = foo* -> true
-                foo     = 'foo'
-                """
-            ),
-            inp='foofoo',
-            out=True
+        self.check(
+            """\
+            grammar = foo* -> true
+            foo     = 'foo'
+            """,
+            text='foofoo',
+            out=True,
         )
+
 
 class JSON5Test(unittest.TestCase):
     def check(self, host, grammar, text, output=None, error=None):
@@ -154,4 +161,3 @@ class JSON5Test(unittest.TestCase):
         self.check(
             h, g, '[1', error='<string>:1 Unexpected end of input at column 3'
         )
-
