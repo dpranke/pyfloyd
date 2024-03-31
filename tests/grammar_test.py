@@ -47,7 +47,7 @@ class GrammarTest(unittest.TestCase):
     maxDiff = None
 
     def check(self, grammar, text, out=None, err=None):
-        p, err = floyd.compile_parser(grammar)
+        p, err = floyd.compile_parser(textwrap.dedent(grammar))
         self.assertIsNone(err)
         actual_out, actual_err = p.parse(text)
         self.assertEqual(out, actual_out)
