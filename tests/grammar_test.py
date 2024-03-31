@@ -87,18 +87,22 @@ class GrammarTest(unittest.TestCase):
         )
 
     def test_rule_with_lit_str(self):
-        p, err = floyd.compile_parser(textwrap.dedent("""\
+        p, err = floyd.compile_parser(
+            textwrap.dedent("""\
             grammar = foo* -> true
             foo     = 'foo'
-            """))
+            """)
+        )
         out, err = p.parse('foofoo')
         self.assertEqual(out, True)
         self.assertIsNone(err)
 
     def test_lit_str(self):
-        p, err = floyd.compile_parser(textwrap.dedent("""\
+        p, err = floyd.compile_parser(
+            textwrap.dedent("""\
             grammar = ('foo')* -> true
-            """))
+            """)
+        )
         out, err = p.parse('foofoo')
         self.assertEqual(out, True)
         self.assertIsNone(err)

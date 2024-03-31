@@ -70,7 +70,7 @@ class ToolTest(unittest.TestCase):
         d = host.mkdtemp()
         try:
             path = d + '/grammar.g'
-            host.write_text_file( path, "grammar = 'foo'* -> true\n")
+            host.write_text_file(path, "grammar = 'foo'* -> true\n")
             ret = floyd.tool.main(['-c', path], host)
             f = host.read_text_file(d + '/grammar.py')
             scope = {}
@@ -83,7 +83,6 @@ class ToolTest(unittest.TestCase):
             self.assertEqual(endpos, 6)
         finally:
             host.rmtree(d)
-
 
     def test_interpret_file(self):
         host = FakeHost()
