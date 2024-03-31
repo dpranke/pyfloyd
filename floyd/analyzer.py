@@ -43,7 +43,7 @@ class Analyzer:
                 return self.rewrite_singles(node[1][0])
             return [node[0], [self.rewrite_singles(n) for n in node[1]]]
         if node[0] == 'paren':
-            return self.rewrite_singles(node[1])
+            return [node[0], self.rewrite_singles(node[1])]
         if node[0] in ('label', 'post'):
             return [node[0], self.rewrite_singles(node[1]), node[2]]
         return node

@@ -1,128 +1,134 @@
-grammar        = sp value:v sp end                    -> v
+grammar        = sp value:v sp end                       -> v
 
 sp             = ws*
 
-ws             = '\u0020' | eol | comment
-               | '\u0009' | '\u000B' | '\u000C' | '\u00A0' | '\uFEFF'
-               | ~~(anything:x ?( is_unicat(x, 'Zs') )) anything:x -> x
+ws             = ' '
+               | eol
+               | comment
+               | '\t'
+               | '\v'
+               | '\f'
+               | '\xa0'
+               | '\ufeff'
+               | ~~(any:x ?(is_unicat(x, 'Zs'))) any:x   -> x
 
-eol            = '\u000D' '\u000A' | '\u000D' | '\u000A'
-               | '\u2028' | '\u2029'
+eol            = '\r' '\n'
+               | '\r'
+               | '\n'
+               | '\u2028'
+               | '\u2029'
 
-comment        = '//' (~eol anything)*
-               | '/*' (~'*/' anything)* '*/'
+comment        = '//' (~eol any)*
+               | '/*' (~'*/' any)* '*/'
 
-value          = 'null'                               -> null
-               | 'true'                               -> true
-               | 'false'                              -> false
-               | num_literal:v                        -> v
-               | object:v                             -> v
-               | array:v                              -> v
-               | string:v                             -> v
+value          = 'null'                                  -> null
+               | 'true'                                  -> true
+               | 'false'                                 -> false
+               | num_literal:v                           -> v
+               | object:v                                -> v
+               | array:v                                 -> v
+               | string:v                                -> v
 
-object         = '{' sp member_list:v sp '}'          -> dict(v)
-               | '{' sp '}'                           -> dict([])
+object         = '{' sp member_list:v sp '}'             -> dict(v)
+               | '{' sp '}'                              -> dict([])
 
-array          = '[' sp element_list:v sp ']'         -> v
-               | '[' sp ']'                           -> []
+array          = '[' sp element_list:v sp ']'            -> v
+               | '[' sp ']'                              -> []
 
-string         = squote sqchar*:cs squote             -> join('', cs)
-               | dquote dqchar*:cs dquote             -> join('', cs)
+string         = squote sqchar*:cs squote                -> join('', cs)
+               | dquote dqchar*:cs dquote                -> join('', cs)
 
-sqchar         = bslash esc_char:c                    -> c
-               | bslash eol                           -> ''
-               | ~bslash ~squote ~eol anything:c      -> c
+sqchar         = bslash esc_char:c                       -> c
+               | bslash eol                              -> ''
+               | ~bslash ~squote ~eol any:c              -> c
 
-dqchar         = bslash esc_char:c                    -> c
-               | bslash eol                           -> ''
-               | ~bslash ~dquote ~eol anything:c      -> c
+dqchar         = bslash esc_char:c                       -> c
+               | bslash eol                              -> ''
+               | ~bslash ~dquote ~eol any:c              -> c
 
-bslash         = '\u005C'
+bslash         = '\\'
 
-squote         = '\u0027'
+squote         = "'"
 
-dquote         = '\u0022'
+dquote         = '"'
 
-esc_char       = 'b'                                 -> '\u0008'
-               | 'f'                                 -> '\u000C'
-               | 'n'                                 -> '\u000A'
-               | 'r'                                 -> '\u000D'
-               | 't'                                 -> '\u0009'
-               | 'v'                                 -> '\u000B'
-               | squote                              -> '\u0027'
-               | dquote                              -> '\u0022'
-               | bslash                              -> '\u005C'
-               | ~('x'|'u'|digit|eol) anything:c     -> c
-               | '0' ~digit                          -> '\u0000'
-               | hex_esc:c                           -> c
-               | unicode_esc:c                       -> c
+esc_char       = 'b'                                     -> '\b'
+               | 'f'                                     -> '\f'
+               | 'n'                                     -> '\n'
+               | 'r'                                     -> '\r'
+               | 't'                                     -> '\t'
+               | 'v'                                     -> '\v'
+               | squote                                  -> "'"
+               | dquote                                  -> '"'
+               | bslash                                  -> '\\'
+               | ~('x' | 'u' | digit | eol) any:c        -> c
+               | '0' ~digit                              -> '\x00'
+               | hex_esc:c                               -> c
+               | unicode_esc:c                           -> c
 
-hex_esc        = 'x' hex:h1 hex:h2                   -> xtou(h1 + h2)
+hex_esc        = 'x' hex:h1 hex:h2                       -> xtou(h1 + h2)
 
-unicode_esc    = 'u' hex:a hex:b hex:c hex:d         -> xtou(a + b + c + d)
+unicode_esc    = 'u' hex:a hex:b hex:c hex:d             -> xtou(a + b + c + d)
 
 element_list   = value:v (sp ',' sp value)*:vs sp ','?   -> [v] + vs
 
 member_list    = member:m (sp ',' sp member)*:ms sp ','? -> [m] + ms
 
-member         = string:k sp ':' sp value:v          -> [k, v]
-               | ident:k sp ':' sp value:v           -> [k, v]
+member         = string:k sp ':' sp value:v              -> [k, v]
+               | ident:k sp ':' sp value:v               -> [k, v]
 
-ident          = id_start:hd id_continue*:tl         -> join('', [hd] + tl)
+ident          = id_start:hd id_continue*:tl             -> join('', [hd] + tl)
 
 id_start       = ascii_id_start
                | other_id_start
                | bslash unicode_esc
 
-ascii_id_start = 'a'..'z'
-               | 'A'..'Z'
-               | '$'
-               | '_'
+ascii_id_start = 'a'..'z' | 'A'..'Z' | '$' | '_'
 
-other_id_start = anything:x ?(is_unicat(x, 'Ll'))    -> x
-               | anything:x ?(is_unicat(x, 'Lm'))    -> x
-               | anything:x ?(is_unicat(x, 'Lo'))    -> x
-               | anything:x ?(is_unicat(x, 'Lt'))    -> x
-               | anything:x ?(is_unicat(x, 'Lu'))    -> x
-               | anything:x ?(is_unicat(x, 'Nl'))    -> x
+other_id_start = any:x ?(is_unicat(x, 'Ll'))             -> x
+               | any:x ?(is_unicat(x, 'Lm'))             -> x
+               | any:x ?(is_unicat(x, 'Lo'))             -> x
+               | any:x ?(is_unicat(x, 'Lt'))             -> x
+               | any:x ?(is_unicat(x, 'Lu'))             -> x
+               | any:x ?(is_unicat(x, 'Nl'))             -> x
 
 id_continue    = ascii_id_start
                | digit
                | other_id_start
-               | anything:x ?(is_unicat(x, 'Mn'))    -> x
-               | anything:x ?(is_unicat(x, 'Mc'))    -> x
-               | anything:x ?(is_unicat(x, 'Nd'))    -> x
-               | anything:x ?(is_unicat(x, 'Pc'))    -> x
+               | any:x ?(is_unicat(x, 'Mn'))             -> x
+               | any:x ?(is_unicat(x, 'Mc'))             -> x
+               | any:x ?(is_unicat(x, 'Nd'))             -> x
+               | any:x ?(is_unicat(x, 'Pc'))             -> x
                | bslash unicode_esc
-               | '\u200C'
-               | '\u200D'
+               | '\u200c'
+               | '\u200d'
 
-num_literal    = '-' num_literal:n                   -> 0 - n
-               | '+' num_literal:n                   -> float(n)
-               | dec_literal:d ~id_start             -> float(d) 
-               | hex_literal:h                       -> hex(h)
-               | 'Infinity'                          -> Infinity
-               | 'NaN'                               -> NaN
+num_literal    = '-' num_literal:n                       -> 0 - n
+               | '+' num_literal:n                       -> float(n)
+               | dec_literal:d ~id_start                 -> float(d)
+               | hex_literal:h                           -> hex(h)
+               | 'Infinity'                              -> Infinity
+               | 'NaN'                                   -> NaN
 
-dec_literal    = dec_int_lit:d frac:f exp:e          -> d + f + e
-               | dec_int_lit:d frac:f                -> d + f
-               | dec_int_lit:d exp:e                 -> d + e
-               | dec_int_lit:d                       -> d
-               | frac:f exp:e                        -> f + e
-               | frac:f                              -> f
+dec_literal    = dec_int_lit:d frac:f exp:e              -> d + f + e
+               | dec_int_lit:d frac:f                    -> d + f
+               | dec_int_lit:d exp:e                     -> d + e
+               | dec_int_lit:d                           -> d
+               | frac:f exp:e                            -> f + e
+               | frac:f                                  -> f
 
-dec_int_lit    = '0' ~digit                          -> '0'
-               | nonzerodigit:d digit*:ds            -> d + join('', ds)
+dec_int_lit    = '0' ~digit                              -> '0'
+               | nonzerodigit:d digit*:ds                -> d + join('', ds)
 
 digit          = '0'..'9'
 
 nonzerodigit   = '1'..'9'
 
-hex_literal    = ('0x' | '0X') hex+:hs               -> '0x' + join('', hs)
+hex_literal    = ('0x' | '0X') hex+:hs                   -> '0x' + join('', hs)
 
 hex            = 'a'..'f' | 'A'..'F' | digit
 
-frac           = '.' digit*:ds                       -> '.' + join('', ds)
+frac           = '.' digit*:ds                           -> '.' + join('', ds)
 
-exp            = ('e' | 'E') ('+' | '-'):s digit*:ds -> 'e' + s + join('', ds)
-               | ('e' | 'E') digit*:ds               -> 'e' + join('', ds)
+exp            = ('e' | 'E') ('+' | '-'):s digit*:ds     -> 'e' + s + join('', ds)
+               | ('e' | 'E') digit*:ds                   -> 'e' + join('', ds)

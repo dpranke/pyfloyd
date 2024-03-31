@@ -106,6 +106,9 @@ class Printer:
     def _ll_lit_(self, node):
         return self._lit_(node)
 
+    def _ll_minus_(self, node):
+        return '%s - %s' % (self._proc(node[1]), self._proc(node[2]))
+
     def _ll_num_(self, node):
         return str(node[1])
 
@@ -134,10 +137,6 @@ class Printer:
 
     def _seq_(self, node):
         return ' '.join(self._proc(e) for e in node[1])
-
-    def _sp_(self, node):
-        del node
-        return ' '
 
     def _paren_(self, node):
         return '(' + self._proc(node[1]) + ')'

@@ -303,8 +303,8 @@ _DEFAULT_FUNCTIONS = {
 
 
 _DEFAULT_RULES = {
-    'anything': d("""\
-        def _anything_(self):
+    'any': d("""\
+        def _any_(self):
             if self.pos < self.end:
                 self._succeed(self.msg[self.pos], self.pos + 1)
             else:
