@@ -48,8 +48,9 @@ class ToolTest(unittest.TestCase):
         self.assertEqual(ret, 1)
         self.assertEqual(host.stdout.getvalue(), '')
         self.assertEqual(
-            host.stderr.getvalue(), 
-            'grammar.g:1 Unexpected end of input at column 4\n')
+            host.stderr.getvalue(),
+            'grammar.g:1 Unexpected end of input at column 4\n',
+        )
 
     def test_help(self):
         proc = subprocess.run(
@@ -61,15 +62,15 @@ class ToolTest(unittest.TestCase):
         self.assertEqual(proc.returncode, 0)
         self.assertNotEqual(proc.stdout, '')
 
-    def test_usage(self):
+    def test_interpret_file(self):
         host = FakeHost()
-        # This should fail because we're not specifying a grammar.
-        self.assertEqual(floyd.tool.main([], host=host), 2)
-
-    def test_version(self):
-        host = FakeHost()
-        self.assertEqual(floyd.tool.main(['--version'], host=host), 0)
-        self.assertEqual(host.stdout.getvalue(), floyd.__version__ + '\n')
+        host.files['grammar.g'] = 'grammar = "Hello" end -> true'
+        host.files['input.txt'] = 'Hello'
+        self.assertEqual(
+            floyd.tool.main(['-i', 'input.txt', 'grammar.g'], host), 0
+        )
+        self.assertEqual(host.stdout.getvalue(), 'true\n')
+        self.assertEqual(host.stderr.getvalue(), '')
 
     def test_interpret(self):
         host = FakeHost()
@@ -81,23 +82,71 @@ class ToolTest(unittest.TestCase):
         self.assertEqual(host.stderr.getvalue(), '')
         self.assertEqual(host.stdout.getvalue(), 'true\n')
 
-    def test_interpret_error(self):
+    def test_interpret_grammar_error(self):
         host = FakeHost()
         host.write_text_file('grammar.g', 'xyz')
-        ret = floyd.tool.main(['-p', 'grammar.g'], host=host)
+        ret = floyd.tool.main(['grammar.g'], host=host)
         self.assertEqual(ret, 1)
         self.assertEqual(host.stdout.getvalue(), '')
         self.assertEqual(
-            host.stderr.getvalue(), 
-            'grammar.g:1 Unexpected end of input at column 4\n')
+            host.stderr.getvalue(),
+            'grammar.g:1 Unexpected end of input at column 4\n',
+        )
+
+    def test_interpret_input_error(self):
+        host = FakeHost()
+        host.files['grammar.g'] = 'grammar = "Hello" end -> true'
+        host.stdin.write('Hell')
+        host.stdin.seek(0)
+        self.assertEqual(floyd.tool.main(['grammar.g'], host), 1)
+        self.assertEqual(host.stdout.getvalue(), '')
+        self.assertEqual(
+            host.stderr.getvalue(),
+            '<stdin>:1 Unexpected end of input at column 5\n',
+        )
+
+    def test_keyboard_interrupt(self):
+        host = FakeHost()
+        host.files['grammar.g'] = ''
+
+        def _error_on_read(path):
+            raise KeyboardInterrupt
+
+        host.read_text_file = _error_on_read
+        self.assertEqual(floyd.tool.main(['grammar.g'], host), 130)
+        self.assertEqual(host.stdout.getvalue(), '')
+        self.assertEqual(host.stderr.getvalue(), 'Interrupted, exiting.\n')
+
+    def test_missing_grammar(self):
+        host = FakeHost()
+        self.assertEqual(floyd.tool.main(['grammar.g'], host), 1)
+        self.assertEqual(host.stdout.getvalue(), '')
+        self.assertEqual(
+            host.stderr.getvalue(), 'Error: no such file: "grammar.g"\n'
+        )
+
+    def test_read_error(self):
+        host = FakeHost()
+        host.files['grammar.g'] = ''
+
+        def _error_on_read(path):
+            raise IOError('read error')
+
+        host.read_text_file = _error_on_read
+        self.assertEqual(floyd.tool.main(['grammar.g'], host), 1)
+        self.assertEqual(host.stdout.getvalue(), '')
+        self.assertEqual(
+            host.stderr.getvalue(), 'Error reading "grammar.g": read error\n'
+        )
 
     def test_pretty_print(self):
         host = FakeHost()
         host.write_text_file('grammar.g', 'grammar = "Hello"    end -> true')
         ret = floyd.tool.main(['-p', 'grammar.g'], host=host)
         self.assertEqual(ret, 0)
-        self.assertEqual(host.stdout.getvalue(),
-                         "grammar = 'Hello' end -> true\n")
+        self.assertEqual(
+            host.stdout.getvalue(), "grammar = 'Hello' end -> true\n"
+        )
 
     def test_pretty_print_error(self):
         host = FakeHost()
@@ -106,5 +155,16 @@ class ToolTest(unittest.TestCase):
         self.assertEqual(ret, 1)
         self.assertEqual(host.stdout.getvalue(), '')
         self.assertEqual(
-            host.stderr.getvalue(), 
-            'grammar.g:1 Unexpected end of input at column 4\n')
+            host.stderr.getvalue(),
+            'grammar.g:1 Unexpected end of input at column 4\n',
+        )
+
+    def test_usage(self):
+        host = FakeHost()
+        # This should fail because we're not specifying a grammar.
+        self.assertEqual(floyd.tool.main([], host=host), 2)
+
+    def test_version(self):
+        host = FakeHost()
+        self.assertEqual(floyd.tool.main(['--version'], host=host), 0)
+        self.assertEqual(host.stdout.getvalue(), floyd.__version__ + '\n')

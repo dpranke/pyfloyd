@@ -44,4 +44,3 @@ class FakeHost:
     def write_text_file(self, path, contents):
         self.files[path] = contents
         self.written_files[path] = contents
-

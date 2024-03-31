@@ -24,7 +24,8 @@ import sys
 # it's not installed.
 if 'floyd' not in sys.modules and importlib.util.find_spec('floyd') is None:
     sys.path.insert(
-        0, str(pathlib.Path(__file__).parent.parent))  # pragma: no cover
+        0, str(pathlib.Path(__file__).parent.parent)
+    )  # pragma: no cover
 
 # pylint: disable=wrong-import-position
 import floyd
@@ -37,12 +38,12 @@ def main(argv=None, host=None):
     try:
         args, err = _parse_args(host, argv)
         if err is not None:
-            return err 
+            return err
 
         grammar, err = _read_grammar(host, args)
         if err:
             host.print(err, file=host.stderr)
-            return 1 
+            return 1
 
         if args.pretty_print:
             contents, err = floyd.pretty_print(grammar, args.grammar)
@@ -50,13 +51,13 @@ def main(argv=None, host=None):
             contents, err = floyd.generate_parser(
                 grammar,
                 class_name=args.class_name,
-                main=args.main, 
+                main=args.main,
                 memoize=args.memoize,
-                path=args.grammar
+                path=args.grammar,
             )
         else:
             contents, err = _interpret_grammar(host, args, grammar)
-            
+
         if err:
             host.print(err, file=host.stderr)
             return 1
@@ -64,7 +65,7 @@ def main(argv=None, host=None):
         return 0
 
     except KeyboardInterrupt:
-        host.print('Interrupted, exiting ...', file=host.stderr)
+        host.print('Interrupted, exiting.', file=host.stderr)
         return 130  # SIGINT
 
     return 0
@@ -142,17 +143,13 @@ def _parse_args(host, argv):
 
 def _read_grammar(host, args):
     if not host.exists(args.grammar):
-        host.print(
-            'Error: no such file: "%s"' % args.grammar, file=host.stderr
-        )
-        return None, 1
+        return None, 'Error: no such file: "%s"' % args.grammar
 
     try:
         grammar_txt = host.read_text_file(args.grammar)
         return grammar_txt, None
     except Exception as e:
-        host.print('Error: %s' % str(e), file=host.stderr)
-        return None, 1
+        return None, 'Error reading "%s": %s' % (args.grammar, str(e))
 
 
 def _interpret_grammar(host, args, grammar):
@@ -161,7 +158,13 @@ def _interpret_grammar(host, args, grammar):
     else:
         path, contents = (args.input, host.read_text_file(args.input))
 
-    out, err = floyd.parse(grammar, contents, path=path, memoize=args.memoize)
+    out, err = floyd.parse(
+        grammar,
+        contents,
+        grammar_path=args.grammar,
+        path=path,
+        memoize=args.memoize,
+    )
     if err:
         return None, err
 
