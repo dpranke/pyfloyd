@@ -681,6 +681,9 @@ class Compiler:
         del rule
         return [node[1]]
 
+    def _ll_paren_(self, rule, node):
+        return self._eval_rule(rule, node[1])
+
     def _ll_plus_(self, rule, node):
         return (
             self._eval_rule(rule, node[1])

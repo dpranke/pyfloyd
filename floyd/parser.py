@@ -1395,34 +1395,34 @@ class Parser:
         self._push('ll_prim__c6')
         self._seq(
             [
-                self._ll_prim__c6__s0_,
+                lambda: self._str('0x'),
                 self._ll_prim__c6__s1_,
+                self._ll_prim__c6__s2_,
             ]
         )
         self._pop('ll_prim__c6')
 
-    def _ll_prim__c6__s0_(self):
-        self._bind(self._digits_, 'ds')
-
     def _ll_prim__c6__s1_(self):
-        self._succeed(['ll_num', self._get('ds')])
+        self._bind(self._hexdigits_, 'hs')
+
+    def _ll_prim__c6__s2_(self):
+        self._succeed(['ll_num', '0x' + self._get('hs')])
 
     def _ll_prim__c7_(self):
         self._push('ll_prim__c7')
         self._seq(
             [
-                lambda: self._str('0x'),
+                self._ll_prim__c7__s0_,
                 self._ll_prim__c7__s1_,
-                self._ll_prim__c7__s2_,
             ]
         )
         self._pop('ll_prim__c7')
 
-    def _ll_prim__c7__s1_(self):
-        self._bind(self._hexdigits_, 'hs')
+    def _ll_prim__c7__s0_(self):
+        self._bind(self._digits_, 'ds')
 
-    def _ll_prim__c7__s2_(self):
-        self._succeed(['ll_num', '0x' + self._get('hs')])
+    def _ll_prim__c7__s1_(self):
+        self._succeed(['ll_num', self._get('ds')])
 
     def _ll_prim__c8_(self):
         self._push('ll_prim__c8')
