@@ -455,7 +455,6 @@ class Compiler:
         for line in lines[:-1]:
             self._ext(line.rstrip())
 
-        # pylint: disable=fixme
         # TODO: Figure out how to handle blank lines at the end of a method
         # better. There will be a blank line if obj[-1] == UN.
         if lines[-1].rstrip():
