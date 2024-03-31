@@ -92,7 +92,20 @@ class Runner:
             'devenv',
             help='Set up a dev venv at //.venv with all the needed packages.',
         )
-        self.add_parser('coverage', help='Run tests and report code coverage.')
+
+        self.add_parser(
+            'presubmit',
+            help='Run all the steps that should be run prior to commiting.',
+        )
+
+        subp = self.add_parser(
+            'coverage', help='Run tests and report code coverage.'
+        )
+        subp.add_argument(
+            '--check',
+            action='store_true',
+            help='Just check to see if any files would be modified.',
+        )
         self.add_parser('format', help='Format the source code with ruff.')
 
         subp = self.add_parser('help', help='Get help on a subcommand.')
@@ -170,7 +183,10 @@ class Runner:
         print('Run `source .venv/bin/activate` to finish devenv setup.')
 
     def run_format(self):
-        self.call([sys.executable, '-m', 'ruff', 'format'])
+        cmd = [sys.executable, '-m', 'ruff', 'format']
+        if self.args.check:
+            cmd.append('--check')
+        self.call(cmd)
 
     def run_help(self):
         if self.args.subcommand:
@@ -179,6 +195,14 @@ class Runner:
 
     def run_lint(self):
         self.call(sys.executable + ' -m pylint run */*.py', shell=True)
+
+    def run_presubmit(self):
+        self.run_check()
+        self.run_lint()
+        self.run_tests()
+        self.run_coverage()
+        self.args.check = True
+        self.run_format()
 
     def run_publish(self):
         if not self.args.test and not self.args.prod:
