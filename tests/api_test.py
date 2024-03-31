@@ -37,7 +37,7 @@ class APITest(unittest.TestCase):
         txt, err = floyd.generate_parser('grammar = "Hello" end -> true')
         self.assertIsNone(err)
         scope = {}
-        exec(txt, scope)  # pylint: disable=exec-used
+        exec(txt, scope)
         parser_cls = scope['Parser']
         obj, err, _ = parser_cls('Hello', '<string>').parse()
         self.assertIsNone(err)

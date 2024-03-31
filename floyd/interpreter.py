@@ -30,7 +30,7 @@ class Interpreter:
             compiled_text, err = comp.compile()
             if err:
                 return None, err, 0
-            exec(compiled_text, scope)  # pylint: disable=exec-used
+            exec(compiled_text, scope)
             self.parser_cls = scope['Parser']
 
         parser = self.parser_cls(contents, path)

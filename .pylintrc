@@ -33,6 +33,8 @@ disable=
     broad-except,
     consider-using-f-string,  # over-sensitive
     duplicate-code,  # Too much is duplicated between printer and compiler.
+    exec-used,  # The uses of exec in this package are okay.
+    fixme,  # Don't want warnings for this.
     global-statement,
     locally-disabled,
     missing-docstring,

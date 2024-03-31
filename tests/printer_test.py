@@ -48,6 +48,7 @@ class PrinterTest(unittest.TestCase):
         return
         # TODO: Improve printer algorithm enough for this to work
         # without requiring all the rules to be more than 80 chars wide.
+        # pylint: disable=unreachable
         host = floyd.host.Host()
         grammar = host.read_text_file(THIS_DIR / '../grammars/floyd.g')
         out, err = floyd.pretty_print(grammar)

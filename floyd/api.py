@@ -44,7 +44,7 @@ class CompiledParser:
         assert err is None  # comp.compile() can't currently fail.
 
         try:
-            exec(compiled_text, scope)  # pylint: disable=exec-used
+            exec(compiled_text, scope)
         except Exception:
             return None, 'Error compiling grammar.'
         self.parser_cls = scope['Parser']
