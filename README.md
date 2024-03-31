@@ -12,8 +12,8 @@ A parsing framework and parser generator for Python.
 2. Run `./run devenv` to create a virtualenv at `//.venv` with
    all of the tools needed to do development (and with `floyd` installed
    as an editable Python project.
-3. Run `source ./.venv/bin/activate` to activate the environment and pick up
-   the tools.
+3. Run `source ./.venv/bin/activate` to activate the environment and pick
+   up the tools.
 
 ## Running the tests
 
@@ -31,6 +31,13 @@ format the code. `./run --help` is your friend to find out more.
 
 ## Version History / Release Notes
 
+* v0.2.0 (2024-03-31)
+    * 100% test coverage.
+    * Code is clean and ready for new work.
+    * Add docs/goals.md to describe what I'm hoping to accomplish with
+      this project.
+    * Add docs/todos.md to capture everything I'm planning to fix or
+      change.
 * v0.1.0 (2024-03-25)
     * Copy over working code from glop v0.7.0. This copies only the code
       needed to run things, and a couple of grammars that can be used
@@ -50,4 +57,5 @@ format the code. `./run --help` is your friend to find out more.
     * Fix typos found after v0.0.1 was tagged :).
 * v0.0.1 (2024-03-24)
     * Initial skeleton of the project uploaded to GitHub. There is nothing
-      project-specific about this project except for the name and description.
+      project-specific about this project except for the name and
+      description.
