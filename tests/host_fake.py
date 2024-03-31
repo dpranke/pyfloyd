@@ -23,13 +23,11 @@ class FakeHost:
         self.files = {}
         self.written_files = {}
 
-    def basename(self, path):
-        parts = path.rsplit('/')
-        assert len(parts) == 1
-        return path
-
     def exists(self, path):
         return path in self.files
+
+    def make_executable(self, path):
+        pass
 
     def print(self, *args, end='\n', file=None):
         file = file or self.stdout

@@ -62,6 +62,8 @@ def main(argv=None, host=None):
             host.print(err, file=host.stderr)
             return 1
         _write(host, args.output, contents)
+        if args.compile and args.main:
+            host.make_executable(args.output)
         return 0
 
     except KeyboardInterrupt:
@@ -134,7 +136,7 @@ def _parse_args(host, argv):
 
     if not args.output:
         if args.compile:
-            args.output = host.splitext(host.basename(args.grammar))[0] + '.py'
+            args.output = host.splitext(args.grammar)[0] + '.py'
         else:
             args.output = '-'
 

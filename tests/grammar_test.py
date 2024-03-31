@@ -55,7 +55,7 @@ class GrammarTest(unittest.TestCase):
         out, err = self.check(h, g, '../grammars/floyd.g')
         # We don't check the actual output here because it is too long
         # and we don't want the test to be so sensitive to the AST for
-        # the floyd grammar. 
+        # the floyd grammar.
         self.assertEqual(out[0][:2], ['rule', 'grammar'])
         self.assertIsNone(err)
 
@@ -94,7 +94,7 @@ class GrammarTest(unittest.TestCase):
         out, err = p.parse('foofoo')
         self.assertEqual(out, True)
         self.assertIsNone(err)
-        
+
     def test_lit_str(self):
         p, err = floyd.compile_parser(textwrap.dedent("""\
             grammar = ('foo')* -> true
@@ -102,4 +102,3 @@ class GrammarTest(unittest.TestCase):
         out, err = p.parse('foofoo')
         self.assertEqual(out, True)
         self.assertIsNone(err)
-        

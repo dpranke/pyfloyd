@@ -13,7 +13,9 @@
 # limitations under the License.
 
 import os
+import shutil
 import sys
+import tempfile
 
 
 class Host:
@@ -22,18 +24,21 @@ class Host:
         self.stdout = sys.stdout
         self.stderr = sys.stderr
 
-    def basename(self, path):
-        return os.path.basename(path)
-
     def exists(self, path):
         return os.path.exists(path)
 
     def make_executable(self, path):
         os.chmod(path, 0o755)
 
+    def mkdtemp(self):
+        return tempfile.mkdtemp()
+
     def print(self, *args, end='\n', file=None, flush=True):
         file = file or self.stdout
         print(*args, end=end, file=file, flush=flush)
+
+    def rmtree(self, path):
+        shutil.rmtree(path)
 
     def splitext(self, path):
         return os.path.splitext(path)
