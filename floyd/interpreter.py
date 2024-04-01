@@ -119,12 +119,6 @@ class Interpreter:
         # this be caught while validating the grammar?
         self._fail("Error: no rule named '%s'" % rule_name)
 
-    def _handle_capture(self, node):
-        start = self.pos
-        self._interpret(node[1])
-        end = self.pos
-        self._succeed(self.msg[start:end])
-
     def _handle_choice(self, node):
         pos = self.pos
         for rule in node[1][:-1]:
@@ -144,13 +138,6 @@ class Interpreter:
             self._fail()
             return
         self._succeed()
-
-    def _handle_eq(self, node):
-        self._interpret(node[1])
-        if self.msg[self.pos:].startswith(self.val):
-            self._succeed(newpos=self.pos + len(self.val))
-        else:
-            self._fail()
 
     def _handle_label(self, node):
         self._interpret(node[1])
@@ -197,16 +184,10 @@ class Interpreter:
         elif node[1] == 'NaN':
             self._succeed(float('NaN'))
 
-    def _handle_ll_dec(self, node):
-        self._succeed(int(node[1]))
-
     def _handle_ll_getitem(self, node):
         self._interpret(node[1])
         if not self.failed:
             self._succeed(['ll_getitem', self.val])
-
-    def _handle_ll_hex(self, node):
-        self._succeed(int(node[1], base=16))
 
     def _handle_ll_num(self, node):
         if node[1].startswith('0x'):
@@ -251,7 +232,7 @@ class Interpreter:
             self._succeed(self.scopes[-1][node[1]])
             return
 
-        self._fail('unknown reference to "%s"' % node[1])
+        self._fail('Reference to unknown variable "%s"' % node[1])
 
     def _handle_not(self, node):
         pos = self.pos
@@ -282,10 +263,6 @@ class Interpreter:
         if not self.failed:
             self._handle_star(node)
             self.val = [hd] + self.val
-
-    def _handle_pos(self, node):
-        del node
-        self.val = self.pos
 
     def _handle_post(self, node):
         if node[2] == '?':
@@ -355,7 +332,7 @@ class Interpreter:
         return val.join(vs)
 
     def _builtin_fn_atoi(self, val):
-        return int(val)
+        return ord(val)
 
     def _builtin_fn_xtou(self, val):
         return chr(int(val, base=16))

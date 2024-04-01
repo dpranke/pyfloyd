@@ -47,8 +47,8 @@ class GrammarTest(unittest.TestCase):
     maxDiff = None
 
     def check(self, grammar, text, out=None, err=None):
-        p, err = floyd.compile_parser(textwrap.dedent(grammar))
-        self.assertIsNone(err)
+        p, p_err = floyd.compile_parser(textwrap.dedent(grammar))
+        self.assertIsNone(p_err)
         actual_out, actual_err = p.parse(text)
         self.assertEqual(out, actual_out)
         self.assertEqual(err, actual_err)
@@ -59,6 +59,9 @@ class GrammarTest(unittest.TestCase):
             err, '<string>:1 Unexpected end of input at column 12'
         )
         self.assertIsNone(p)
+
+    def test_atoi(self):
+        self.check('grammar = -> atoi("a")', text='', out=97)
 
     def test_c_style_comment(self):
         self.check('grammar = /* foo */ end -> true', text='', out=True)
@@ -73,7 +76,14 @@ class GrammarTest(unittest.TestCase):
             out=True,
         )
 
-    def test_error_on_second_line(self):
+    def test_empty(self):
+        self.check('grammar = ', text='', out=None, err=None)
+
+    def test_end(self):
+        self.check('grammar = end', text='foo', out=None,
+                   err='<string>:1 Unexpected "f" at column 1')
+
+    def test_error_on_second_line_of_grammar(self):
         p, err = floyd.compile_parser(
             textwrap.dedent("""\
             grammar = 'foo'
@@ -82,6 +92,14 @@ class GrammarTest(unittest.TestCase):
         )
         self.assertIsNone(p)
         self.assertEqual(err, '<string>:2 Unexpected "4" at column 11')
+
+    def test_error_on_second_line_of_input(self):
+        self.check(
+            "grammar = '\\nfoo'",
+            text='\nbar',
+            out=None,
+            err='<string>:2 Unexpected "b" at column 1'
+        )
 
     def test_error_unexpected_thing(self):
         p, err = floyd.compile_parser('grammar = 1 2 3')
@@ -96,6 +114,9 @@ class GrammarTest(unittest.TestCase):
     def test_hex_digits_in_value(self):
         self.check('grammar = -> 0x20', text='', out=32)
 
+    def test_itou(self):
+        self.check('grammar = -> itou(97)', text='', out='a')
+
     def test_lit_str(self):
         self.check("grammar = ('foo')* -> true", text='foofoo', out=True)
 
@@ -108,6 +129,15 @@ class GrammarTest(unittest.TestCase):
     def test_paren_in_value(self):
         self.check('grammar = -> (true)', text='', out=True)
 
+    def test_pred(self):
+        self.check('grammar = ?(true) end -> true', text='', out=True)
+        self.check(textwrap.dedent("""\
+            grammar = ?(false) end -> 'a'
+                    | end -> 'b'
+            """), text='', out='b')
+        self.check('grammar = ?("foo") end', text='', out=None,
+                   err='<string>:1 Bad predicate value')
+
     def test_rule_with_lit_str(self):
         self.check(
             """\
@@ -117,6 +147,10 @@ class GrammarTest(unittest.TestCase):
             text='foofoo',
             out=True,
         )
+
+    def test_error_on_unknown_var(self):
+        self.check('grammar = -> v', text='', out=None,
+                   err='<string>:1 Reference to unknown variable "v"')
 
 
 class InterpreterTest(unittest.TestCase):
