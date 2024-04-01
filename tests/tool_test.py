@@ -112,7 +112,8 @@ class ToolTest(unittest.TestCase):
         self.assertEqual(host.stdout.getvalue(), '')
         self.assertEqual(
             host.stderr.getvalue(),
-            'grammar.g:1 Unexpected end of input at column 4\n',
+            'Error in grammar: grammar.g:1 Unexpected end of '
+            'input at column 4\n',
         )
 
     def test_interpret_input_error(self):

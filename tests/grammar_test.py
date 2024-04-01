@@ -119,6 +119,89 @@ class GrammarTest(unittest.TestCase):
         )
 
 
+class InterpreterTest(unittest.TestCase):
+    def test_basic(self):
+        out, err = floyd.parse('grammar = end -> true', '')
+        self.assertEqual(out, True)
+        self.assertIsNone(err)
+
+    def test_bind(self):
+        out, err = floyd.parse("grammar = 'a'*:v -> v", 'aa')
+        self.assertEqual(out, ['a', 'a'])
+        self.assertIsNone(err)
+
+    def test_choice(self):
+        out, err = floyd.parse(textwrap.dedent("""\
+            grammar = 'foo' -> true
+                    | 'bar' -> false
+            """), 'foo')
+        self.assertEqual(out, True)
+        self.assertIsNone(err)
+
+        out, err = floyd.parse(textwrap.dedent("""\
+            grammar = 'foo' -> true
+                    | 'bar' -> false
+            """), 'bar')
+        self.assertEqual(out, False)
+        self.assertIsNone(err)
+
+    def test_ll_plus(self):
+        out, err = floyd.parse(
+            "grammar = 'a':a 'b'*:bs -> a + join('', bs)", 'abb')
+        self.assertEqual(out, 'abb')
+        self.assertIsNone(err)
+
+    def test_plus(self):
+        p, err = floyd.compile_parser("grammar = 'a'+ -> true")
+        self.assertIsNone(err)
+
+        out, err = p.parse('')
+        self.assertIsNone(out)
+        self.assertEqual(err, '<string>:1 Unexpected end of input at column 1')
+
+        out, err = p.parse('a')
+        self.assertEqual(out, True)
+        self.assertIsNone(err)
+
+        out, err = p.parse('aa')
+        self.assertEqual(out, True)
+        self.assertIsNone(err)
+
+    def test_seq(self):
+        out, err = floyd.parse("grammar = 'foo' 'bar' -> true", 'foobar')
+        self.assertEqual(out, True)
+        self.assertIsNone(err)
+
+    def test_star(self):
+        p, err = floyd.compile_parser("grammar = 'a'* -> true")
+        self.assertIsNone(err)
+
+        out, err = p.parse('')
+        self.assertEqual(out, True)
+        self.assertIsNone(err)
+
+        out, err = p.parse('a')
+        self.assertEqual(out, True)
+        self.assertIsNone(err)
+
+        out, err = p.parse('aa')
+        self.assertEqual(out, True)
+        self.assertIsNone(err)
+
+    def test_opt(self):
+        out, err = floyd.parse("grammar = 'a' 'b'? -> true", 'a')
+        self.assertEqual(out, True)
+        self.assertIsNone(err)
+
+    def test_array(self):
+        out, err = floyd.parse(textwrap.dedent("""\
+            grammar = '[' value:v (',' value)*:vs ','? ']' -> [v] + vs
+            value   = '2':v                                -> float(v)
+            """), '[2]')
+        self.assertEqual(out, [2.0])
+        self.assertIsNone(err)
+
+
 class JSON5Test(unittest.TestCase):
     def check(self, host, grammar, text, output=None, error=None):
         if host.exists(THIS_DIR / text):
@@ -139,19 +222,19 @@ class JSON5Test(unittest.TestCase):
         h = floyd.host.Host()
         # We compile the parser outside of check so that we can reuse it
         # for multiple tests.
-        g, _ = floyd.compile_parser(
-            h.read_text_file(THIS_DIR / '../grammars/json5.g'),
-            path=str(THIS_DIR / '../grammars/json5.g'),
-        )
-        self.check(
-            h, g, 'grammars/json5_sample.inp', 'grammars/json5_sample.outp'
-        )
+        path = str(THIS_DIR / '../grammars/json5.g')
+        g, _ = floyd.compile_parser(h.read_text_file(path), path)
+        self.check(h, g, '123', '123')
         self.check(h, g, 'Infinity', 'Infinity')
         self.check(h, g, 'null', 'null')
         self.check(h, g, 'true', 'true')
         self.check(h, g, 'false', 'false')
+        self.check(h, g, '"foo"', '"foo"')
+        self.check(h, g, '[]', '[]')
+        self.check(h, g, '[2]', '[2]')
+        self.check(h, g, '{}', '{}')
         self.check(h, g, '{foo: "bar"}', '{"foo": "bar"}')
-        self.check(h, g, '[1, 2]', '[1, 2]')
+        self.check(h, g, '{foo: "bar", a: "b"}', '{"foo": "bar", "a": "b"}')
 
         # can't use check for this because NaN != NaN.
         obj, err = g.parse('NaN')
@@ -160,4 +243,8 @@ class JSON5Test(unittest.TestCase):
 
         self.check(
             h, g, '[1', error='<string>:1 Unexpected end of input at column 3'
+        )
+
+        self.check(
+            h, g, 'grammars/json5_sample.inp', 'grammars/json5_sample.outp'
         )
