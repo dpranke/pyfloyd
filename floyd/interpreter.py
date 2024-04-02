@@ -19,33 +19,34 @@ class Interpreter:
     def __init__(self, grammar, memoize):
         self.memoize = memoize
         self.grammar = grammar
-        self.parser_cls = None
+        self.grammar.rules = self.grammar.ast[1]
 
+        self.msg = None
+        self.fname = None
         self.failed = False
         self.val = None
         self.pos = 0
+        self.end = -1
         self.errstr = 'Error: uninitialized'
         self.errpos = 0
-        self.msg = None
-        self.fname = None
-        self.end = -1
         self.scopes = []
 
     def parse(self, msg, fname):
         self.msg = msg
         self.fname = fname
-
+        self.failed = False
+        self.val = None
         self.pos = 0
         self.end = len(self.msg)
         self.errstr = None
         self.errpos = 0
-
-        self.grammar.rules = self.grammar.ast[1]
+        self.scopes = []
 
         cur_node = None
         for node in self.grammar.rules:
             if node[0] == 'rule' and node[1] == self.grammar.starting_rule:
                 cur_node = node
+                break
 
         assert cur_node, (
             "Error: unknown starting rule '%s'" % self.grammar.starting_rule

@@ -28,28 +28,20 @@ THIS_DIR = pathlib.Path(__file__).parent
 class FloydTest(unittest.TestCase):
     maxDiff = None
 
-    def test_floyd(self):
-        h = floyd.host.Host()
-        grammar = h.read_text_file(THIS_DIR / '../grammars/floyd.g')
-        p, err = floyd.compile_parser(
-            grammar, path=str(THIS_DIR / '../grammars/floyd.g')
-        )
-        self.assertIsNone(err)
-        out, err = p.parse(grammar, '../grammars/floyd.g')
-        # We don't check the actual output here because it is too long
-        # and we don't want the test to be so sensitive to the AST for
-        # the floyd grammar.
-        self.assertEqual(out[0][:2], ['rule', 'grammar'])
-        self.assertIsNone(err)
-
 
 class GrammarTest(unittest.TestCase):
     maxDiff = None
 
+    def compile(self, grammar, path=None):
+        return floyd.compile_parser(textwrap.dedent(grammar), path)
+
     def check(self, grammar, text, out=None, err=None):
         p, p_err = floyd.compile_parser(textwrap.dedent(grammar))
         self.assertIsNone(p_err)
-        actual_out, actual_err = p.parse(text)
+        self.checkp(p, text, out, err)
+
+    def checkp(self, parser, text, out=None, err=None):
+        actual_out, actual_err = parser.parse(text)
         self.assertEqual(out, actual_out)
         self.assertEqual(err, actual_err)
 
@@ -61,7 +53,7 @@ class GrammarTest(unittest.TestCase):
     def test_any_fails(self):
         self.check_grammar_error(
             "grammar = '",
-            err='<string>:1 Unexpected end of input at column 12'
+            err='<string>:1 Unexpected end of input at column 12',
         )
 
     def test_array(self):
@@ -160,11 +152,102 @@ class GrammarTest(unittest.TestCase):
             'grammar = "\\n\\\'\\"foo" -> true', text='\n\'"foo', out=True
         )
 
+    def test_floyd(self):
+        h = floyd.host.Host()
+        path = str(THIS_DIR / '../grammars/floyd.g')
+        grammar = h.read_text_file(path)
+        p, err = self.compile(grammar, path)
+        self.assertIsNone(err)
+        out, err = p.parse(grammar, '../grammars/floyd.g')
+        # We don't check the actual output here because it is too long
+        # and we don't want the test to be so sensitive to the AST for
+        # the floyd grammar.
+        self.assertEqual(out[0][:2], ['rule', 'grammar'])
+        self.assertIsNone(err)
+
     def test_hex_digits_in_value(self):
         self.check('grammar = -> 0x20', text='', out=32)
 
     def test_itou(self):
         self.check('grammar = -> itou(97)', text='', out='a')
+
+    def test_json5(self):
+        h = floyd.host.Host()
+        path = str(THIS_DIR / '../grammars/json5.g')
+        p, err = self.compile(h.read_text_file(path))
+        self.checkp(p, text='123', out=123)
+        self.checkp(p, text='Infinity', out=float('inf'))
+        self.checkp(p, text='null', out=None)
+        self.checkp(p, text='true', out=True)
+        self.checkp(p, text='false', out=False)
+        self.checkp(p, text='"foo"', out='foo')
+        self.checkp(p, text='[]', out=[])
+        self.checkp(p, text='[2]', out=[2])
+        self.checkp(p, text='{}', out={})
+        self.checkp(p, text='{foo: "bar"}', out={'foo': 'bar'})
+        self.checkp(
+            p, text='{foo: "bar", a: "b"}', out={'foo': 'bar', 'a': 'b'}
+        )
+
+        # Can't use check for this because NaN != NaN.
+        obj, err = p.parse('NaN')
+        self.assertTrue(math.isnan(obj))
+        self.assertTrue(err is None)
+
+        self.checkp(
+            p, text='[1', err='<string>:1 Unexpected end of input at column 3'
+        )
+
+        # Check that leading whitespace is allowed.
+        self.checkp(p, '  {}', {})
+
+        # Check the sample file from pyjson5.
+        self.checkp(
+            p,
+            textwrap.dedent("""\
+            {
+                foo: 'bar',
+                while: true,
+
+                this: 'is a \\
+            multi-line string',
+
+                // this is an inline comment
+                here: 'is another', // inline comment
+
+                /* this is a block comment
+                   that continues on another line */
+
+                hex: 0xDEADbeef,
+                half: .5,
+                delta: +10,
+                to: Infinity,   // and beyond!
+
+                finally: 'a trailing comma',
+                oh: [
+                    "we shouldn't forget",
+                    'arrays can have',
+                    'trailing commas too',
+                ],
+            }
+            """),
+            out={
+                'foo': 'bar',
+                'while': True,
+                'this': 'is a multi-line string',
+                'here': 'is another',
+                'hex': 3735928559,
+                'half': 0.5,
+                'delta': 10.0,
+                'to': float('inf'),
+                'finally': 'a trailing comma',
+                'oh': [
+                    "we shouldn't forget",
+                    'arrays can have',
+                    'trailing commas too',
+                ],
+            },
+        )
 
     def test_lit_str(self):
         self.check("grammar = ('foo')* -> true", text='foofoo', out=True)
@@ -232,52 +315,3 @@ class GrammarTest(unittest.TestCase):
         self.check("grammar = 'a'* -> true", text='', out=True)
         self.check("grammar = 'a'* -> true", text='a', out=True)
         self.check("grammar = 'a'* -> true", text='aa', out=True)
-
-
-class JSON5Test(unittest.TestCase):
-    parser = None
-
-    @classmethod
-    def setUpClass(cls):
-        h = floyd.host.Host()
-        path = str(THIS_DIR / '../grammars/json5.g')
-        cls.parser, err = floyd.compile_parser(h.read_text_file(path), path)
-        assert err is None
-
-    def check(self, text, out=None, err=None):
-        actual_out, actual_err = self.parser.parse(text)
-        self.assertEqual(out, actual_out)
-        self.assertEqual(err, actual_err)
-
-    def checkfiles(self, inp_path, outp_path):
-        h = floyd.host.Host()
-        out, err = self.parser.parse(h.read_text_file(THIS_DIR / inp_path))
-        self.assertEqual(
-            out, json.loads(h.read_text_file(THIS_DIR / outp_path))
-        )
-        self.assertIsNone(err)
-
-    def test_full_grammar(self):
-        self.checkfiles(
-            'grammars/json5_sample.inp', 'grammars/json5_sample.outp'
-        )
-
-    def test_json5(self):
-        self.check('123', 123)
-        self.check('Infinity', float('inf'))
-        self.check('null', None)
-        self.check('true', True)
-        self.check('false', False)
-        self.check('"foo"', 'foo')
-        self.check('[]', [])
-        self.check('[2]', [2])
-        self.check('{}', {})
-        self.check('{foo: "bar"}', {'foo': 'bar'})
-        self.check('{foo: "bar", a: "b"}', {'foo': 'bar', 'a': 'b'})
-
-        # can't use check for this because NaN != NaN.
-        obj, err = self.parser.parse('NaN')
-        self.assertTrue(math.isnan(obj))
-        self.assertTrue(err is None)
-
-        self.check('[1', err='<string>:1 Unexpected end of input at column 3')
