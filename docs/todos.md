@@ -44,7 +44,7 @@
 
 * Use `?{}` for semantic predicate instead of `?()`, or use `?<>` maybe?
 
-* Add `_pos` built-in rule (and _pos() built-in function), 
+* Maybe add `_pos` built-in rule (and _pos() built-in function), 
   `_text` built-in value.
 
 * Implement support for automatic whitespace and comment insertion in
@@ -58,7 +58,7 @@
 
 * Implement left recursion. 
 
-* Figure out how to notation for associativity and precedence without
+* Figure out how to notate for associativity and precedence without
   having to encode it in the ordering of rules, e.g. so you can write
   `expr = expr '*' expr` rather than `expr = expr '*' add_expr`.
   - Also figure out how to implement it :).
