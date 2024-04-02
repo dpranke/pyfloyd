@@ -16,7 +16,6 @@ import math
 import pathlib
 import textwrap
 import unittest
-import json
 
 import floyd
 import floyd.host
@@ -25,18 +24,9 @@ import floyd.host
 THIS_DIR = pathlib.Path(__file__).parent
 
 
-class FloydTest(unittest.TestCase):
-    maxDiff = None
-
-
-class GrammarTest(unittest.TestCase):
-    maxDiff = None
-
-    def compile(self, grammar, path=None):
-        return floyd.compile_parser(textwrap.dedent(grammar), path)
-
+class GrammarTestsMixin:
     def check(self, grammar, text, out=None, err=None):
-        p, p_err = floyd.compile_parser(textwrap.dedent(grammar))
+        p, p_err = self.compile(textwrap.dedent(grammar))
         self.assertIsNone(p_err)
         self.checkp(p, text, out, err)
 
@@ -46,7 +36,7 @@ class GrammarTest(unittest.TestCase):
         self.assertEqual(err, actual_err)
 
     def check_grammar_error(self, grammar, err):
-        p, p_err = floyd.compile_parser(textwrap.dedent(grammar))
+        p, p_err = self.compile(grammar)
         self.assertIsNone(p)
         self.assertEqual(err, p_err)
 
@@ -65,9 +55,6 @@ class GrammarTest(unittest.TestCase):
             text='[2]',
             out=[2.0],
         )
-
-    def test_atoi(self):
-        self.check('grammar = -> atoi("a")', text='', out=97)
 
     def test_basic(self):
         self.check('grammar = end -> true', text='', out=True)
@@ -315,3 +302,61 @@ class GrammarTest(unittest.TestCase):
         self.check("grammar = 'a'* -> true", text='', out=True)
         self.check("grammar = 'a'* -> true", text='a', out=True)
         self.check("grammar = 'a'* -> true", text='aa', out=True)
+
+    def test_utoi(self):
+        self.check('grammar = -> utoi("a")', text='', out=97)
+
+
+class Interpreter(unittest.TestCase, GrammarTestsMixin):
+    max_diff = None
+
+    def compile(self, grammar, path='<string>'):
+        return floyd.compile_parser(textwrap.dedent(grammar), path)
+
+
+class Compiler(unittest.TestCase, GrammarTestsMixin):
+    max_diff = None
+
+    def compile(self, grammar, path='<string>'):
+        source_code, err = floyd.generate_parser(
+            grammar, main=False, memoize=False, path=path
+        )
+        if err:
+            assert source_code is None
+            return None, err
+
+        scope = {}
+        debug = False
+        if debug:  # pragma: no cover
+            h = floyd.host.Host()
+            d = h.mkdtemp()
+            h.write_text_file(d + '/parser.py', source_code)
+        exec(source_code, scope)
+        parser_cls = scope['Parser']
+
+        return ParserWrapper(parser_cls), None
+
+    def test_empty(self):
+        pass
+
+    def test_end(self):
+        pass
+
+    def test_error_on_second_line_of_grammar(self):
+        pass
+
+    def test_error_on_unknown_var(self):
+        pass
+
+    def test_pred(self):
+        pass
+
+
+class ParserWrapper:
+    def __init__(self, parser_cls):
+        self.parser_cls = parser_cls
+
+    def parse(self, text, path='<string>'):
+        parser = self.parser_cls(text, path)
+        out, err, _ = parser.parse()
+        return out, err

@@ -338,7 +338,7 @@ class Interpreter:
     def _builtin_fn_join(self, val, vs):
         return val.join(vs)
 
-    def _builtin_fn_atoi(self, val):
+    def _builtin_fn_utoi(self, val):
         return ord(val)
 
     def _builtin_fn_xtou(self, val):

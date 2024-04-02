@@ -288,8 +288,8 @@ _DEFAULT_FUNCTIONS = {
             return s.join(vs)
         """),
     'utoi': d("""\
-        def _atoi(self, s):
-            return int(s)
+        def _utoi(self, s):
+            return ord(s)
         """),
     'xtoi': d("""\
         def _xtoi(self, s):
