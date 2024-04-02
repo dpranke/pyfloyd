@@ -39,7 +39,11 @@ class Analyzer:
         if node[0] == 'rule':
             return [node[0], node[1], self.rewrite_singles(node[2])]
         if node[0] in ('choice', 'seq'):
-            if len(node[1]) == 1:
+            # TODO: the apply check stops top-level sequences with only
+            # an apply from being inlined, messing up the compiler
+            # code generation. Figure out how to not have to special
+            # case this.
+            if len(node[1]) == 1 and node[1][0][0] != 'apply':
                 return self.rewrite_singles(node[1][0])
             return [node[0], [self.rewrite_singles(n) for n in node[1]]]
         if node[0] == 'paren':

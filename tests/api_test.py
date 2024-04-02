@@ -54,9 +54,6 @@ class APITest(unittest.TestCase):
         self.assertEqual(err, None)
 
     def test_parse_grammar_err(self):
-        # TODO: This test originally used 'grammar =', but that is actually
-        # a legal (empty) grammar, and the compiler wasn't rejecting it.
-        # Write another test for the compiler to catch this bug and fix it.
         obj, err = floyd.parse('grammar', '')
         self.assertEqual(obj, None)
         self.assertEqual(

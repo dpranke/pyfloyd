@@ -1,13 +1,24 @@
 # Things TODO
 
+* compiler.py: Figure out how to handle inlining methods more consistently
+  in _compile so that we don't have the special-casing logic here. Same
+  thing in analyzer.py rewrite_singles().
+
 * compiler.py: Figure out how to handle blank lines at the end of a method
   better in _flatten().
 
+* grammar_test.py: Figure out how to reject references to variables that
+  weren't bound at compile/interpret time,
+  see GrammarTest.test_error_on_unknown_var.
+
+* interpreter.py: Figure out whether you can statically reject unknown
+  rules (in _handle_apply).
+
 * printer_test.py: Improve printer algorithm so that two choices with
-  actions are not printed on a single line.
+  actions are not printed on a single line (see test_actions).
 
 * printer_test.py: Improve printer algorithm so that it can pretty-print
-  floyd.g and stay under 80 characters wide.
+  floyd.g and stay under 80 characters wide (see test_floyd).
 
 * Replace `:x` bindings with `$1`, `$2`, and so on.
   - use `$0` for matching everything as an array?
@@ -32,8 +43,6 @@
 * Add bounded qualifiers like `foo^3`, `foo^3+`, `foo^3,4` or something.
 
 * Use `?{}` for semantic predicate instead of `?()`, or use `?<>` maybe?
-
-* Implement a real interpreter (backport from glop main branch).
 
 * Add `_pos` built-in rule (and _pos() built-in function), 
   `_text` built-in value.

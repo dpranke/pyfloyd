@@ -122,7 +122,7 @@ class GrammarTestsMixin:
         )
 
     def test_error_on_unknown_var(self):
-        # TODO: This could be rejected at compile time.
+        # TODO: This could/should be rejected at compile time.
         self.check(
             'grammar = -> v',
             text='',
@@ -279,7 +279,7 @@ class GrammarTestsMixin:
             out='b',
         )
         self.check(
-            'grammar = ?("foo") end',
+            'grammar = ?("foo") end -> false',
             text='',
             out=None,
             err='<string>:1 Bad predicate value',
@@ -319,7 +319,7 @@ class Compiler(unittest.TestCase, GrammarTestsMixin):
 
     def compile(self, grammar, path='<string>'):
         source_code, err = floyd.generate_parser(
-            grammar, main=False, memoize=False, path=path
+            textwrap.dedent(grammar), main=False, memoize=False, path=path
         )
         if err:
             assert source_code is None
@@ -333,26 +333,12 @@ class Compiler(unittest.TestCase, GrammarTestsMixin):
             h.write_text_file(d + '/parser.py', source_code)
         exec(source_code, scope)
         parser_cls = scope['Parser']
-
-        return ParserWrapper(parser_cls), None
-
-    def test_empty(self):
-        pass
-
-    def test_end(self):
-        pass
-
-    def test_error_on_second_line_of_grammar(self):
-        pass
-
-    def test_error_on_unknown_var(self):
-        pass
-
-    def test_pred(self):
-        pass
+        if debug:  # pragma: no cover
+            h.rmtree(d)
+        return _ParserWrapper(parser_cls), None
 
 
-class ParserWrapper:
+class _ParserWrapper:
     def __init__(self, parser_cls):
         self.parser_cls = parser_cls
 

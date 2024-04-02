@@ -96,6 +96,9 @@ if __name__ == '__main__':
 
 
 _PUBLIC_METHODS = """\
+class _ParsingRuntimeError(Exception):
+    pass
+
 
 class %s:
     def __init__(self, msg, fname):
@@ -110,7 +113,11 @@ class %s:
         self._cache = {}
 
     def parse(self):
-        self._%s_()
+        try:
+            self._%s_()
+        except _ParsingRuntimeError as e:
+            lineno, colno = self._err_offsets()
+            return (None, f'{self.fname}:{lineno} ' + str(e), self.errpos)
         if self.failed:
             return None, self._err_str(), self.errpos
         return self.val, None, self.pos
@@ -247,6 +254,10 @@ _BINDINGS = """\
         assert name == actual_name
 
     def _get(self, var):
+        if not self._scopes or var not in self._scopes[-1][1]:
+            raise _ParsingRuntimeError(
+                'Reference to unknown variable "%s"' % var
+            )
         return self._scopes[-1][1][var]
 
     def _set(self, var, val):
@@ -412,6 +423,8 @@ class Compiler:
     def _compile(self, node, rule, sub_type='', index=0, top_level=False):
         assert node
         assert not self._method_lines
+        # TODO: Figure out how to handle inlining methods more consistently
+        # so that we don't have the special-casing logic here.
         if node[0] == 'apply':
             if node[1] not in self.grammar.rules:
                 self._builtin_rules_needed.add(node[1])
@@ -513,7 +526,7 @@ class Compiler:
         return 1
 
     def _has_labels(self, node):
-        if node and node[0] == 'label':
+        if node and node[0] in ('label', 'll_var'):
             return True
         for n in node:
             if isinstance(n, list) and self._has_labels(n):
@@ -581,12 +594,15 @@ class Compiler:
 
     def _action_(self, rule, node):
         self._depth = 0
+        if self._has_labels(node):
+            self._bindings_needed = True
         obj = self._eval_rule(rule, node[1])
         self._flatten(['self._succeed(', OI, obj, OU, ')'])
 
     def _empty_(self, rule, node):
         del rule
         del node
+        self._flatten(['self._succeed(None)'])
 
     def _not_(self, rule, node):
         sub_rule = self._compile(node[1], rule + '_n')
@@ -616,13 +632,17 @@ class Compiler:
                 'v = ',
                 obj,
                 NL,
-                'if v:',
+                'if v is True:',
                 IN,
                 'self._succeed(v)',
                 UN,
-                'else:',
+                'elif v is False:',
                 IN,
                 'self._fail()',
+                UN,
+                'else:',
+                IN,
+                'raise _ParsingRuntimeError("Bad predicate value")',
                 UN,
             ]
         )
