@@ -31,6 +31,9 @@ format the code. `./run --help` is your friend to find out more.
 
 ## Version History / Release Notes
 
+* v0.3.0 (2024-04-02)
+    * Changed the interpreter so that it no longer relies on runtime
+      compilation.
 * v0.2.0 (2024-03-31)
     * 100% test coverage.
     * Code is clean and ready for new work.
