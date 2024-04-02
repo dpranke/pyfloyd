@@ -61,7 +61,7 @@ class APITest(unittest.TestCase):
         self.assertEqual(obj, None)
         self.assertEqual(
             err,
-            'Error in grammar: <string>:1 Unexpected end of input at column 8'
+            'Error in grammar: <string>:1 Unexpected end of input at column 8',
         )
 
     def test_pretty_print(self):

@@ -24,8 +24,8 @@ class Interpreter:
         self.failed = False
         self.val = None
         self.pos = 0
-        self.errstr = "Error: uninitialized"
-        self.errpos  = 0
+        self.errstr = 'Error: uninitialized'
+        self.errpos = 0
         self.msg = None
         self.fname = None
         self.end = -1
@@ -47,8 +47,9 @@ class Interpreter:
             if node[0] == 'rule' and node[1] == self.grammar.starting_rule:
                 cur_node = node
 
-        assert cur_node, ("Error: unknown starting rule '%s'" %
-                          self.grammar.starting_rule)
+        assert cur_node, (
+            "Error: unknown starting rule '%s'" % self.grammar.starting_rule
+        )
 
         self._interpret(cur_node[2])
         if self.failed:
@@ -57,7 +58,7 @@ class Interpreter:
 
     def _interpret(self, node):
         node_handler = getattr(self, '_handle_' + node[0], None)
-        assert node_handler, ("Unimplemented node type '%s'" % node[0])
+        assert node_handler, "Unimplemented node type '%s'" % node[0]
         node_handler(node)
 
     def _fail(self, errstr=None):
@@ -80,7 +81,7 @@ class Interpreter:
     def _format_error(self):
         lineno = 1
         colno = 1
-        for ch in self.msg[:self.errpos]:
+        for ch in self.msg[: self.errpos]:
             if ch == '\n':
                 lineno += 1
                 colno = 1
@@ -90,7 +91,7 @@ class Interpreter:
             if self.errpos == len(self.msg):
                 thing = 'end of input'
             else:
-                thing = repr(self.msg[self.errpos]).replace("'", "\"")
+                thing = repr(self.msg[self.errpos]).replace("'", '"')
             self.errstr = 'Unexpected %s at column %d' % (thing, colno)
 
         msg = '%s:%d %s' % (self.fname, lineno, self.errstr)
@@ -149,12 +150,15 @@ class Interpreter:
         i = 0
         lit = node[1]
         lit_len = len(lit)
-        while (i < lit_len and self.pos < self.end and
-                self.msg[self.pos] == lit[i]):
+        while (
+            i < lit_len
+            and self.pos < self.end
+            and self.msg[self.pos] == lit[i]
+        ):
             self.pos += 1
             i += 1
         if i == lit_len:
-            self._succeed(self.msg[self.pos-1])
+            self._succeed(self.msg[self.pos - 1])
         else:
             self._fail()
 
@@ -285,8 +289,10 @@ class Interpreter:
     def _handle_range(self, node):
         assert node[1][0] == 'lit'
         assert node[2][0] == 'lit'
-        if (self.pos != self.end and
-                node[1][1] <= self.msg[self.pos] <= node[2][1]):
+        if (
+            self.pos != self.end
+            and node[1][1] <= self.msg[self.pos] <= node[2][1]
+        ):
             self._succeed(self.msg[self.pos], self.pos + 1)
             return
         self._fail()
