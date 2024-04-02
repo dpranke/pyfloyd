@@ -53,18 +53,57 @@ class GrammarTest(unittest.TestCase):
         self.assertEqual(out, actual_out)
         self.assertEqual(err, actual_err)
 
-    def test_any_fails(self):
-        p, err = floyd.compile_parser("grammar = '")
-        self.assertEqual(
-            err, '<string>:1 Unexpected end of input at column 12'
-        )
+    def check_grammar_error(self, grammar, err):
+        p, p_err = floyd.compile_parser(textwrap.dedent(grammar))
         self.assertIsNone(p)
+        self.assertEqual(err, p_err)
+
+    def test_any_fails(self):
+        self.check_grammar_error(
+            "grammar = '",
+            err='<string>:1 Unexpected end of input at column 12'
+        )
+
+    def test_array(self):
+        self.check(
+            """\
+            grammar = '[' value:v (',' value)*:vs ','? ']' -> [v] + vs
+            value   = '2':v                                -> float(v)
+            """,
+            text='[2]',
+            out=[2.0],
+        )
 
     def test_atoi(self):
         self.check('grammar = -> atoi("a")', text='', out=97)
 
+    def test_basic(self):
+        self.check('grammar = end -> true', text='', out=True)
+
+    def test_bind(self):
+        self.check("grammar = 'a'*:v -> v", text='aa', out=['a', 'a'])
+
     def test_c_style_comment(self):
         self.check('grammar = /* foo */ end -> true', text='', out=True)
+
+    def test_choice(self):
+        self.check(
+            """\
+            grammar = 'foo' -> true
+                    | 'bar' -> false
+            """,
+            text='foo',
+            out=True,
+        )
+
+        self.check(
+            """\
+            grammar = 'foo' -> true
+                    | 'bar' -> false
+            """,
+            text='bar',
+            out=False,
+        )
 
     def test_cpp_style_comment(self):
         self.check(
@@ -80,31 +119,41 @@ class GrammarTest(unittest.TestCase):
         self.check('grammar = ', text='', out=None, err=None)
 
     def test_end(self):
-        self.check('grammar = end', text='foo', out=None,
-                   err='<string>:1 Unexpected "f" at column 1')
+        self.check(
+            'grammar = end',
+            text='foo',
+            out=None,
+            err='<string>:1 Unexpected "f" at column 1',
+        )
 
     def test_error_on_second_line_of_grammar(self):
-        p, err = floyd.compile_parser(
-            textwrap.dedent("""\
+        self.check_grammar_error(
+            """\
             grammar = 'foo'
                       4
-            """)
+            """,
+            err='<string>:2 Unexpected "4" at column 11',
         )
-        self.assertIsNone(p)
-        self.assertEqual(err, '<string>:2 Unexpected "4" at column 11')
 
     def test_error_on_second_line_of_input(self):
         self.check(
             "grammar = '\\nfoo'",
             text='\nbar',
-            out=None,
-            err='<string>:2 Unexpected "b" at column 1'
+            err='<string>:2 Unexpected "b" at column 1',
+        )
+
+    def test_error_on_unknown_var(self):
+        # TODO: This could be rejected at compile time.
+        self.check(
+            'grammar = -> v',
+            text='',
+            err='<string>:1 Reference to unknown variable "v"',
         )
 
     def test_error_unexpected_thing(self):
-        p, err = floyd.compile_parser('grammar = 1 2 3')
-        self.assertIsNone(p)
-        self.assertEqual(err, '<string>:1 Unexpected "1" at column 11')
+        self.check_grammar_error(
+            'grammar = 1 2 3', err='<string>:1 Unexpected "1" at column 11'
+        )
 
     def test_escapes_in_string(self):
         self.check(
@@ -120,8 +169,18 @@ class GrammarTest(unittest.TestCase):
     def test_lit_str(self):
         self.check("grammar = ('foo')* -> true", text='foofoo', out=True)
 
+    def test_ll_plus(self):
+        self.check(
+            "grammar = 'a':a 'b'*:bs -> a + join('', bs)",
+            text='abb',
+            out='abb',
+        )
+
     def test_long_unicode_literals(self):
         self.check("grammar = '\\U00000020' -> true", text=' ', out=True)
+
+    def test_opt(self):
+        self.check("grammar = 'a' 'b'? -> true", text='a', out=True)
 
     def test_optional_comma(self):
         self.check('grammar = end -> true,', text='', out=True)
@@ -129,14 +188,32 @@ class GrammarTest(unittest.TestCase):
     def test_paren_in_value(self):
         self.check('grammar = -> (true)', text='', out=True)
 
+    def test_plus(self):
+        self.check(
+            "grammar = 'a'+ -> true",
+            text='',
+            err='<string>:1 Unexpected end of input at column 1',
+        )
+
+        self.check("grammar = 'a'+ -> true", text='a', out=True)
+        self.check("grammar = 'a'+ -> true", text='aa', out=True)
+
     def test_pred(self):
         self.check('grammar = ?(true) end -> true', text='', out=True)
-        self.check(textwrap.dedent("""\
+        self.check(
+            textwrap.dedent("""\
             grammar = ?(false) end -> 'a'
                     | end -> 'b'
-            """), text='', out='b')
-        self.check('grammar = ?("foo") end', text='', out=None,
-                   err='<string>:1 Bad predicate value')
+            """),
+            text='',
+            out='b',
+        )
+        self.check(
+            'grammar = ?("foo") end',
+            text='',
+            out=None,
+            err='<string>:1 Bad predicate value',
+        )
 
     def test_rule_with_lit_str(self):
         self.check(
@@ -148,137 +225,59 @@ class GrammarTest(unittest.TestCase):
             out=True,
         )
 
-    def test_error_on_unknown_var(self):
-        self.check('grammar = -> v', text='', out=None,
-                   err='<string>:1 Reference to unknown variable "v"')
-
-
-class InterpreterTest(unittest.TestCase):
-    def test_basic(self):
-        out, err = floyd.parse('grammar = end -> true', '')
-        self.assertEqual(out, True)
-        self.assertIsNone(err)
-
-    def test_bind(self):
-        out, err = floyd.parse("grammar = 'a'*:v -> v", 'aa')
-        self.assertEqual(out, ['a', 'a'])
-        self.assertIsNone(err)
-
-    def test_choice(self):
-        out, err = floyd.parse(textwrap.dedent("""\
-            grammar = 'foo' -> true
-                    | 'bar' -> false
-            """), 'foo')
-        self.assertEqual(out, True)
-        self.assertIsNone(err)
-
-        out, err = floyd.parse(textwrap.dedent("""\
-            grammar = 'foo' -> true
-                    | 'bar' -> false
-            """), 'bar')
-        self.assertEqual(out, False)
-        self.assertIsNone(err)
-
-    def test_ll_plus(self):
-        out, err = floyd.parse(
-            "grammar = 'a':a 'b'*:bs -> a + join('', bs)", 'abb')
-        self.assertEqual(out, 'abb')
-        self.assertIsNone(err)
-
-    def test_plus(self):
-        p, err = floyd.compile_parser("grammar = 'a'+ -> true")
-        self.assertIsNone(err)
-
-        out, err = p.parse('')
-        self.assertIsNone(out)
-        self.assertEqual(err, '<string>:1 Unexpected end of input at column 1')
-
-        out, err = p.parse('a')
-        self.assertEqual(out, True)
-        self.assertIsNone(err)
-
-        out, err = p.parse('aa')
-        self.assertEqual(out, True)
-        self.assertIsNone(err)
-
     def test_seq(self):
-        out, err = floyd.parse("grammar = 'foo' 'bar' -> true", 'foobar')
-        self.assertEqual(out, True)
-        self.assertIsNone(err)
+        self.check("grammar = 'foo' 'bar' -> true", text='foobar', out=True)
 
     def test_star(self):
-        p, err = floyd.compile_parser("grammar = 'a'* -> true")
-        self.assertIsNone(err)
-
-        out, err = p.parse('')
-        self.assertEqual(out, True)
-        self.assertIsNone(err)
-
-        out, err = p.parse('a')
-        self.assertEqual(out, True)
-        self.assertIsNone(err)
-
-        out, err = p.parse('aa')
-        self.assertEqual(out, True)
-        self.assertIsNone(err)
-
-    def test_opt(self):
-        out, err = floyd.parse("grammar = 'a' 'b'? -> true", 'a')
-        self.assertEqual(out, True)
-        self.assertIsNone(err)
-
-    def test_array(self):
-        out, err = floyd.parse(textwrap.dedent("""\
-            grammar = '[' value:v (',' value)*:vs ','? ']' -> [v] + vs
-            value   = '2':v                                -> float(v)
-            """), '[2]')
-        self.assertEqual(out, [2.0])
-        self.assertIsNone(err)
+        self.check("grammar = 'a'* -> true", text='', out=True)
+        self.check("grammar = 'a'* -> true", text='a', out=True)
+        self.check("grammar = 'a'* -> true", text='aa', out=True)
 
 
 class JSON5Test(unittest.TestCase):
-    def check(self, host, grammar, text, output=None, error=None):
-        if host.exists(THIS_DIR / text):
-            text = host.read_text_file(THIS_DIR / text)
-        if output:
-            if host.exists(THIS_DIR / output):
-                output = host.read_text_file(THIS_DIR / output)
-            expected_obj = json.loads(output)
+    parser = None
 
-        actual_obj, actual_err = grammar.parse(text)
-        if output:
-            self.assertEqual(expected_obj, actual_obj)
-        if error:
-            self.assertEqual(error, actual_err)
-        return actual_obj, actual_err
+    @classmethod
+    def setUpClass(cls):
+        h = floyd.host.Host()
+        path = str(THIS_DIR / '../grammars/json5.g')
+        cls.parser, err = floyd.compile_parser(h.read_text_file(path), path)
+        assert err is None
+
+    def check(self, text, out=None, err=None):
+        actual_out, actual_err = self.parser.parse(text)
+        self.assertEqual(out, actual_out)
+        self.assertEqual(err, actual_err)
+
+    def checkfiles(self, inp_path, outp_path):
+        h = floyd.host.Host()
+        out, err = self.parser.parse(h.read_text_file(THIS_DIR / inp_path))
+        self.assertEqual(
+            out, json.loads(h.read_text_file(THIS_DIR / outp_path))
+        )
+        self.assertIsNone(err)
+
+    def test_full_grammar(self):
+        self.checkfiles(
+            'grammars/json5_sample.inp', 'grammars/json5_sample.outp'
+        )
 
     def test_json5(self):
-        h = floyd.host.Host()
-        # We compile the parser outside of check so that we can reuse it
-        # for multiple tests.
-        path = str(THIS_DIR / '../grammars/json5.g')
-        g, _ = floyd.compile_parser(h.read_text_file(path), path)
-        self.check(h, g, '123', '123')
-        self.check(h, g, 'Infinity', 'Infinity')
-        self.check(h, g, 'null', 'null')
-        self.check(h, g, 'true', 'true')
-        self.check(h, g, 'false', 'false')
-        self.check(h, g, '"foo"', '"foo"')
-        self.check(h, g, '[]', '[]')
-        self.check(h, g, '[2]', '[2]')
-        self.check(h, g, '{}', '{}')
-        self.check(h, g, '{foo: "bar"}', '{"foo": "bar"}')
-        self.check(h, g, '{foo: "bar", a: "b"}', '{"foo": "bar", "a": "b"}')
+        self.check('123', 123)
+        self.check('Infinity', float('inf'))
+        self.check('null', None)
+        self.check('true', True)
+        self.check('false', False)
+        self.check('"foo"', 'foo')
+        self.check('[]', [])
+        self.check('[2]', [2])
+        self.check('{}', {})
+        self.check('{foo: "bar"}', {'foo': 'bar'})
+        self.check('{foo: "bar", a: "b"}', {'foo': 'bar', 'a': 'b'})
 
         # can't use check for this because NaN != NaN.
-        obj, err = g.parse('NaN')
+        obj, err = self.parser.parse('NaN')
         self.assertTrue(math.isnan(obj))
         self.assertTrue(err is None)
 
-        self.check(
-            h, g, '[1', error='<string>:1 Unexpected end of input at column 3'
-        )
-
-        self.check(
-            h, g, 'grammars/json5_sample.inp', 'grammars/json5_sample.outp'
-        )
+        self.check('[1', err='<string>:1 Unexpected end of input at column 3')
