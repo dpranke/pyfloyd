@@ -111,6 +111,8 @@ class %s:
         self.errpos = 0
         self._scopes = []
         self._cache = {}
+        self._blocked = set()
+        self._seeds = []
 
     def parse(self):
         try:
@@ -162,6 +164,32 @@ _HELPER_METHODS = """\
         rule()
         if not self.failed:
             self._set(var, self.val)
+
+    def _leftrec(self, rule, rule_name):
+        pos = self.pos
+        key = (rule_name, pos)
+        seed = self._seeds.get(key)
+        if seed:
+            self.val, self.failed, self.pos = seed
+            return
+        if rule_name in self._blocked:
+            self._fail()
+        current = (None, True, self.pos)
+        self._seeds[key] = current
+        self._blocked.add(rule_name)
+        while True:
+            rule()
+            if self.pos > current[2]:
+                current = (self.val, self.failed, self.pos)
+                self._seeds[key] = current
+                self.pos = pos
+            else:
+                del self._seeds[key]
+                self._seeds.pop(rule_name, pos)
+                if rule_name in self._blocked:
+                    self._blocked.remove(rule_name)
+                self.val, self.failed, self.pos = current
+                return
 
     def _not(self, rule):
         p = self.pos
@@ -591,6 +619,11 @@ class Compiler:
                 ')',
             ]
         )
+
+    def _leftrec_(self, rule, node):
+        var = string_literal.encode(node[2])
+        val = self._eval_rule(rule, node[1])
+        self._flatten(['self._leftrec(', OI, val, ', ', var, OU, ')'])
 
     def _action_(self, rule, node):
         self._depth = 0

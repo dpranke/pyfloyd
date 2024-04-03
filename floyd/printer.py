@@ -88,6 +88,9 @@ class Printer:
     def _label_(self, node):
         return '%s:%s' % (self._proc(node[1]), node[2])
 
+    def _leftrec_(self, node):
+        return ' '.join(self._proc(e) for e in node[1])
+
     def _lit_(self, node):
         return string_literal.encode(node[1])
 

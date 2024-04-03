@@ -30,6 +30,8 @@ class Interpreter:
         self.errstr = 'Error: uninitialized'
         self.errpos = 0
         self.scopes = []
+        self.seeds = {}
+        self.blocked = set()
 
     def parse(self, msg, fname):
         self.msg = msg
@@ -146,6 +148,33 @@ class Interpreter:
         if not self.failed:
             self.scopes[-1][node[2]] = self.val
             self._succeed()
+
+    def _handle_leftrec(self, node):
+        pos = self.pos
+        rule_name = node[2]
+        key = (rule_name, pos)
+        seed = self.seeds.get(key)
+        if seed:
+            self.val, self.failed, self.pos = seed
+            return
+        if rule_name in self.blocked:
+            self._fail()
+        current = (None, True, self.pos)
+        self.seeds[key] = current
+        self.blocked.add(rule_name)
+        while True:
+            self._interpret(node[1])
+            if self.pos > current[2]:
+                current = (self.val, self.failed, self.pos)
+                self.seeds[key] = current
+                self.pos = pos
+            else:
+                del self.seeds[key]
+                self.seeds.pop(rule_name, pos)
+                if rule_name in self.blocked:
+                    self.blocked.remove(rule_name)
+                self.val, self.failed, self.pos = current
+                return
 
     def _handle_lit(self, node):
         i = 0

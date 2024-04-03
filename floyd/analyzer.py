@@ -31,6 +31,7 @@ class Analyzer:
             ast = ['rules', ast]
         assert ast[0] == 'rules' and any(n[0] == 'rule' for n in ast[1])
         ast = self.rewrite_singles(ast)
+        ast = rewrite_left_recursion(ast)
         return Grammar(ast)
 
     def rewrite_singles(self, node):
@@ -51,3 +52,93 @@ class Analyzer:
         if node[0] in ('label', 'post'):
             return [node[0], self.rewrite_singles(node[1]), node[2]]
         return node
+
+
+def check_for_left_recursion(ast):
+    """Returns a list of all potentially left-recursive rules."""
+    lr_rules = set()
+    rules = {}
+    for _, name, body in ast[1]:
+        rules[name] = body
+    for _, name, body in ast[1]:
+        seen = set()
+        has_lr = _check_lr(name, body, rules, seen)
+        if has_lr:
+            lr_rules.add(name)
+    return lr_rules
+
+
+def rewrite_left_recursion(ast):
+    lr_rules = check_for_left_recursion(ast)
+    new_rules = []
+    for rule in ast[1]:
+        if rule[1] in lr_rules:
+            new_rules.append([rule[0], rule[1], ['leftrec', rule[2], rule[1]]])
+        else:
+            new_rules.append(rule)
+    return ['rules', new_rules]
+
+
+def _check_lr(name, node, rules, seen):
+    # pylint: disable=too-many-branches
+    ty = node[0]
+    if ty == 'action':
+        return False
+    if ty == 'any':
+        return False
+    if ty == 'apply':
+        if node[1] == name:
+            return True  # Direct recursion.
+        if node[1] in ('any', 'anything', 'end'):
+            return False
+        if node[1] in seen:
+            # We've hit left recursion on a different rule, so, no.
+            return False
+        seen.add(node[1])
+        return _check_lr(name, rules[node[1]], rules, seen)
+    if ty == 'capture':
+        return _check_lr(name, node[1], rules, seen)
+    if ty == 'choice':
+        return any(_check_lr(name, n, rules, seen) for n in node[1])
+    if ty == 'empty':
+        return False
+    if ty == 'eq':
+        return False
+    if ty == 'label':
+        return _check_lr(name, node[1], rules, seen)
+    if ty == 'lit':
+        return False
+    if ty == 'not':
+        return _check_lr(name, node[1], rules, seen)
+    if ty == 'opt':
+        return _check_lr(name, node[1], rules, seen)
+    if ty == 'paren':
+        return _check_lr(name, node[1], rules, seen)
+    if ty == 'plus':
+        return _check_lr(name, node[1], rules, seen)
+    if ty == 'pos':
+        return False
+    if ty == 'post':
+        return _check_lr(name, node[1], rules, seen)
+    if ty == 'pred':
+        return False
+    if ty == 'range':
+        return False
+    if ty == 'scope':
+        for subnode in node[1]:
+            r = _check_lr(name, subnode, rules, seen)
+            if r:
+                return r
+        return False
+    if ty == 'seq':
+        for subnode in node[1]:
+            if subnode[0] == 'lit':
+                return False
+            r = _check_lr(name, subnode, rules, seen)
+            if r:
+                return r
+        return False
+    if ty == 'star':
+        return _check_lr(name, node[1], rules, seen)
+
+    assert False, 'unexpected AST node type %s' % ty  # pragma: no cover
