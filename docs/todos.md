@@ -3,6 +3,9 @@
 * grammar_test.py: Figure out what should happen in
   disabled_test_recursion_left_opt.
 
+* compiler.py: Figure out how to prune any methods that aren't actually
+  needed for the parser.
+
 * compiler.py: Figure out how to handle inlining methods more consistently
   in _compile so that we don't have the special-casing logic here. Same
   thing in analyzer.py rewrite_singles().
