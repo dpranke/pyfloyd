@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any, Tuple
+
 from floyd.analyzer import Analyzer
 from floyd.compiler import Compiler
 from floyd.interpreter import Interpreter
@@ -19,55 +21,79 @@ from floyd.parser import Parser
 from floyd.printer import Printer
 
 
-def compile_parser(grammar, path='<string>', memoize=False):
-    p = CompiledParser()
-    _, err = p.compile(grammar, path=path, memoize=memoize)
-    if err:
-        return None, err
-    return p, None
+class ParserInterface:
+    def parse(
+        self, text: str, path: str = '<string>'
+    ) -> Tuple[Any, str | None, int]:
+        raise NotImplementedError
 
 
-class CompiledParser:
+class _CompiledParser(ParserInterface):
     def __init__(self):
         self.grammar = None
         self.interpreter = None
 
-    def compile(self, grammar, path='<string>', memoize=False):
+    def compile(
+        self, grammar: str, path: str = '<string>', memoize: bool = False
+    ) -> Tuple[str | None, int]:
         parser = Parser(grammar, path)
-        ast, err, _ = parser.parse()
+        ast, err, endpos = parser.parse()
         if err:
-            return None, err
+            return err, endpos
         self.grammar = Analyzer().analyze(ast)
         self.interpreter = Interpreter(self.grammar, memoize=memoize)
-        return None, None
+        return None, 0
 
-    def parse(self, text, path='<string>'):
-        out, err, _ = self.interpreter.parse(text, path)
-        return out, err
+    def parse(
+        self, text: str, path: str = '<string>'
+    ) -> Tuple[Any, str | None, int]:
+        out, err, endpos = self.interpreter.parse(text, path)
+        return out, err, endpos
+
+
+def compile_parser(
+    grammar: str, path: str = '<string>', memoize: bool = False
+) -> Tuple[ParserInterface | None, str | None, int]:
+    p = _CompiledParser()
+    err, endpos = p.compile(grammar, path=path, memoize=memoize)
+    if err:
+        return None, err, endpos
+    return p, None, endpos
 
 
 def generate_parser(
-    grammar, class_name='Parser', main=False, memoize=False, path='<string>'
-):
-    ast, err, _ = Parser(grammar, path).parse()
+    grammar: str,
+    class_name: str = 'Parser',
+    main: bool = False,
+    memoize: bool = False,
+    path: str = '<string>',
+) -> Tuple[str | None, str | None, int]:
+    ast, err, endpos = Parser(grammar, path).parse()
     if err:
-        return None, err
+        return None, err, endpos
     ast = Analyzer().analyze(ast)
-    return Compiler(ast, class_name, main, memoize).compile()
+    _, err = Compiler(ast, class_name, main, memoize).compile()
+    return err
 
 
 def parse(
-    grammar, text, grammar_path='<string>', path='<string>', memoize=False
-):
+    grammar: str,
+    text: str,
+    grammar_path: str = '<string>',
+    path: str = '<string>',
+    memoize: bool = False,
+) -> Tuple[Any, str | None, int]:
     """Match an input text against the specified grammar."""
-    c, err = compile_parser(grammar, grammar_path, memoize=memoize)
+    c, err, endpos = compile_parser(grammar, grammar_path, memoize=memoize)
     if err:
-        return c, 'Error in grammar: ' + err
-    val, err = c.parse(text, path)
-    return val, err
+        return c, 'Error in grammar: ' + err, endpos
+    assert c is not None  # This makes mypy not warn about a union-attr
+    return c.parse(text, path)
 
 
-def pretty_print(grammar, path='<string>'):
+def pretty_print(
+    grammar: str, path: str = '<string>'
+) -> Tuple[str | None, str | None]:
     parser = Parser(grammar, path)
     ast, err, _ = parser.parse()
     if err:

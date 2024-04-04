@@ -15,7 +15,7 @@
 import enum
 import textwrap
 
-from . import string_literal
+from floyd import string_literal
 
 
 Whitespace = enum.Enum(
@@ -360,7 +360,7 @@ _DEFAULT_RULES = {
 
 
 class Compiler:
-    def __init__(self, grammar, classname, main_wanted, memoize=True):
+    def __init__(self, grammar, classname, main_wanted=True, memoize=True):
         self.grammar = grammar
         self.classname = classname
         self._depth = 0
@@ -627,7 +627,8 @@ class Compiler:
             self._bindings_needed = True
             self._flatten(["self._push('", rule, "')"])
         self._flatten(
-            ['self._leftrec(', OI, sub_rule, ',', "'", node[2], "'", OU, ')'])
+            ['self._leftrec(', OI, sub_rule, ',', "'", node[2], "'", OU, ')']
+        )
         if needs_scope:
             self._bindings_needed = True
             self._flatten(["self._pop('", rule, "')"])

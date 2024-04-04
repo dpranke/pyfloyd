@@ -19,7 +19,7 @@ class Printer:
     def __init__(self, grammar):
         self.grammar = grammar
 
-    def dumps(self):
+    def dumps(self) -> str:
         rules, max_rule_len, max_choice_len = self._build_rules()
         return self._format_rules(rules, max_rule_len, max_choice_len)
 

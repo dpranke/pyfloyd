@@ -48,7 +48,7 @@ def main(argv=None, host=None):
         if args.pretty_print:
             contents, err = floyd.pretty_print(grammar, args.grammar)
         elif args.compile:
-            contents, err = floyd.generate_parser(
+            contents, err, _ = floyd.generate_parser(
                 grammar,
                 class_name=args.class_name,
                 main=args.main,
@@ -56,7 +56,7 @@ def main(argv=None, host=None):
                 path=args.grammar,
             )
         else:
-            contents, err = _interpret_grammar(host, args, grammar)
+            contents, err, _ = _interpret_grammar(host, args, grammar)
 
         if err:
             host.print(err, file=host.stderr)
@@ -160,7 +160,7 @@ def _interpret_grammar(host, args, grammar):
     else:
         path, contents = (args.input, host.read_text_file(args.input))
 
-    out, err = floyd.parse(
+    out, err, endpos = floyd.parse(
         grammar,
         contents,
         grammar_path=args.grammar,
@@ -168,10 +168,10 @@ def _interpret_grammar(host, args, grammar):
         memoize=args.memoize,
     )
     if err:
-        return None, err
+        return None, err, endpos
 
     out = json.dumps(out, indent=2, sort_keys=True) + '\n'
-    return out, None
+    return out, None, endpos
 
 
 def _write(host, path, contents):

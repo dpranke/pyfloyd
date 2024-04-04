@@ -21,20 +21,20 @@ class APITest(unittest.TestCase):
     maxDiff = None
 
     def test_compile(self):
-        parser, err = floyd.compile_parser('grammar = "foo" "bar"')
+        parser, err, _ = floyd.compile_parser('grammar = "foo" "bar"')
         self.assertIsNone(err)
 
-        val, err = parser.parse('baz')
+        val, err, _ = parser.parse('baz')
         self.assertIsNone(val)
         self.assertEqual(err, '<string>:1 Unexpected "b" at column 1')
 
     def test_compile_bad_grammar(self):
-        parser, err = floyd.compile_parser('xyz')
+        parser, err, _ = floyd.compile_parser('xyz')
         self.assertIsNone(parser)
         self.assertEqual(err, '<string>:1 Unexpected end of input at column 4')
 
     def test_generate_parser(self):
-        txt, err = floyd.generate_parser('grammar = "Hello" end -> true')
+        txt, err, _ = floyd.generate_parser('grammar = "Hello" end -> true')
         self.assertIsNone(err)
         scope = {}
         exec(txt, scope)
@@ -44,17 +44,19 @@ class APITest(unittest.TestCase):
         self.assertEqual(obj, True)
 
     def test_generate_parser_fails(self):
-        txt, err = floyd.generate_parser('xyz')
+        txt, err, _ = floyd.generate_parser('xyz')
         self.assertIsNone(txt)
         self.assertEqual(err, '<string>:1 Unexpected end of input at column 4')
 
     def test_parse(self):
-        obj, err = floyd.parse('grammar = "Hello, world" end', 'Hello, world')
+        obj, err, _ = floyd.parse(
+            'grammar = "Hello, world" end', 'Hello, world'
+        )
         self.assertEqual(obj, None)
         self.assertEqual(err, None)
 
     def test_parse_grammar_err(self):
-        obj, err = floyd.parse('grammar', '')
+        obj, err, _ = floyd.parse('grammar', '')
         self.assertEqual(obj, None)
         self.assertEqual(
             err,
