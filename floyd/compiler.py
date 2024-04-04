@@ -112,7 +112,7 @@ class %s:
         self._scopes = []
         self._cache = {}
         self._blocked = set()
-        self._seeds = []
+        self._seeds = {}
 
     def parse(self):
         try:
@@ -621,9 +621,16 @@ class Compiler:
         )
 
     def _leftrec_(self, rule, node):
-        var = string_literal.encode(node[2])
-        val = self._eval_rule(rule, node[1])
-        self._flatten(['self._leftrec(', OI, val, ', ', var, OU, ')'])
+        sub_rule = self._compile(node[1], rule + '_l')
+        needs_scope = self._has_labels(node)
+        if needs_scope:
+            self._bindings_needed = True
+            self._flatten(["self._push('", rule, "')"])
+        self._flatten(
+            ['self._leftrec(', OI, sub_rule, ',', "'", node[2], "'", OU, ')'])
+        if needs_scope:
+            self._bindings_needed = True
+            self._flatten(["self._pop('", rule, "')"])
 
     def _action_(self, rule, node):
         self._depth = 0

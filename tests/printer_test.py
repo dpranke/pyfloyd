@@ -67,3 +67,9 @@ class PrinterTest(unittest.TestCase):
         out, err = floyd.pretty_print(grammar)
         self.assertEqual(grammar, out)
         self.assertIsNone(err)
+
+    def test_leftrec(self):
+        grammar = "grammar = grammar 'a' | 'a'\n"
+        out, err = floyd.pretty_print(grammar)
+        self.assertEqual(grammar, out)
+        self.assertIsNone(err)

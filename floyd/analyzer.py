@@ -84,8 +84,6 @@ def _check_lr(name, node, rules, seen):
     ty = node[0]
     if ty == 'action':
         return False
-    if ty == 'any':
-        return False
     if ty == 'apply':
         if node[1] == name:
             return True  # Direct recursion.
@@ -96,13 +94,9 @@ def _check_lr(name, node, rules, seen):
             return False
         seen.add(node[1])
         return _check_lr(name, rules[node[1]], rules, seen)
-    if ty == 'capture':
-        return _check_lr(name, node[1], rules, seen)
     if ty == 'choice':
         return any(_check_lr(name, n, rules, seen) for n in node[1])
     if ty == 'empty':
-        return False
-    if ty == 'eq':
         return False
     if ty == 'label':
         return _check_lr(name, node[1], rules, seen)
@@ -110,25 +104,13 @@ def _check_lr(name, node, rules, seen):
         return False
     if ty == 'not':
         return _check_lr(name, node[1], rules, seen)
-    if ty == 'opt':
-        return _check_lr(name, node[1], rules, seen)
     if ty == 'paren':
         return _check_lr(name, node[1], rules, seen)
-    if ty == 'plus':
-        return _check_lr(name, node[1], rules, seen)
-    if ty == 'pos':
-        return False
     if ty == 'post':
         return _check_lr(name, node[1], rules, seen)
     if ty == 'pred':
         return False
     if ty == 'range':
-        return False
-    if ty == 'scope':
-        for subnode in node[1]:
-            r = _check_lr(name, subnode, rules, seen)
-            if r:
-                return r
         return False
     if ty == 'seq':
         for subnode in node[1]:
@@ -138,7 +120,5 @@ def _check_lr(name, node, rules, seen):
             if r:
                 return r
         return False
-    if ty == 'star':
-        return _check_lr(name, node[1], rules, seen)
 
     assert False, 'unexpected AST node type %s' % ty  # pragma: no cover

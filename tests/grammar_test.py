@@ -41,6 +41,11 @@ class GrammarTestsMixin:
         self.assertEqual(err, p_err)
 
     def test_any_fails(self):
+        self.check('grammar = any', '',
+                   err='<string>:1 Unexpected end of input at column 1')
+
+    def test_any_fails_in_parser(self):
+        # This tests what happens when a grammar itself fails the 'any' test.
         self.check_grammar_error(
             "grammar = '",
             err='<string>:1 Unexpected end of input at column 12',
@@ -284,6 +289,59 @@ class GrammarTestsMixin:
             out=None,
             err='<string>:1 Bad predicate value',
         )
+
+    def test_recursion_direct_left(self):
+        self.check("""\
+            grammar = grammar:g '+' 'a' -> [g, '+', 'a']
+                    | 'a'               -> 'a'
+            """,
+            'a+a+a', [['a', '+', 'a'], '+', 'a'])
+
+    def test_recursion_direct_right(self):
+        self.check("""\
+            grammar = 'a' '+' grammar:g -> ['a', '+', g]
+                    | 'a'               -> 'a'
+            """,
+            'a+a+a', ['a', '+', ['a', '+', 'a']])
+
+    def test_recursion_indirect_left(self):
+        self.check("""\
+            grammar = b:b '+' 'a'   -> [b, '+', 'a']
+                    | 'a'           -> 'a'
+            b       = grammar:g     -> g
+            """,
+            'a+a+a', [['a', '+', 'a'], '+', 'a'])
+
+    def test_recursion_indirect_right(self):
+        self.check("""\
+            grammar = 'a' '+' b:b   -> ['a', '+', b]
+                    | 'a'           -> 'a'
+            b       = grammar:g     -> g
+            """,
+            'a+a+a', ['a', '+', ['a', '+', 'a']])
+
+    def test_recursion_interior(self):
+        self.check("""\
+            grammar = 'a' grammar:g 'b' -> 'a' + g + 'b'| 'ab' -> 'ab'
+            """,
+            'aabb', 'aabb')
+
+    def disabled_test_recursion_left_opt(self):
+        # TODO: Figure out what should actually happen here and whether
+        # there's a bug.
+        grammar = textwrap.dedent("""\
+            grammar = 'b'?:b grammar:g 'c' -> join('', b) + g + 'c'
+                    | 'a'                  -> 'a'
+            """)
+        self.check(grammar, 'ac', 'ac')
+        self.check(grammar, 'bac', 'bac')
+
+    def test_recursion_repeated(self):
+        self.check("""
+            grammar = grammar:x grammar:y 'a' -> [x, y, 'a']
+                    | 'a'                     -> 'a'
+            """,
+            'aaa', ['a', 'a', 'a'])
 
     def test_rule_with_lit_str(self):
         self.check(

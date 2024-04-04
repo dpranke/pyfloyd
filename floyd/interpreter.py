@@ -113,6 +113,8 @@ class Interpreter:
             if self.pos != self.end:
                 self._succeed(self.msg[self.pos], self.pos + 1)
                 return
+            self._fail()
+            return
 
         for rule in self.grammar.rules:
             if rule_name == rule[1]:
@@ -121,7 +123,7 @@ class Interpreter:
 
         # TODO: figure out if/when this can actually be reached. Shouldn't
         # this be caught while validating the grammar?
-        self._fail("Error: no rule named '%s'" % rule_name)
+        self._fail("Error: no rule named '%s'" % rule_name) # pragma: no cover
 
     def _handle_choice(self, node):
         pos = self.pos
