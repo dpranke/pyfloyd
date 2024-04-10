@@ -25,7 +25,7 @@ class ParserInterface:
     def parse(
         self, text: str, path: str = '<string>'
     ) -> Tuple[Any, str | None, int]:
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
 
 class _CompiledParser(ParserInterface):
@@ -72,8 +72,8 @@ def generate_parser(
     if err:
         return None, err, endpos
     ast = Analyzer().analyze(ast)
-    _, err = Compiler(ast, class_name, main, memoize).compile()
-    return err
+    text, err = Compiler(ast, class_name, main, memoize).compile()
+    return text, err, 0
 
 
 def parse(

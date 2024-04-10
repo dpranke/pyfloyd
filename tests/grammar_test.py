@@ -26,17 +26,17 @@ THIS_DIR = pathlib.Path(__file__).parent
 
 class GrammarTestsMixin:
     def check(self, grammar, text, out=None, err=None):
-        p, p_err = self.compile(textwrap.dedent(grammar))
+        p, p_err, _ = self.compile(textwrap.dedent(grammar))
         self.assertIsNone(p_err)
         self.checkp(p, text, out, err)
 
     def checkp(self, parser, text, out=None, err=None):
-        actual_out, actual_err = parser.parse(text)
+        actual_out, actual_err, _ = parser.parse(text)
         self.assertEqual(out, actual_out)
         self.assertEqual(err, actual_err)
 
     def check_grammar_error(self, grammar, err):
-        p, p_err = self.compile(grammar)
+        p, p_err, _ = self.compile(grammar)
         self.assertIsNone(p)
         self.assertEqual(err, p_err)
 
@@ -151,9 +151,9 @@ class GrammarTestsMixin:
         h = floyd.host.Host()
         path = str(THIS_DIR / '../grammars/floyd.g')
         grammar = h.read_text_file(path)
-        p, err = self.compile(grammar, path)
+        p, err, _ = self.compile(grammar, path)
         self.assertIsNone(err)
-        out, err = p.parse(grammar, '../grammars/floyd.g')
+        out, err, _ = p.parse(grammar, '../grammars/floyd.g')
         # We don't check the actual output here because it is too long
         # and we don't want the test to be so sensitive to the AST for
         # the floyd grammar.
@@ -169,7 +169,7 @@ class GrammarTestsMixin:
     def test_json5(self):
         h = floyd.host.Host()
         path = str(THIS_DIR / '../grammars/json5.g')
-        p, err = self.compile(h.read_text_file(path))
+        p, err, _ = self.compile(h.read_text_file(path))
         self.checkp(p, text='123', out=123)
         self.checkp(p, text='Infinity', out=float('inf'))
         self.checkp(p, text='null', out=None)
@@ -185,7 +185,7 @@ class GrammarTestsMixin:
         )
 
         # Can't use check for this because NaN != NaN.
-        obj, err = p.parse('NaN')
+        obj, err, _ = p.parse('NaN')
         self.assertTrue(math.isnan(obj))
         self.assertTrue(err is None)
 
@@ -397,12 +397,12 @@ class Compiler(unittest.TestCase, GrammarTestsMixin):
     max_diff = None
 
     def compile(self, grammar, path='<string>'):
-        source_code, err = floyd.generate_parser(
+        source_code, err, endpos = floyd.generate_parser(
             textwrap.dedent(grammar), main=False, memoize=False, path=path
         )
         if err:
             assert source_code is None
-            return None, err
+            return None, err, endpos
 
         scope = {}
         debug = False
@@ -414,7 +414,7 @@ class Compiler(unittest.TestCase, GrammarTestsMixin):
         parser_cls = scope['Parser']
         if debug:  # pragma: no cover
             h.rmtree(d)
-        return _ParserWrapper(parser_cls), None
+        return _ParserWrapper(parser_cls), None, 0
 
 
 class _ParserWrapper:
@@ -423,5 +423,4 @@ class _ParserWrapper:
 
     def parse(self, text, path='<string>'):
         parser = self.parser_cls(text, path)
-        out, err, _ = parser.parse()
-        return out, err
+        return parser.parse()

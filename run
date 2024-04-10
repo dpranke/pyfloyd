@@ -99,7 +99,6 @@ class Runner:
         )
 
         self.add_parser('coverage', help='Run tests and report code coverage.')
-
         subp = self.add_parser(
             'format', help='Format the source code with ruff.'
         )
@@ -118,6 +117,8 @@ class Runner:
         )
 
         self.add_parser('lint', help='Lint the source code with pylint.')
+
+        self.add_parser('mypy', help='Typecheck the code with mypy.')
 
         subp = self.add_parser('publish', help='Upload packages to PyPI.')
         subp.add_argument(
@@ -197,13 +198,17 @@ class Runner:
     def run_lint(self):
         self.call(sys.executable + ' -m pylint run */*.py', shell=True)
 
+    def run_mypy(self):
+        self.call(sys.executable + ' -m mypy run */*.py', shell=True)
+
     def run_presubmit(self):
-        self.run_check()
-        self.run_lint()
-        self.run_tests()
-        self.run_coverage()
         self.args.check = True
         self.run_format()
+        self.run_check()
+        self.run_lint()
+        self.run_mypy()
+        self.run_tests()
+        self.run_coverage()
 
     def run_publish(self):
         if not self.args.test and not self.args.prod:
