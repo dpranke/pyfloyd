@@ -44,7 +44,7 @@ class PrinterTest(unittest.TestCase):
         self.assertEqual(grammar, out)
         self.assertIsNone(err)
 
-    def test_floyd(self):
+    def test_floyd(self):  # pragma: no cover
         return
         # TODO: Improve printer algorithm enough for this to work
         # without requiring all the rules to be more than 80 chars wide.

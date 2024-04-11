@@ -70,8 +70,6 @@ def main(argv=None, host=None):
         host.print('Interrupted, exiting.', file=host.stderr)
         return 130  # SIGINT
 
-    return 0
-
 
 def _parse_args(host, argv):
     ap = argparse.ArgumentParser(prog='floyd')
