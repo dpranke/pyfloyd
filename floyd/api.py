@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Tuple
+from typing import Any, Optional, Tuple
 
 from floyd.analyzer import Analyzer
 from floyd.compiler import Compiler
@@ -24,7 +24,7 @@ from floyd.printer import Printer
 class ParserInterface:
     def parse(
         self, text: str, path: str = '<string>'
-    ) -> Tuple[Any, str | None, int]:
+    ) -> Tuple[Any, Optional[str], int]:
         raise NotImplementedError  # pragma: no cover
 
 
@@ -35,7 +35,7 @@ class _CompiledParser(ParserInterface):
 
     def compile(
         self, grammar: str, path: str = '<string>', memoize: bool = False
-    ) -> Tuple[str | None, int]:
+    ) -> Tuple[Optional[str], int]:
         parser = Parser(grammar, path)
         ast, err, endpos = parser.parse()
         if err:
@@ -46,14 +46,14 @@ class _CompiledParser(ParserInterface):
 
     def parse(
         self, text: str, path: str = '<string>'
-    ) -> Tuple[Any, str | None, int]:
+    ) -> Tuple[Any, Optional[str], int]:
         out, err, endpos = self.interpreter.parse(text, path)
         return out, err, endpos
 
 
 def compile_parser(
     grammar: str, path: str = '<string>', memoize: bool = False
-) -> Tuple[ParserInterface | None, str | None, int]:
+) -> Tuple[Optional[ParserInterface], Optional[str], int]:
     p = _CompiledParser()
     err, endpos = p.compile(grammar, path=path, memoize=memoize)
     if err:
@@ -67,7 +67,7 @@ def generate_parser(
     main: bool = False,
     memoize: bool = False,
     path: str = '<string>',
-) -> Tuple[str | None, str | None, int]:
+) -> Tuple[Optional[str], Optional[str], int]:
     ast, err, endpos = Parser(grammar, path).parse()
     if err:
         return None, err, endpos
@@ -82,7 +82,7 @@ def parse(
     grammar_path: str = '<string>',
     path: str = '<string>',
     memoize: bool = False,
-) -> Tuple[Any, str | None, int]:
+) -> Tuple[Any, Optional[str], int]:
     """Match an input text against the specified grammar."""
     c, err, endpos = compile_parser(grammar, grammar_path, memoize=memoize)
     if err:
@@ -93,7 +93,7 @@ def parse(
 
 def pretty_print(
     grammar: str, path: str = '<string>'
-) -> Tuple[str | None, str | None]:
+) -> Tuple[Optional[str], Optional[str]]:
     parser = Parser(grammar, path)
     ast, err, _ = parser.parse()
     if err:
