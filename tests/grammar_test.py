@@ -372,7 +372,7 @@ class GrammarTestsMixin:
         self.check(
             grammar,
             'bac',
-            err='<string>:1 Unexpected end of input at column 4'
+            err='<string>:1 Unexpected end of input at column 4',
         )
 
     def test_recursion_repeated(self):
