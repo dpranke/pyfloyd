@@ -293,6 +293,17 @@ class GrammarTestsMixin:
             err='<string>:1 Bad predicate value',
         )
 
+    def test_recursion_both(self):
+        grammar = """\
+            expr = expr:l '+' expr:r -> [l, '+', r]
+                 | '0'..'9':d        -> d
+            """
+        # Note that a grammar that is both left- and right-recursive
+        # ends up being right-associative.
+        # TODO: Figure out a way to make it be (optionally?) left-associative
+        # instead.
+        self.check(grammar, '1+2+3', ['1', '+', ['2', '+', '3']])
+
     def test_recursion_direct_left(self):
         self.check(
             """\
@@ -344,15 +355,25 @@ class GrammarTestsMixin:
             'aabb',
         )
 
-    def disabled_test_recursion_left_opt(self):
-        # TODO: Figure out what should actually happen here and whether
-        # there's a bug.
+    def test_recursion_left_opt(self):
         grammar = textwrap.dedent("""\
             grammar = 'b'?:b grammar:g 'c' -> join('', b) + g + 'c'
-                    | 'a'                  -> 'a'
+                    | 'a'           -> 'a'
             """)
         self.check(grammar, 'ac', 'ac')
-        self.check(grammar, 'bac', 'bac')
+        self.check(grammar, 'acc', 'acc')
+
+        # This result, while counter-intuitive, is correct (I think).
+        # The initial invocation parses a 'b', then invokes grammar
+        # recursively, then expects there to be a 'c' left over.
+        # However, because grammar is left-recursive, once it gets
+        # going it consumes all of the remaining c's (as per the line
+        # above), and doesn't leave any left over for the first invocation.
+        self.check(
+            grammar,
+            'bac',
+            err='<string>:1 Unexpected end of input at column 4'
+        )
 
     def test_recursion_repeated(self):
         self.check(

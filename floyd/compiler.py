@@ -111,7 +111,6 @@ class %s:
         self.errpos = 0
         self._scopes = []
         self._cache = {}
-        self._blocked = set()
         self._seeds = {}
 
     def parse(self):
@@ -172,11 +171,8 @@ _HELPER_METHODS = """\
         if seed:
             self.val, self.failed, self.pos = seed
             return
-        if rule_name in self._blocked:
-            self._fail()
         current = (None, True, self.pos)
         self._seeds[key] = current
-        self._blocked.add(rule_name)
         while True:
             rule()
             if self.pos > current[2]:
@@ -185,9 +181,6 @@ _HELPER_METHODS = """\
                 self.pos = pos
             else:
                 del self._seeds[key]
-                self._seeds.pop(rule_name, pos)
-                if rule_name in self._blocked:
-                    self._blocked.remove(rule_name)
                 self.val, self.failed, self.pos = current
                 return
 

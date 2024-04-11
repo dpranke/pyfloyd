@@ -1,7 +1,8 @@
 # Things TODO
 
-* grammar_test.py: Figure out what should happen in
-  disabled_test_recursion_left_opt.
+* grammars that are both left- and right-recursive end up being
+  right-associative. Figure out how to make them be (optionally?)
+  left-associative instead.
 
 * compiler.py: Figure out how to prune any methods that aren't actually
   needed for the parser.

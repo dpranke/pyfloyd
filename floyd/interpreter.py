@@ -31,7 +31,6 @@ class Interpreter:
         self.errpos = 0
         self.scopes = []
         self.seeds = {}
-        self.blocked = set()
 
     def parse(self, msg, fname):
         self.msg = msg
@@ -152,6 +151,12 @@ class Interpreter:
             self._succeed()
 
     def _handle_leftrec(self, node):
+        # This approach to handling left-recursion is based on the approach
+        # described in "Parsing Expression Grammars Made Practical" by
+        # Laurent and Mens, 2016. It does not contain the mechanism for
+        # making the rule be left-associative, because that didn't seem
+        # to work correctly. See the TODO about this (e.g., in
+        # test_recursion_both() in grammar_test.py).
         pos = self.pos
         rule_name = node[2]
         key = (rule_name, pos)
@@ -159,11 +164,8 @@ class Interpreter:
         if seed:
             self.val, self.failed, self.pos = seed
             return
-        if rule_name in self.blocked:
-            self._fail()
         current = (None, True, self.pos)
         self.seeds[key] = current
-        self.blocked.add(rule_name)
         while True:
             self._interpret(node[1])
             if self.pos > current[2]:
@@ -172,9 +174,6 @@ class Interpreter:
                 self.pos = pos
             else:
                 del self.seeds[key]
-                self.seeds.pop(rule_name, pos)
-                if rule_name in self.blocked:
-                    self.blocked.remove(rule_name)
                 self.val, self.failed, self.pos = current
                 return
 
