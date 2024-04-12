@@ -43,7 +43,6 @@ _DEFAULT_HEADER = """\
 # pylint: disable=line-too-long,too-many-lines,unnecessary-lambda
 
 import unicodedata  # noqa: F401 pylint: disable=unused-import
-
 """
 
 
@@ -53,13 +52,14 @@ _DEFAULT_FOOTER = ''
 _MAIN_HEADER = """\
 #!/usr/bin/env python
 
+# pylint: disable=line-too-long,too-many-lines,unnecessary-lambda
+
 import argparse
 import json
 import os
 import sys
-import unicodedata
+import unicodedata  # noqa: F401 pylint: disable=unused-import
 
-# pylint: disable=line-too-long
 
 def main(argv=sys.argv[1:], stdin=sys.stdin, stdout=sys.stdout,
          stderr=sys.stderr, exists=os.path.exists, opener=open):
@@ -88,16 +88,12 @@ def main(argv=sys.argv[1:], stdin=sys.stdin, stdout=sys.stdout,
 
 
 _MAIN_FOOTER = """\
-
-
 if __name__ == '__main__':
     sys.exit(main())
 """
 
 
 _PUBLIC_METHODS = """\
-
-
 class _ParsingRuntimeError(Exception):
     pass
 
@@ -118,7 +114,7 @@ class %s:
     def parse(self):
         try:
             self._%s_()
-        except _ParsingRuntimeError as e:
+        except _ParsingRuntimeError as e:  # pragma: no cover
             lineno, _ = self._err_offsets()
             return (None, f'{self.fname}:{lineno} ' + str(e), self.errpos)
         if self.failed:
@@ -165,26 +161,6 @@ _HELPER_METHODS = """\
         rule()
         if not self.failed:
             self._set(var, self.val)
-
-    def _leftrec(self, rule, rule_name):
-        pos = self.pos
-        key = (rule_name, pos)
-        seed = self._seeds.get(key)
-        if seed:
-            self.val, self.failed, self.pos = seed
-            return
-        current = (None, True, self.pos)
-        self._seeds[key] = current
-        while True:
-            rule()
-            if self.pos > current[2]:
-                current = (self.val, self.failed, self.pos)
-                self._seeds[key] = current
-                self.pos = pos
-            else:
-                del self._seeds[key]
-                self.val, self.failed, self.pos = current
-                return
 
     def _not(self, rule):
         p = self.pos
@@ -239,13 +215,15 @@ _HELPER_METHODS = """\
             self._rewind(p)
         rules[-1]()
 
-    def _unicat(self, cat):
+    def _unicat(self, cat):  # pragma: no cover
+        # TODO: Figure out how to omit this if it isn't needed.
         p = self.pos
         if p < self.end and unicodedata.category(self.msg[p]) == cat:
             self._succeed(self.msg[p], self.pos + 1)
         else:
             self._fail()
 """
+
 
 _EXPECT = """\
 
@@ -264,6 +242,31 @@ _EXPECT = """\
         self.val = s
 """
 
+
+_LEFTREC = """\
+
+    def _leftrec(self, rule, rule_name):
+        pos = self.pos
+        key = (rule_name, pos)
+        seed = self._seeds.get(key)
+        if seed:
+            self.val, self.failed, self.pos = seed
+            return
+        current = (None, True, self.pos)
+        self._seeds[key] = current
+        while True:
+            rule()
+            if self.pos > current[2]:
+                current = (self.val, self.failed, self.pos)
+                self._seeds[key] = current
+                self.pos = pos
+            else:
+                del self._seeds[key]
+                self.val, self.failed, self.pos = current
+                return
+"""
+
+
 _RANGE = """\
 
     def _range(self, i, j):
@@ -273,6 +276,7 @@ _RANGE = """\
         else:
             self._fail()
 """
+
 
 _BINDINGS = """\
 
@@ -287,7 +291,7 @@ _BINDINGS = """\
         if not self._scopes or var not in self._scopes[-1][1]:
             raise _ParsingRuntimeError(
                 'Reference to unknown variable "%s"' % var
-            )
+            )  # pragma: no cover
         return self._scopes[-1][1][var]
 
     def _set(self, var, val):
@@ -380,6 +384,7 @@ class Compiler:
         self._builtin_rules_needed = set()
         self._bindings_needed = False
         self._expect_needed = False
+        self._leftrec_needed = False
         self._range_needed = False
         self._methods = {}
         self._method_lines = []
@@ -390,12 +395,16 @@ class Compiler:
 
         text = (
             self.header
+            + '\n'
+            + '\n'
             + _PUBLIC_METHODS % (self.classname, self.grammar.starting_rule)
             + _HELPER_METHODS
         )
 
         if self._expect_needed:
             text += _EXPECT
+        if self._leftrec_needed:
+            text += _LEFTREC
         if self._range_needed:
             text += _RANGE
         if self._bindings_needed:
@@ -431,7 +440,8 @@ class Compiler:
             for line in self.builtin_rules[name]:
                 text += '    %s\n' % line
 
-        text += self.footer
+        if self.footer:
+            text += '\n\n' + self.footer
         return text, None
 
     def _method_text(self, name, lines, memoize):
@@ -624,6 +634,7 @@ class Compiler:
 
     def _leftrec_(self, rule, node):
         sub_rule = self._compile(node[1], rule + '_l')
+        self._leftrec_needed = True
         needs_scope = self._has_labels(node)
         if needs_scope:
             self._bindings_needed = True

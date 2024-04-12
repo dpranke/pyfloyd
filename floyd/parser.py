@@ -23,7 +23,7 @@ class Parser:
     def parse(self):
         try:
             self._grammar_()
-        except _ParsingRuntimeError as e:
+        except _ParsingRuntimeError as e:  # pragma: no cover
             lineno, _ = self._err_offsets()
             return (None, f'{self.fname}:{lineno} ' + str(e), self.errpos)
         if self.failed:
@@ -67,26 +67,6 @@ class Parser:
         rule()
         if not self.failed:
             self._set(var, self.val)
-
-    def _leftrec(self, rule, rule_name):
-        pos = self.pos
-        key = (rule_name, pos)
-        seed = self._seeds.get(key)
-        if seed:
-            self.val, self.failed, self.pos = seed
-            return
-        current = (None, True, self.pos)
-        self._seeds[key] = current
-        while True:
-            rule()
-            if self.pos > current[2]:
-                current = (self.val, self.failed, self.pos)
-                self._seeds[key] = current
-                self.pos = pos
-            else:
-                del self._seeds[key]
-                self.val, self.failed, self.pos = current
-                return
 
     def _not(self, rule):
         p = self.pos
@@ -141,7 +121,8 @@ class Parser:
             self._rewind(p)
         rules[-1]()
 
-    def _unicat(self, cat):
+    def _unicat(self, cat):  # pragma: no cover
+        # TODO: Figure out how to omit this if it isn't needed.
         p = self.pos
         if p < self.end and unicodedata.category(self.msg[p]) == cat:
             self._succeed(self.msg[p], self.pos + 1)
@@ -180,7 +161,7 @@ class Parser:
         if not self._scopes or var not in self._scopes[-1][1]:
             raise _ParsingRuntimeError(
                 'Reference to unknown variable "%s"' % var
-            )
+            )  # pragma: no cover
         return self._scopes[-1][1][var]
 
     def _set(self, var, val):

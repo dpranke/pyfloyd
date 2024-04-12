@@ -4,6 +4,11 @@
   right-associative. Figure out how to make them be (optionally?)
   left-associative instead.
 
+* compiler.py: Figure out if we can omit generated code if it isn't
+  actually possible to execute it. (See the places where I needed to
+  add `# pragma: no cover` to get the code coverage of floyd/parser.py
+  to 100%.
+
 * compiler.py: Figure out how to prune any methods that aren't actually
   needed for the parser.
 
@@ -31,8 +36,6 @@
   - use `$0` for matching everything as an array?
 
 * Use `\1` for "text matching $1".
-
-* Replace `is_unicat('Ld') with \p{Ld} (to match regex syntax).
 
 * Support regexp escapes like \d, \s, and so on.
 
