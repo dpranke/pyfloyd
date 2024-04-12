@@ -96,6 +96,8 @@ if __name__ == '__main__':
 
 
 _PUBLIC_METHODS = """\
+
+
 class _ParsingRuntimeError(Exception):
     pass
 
@@ -117,7 +119,7 @@ class %s:
         try:
             self._%s_()
         except _ParsingRuntimeError as e:
-            lineno, colno = self._err_offsets()
+            lineno, _ = self._err_offsets()
             return (None, f'{self.fname}:{lineno} ' + str(e), self.errpos)
         if self.failed:
             return None, self._err_str(), self.errpos
@@ -236,6 +238,13 @@ _HELPER_METHODS = """\
                 return
             self._rewind(p)
         rules[-1]()
+
+    def _unicat(self, cat):
+        p = self.pos
+        if p < self.end and unicodedata.category(self.msg[p]) == cat:
+            self._succeed(self.msg[p], self.pos + 1)
+        else:
+            self._fail()
 """
 
 _EXPECT = """\
@@ -693,6 +702,10 @@ class Compiler:
                 ')',
             ]
         )
+
+    def _unicat_(self, rule, node):
+        del rule
+        self._flatten(['self._unicat(', string_literal.encode(node[1]), ')'])
 
     #
     # Handlers for the host nodes in the AST

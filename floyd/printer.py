@@ -94,6 +94,9 @@ class Printer:
     def _lit_(self, node):
         return string_literal.encode(node[1])
 
+    def _unicat_(self, node):
+        return '\\p{%s}' % node[1]
+
     def _ll_arr_(self, node):
         return '[%s]' % ', '.join(self._proc(el) for el in node[1])
 

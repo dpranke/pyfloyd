@@ -193,6 +193,13 @@ class Interpreter:
         else:
             self._fail()
 
+    def _handle_unicat(self, node):
+        p = self.pos
+        if p < self.end and unicodedata.category(self.msg[p]) == node[1]:
+            self._succeed(self.msg[p], newpos=p + 1)
+        else:
+            self._fail()
+
     def _handle_ll_arr(self, node):
         vals = []
         for subnode in node[1]:

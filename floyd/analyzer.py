@@ -117,5 +117,7 @@ def _check_lr(name, node, rules, seen):
             if r:
                 return r
         return False
+    if ty == 'unicat':
+        return False
 
     assert False, 'unexpected AST node type %s' % ty  # pragma: no cover

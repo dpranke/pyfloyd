@@ -85,20 +85,20 @@ id_start       = ascii_id_start
 
 ascii_id_start = 'a'..'z' | 'A'..'Z' | '$' | '_'
 
-other_id_start = any:x ?(is_unicat(x, 'Ll'))             -> x
-               | any:x ?(is_unicat(x, 'Lm'))             -> x
-               | any:x ?(is_unicat(x, 'Lo'))             -> x
-               | any:x ?(is_unicat(x, 'Lt'))             -> x
-               | any:x ?(is_unicat(x, 'Lu'))             -> x
-               | any:x ?(is_unicat(x, 'Nl'))             -> x
+other_id_start = \p{Ll}:x                                -> x
+               | \p{Lm}:x                                -> x
+               | \p{Lo}:x                                -> x
+               | \p{Lt}:x                                -> x
+               | \p{Lu}:x                                -> x
+               | \p{Nl}:x                                -> x
 
 id_continue    = ascii_id_start
                | digit
                | other_id_start
-               | any:x ?(is_unicat(x, 'Mn'))             -> x
-               | any:x ?(is_unicat(x, 'Mc'))             -> x
-               | any:x ?(is_unicat(x, 'Nd'))             -> x
-               | any:x ?(is_unicat(x, 'Pc'))             -> x
+               | \p{Mn}:x                                -> x
+               | \p{Mc}:x                                -> x
+               | \p{Nd}:x                                -> x
+               | \p{Pc}:x                                -> x
                | bslash unicode_esc
                | '\u200c'
                | '\u200d'

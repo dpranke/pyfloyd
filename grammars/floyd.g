@@ -32,6 +32,7 @@ post_op     = '?' | '*' | '+'
 
 prim_expr   = lit:i sp '..' sp lit:j              -> ['range', i, j]
             | lit:l                               -> l
+            | escape:e                            -> e
             | ident:i ~(sp '=')                   -> ['apply', i]
             | '->' sp ll_expr:e                   -> ['action', e]
             | '~' prim_expr:e                     -> ['not', e]
@@ -71,6 +72,8 @@ unicode_esc = 'u' hex:h1 hex:h2 hex:h3 hex:h4     -> xtou(h1 + h2 + h3 + h4)
             | 'U' hex:h1 hex:h2 hex:h3 hex:h4
                   hex:h5 hex:h6 hex:h7 hex:h8     -> xtou(h1 + h2 + h3 + h4 +
                                                           h5 + h6 + h7 + h8)
+
+escape      = '\\p{' ident:i '}'                  -> ['unicat', i]
 
 ll_exprs    = ll_expr:e (sp ',' sp ll_expr)*:es   -> [e] + es
             |                                     -> []

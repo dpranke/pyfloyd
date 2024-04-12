@@ -30,7 +30,7 @@
 * Replace `:x` bindings with `$1`, `$2`, and so on.
   - use `$0` for matching everything as an array?
 
-* Use `\1` for "text matching $1.
+* Use `\1` for "text matching $1".
 
 * Replace `is_unicat('Ld') with \p{Ld} (to match regex syntax).
 
@@ -62,8 +62,6 @@
     nonterminals, not tokens.
   - Need some kind of better name for nonterminals. Rules?
   - Enforce that tokens can be expressed as regexps.
-
-* Implement left recursion. 
 
 * Figure out how to notate for associativity and precedence without
   having to encode it in the ordering of rules, e.g. so you can write

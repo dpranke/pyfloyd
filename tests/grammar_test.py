@@ -142,6 +142,9 @@ class GrammarTestsMixin:
             'grammar = 1 2 3', err='<string>:1 Unexpected "1" at column 11'
         )
 
+    def test_escape_unicat(self):
+        self.check('grammar = \\p{Nd} -> true', text='1', out=True)
+
     def test_escapes_in_string(self):
         self.check(
             'grammar = "\\n\\\'\\"foo" -> true', text='\n\'"foo', out=True
