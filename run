@@ -17,7 +17,7 @@ class Runner:
         self.verbose = False
 
     def add_parser(self, cmd, help):  # pylint: disable=redefined-builtin
-        method = getattr(self, 'run_' + cmd)
+        method = getattr(self, 'run_' + cmd.replace('-', '_'))
         subp = self.subps.add_parser(cmd, help=help)
         subp.add_argument(
             '-n',
@@ -87,6 +87,13 @@ class Runner:
 
         self.add_parser('build', help='Build the package.')
         self.add_parser('check', help='Lint the source code with ruff.')
+        self.add_parser(
+            'check-regen',
+            help=(
+                'Check to ensure that floyd/parser.py is up to date '
+                'with grammars/floyd.py.'
+            ),
+        )
         self.add_parser('clean', help='Remove any local files.')
         self.add_parser(
             'devenv',
@@ -148,6 +155,18 @@ class Runner:
     def run_check(self):
         self.call([sys.executable, '-m', 'ruff', 'check'])
 
+    def run_check_regen(self):
+        with open('floyd/parser.py', encoding='utf-8') as fp:
+            old = fp.read()
+        self._gen_parser()
+        with open('parser.py', encoding='utf-8') as fp:
+            new = fp.read()
+        os.remove('parser.py')
+        if old != new:
+            print('Need to regenerate the parser with `run regen`.')
+            sys.exit(1)
+        print('floyd/parser.py is up to date.')
+
     def run_clean(self):
         path = shutil.which('git')
         if path is None:
@@ -203,6 +222,7 @@ class Runner:
 
     def run_presubmit(self):
         self.args.check = True
+        self.run_check_regen()
         self.run_format()
         self.run_check()
         self.run_lint()
@@ -235,6 +255,18 @@ class Runner:
         self.call(cmd)
 
     def run_regen(self):
+        self._gen_parser()
+        os.rename('parser.py', 'floyd/parser.py')
+
+    def run_tests(self):
+        self.call(
+            [sys.executable, '-m', 'unittest', 'discover', '-p', '*_test.py']
+        )
+
+    def set_func(self, subp, method):
+        subp.set_defaults(func=lambda _: method())
+
+    def _gen_parser(self):
         self.call(
             [
                 sys.executable,
@@ -248,15 +280,6 @@ class Runner:
                 'grammars/floyd.g',
             ]
         )
-        os.rename('parser.py', 'floyd/parser.py')
-
-    def run_tests(self):
-        self.call(
-            [sys.executable, '-m', 'unittest', 'discover', '-p', '*_test.py']
-        )
-
-    def set_func(self, subp, method):
-        subp.set_defaults(func=lambda _: method())
 
 
 if __name__ == '__main__':
