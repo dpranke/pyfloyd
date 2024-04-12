@@ -84,6 +84,29 @@ class ToolTest(unittest.TestCase):
         finally:
             host.rmtree(d)
 
+    def test_integration_main(self):
+        # This does a full end-to-end test with floyd writing the
+        # compiled parser to the filesystem, loading the file from
+        # filesystem, and using it to parse something.
+        host = floyd.host.Host()
+        d = host.mkdtemp()
+        try:
+            path = d + '/grammar.g'
+            host.write_text_file(path, "grammar = 'foo'* -> true\n")
+            floyd.tool.main(['-c', '--main', path])
+
+            host.write_text_file(d + '/foo.inp', 'foofoo')
+            proc = subprocess.run(
+                [sys.executable, d + '/grammar.py', d + '/foo.inp'],
+                capture_output=True,
+                check=False,
+                text=True,
+            )
+            self.assertEqual(proc.returncode, 0)
+            self.assertEqual(proc.stdout, 'true\n')
+        finally:
+            host.rmtree(d)
+
     def test_interpret_file(self):
         host = FakeHost()
         host.files['grammar.g'] = 'grammar = "Hello" end -> true'
@@ -139,6 +162,35 @@ class ToolTest(unittest.TestCase):
         self.assertEqual(floyd.tool.main(['grammar.g'], host), 130)
         self.assertEqual(host.stdout.getvalue(), '')
         self.assertEqual(host.stderr.getvalue(), 'Interrupted, exiting.\n')
+
+    def test_main(self):
+        host = FakeHost()
+        host.write_text_file('grammar.g', 'grammar = "Hello" end -> true')
+        ret = floyd.tool.main(['-c', '--main', 'grammar.g'], host=host)
+        self.assertEqual(ret, 0)
+        self.assertEqual(host.stdout.getvalue(), '')
+        self.assertEqual(host.stderr.getvalue(), '')
+        parser = host.files['grammar.py']
+        scope = {}
+        exec(parser, scope)
+        main_fn = scope['main']
+        self.assertIsNotNone(main_fn)
+
+    def test_memoize(self):
+        host = FakeHost()
+        host.write_text_file('grammar.g', 'grammar = "Hello" end -> true')
+        ret = floyd.tool.main(['-c', '--memoize', 'grammar.g'], host=host)
+        self.assertEqual(ret, 0)
+        self.assertEqual(host.stdout.getvalue(), '')
+        self.assertEqual(host.stderr.getvalue(), '')
+        parser = host.files['grammar.py']
+        scope = {}
+        exec(parser, scope)
+        parser_cls = scope['Parser']
+        obj, err, endpos = parser_cls('Hello', 'grammar.g').parse()
+        self.assertEqual(obj, True)
+        self.assertIsNone(err)
+        self.assertEqual(endpos, 5)
 
     def test_missing_grammar(self):
         host = FakeHost()

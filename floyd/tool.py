@@ -104,15 +104,15 @@ def _parse_args(host, argv):
     ap.add_argument(
         '--memoize',
         action='store_true',
-        default=True,
-        help='memoize intermediate results (on by default)',
+        default=False,
+        help='memoize intermediate results (off by default)',
     )
     ap.add_argument('--no-memoize', dest='memoize', action='store_false')
     ap.add_argument(
         '--main',
         action='store_true',
-        default=True,
-        help='generate a main() wrapper (on by default)',
+        default=False,
+        help='generate a main() wrapper (off by default)',
     )
     ap.add_argument('--no-main', dest='main', action='store_false')
     ap.add_argument(
