@@ -61,8 +61,14 @@ import sys
 import unicodedata  # noqa: F401 pylint: disable=unused-import
 
 
-def main(argv=sys.argv[1:], stdin=sys.stdin, stdout=sys.stdout,
-         stderr=sys.stderr, exists=os.path.exists, opener=open):
+def main(
+    argv=sys.argv[1:],
+    stdin=sys.stdin,
+    stdout=sys.stdout,
+    stderr=sys.stderr,
+    exists=os.path.exists,
+    opener=open,
+):
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument('file', nargs='?')
     args = arg_parser.parse_args(argv)
@@ -94,11 +100,8 @@ if __name__ == '__main__':
 
 
 _PUBLIC_METHODS = """\
-class _ParsingRuntimeError(Exception):
-    pass
-
-
-class %s:
+{exception}
+class {classname}:
     def __init__(self, msg, fname):
         self.msg = msg
         self.end = len(self.msg)
@@ -108,15 +111,11 @@ class %s:
         self.failed = False
         self.errpos = 0
         self._scopes = []
-        self._cache = {}
-        self._seeds = {}
+        self._cache = {{}}
+        self._seeds = {{}}
 
     def parse(self):
-        try:
-            self._%s_()
-        except _ParsingRuntimeError as e:  # pragma: no cover
-            lineno, _ = self._err_offsets()
-            return (None, f'{self.fname}:{lineno} ' + str(e), self.errpos)
+{start}
         if self.failed:
             return None, self._err_str(), self.errpos
         return self.val, None, self.pos
@@ -129,8 +128,13 @@ _HELPER_METHODS = """\
         if self.errpos == len(self.msg):
             thing = 'end of input'
         else:
-            thing = f'"{self.msg[self.errpos]}"'
-        return f'{self.fname}:{lineno} Unexpected {thing} at column {colno}'
+            thing = '"%s"' % self.msg[self.errpos]
+        return '%s:%d Unexpected %s at column %d' % (
+            self.fname,
+            lineno,
+            thing,
+            colno,
+        )
 
     def _err_offsets(self):
         lineno = 1
@@ -288,10 +292,6 @@ _BINDINGS = """\
         assert name == actual_name
 
     def _get(self, var):
-        if not self._scopes or var not in self._scopes[-1][1]:
-            raise _ParsingRuntimeError(
-                'Reference to unknown variable "%s"' % var
-            )  # pragma: no cover
         return self._scopes[-1][1][var]
 
     def _set(self, var, val):
@@ -383,6 +383,7 @@ class Compiler:
         self._builtin_functions_needed = set()
         self._builtin_rules_needed = set()
         self._bindings_needed = False
+        self._exception_needed = False
         self._expect_needed = False
         self._leftrec_needed = False
         self._range_needed = False
@@ -393,13 +394,33 @@ class Compiler:
         for rule, node in self.grammar.rules.items():
             self._compile(node, rule, top_level=True)
 
-        text = (
-            self.header
-            + '\n'
-            + '\n'
-            + _PUBLIC_METHODS % (self.classname, self.grammar.starting_rule)
-            + _HELPER_METHODS
+        if self._exception_needed:
+            exception = textwrap.dedent("""\
+
+                class _ParsingRuntimeError(Exception):
+                    pass
+
+                """)
+            start = (
+                '        try:\n'
+                '            self._%s_()\n'
+                '        except _ParsingRuntimeError as e:  '
+                '# pragma: no cover\n'
+                '            lineno, _ = self._err_offsets()\n'
+                '            return (\n'
+                '                None,\n'
+                "                self.fname + ':' + str(lineno) + ' ' "
+                '+ str(e),\n'
+                '                self.errpos,\n'
+                '            )' % self.grammar.starting_rule
+            )
+        else:
+            exception = ''
+            start = '        self._%s_()' % self.grammar.starting_rule
+        public_methods = _PUBLIC_METHODS.format(
+            exception=exception, start=start, classname=self.classname
         )
+        text = self.header + '\n' + public_methods + _HELPER_METHODS
 
         if self._expect_needed:
             text += _EXPECT
@@ -466,6 +487,8 @@ class Compiler:
         # TODO: Figure out how to handle inlining methods more consistently
         # so that we don't have the special-casing logic here.
         if node[0] == 'apply':
+            # Unknown rules were caught in analysis so if the rule isn't
+            # one of the ones in the grammar it must be a built-in one.
             if node[1] not in self.grammar.rules:
                 self._builtin_rules_needed.add(node[1])
             return 'self._%s_' % node[1]
@@ -681,6 +704,10 @@ class Compiler:
 
     def _pred_(self, rule, node):
         obj = self._eval_rule(rule, node[1])
+        # TODO: Figure out how to statically analyze predicates to
+        # catch ones that don't return booleans, so that we don't need
+        # the _ParsingRuntimeError exception
+        self._exception_needed = True
         self._flatten(
             [
                 'v = ',
@@ -696,7 +723,7 @@ class Compiler:
                 UN,
                 'else:',
                 IN,
-                'raise _ParsingRuntimeError("Bad predicate value")',
+                "raise _ParsingRuntimeError('Bad predicate value')",
                 UN,
             ]
         )
@@ -769,16 +796,20 @@ class Compiler:
         )
 
     def _ll_qual_(self, rule, node):
-        v = self._eval_rule(rule, node[1])
+        assert node[1][0] == 'll_var'
+        if node[2][0][0] == 'll_call':
+            # Unknown functions should have been caught in analysis.
+            assert node[1][1] in self.builtin_functions
+            self._builtin_functions_needed.add(node[1][1])
+            v = ['self._%s' % node[1][1]]
+        else:
+            v = self._eval_rule(rule, node[1])
         for p in node[2]:
             v += self._eval_rule(rule, p)
         return [v]
 
     def _ll_var_(self, rule, node):
         del rule
-        if node[1] in self.builtin_functions:
-            self._builtin_functions_needed.add(node[1])
-            return ['self._%s' % node[1]]
         return ["self._get('%s')" % node[1]]
 
     def _ll_const_(self, rule, node):

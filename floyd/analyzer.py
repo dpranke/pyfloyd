@@ -15,6 +15,19 @@
 import collections
 
 
+class AnalysisError(Exception):
+    """Raised when something fails one or more static analysis checks."""
+
+    def __init__(self, errors):
+        self.errors = errors
+
+    def __str__(self):
+        s = 'Errors were found:\n  '
+        s += '\n  '.join(error for error in self.errors)
+        s += '\n'
+        return s
+
+
 class Grammar:
     def __init__(self, ast):
         self.ast = ast
@@ -23,15 +36,100 @@ class Grammar:
 
 
 def analyze(ast):
-    if ast[0] != 'rules':
-        ast = ['rules', ast]
-    assert ast[0] == 'rules' and any(n[0] == 'rule' for n in ast[1])
+    """Analyze and optimize the AST.
+
+    This runs any static analysis we can do over the grammars and
+    optimizes what we can. Raises AnalysisError if there are any errors.
+    """
+
+    # Do whatever analysis we can do.
+    _Analyzer().analyze(ast)
+
+    # Now optimize and rewrite the AST as needed.
     ast = _rewrite_singles(ast)
     ast = _rewrite_left_recursion(ast)
     return Grammar(ast)
 
 
+class _Analyzer:
+    def __init__(self):
+        self.rules = set()
+        self.scopes = []
+        self.errors = []
+
+    def analyze(self, ast):
+        self.rules = set(n[1] for n in ast[1])
+        self.walk(ast)
+        if self.errors:
+            raise AnalysisError(self.errors)
+
+    def walk(self, node):
+        ty = node[0]
+
+        if ty == 'seq':
+            # Figure out what, if any, variables are being bound in this
+            # sequence so that we can ensure that only bound variables
+            # are being dereferenced in ll_var nodes.
+            self.scopes.append([])
+            for n in node[1]:
+                if n[0] == 'label':
+                    self.scopes[-1].append(n[2])
+
+        if ty == 'apply':
+            if node[1] not in self.rules and node[1] not in ('any', 'end'):
+                self.errors.append(f'Unknown rule "{node[1]}"')
+        if ty == 'll_qual':
+            assert node[1][0] == 'll_var'
+            name = node[1][1]
+            if node[2][0][0] == 'll_call':
+                if name not in (
+                    'cat',
+                    'dict',
+                    'float',
+                    'hex',
+                    'is_unicat',
+                    'itou',
+                    'join',
+                    'utoi',
+                    'xtoi',
+                    'xtou',
+                ):
+                    self.errors.append(f'Unknown function "{name}" called')
+            else:
+                self.walk(node[1])
+        if ty == 'll_var':
+            if node[1] not in self.scopes[-1]:
+                self.errors.append(f'Unknown variable "{node[1]}" referenced')
+
+        if ty in ('choice', 'll_arr', 'll_call', 'rules', 'seq'):
+            for n in node[1]:
+                self.walk(n)
+        elif ty == 'rule':
+            self.walk(node[2])
+        elif ty in (
+            'action',
+            'label',
+            'll_getitem',
+            'll_paren',
+            'not',
+            'paren',
+            'post',
+            'pred',
+        ):
+            self.walk(node[1])
+        elif ty in ('ll_plus', 'll_minus'):
+            self.walk(node[1])
+            self.walk(node[2])
+        elif ty == 'll_qual':
+            for n in node[2]:
+                self.walk(n)
+
+        if ty == 'seq':
+            self.scopes.pop()
+
+
 def _rewrite_singles(node):
+    """Collapse seqs and choices with only one expr to just the expr."""
     if node[0] == 'rules':
         return [node[0], [_rewrite_singles(n) for n in node[1]]]
     if node[0] == 'rule':
@@ -52,6 +150,7 @@ def _rewrite_singles(node):
 
 
 def _rewrite_left_recursion(ast):
+    """Rewrite the AST to insert leftrec nodes as needed."""
     lr_rules = _check_for_left_recursion(ast)
     new_rules = []
     for rule in ast[1]:

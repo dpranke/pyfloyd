@@ -1,4 +1,4 @@
-grammar     = (sp rule)*:vs sp end                -> vs
+grammar     = (sp rule)*:vs sp end                -> ['rules', vs]
 
 sp          = ws*
 

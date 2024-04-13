@@ -3,10 +3,6 @@
 import unicodedata  # noqa: F401 pylint: disable=unused-import
 
 
-class _ParsingRuntimeError(Exception):
-    pass
-
-
 class Parser:
     def __init__(self, msg, fname):
         self.msg = msg
@@ -21,11 +17,7 @@ class Parser:
         self._seeds = {}
 
     def parse(self):
-        try:
-            self._grammar_()
-        except _ParsingRuntimeError as e:  # pragma: no cover
-            lineno, _ = self._err_offsets()
-            return (None, f'{self.fname}:{lineno} ' + str(e), self.errpos)
+        self._grammar_()
         if self.failed:
             return None, self._err_str(), self.errpos
         return self.val, None, self.pos
@@ -35,8 +27,13 @@ class Parser:
         if self.errpos == len(self.msg):
             thing = 'end of input'
         else:
-            thing = f'"{self.msg[self.errpos]}"'
-        return f'{self.fname}:{lineno} Unexpected {thing} at column {colno}'
+            thing = '"%s"' % self.msg[self.errpos]
+        return '%s:%d Unexpected %s at column %d' % (
+            self.fname,
+            lineno,
+            thing,
+            colno,
+        )
 
     def _err_offsets(self):
         lineno = 1
@@ -158,10 +155,6 @@ class Parser:
         assert name == actual_name
 
     def _get(self, var):
-        if not self._scopes or var not in self._scopes[-1][1]:
-            raise _ParsingRuntimeError(
-                'Reference to unknown variable "%s"' % var
-            )  # pragma: no cover
         return self._scopes[-1][1][var]
 
     def _set(self, var, val):
@@ -203,7 +196,7 @@ class Parser:
         )
 
     def _grammar__s3_(self):
-        self._succeed(self._get('vs'))
+        self._succeed(['rules', self._get('vs')])
 
     def _sp_(self):
         self._star(self._ws_)

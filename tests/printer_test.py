@@ -36,6 +36,15 @@ class PrinterTest(unittest.TestCase):
         self.assertEqual(grammar, out)
         self.assertIsNone(err)
 
+    def test_bad_grammar(self):
+        grammar = 'grammar = end -> foo'
+        out, err = floyd.pretty_print(grammar)
+        self.assertIsNone(out)
+        self.assertEqual(
+            err,
+            'Errors were found:\n  Unknown variable "foo" referenced\n',
+        )
+
     def test_empty(self):
         grammar = textwrap.dedent("""\
             grammar = 'foo' |

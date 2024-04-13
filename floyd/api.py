@@ -14,7 +14,7 @@
 
 from typing import Any, Optional, Tuple
 
-import floyd.analyzer
+from floyd import analyzer
 from floyd.compiler import Compiler
 from floyd.interpreter import Interpreter
 from floyd.parser import Parser
@@ -40,9 +40,12 @@ class _CompiledParser(ParserInterface):
         ast, err, endpos = parser.parse()
         if err:
             return err, endpos
-        self.grammar = floyd.analyzer.analyze(ast)
-        self.interpreter = Interpreter(self.grammar, memoize=memoize)
-        return None, 0
+        try:
+            self.grammar = analyzer.analyze(ast)
+            self.interpreter = Interpreter(self.grammar, memoize=memoize)
+            return None, 0
+        except analyzer.AnalysisError as e:
+            return str(e), endpos
 
     def parse(
         self, text: str, path: str = '<string>'
@@ -71,9 +74,12 @@ def generate_parser(
     ast, err, endpos = Parser(grammar, path).parse()
     if err:
         return None, err, endpos
-    ast = floyd.analyzer.analyze(ast)
-    text, err = Compiler(ast, class_name, main, memoize).compile()
-    return text, err, 0
+    try:
+        grammar = analyzer.analyze(ast)
+        text, err = Compiler(grammar, class_name, main, memoize).compile()
+        return text, err, 0
+    except analyzer.AnalysisError as e:
+        return None, str(e), 0
 
 
 def parse(
@@ -98,5 +104,9 @@ def pretty_print(
     ast, err, _ = parser.parse()
     if err:
         return None, err
-    grammar = floyd.analyzer.analyze(ast)
-    return Printer(grammar).dumps(), None
+
+    try:
+        grammar = analyzer.analyze(ast)
+        return Printer(grammar).dumps(), None
+    except analyzer.AnalysisError as e:
+        return None, str(e)

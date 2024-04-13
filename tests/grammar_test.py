@@ -25,10 +25,11 @@ THIS_DIR = pathlib.Path(__file__).parent
 
 
 class GrammarTestsMixin:
-    def check(self, grammar, text, out=None, err=None):
+    def check(self, grammar, text, out=None, err=None, grammar_err=None):
         p, p_err, _ = self.compile(textwrap.dedent(grammar))
-        self.assertIsNone(p_err)
-        self.checkp(p, text, out, err)
+        self.assertEqual(grammar_err, p_err)
+        if p:
+            self.checkp(p, text, out, err)
 
     def checkp(self, parser, text, out=None, err=None):
         actual_out, actual_err, _ = parser.parse(text)
@@ -129,12 +130,29 @@ class GrammarTestsMixin:
             err='<string>:2 Unexpected "b" at column 1',
         )
 
+    def test_error_on_unknown_function(self):
+        self.check(
+            'grammar = -> foo()',
+            text='',
+            grammar_err=(
+                'Errors were found:\n' '  Unknown function "foo" called\n'
+            ),
+        )
+
     def test_error_on_unknown_var(self):
-        # TODO: This could/should be rejected at compile time.
         self.check(
             'grammar = -> v',
             text='',
-            err='<string>:1 Reference to unknown variable "v"',
+            grammar_err=(
+                'Errors were found:\n' '  Unknown variable "v" referenced\n'
+            ),
+        )
+
+    def test_error_on_unknown_rule(self):
+        self.check(
+            'grammar = foo',
+            text='',
+            grammar_err=('Errors were found:\n' '  Unknown rule "foo"\n'),
         )
 
     def test_error_unexpected_thing(self):
@@ -160,7 +178,7 @@ class GrammarTestsMixin:
         # We don't check the actual output here because it is too long
         # and we don't want the test to be so sensitive to the AST for
         # the floyd grammar.
-        self.assertEqual(out[0][:2], ['rule', 'grammar'])
+        self.assertEqual(out[0], 'rules')
         self.assertIsNone(err)
 
     def test_hex_digits_in_value(self):

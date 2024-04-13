@@ -19,7 +19,6 @@ class Interpreter:
     def __init__(self, grammar, memoize):
         self.memoize = memoize
         self.grammar = grammar
-        self.grammar.rules = self.grammar.ast[1]
 
         self.msg = None
         self.fname = None
@@ -43,17 +42,7 @@ class Interpreter:
         self.errpos = 0
         self.scopes = []
 
-        cur_node = None
-        for node in self.grammar.rules:
-            if node[0] == 'rule' and node[1] == self.grammar.starting_rule:
-                cur_node = node
-                break
-
-        assert cur_node, (
-            "Error: unknown starting rule '%s'" % self.grammar.starting_rule
-        )
-
-        self._interpret(cur_node[2])
+        self._interpret(self.grammar.rules[self.grammar.starting_rule])
         if self.failed:
             return self._format_error()
         return self.val, None, self.pos
@@ -115,14 +104,9 @@ class Interpreter:
             self._fail()
             return
 
-        for rule in self.grammar.rules:
-            if rule_name == rule[1]:
-                self._interpret(rule[2])
-                return
-
-        # TODO: figure out if/when this can actually be reached. Shouldn't
-        # this be caught while validating the grammar?
-        self._fail("Error: no rule named '%s'" % rule_name)  # pragma: no cover
+        # Unknown rules should have been caught in analysis, so we don't
+        # need to worry about one here and can jump straight to the rule.
+        self._interpret(self.grammar.rules[rule_name])
 
     def _handle_choice(self, node):
         pos = self.pos
@@ -270,11 +254,9 @@ class Interpreter:
             self._succeed(node[1])
             return
 
-        if self.scopes and (node[1] in self.scopes[-1]):
-            self._succeed(self.scopes[-1][node[1]])
-            return
-
-        self._fail('Reference to unknown variable "%s"' % node[1])
+        # Unknown variables should have been caught in analysis.
+        assert self.scopes and (node[1] in self.scopes[-1])
+        self._succeed(self.scopes[-1][node[1]])
 
     def _handle_not(self, node):
         pos = self.pos
@@ -322,6 +304,9 @@ class Interpreter:
             self.val = False
             self._fail()
         else:
+            # TODO: Figure out how to statically analyze predicates to
+            # catch ones that don't return booleans, so that we don't need
+            # this code path.
             self._fail('Bad predicate value')
 
     def _handle_range(self, node):

@@ -4,10 +4,17 @@
   right-associative. Figure out how to make them be (optionally?)
   left-associative instead.
 
-* compiler.py: Figure out if we can omit generated code if it isn't
-  actually possible to execute it. (See the places where I needed to
-  add `# pragma: no cover` to get the code coverage of floyd/parser.py
-  to 100%.
+* analyzer.py: Change the floyd parser to use proper nodes that contain
+  line number and column info so that when we catch errors in analysis
+  we can actually point to where the error is happening.
+
+* analyzer.py: Figure out how to do type analysis of predicates to
+  statically catch ones that don't return booleans.
+
+* compiler.py: Figure out if we can omit generated code when it isn't
+  actually possible to execute it (E.g., catching a ParsingRuntimeError
+  when one will never be thrown). See where I had to add `# pragma: no cover`
+  to get the code coverage of floyd/parser.py to 100%.
 
 * compiler.py: Figure out how to prune any methods that aren't actually
   needed for the parser.
@@ -18,13 +25,6 @@
 
 * compiler.py: Figure out how to handle blank lines at the end of a method
   better in _flatten().
-
-* grammar_test.py: Figure out how to reject references to variables that
-  weren't bound at compile/interpret time,
-  see GrammarTest.test_error_on_unknown_var.
-
-* interpreter.py: Figure out whether you can statically reject unknown
-  rules (in _handle_apply).
 
 * printer_test.py: Improve printer algorithm so that two choices with
   actions are not printed on a single line (see test_actions).
