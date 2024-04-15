@@ -265,6 +265,26 @@ class GrammarTestsMixin:
             },
         )
 
+    def test_label(self):
+        self.check("grammar = 'foobar':v -> v", text='foobar', out='foobar')
+        self.check("grammar = 'foobar' -> $1", text='foobar', out='foobar')
+        self.check(
+            "grammar = 'foobar':$1 -> $1",
+            text='foobar',
+            grammar_err=(
+                'Errors were found:\n'
+                '  "$1" is a reserved variable name '
+                'and cannot be explicitly defined\n'
+            ),
+        )
+        self.check(
+            "grammar = 'foobar' -> $2",
+            text='foobar',
+            grammar_err=(
+                'Errors were found:\n  Unknown variable "$2" referenced\n'
+            ),
+        )
+
     def test_lit_str(self):
         self.check("grammar = ('foo')* -> true", text='foofoo', out=True)
 

@@ -370,6 +370,7 @@ class Parser:
                 self._id_start__c0_,
                 self._id_start__c1_,
                 self._id_start__c2_,
+                self._id_start__c3_,
             ]
         )
 
@@ -381,6 +382,9 @@ class Parser:
 
     def _id_start__c2_(self):
         self._ch('_')
+
+    def _id_start__c3_(self):
+        self._ch('$')
 
     def _id_continue_(self):
         self._choose(

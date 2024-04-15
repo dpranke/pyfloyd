@@ -43,7 +43,8 @@ def analyze(ast):
     """
 
     # Do whatever analysis we can do.
-    _Analyzer().analyze(ast)
+    a = _Analyzer()
+    a.analyze(ast)
 
     # Now optimize and rewrite the AST as needed.
     ast = _rewrite_singles(ast)
@@ -71,6 +72,22 @@ class _Analyzer:
             # sequence so that we can ensure that only bound variables
             # are being dereferenced in ll_var nodes.
             self.scopes.append([])
+            vs = set()
+            for i, n in enumerate(node[1], start=1):
+                if n[0] in ('action', 'pred'):
+                    self._vars_needed(n[1], i, vs)
+            for i, n in enumerate(node[1], start=1):
+                name = f'${i}'
+                if n[0] == 'label' and n[2][0] == '$':
+                    self.errors.append(
+                        (
+                            f'"{name}" is a reserved variable name '
+                            'and cannot be explicitly defined'
+                        )
+                    )
+                if name in vs and (n[0] != 'label' or n[2] != name):
+                    node[1][i - 1] = ['label', n, name]
+
             for n in node[1]:
                 if n[0] == 'label':
                     self.scopes[-1].append(n[2])
@@ -98,7 +115,7 @@ class _Analyzer:
             else:
                 self.walk(node[1])
         if ty == 'll_var':
-            if node[1] not in self.scopes[-1]:
+            if node[1] not in self.scopes[-1] and node[1][0] != '$':
                 self.errors.append(f'Unknown variable "{node[1]}" referenced')
 
         if ty in ('choice', 'll_arr', 'll_call', 'rules', 'seq'):
@@ -126,6 +143,33 @@ class _Analyzer:
 
         if ty == 'seq':
             self.scopes.pop()
+
+    def _vars_needed(self, node, max_num, vs):
+        ty = node[0]
+        if ty == 'll_var':
+            if node[1][0] == '$':
+                num = int(node[1][1:])
+                if num >= max_num:
+                    self.errors.append(
+                        f'Unknown variable "{node[1]}" referenced'
+                    )
+                else:
+                    vs.add(node[1])
+        elif ty in ('ll_arr', 'll_call'):
+            for n in node[1]:
+                self._vars_needed(n, max_num, vs)
+        elif ty in ('ll_getitem', 'll_paren'):
+            self._vars_needed(node[1], max_num, vs)
+        elif ty in ('ll_plus', 'll_minus'):
+            self._vars_needed(node[1], max_num, vs)
+            self._vars_needed(node[2], max_num, vs)
+        elif ty in ('ll_qual'):
+            for n in node[2]:
+                self._vars_needed(n, max_num, vs)
+        elif ty in ('ll_const', 'll_lit', 'll_num'):
+            pass
+        else:  # pragma: no cover
+            assert False, f'Unexpected AST node type: {ty}'
 
 
 def _rewrite_singles(node):

@@ -32,9 +32,6 @@
 * printer_test.py: Improve printer algorithm so that it can pretty-print
   floyd.g and stay under 80 characters wide (see test_floyd).
 
-* Replace `:x` bindings with `$1`, `$2`, and so on.
-  - use `$0` for matching everything as an array?
-
 * Use `\1` for "text matching $1".
 
 * Support regexp escapes like \d, \s, and so on.

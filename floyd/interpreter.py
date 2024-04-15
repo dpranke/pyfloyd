@@ -165,6 +165,7 @@ class Interpreter:
         i = 0
         lit = node[1]
         lit_len = len(lit)
+        pos = self.pos
         while (
             i < lit_len
             and self.pos < self.end
@@ -173,7 +174,7 @@ class Interpreter:
             self.pos += 1
             i += 1
         if i == lit_len:
-            self._succeed(self.msg[self.pos - 1])
+            self._succeed(self.msg[pos : self.pos])
         else:
             self._fail()
 
