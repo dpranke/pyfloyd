@@ -31,9 +31,21 @@ class AnalysisError(Exception):
 class Grammar:
     def __init__(self, ast):
         self.ast = ast
-        self.starting_rule = ast[1][0][1]
-        self.rules = collections.OrderedDict((n[1], n[2]) for n in ast[1])
-
+        self.starting_rule = None
+        for n in ast[1]:
+            if n[0] == 'rule':
+                self.starting_rule = n[1]
+                break
+        self.tokens = set()
+        self.rules = collections.OrderedDict()
+        for n in ast[1]:
+            if n[0] == 'pragma' and n[1] == 'tokens':
+                for t in n[2:]:
+                    self.tokens.add(t)
+            elif n[0] == 'rule':
+                self.rules[n[1]] = n[2]
+        self.whitespace = None
+        self.comment = None
 
 def analyze(ast):
     """Analyze and optimize the AST.
@@ -55,11 +67,12 @@ def analyze(ast):
 class _Analyzer:
     def __init__(self):
         self.rules = set()
+        self.tokens = set()
         self.scopes = []
         self.errors = []
 
     def analyze(self, ast):
-        self.rules = set(n[1] for n in ast[1])
+        self.rules = set(n[1] for n in ast[1] if n[0] == 'rule')
         self.walk(ast)
         if self.errors:
             raise AnalysisError(self.errors)
@@ -121,6 +134,18 @@ class _Analyzer:
         if ty in ('choice', 'll_arr', 'll_call', 'rules', 'seq'):
             for n in node[1]:
                 self.walk(n)
+        elif ty == 'pragma':
+            if node[1] in ('token', 'tokens'):
+                for n in node[2]:
+                    if n in self.rules:
+                        self.tokens.add(n)
+                    else:
+                        self.errors.append(f'Unknown token rule "{n}"')
+            elif node[1] == 'whitespace':
+                self.whitespace = self.node[2]
+            else:
+                assert node[1] == 'comment'
+                self.comment = self.node[2]
         elif ty == 'rule':
             self.walk(node[2])
         elif ty in (
@@ -209,9 +234,13 @@ def _check_for_left_recursion(ast):
     """Returns a list of all potentially left-recursive rules."""
     lr_rules = set()
     rules = {}
-    for _, name, body in ast[1]:
+    for ty, name, body in ast[1]:
+        if ty == 'pragma':
+            continue
         rules[name] = body
-    for _, name, body in ast[1]:
+    for ty, name, body in ast[1]:
+        if ty == 'pragma':
+            continue
         seen = set()
         has_lr = _check_lr(name, body, rules, seen)
         if has_lr:

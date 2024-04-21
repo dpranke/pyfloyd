@@ -1,4 +1,4 @@
-grammar     = (sp rule)*:vs sp end                -> ['rules', vs]
+grammar     = (sp (pragma|rule))*:vs sp end       -> ['rules', vs]
 
 sp          = ws*
 
@@ -8,6 +8,13 @@ eol         = '\x0D' '\x0A' | '\x0D' | '\x0A'
 
 comment     = '//' (~eol any)*
             | '/*' (~'*/' any)* '*/'
+
+pragma      = '%token' (~eol ws)* ident:t         -> ['pragma', 'token', [t]]
+            | '%tokens' ((~eol ws)* ident)+:ts    -> ['pragma', 'tokens', ts]
+            | '%whitespace' sp '=' sp choice:cs sp
+                                                  -> ['pragma', 'whitespace',
+                                                      cs]
+            | '%comment' sp '=' sp choice:cs sp   -> ['pragma', 'comment', cs]
 
 rule        = ident:i sp '=' sp choice:cs sp ','? -> ['rule', i, cs]
 

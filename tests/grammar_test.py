@@ -444,6 +444,30 @@ class GrammarTestsMixin:
         self.check("grammar = 'a'* -> true", text='a', out=True)
         self.check("grammar = 'a'* -> true", text='aa', out=True)
 
+    def test_token(self):
+        self.check(
+            """\
+            %token bar
+            grammar = foo -> true
+            foo     = bar
+            bar     = 'baz'
+            """,
+            text='baz',
+            out=True,
+        )
+
+    def test_token_is_unknown(self):
+        self.check(
+            """\
+            %token quux
+            grammar = foo -> true
+            foo     = bar
+            bar     = 'baz'
+            """,
+            text='baz',
+            grammar_err='Errors were found:\n  Unknown token rule "quux"\n',
+        )
+
     def test_utoi(self):
         self.check('grammar = -> utoi("a")', text='', out=97)
 

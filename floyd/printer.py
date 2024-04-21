@@ -18,49 +18,73 @@ from floyd import string_literal
 class Printer:
     def __init__(self, grammar):
         self.grammar = grammar
+        self.max_rule_len = 0
+        self.max_choice_len = 0
 
     def dumps(self) -> str:
-        rules, max_rule_len, max_choice_len = self._build_rules()
-        return self._format_rules(rules, max_rule_len, max_choice_len)
+        rules = self._build_rules()
+        return self._format_rules(rules)
 
     def _build_rules(self):
         rules = []
-        max_rule_len = 0
-        max_choice_len = 0
-        for rule_name, node in self.grammar.rules.items():
-            cs = []
-            max_rule_len = max(len(rule_name), max_rule_len)
-            single_line_str = self._proc(node)
-            if len(single_line_str) > 36 and node[0] == 'choice':
-                for choice_node in node[1]:
-                    choice, action = self._split_action(choice_node)
-                    max_choice_len = max(len(choice), max_choice_len)
-                    cs.append((choice, action))
+        for ty, rule_name, node in self.grammar.ast[1]:
+            if ty == 'pragma':
+                rule_name = '%' + rule_name
+                self.max_rule_len = max(len(rule_name), self.max_rule_len)
+                if rule_name == '%token':
+                    cs = [(node[0], '')]
+                elif rule_name == '%tokens':
+                    if len(node) == 1:
+                        rule_name = '%token'
+                        cs = [(node[0], '')]
+                    else:
+                        cs = [(' '.join(node), '')]
+                else:
+                    assert rule_name in ('%comment', '%whitespace')
+                    cs = self._fmt_rule(node)
             else:
-                choice, action = self._split_action(node)
-                cs = [(choice, action)]
-                max_choice_len = max(len(choice), max_choice_len)
+                self.max_rule_len = max(len(rule_name), self.max_rule_len)
+                cs = self._fmt_rule(node)
             rules.append((rule_name, cs))
-        return rules, max_rule_len, max_choice_len
+        return rules
+
+    def _fmt_rule(self, node):
+        single_line_str = self._proc(node)
+        if len(single_line_str) > 36 and node[0] == 'choice':
+            cs = []
+            for choice_node in node[1]:
+                choice, action = self._split_action(choice_node)
+                self.max_choice_len = max(len(choice), self.max_choice_len)
+                cs.append((choice, action))
+        else:
+            choice, action = self._split_action(node)
+            cs = [(choice, action)]
+            self.max_choice_len = max(len(choice), self.max_choice_len)
+        return cs
 
     def _split_action(self, node):
         if node[0] != 'seq' or node[1][-1][0] != 'action':
             return (self._proc(node), '')
         return (self._proc(['seq', node[1][:-1]]), self._proc(node[1][-1]))
 
-    def _format_rules(self, rules, max_rule_len, max_choice_len):
+    def _format_rules(self, rules):
         line_fmt = (
-            '%%-%ds' % max_rule_len
+            '%%-%ds' % self.max_rule_len
             + ' %s '
-            + '%%-%ds' % max_choice_len
+            + '%%-%ds' % self.max_choice_len
             + ' %s'
         )
         lines = []
         for rule_name, choices in rules:
-            choice, act = choices[0]
-            lines.append((line_fmt % (rule_name, '=', choice, act)).rstrip())
-            for choice, act in choices[1:]:
-                lines.append((line_fmt % ('', '|', choice, act)).rstrip())
+            if rule_name.startswith('%'):
+                lines.append(rule_name + ' ' + ' '.join(c[0] for c in choices))
+            else:
+                choice, act = choices[0]
+                lines.append(
+                    (line_fmt % (rule_name, '=', choice, act)).rstrip()
+                )
+                for choice, act in choices[1:]:
+                    lines.append((line_fmt % ('', '|', choice, act)).rstrip())
             lines.append('')
         return '\n'.join(lines).strip() + '\n'
 
