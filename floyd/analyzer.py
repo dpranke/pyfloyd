@@ -31,21 +31,24 @@ class AnalysisError(Exception):
 class Grammar:
     def __init__(self, ast):
         self.ast = ast
+        self.comment = None
+        self.comment_style = None
+        self.rules = collections.OrderedDict()
         self.starting_rule = None
-        for n in ast[1]:
+        self.tokens = set()
+        self.whitespace = None
+        self.whitespace_style = None
+
+        for n in self.ast[1]:
             if n[0] == 'rule':
                 self.starting_rule = n[1]
                 break
-        self.tokens = set()
-        self.rules = collections.OrderedDict()
-        for n in ast[1]:
-            if n[0] == 'pragma' and n[1] == 'tokens':
-                for t in n[2:]:
+
+        for n in self.ast[1]:
+            if n[0] == 'pragma' and n[1] in ('token', 'tokens'):
+                for t in n[2]:
                     self.tokens.add(t)
-            elif n[0] == 'rule':
-                self.rules[n[1]] = n[2]
-        self.whitespace = None
-        self.comment = None
+
 
 def analyze(ast):
     """Analyze and optimize the AST.
@@ -55,29 +58,60 @@ def analyze(ast):
     """
 
     # Do whatever analysis we can do.
-    a = _Analyzer()
-    a.analyze(ast)
+    g = Grammar(ast)
+    a = _Analyzer(g)
+    a.analyze()
 
     # Now optimize and rewrite the AST as needed.
-    ast = _rewrite_singles(ast)
-    ast = _rewrite_left_recursion(ast)
-    return Grammar(ast)
+    _rewrite_singles(g)
+    _rewrite_left_recursion(g)
+    _rewrite_filler(g)
+    return g
+
+
+BUILTIN_FUNCTIONS = (
+    'cat',
+    'dict',
+    'float',
+    'hex',
+    'is_unicat',
+    'itou',
+    'join',
+    'utoi',
+    'xtoi',
+    'xtou',
+)
+
+
+BUILTIN_RULES = (
+    'any',
+    'end',
+)
 
 
 class _Analyzer:
-    def __init__(self):
-        self.rules = set()
-        self.tokens = set()
-        self.scopes = []
-        self.errors = []
+    def __init__(self, grammar):
+        self.grammar = grammar
 
-    def analyze(self, ast):
-        self.rules = set(n[1] for n in ast[1] if n[0] == 'rule')
-        self.walk(ast)
+        self.comment = None
+        self.comment_style = None
+        self.errors = []
+        self.rules = set()
+        self.scopes = []
+        self.tokens = set()
+        self.whitespace = None
+        self.whitespace_style = None
+
+    def analyze(self):
+        self.rules = set(n[1] for n in self.grammar.ast[1] if n[0] == 'rule')
+        self.walk(self.grammar.ast)
+
+        self._check_pragmas()
+
         if self.errors:
             raise AnalysisError(self.errors)
 
-    def walk(self, node):
+    def walk(self, node):  # pylint: disable=too-many-statements
         ty = node[0]
 
         if ty == 'seq':
@@ -112,18 +146,7 @@ class _Analyzer:
             assert node[1][0] == 'll_var'
             name = node[1][1]
             if node[2][0][0] == 'll_call':
-                if name not in (
-                    'cat',
-                    'dict',
-                    'float',
-                    'hex',
-                    'is_unicat',
-                    'itou',
-                    'join',
-                    'utoi',
-                    'xtoi',
-                    'xtou',
-                ):
+                if name not in BUILTIN_FUNCTIONS:
                     self.errors.append(f'Unknown function "{name}" called')
             else:
                 self.walk(node[1])
@@ -141,11 +164,15 @@ class _Analyzer:
                         self.tokens.add(n)
                     else:
                         self.errors.append(f'Unknown token rule "{n}"')
+            elif node[1] == 'whitespace_style':
+                self.whitespace_style = node[2]
             elif node[1] == 'whitespace':
-                self.whitespace = self.node[2]
+                self.whitespace = node[2]
+            elif node[1] == 'comment_style':
+                self.comment_style = node[2]
             else:
                 assert node[1] == 'comment'
-                self.comment = self.node[2]
+                self.comment = node[2]
         elif ty == 'rule':
             self.walk(node[2])
         elif ty in (
@@ -196,38 +223,72 @@ class _Analyzer:
         else:  # pragma: no cover
             assert False, f'Unexpected AST node type: {ty}'
 
+    def _check_pragmas(self):
+        if self.comment and self.comment_style:
+            self.errors.append(
+                "Can't set both comment and comment_style pragmas"
+            )
+        if self.whitespace and self.whitespace_style:
+            self.errors.append(
+                "Can't set both whitespace and whitespace_style pragmas"
+            )
+        if self.comment and not self.tokens:
+            self.errors.append(
+                "Can't set comment pragma without also defining tokens"
+            )
+        if self.comment_style and not self.tokens:
+            self.errors.append(
+                "Can't set comment_style pragma without also defining tokens"
+            )
+        if self.whitespace and not self.tokens:
+            self.errors.append(
+                "Can't set whitespace pragma without also defining tokens"
+            )
+        if self.whitespace_style and not self.tokens:
+            self.errors.append(
+                "Can't set whitespace_style pragma without also defining tokens"
+            )
 
-def _rewrite_singles(node):
+
+def _rewrite_singles(grammar):
+    grammar.ast = _walk_singles(grammar.ast)
+
+
+def _walk_singles(node):
     """Collapse seqs and choices with only one expr to just the expr."""
     if node[0] == 'rules':
-        return [node[0], [_rewrite_singles(n) for n in node[1]]]
+        return [node[0], [_walk_singles(n) for n in node[1]]]
     if node[0] == 'rule':
-        return [node[0], node[1], _rewrite_singles(node[2])]
+        return [node[0], node[1], _walk_singles(node[2])]
     if node[0] in ('choice', 'seq'):
         # TODO: the apply check stops top-level sequences with only
         # an apply from being inlined, messing up the compiler
         # code generation. Figure out how to not have to special
         # case this.
         if len(node[1]) == 1 and node[1][0][0] != 'apply':
-            return _rewrite_singles(node[1][0])
-        return [node[0], [_rewrite_singles(n) for n in node[1]]]
+            return _walk_singles(node[1][0])
+        return [node[0], [_walk_singles(n) for n in node[1]]]
     if node[0] == 'paren':
-        return [node[0], _rewrite_singles(node[1])]
+        return [node[0], _walk_singles(node[1])]
     if node[0] in ('label', 'post'):
-        return [node[0], _rewrite_singles(node[1]), node[2]]
+        return [node[0], _walk_singles(node[1]), node[2]]
     return node
 
 
-def _rewrite_left_recursion(ast):
+def _rewrite_left_recursion(grammar):
     """Rewrite the AST to insert leftrec nodes as needed."""
-    lr_rules = _check_for_left_recursion(ast)
+    lr_rules = _check_for_left_recursion(grammar.ast)
     new_rules = []
-    for rule in ast[1]:
+    for rule in grammar.ast[1]:
         if rule[1] in lr_rules:
-            new_rules.append([rule[0], rule[1], ['leftrec', rule[2], rule[1]]])
+            new_rule = [rule[0], rule[1], ['leftrec', rule[2], rule[1]]]
         else:
-            new_rules.append(rule)
-    return ['rules', new_rules]
+            new_rule = rule
+        new_rules.append(new_rule)
+    grammar.ast = ['rules', new_rules]
+    for n in grammar.ast[1]:
+        if n[0] == 'rule':
+            grammar.rules[n[1]] = n[2]
 
 
 def _check_for_left_recursion(ast):
@@ -293,3 +354,95 @@ def _check_lr(name, node, rules, seen):
         return False
 
     assert False, 'unexpected AST node type %s' % ty  # pragma: no cover
+
+
+def _rewrite_filler(grammar):
+    _TokenVisitor(grammar).process()
+    # _FillerVisitor(grammar).process()
+
+
+class Visitor:
+    def __init__(self, grammar):
+        self.grammar = grammar
+
+    def visit_pre(self, node):  # pragma: no cover
+        return node
+
+    def process(self):  # pragma: no cover
+        pass
+
+    def visit_post(self, node):  # pragma: no cover
+        pass
+
+
+def walk(node, visitor):
+    node = visitor.visit_pre(node)
+
+    ty = node[0]
+    if ty in (
+        'action',
+        'label',
+        'll_getitem',
+        'll_paren',
+        'not',
+        'post',
+        'pred',
+        'paren',
+    ):
+        walk(node[1], visitor)
+    elif ty == 'rule':
+        walk(node[2], visitor)
+    elif ty in ('ll_plus', 'll_minus'):
+        walk(node[1], visitor)
+        walk(node[2], visitor)
+    elif ty in (
+        'choice',
+        'll_arr',
+        'll_call',
+        'rules',
+        'seq',
+    ):
+        for n in node[1]:
+            walk(n, visitor)
+    elif ty == 'll_qual':
+        for n in node[2]:
+            walk(n, visitor)
+    else:
+        # The remaining nodes are all leaf nodes.
+        assert ty in (
+            'apply',
+            'empty',
+            'lit',
+            'll_const',
+            'll_var',
+            'll_num',
+            'pragma',
+            'range',
+            'unicat',
+        ), f'Unexpected AST node type "{ty}": {node}'
+
+    visitor.visit_post(node)
+
+
+class _TokenVisitor(Visitor):
+    def __init__(self, grammar):
+        super().__init__(grammar)
+        self.rules_to_process = grammar.tokens.copy()
+        self.rules_processed = set()
+
+    def process(self):
+        while self.rules_to_process:
+            rule = self.rules_to_process.pop()
+            self.rules_processed.add(rule)
+            walk(self.grammar.rules[rule], self)
+        self.grammar.tokens = self.rules_processed
+
+    def visit_pre(self, node):
+        if node[0] == 'apply':
+            rule_name = node[1]
+            if (
+                rule_name not in self.rules_processed
+                and rule_name not in BUILTIN_RULES
+            ):
+                self.rules_to_process.add(rule_name)
+        return node

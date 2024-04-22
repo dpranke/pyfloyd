@@ -345,6 +345,8 @@ class Parser:
                 self._pragma__c1_,
                 self._pragma__c2_,
                 self._pragma__c3_,
+                self._pragma__c4_,
+                self._pragma__c5_,
             ]
         )
 
@@ -352,117 +354,124 @@ class Parser:
         self._push('pragma__c0')
         self._seq(
             [
-                lambda: self._str('%token'),
+                lambda: self._str('%tokens'),
                 self._pragma__c0__s1_,
                 self._pragma__c0__s2_,
-                self._pragma__c0__s3_,
             ]
         )
         self._pop('pragma__c0')
 
     def _pragma__c0__s1_(self):
-        self._star(self._pragma__c0__s1_p_)
+        self._bind(self._pragma__c0__s1_l_, 'ts')
 
-    def _pragma__c0__s1_p_(self):
-        (self._pragma__c0__s1_p_g_)()
+    def _pragma__c0__s1_l_(self):
+        self._plus(self._pragma__c0__s1_l_p_)
 
-    def _pragma__c0__s1_p_g_(self):
+    def _pragma__c0__s1_l_p_(self):
+        (self._pragma__c0__s1_l_p_g_)()
+
+    def _pragma__c0__s1_l_p_g_(self):
         self._seq(
             [
-                self._pragma__c0__s1_p_g__s0_,
+                self._pragma__c0__s1_l_p_g__s0_,
+                self._ident_,
+            ]
+        )
+
+    def _pragma__c0__s1_l_p_g__s0_(self):
+        self._plus(self._pragma__c0__s1_l_p_g__s0_p_)
+
+    def _pragma__c0__s1_l_p_g__s0_p_(self):
+        (self._pragma__c0__s1_l_p_g__s0_p_g_)()
+
+    def _pragma__c0__s1_l_p_g__s0_p_g_(self):
+        self._seq(
+            [
+                self._pragma__c0__s1_l_p_g__s0_p_g__s0_,
                 self._ws_,
             ]
         )
 
-    def _pragma__c0__s1_p_g__s0_(self):
+    def _pragma__c0__s1_l_p_g__s0_p_g__s0_(self):
         self._not(self._eol_)
 
     def _pragma__c0__s2_(self):
-        self._bind(self._ident_, 't')
-
-    def _pragma__c0__s3_(self):
-        self._succeed(['pragma', 'token', [self._get('t')]])
+        self._succeed(['pragma', 'tokens', self._get('ts')])
 
     def _pragma__c1_(self):
         self._push('pragma__c1')
         self._seq(
             [
-                lambda: self._str('%tokens'),
+                lambda: self._str('%token'),
                 self._pragma__c1__s1_,
                 self._pragma__c1__s2_,
+                self._pragma__c1__s3_,
             ]
         )
         self._pop('pragma__c1')
 
     def _pragma__c1__s1_(self):
-        self._bind(self._pragma__c1__s1_l_, 'ts')
+        self._plus(self._pragma__c1__s1_p_)
 
-    def _pragma__c1__s1_l_(self):
-        self._plus(self._pragma__c1__s1_l_p_)
+    def _pragma__c1__s1_p_(self):
+        (self._pragma__c1__s1_p_g_)()
 
-    def _pragma__c1__s1_l_p_(self):
-        (self._pragma__c1__s1_l_p_g_)()
-
-    def _pragma__c1__s1_l_p_g_(self):
+    def _pragma__c1__s1_p_g_(self):
         self._seq(
             [
-                self._pragma__c1__s1_l_p_g__s0_,
-                self._ident_,
-            ]
-        )
-
-    def _pragma__c1__s1_l_p_g__s0_(self):
-        self._star(self._pragma__c1__s1_l_p_g__s0_p_)
-
-    def _pragma__c1__s1_l_p_g__s0_p_(self):
-        (self._pragma__c1__s1_l_p_g__s0_p_g_)()
-
-    def _pragma__c1__s1_l_p_g__s0_p_g_(self):
-        self._seq(
-            [
-                self._pragma__c1__s1_l_p_g__s0_p_g__s0_,
+                self._pragma__c1__s1_p_g__s0_,
                 self._ws_,
             ]
         )
 
-    def _pragma__c1__s1_l_p_g__s0_p_g__s0_(self):
+    def _pragma__c1__s1_p_g__s0_(self):
         self._not(self._eol_)
 
     def _pragma__c1__s2_(self):
-        self._succeed(['pragma', 'tokens', self._get('ts')])
+        self._bind(self._ident_, 't')
+
+    def _pragma__c1__s3_(self):
+        self._succeed(['pragma', 'token', [self._get('t')]])
 
     def _pragma__c2_(self):
         self._push('pragma__c2')
+        self._seq(
+            [
+                lambda: self._str('%whitespace_style'),
+                self._sp_,
+                self._pragma__c2__s2_,
+                self._pragma__c2__s3_,
+            ]
+        )
+        self._pop('pragma__c2')
+
+    def _pragma__c2__s2_(self):
+        self._bind(self._pragma__c2__s2_l_, 's')
+
+    def _pragma__c2__s2_l_(self):
+        (self._pragma__c2__s2_l_g_)()
+
+    def _pragma__c2__s2_l_g_(self):
+        self._choose(
+            [
+                lambda: self._str('standard'),
+                lambda: self._str('unicode'),
+            ]
+        )
+
+    def _pragma__c2__s3_(self):
+        self._succeed(['pragma', 'whitespace_style', self._get('s')])
+
+    def _pragma__c3_(self):
+        self._push('pragma__c3')
         self._seq(
             [
                 lambda: self._str('%whitespace'),
                 self._sp_,
                 lambda: self._ch('='),
                 self._sp_,
-                self._pragma__c2__s4_,
-                self._sp_,
-                self._pragma__c2__s6_,
-            ]
-        )
-        self._pop('pragma__c2')
-
-    def _pragma__c2__s4_(self):
-        self._bind(self._choice_, 'cs')
-
-    def _pragma__c2__s6_(self):
-        self._succeed(['pragma', 'whitespace', self._get('cs')])
-
-    def _pragma__c3_(self):
-        self._push('pragma__c3')
-        self._seq(
-            [
-                lambda: self._str('%comment'),
-                self._sp_,
-                lambda: self._ch('='),
-                self._sp_,
                 self._pragma__c3__s4_,
-                self._sp_,
-                self._pragma__c3__s6_,
+                self._pragma__c3__s5_,
             ]
         )
         self._pop('pragma__c3')
@@ -470,7 +479,64 @@ class Parser:
     def _pragma__c3__s4_(self):
         self._bind(self._choice_, 'cs')
 
-    def _pragma__c3__s6_(self):
+    def _pragma__c3__s5_(self):
+        self._succeed(['pragma', 'whitespace', self._get('cs')])
+
+    def _pragma__c4_(self):
+        self._push('pragma__c4')
+        self._seq(
+            [
+                lambda: self._str('%comment_style'),
+                self._sp_,
+                self._pragma__c4__s2_,
+                self._pragma__c4__s3_,
+            ]
+        )
+        self._pop('pragma__c4')
+
+    def _pragma__c4__s2_(self):
+        self._bind(self._pragma__c4__s2_l_, 'c')
+
+    def _pragma__c4__s2_l_(self):
+        (self._pragma__c4__s2_l_g_)()
+
+    def _pragma__c4__s2_l_g_(self):
+        self._choose(
+            [
+                lambda: self._str('C++'),
+                lambda: self._str('C#'),
+                self._pragma__c4__s2_l_g__c2_,
+            ]
+        )
+
+    def _pragma__c4__s2_l_g__c2_(self):
+        self._seq(
+            [
+                self._ident_,
+            ]
+        )
+
+    def _pragma__c4__s3_(self):
+        self._succeed(['pragma', 'comment_style', self._get('c')])
+
+    def _pragma__c5_(self):
+        self._push('pragma__c5')
+        self._seq(
+            [
+                lambda: self._str('%comment'),
+                self._sp_,
+                lambda: self._ch('='),
+                self._sp_,
+                self._pragma__c5__s4_,
+                self._pragma__c5__s5_,
+            ]
+        )
+        self._pop('pragma__c5')
+
+    def _pragma__c5__s4_(self):
+        self._bind(self._choice_, 'cs')
+
+    def _pragma__c5__s5_(self):
         self._succeed(['pragma', 'comment', self._get('cs')])
 
     def _rule_(self):

@@ -9,12 +9,18 @@ eol         = '\x0D' '\x0A' | '\x0D' | '\x0A'
 comment     = '//' (~eol any)*
             | '/*' (~'*/' any)* '*/'
 
-pragma      = '%token' (~eol ws)* ident:t         -> ['pragma', 'token', [t]]
-            | '%tokens' ((~eol ws)* ident)+:ts    -> ['pragma', 'tokens', ts]
-            | '%whitespace' sp '=' sp choice:cs sp
+pragma      = '%tokens' ((~eol ws)+ ident)+:ts    -> ['pragma', 'tokens', ts]
+            | '%token' (~eol ws)+ ident:t         -> ['pragma', 'token', [t]]
+            | '%whitespace_style' sp
+              ('standard'|'unicode'):s            -> ['pragma',
+                                                      'whitespace_style', s]
+            | '%whitespace' sp '=' sp choice:cs
                                                   -> ['pragma', 'whitespace',
                                                       cs]
-            | '%comment' sp '=' sp choice:cs sp   -> ['pragma', 'comment', cs]
+            | '%comment_style' sp
+              ('C++' | 'C#' | ident):c            -> ['pragma',
+                                                      'comment_style', c]
+            | '%comment' sp '=' sp choice:cs      -> ['pragma', 'comment', cs]
 
 rule        = ident:i sp '=' sp choice:cs sp ','? -> ['rule', i, cs]
 

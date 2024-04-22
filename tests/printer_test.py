@@ -83,7 +83,7 @@ class PrinterTest(unittest.TestCase):
         self.assertEqual(grammar, out)
         self.assertIsNone(err)
 
-    def test_tokens(self):
+    def test_token(self):
         grammar = textwrap.dedent("""\
             %token foo
 

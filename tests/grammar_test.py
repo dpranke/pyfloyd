@@ -93,7 +93,78 @@ class GrammarTestsMixin:
             out=False,
         )
 
-    def test_cpp_style_comment(self):
+    def test_comment_pragma(self):
+        grammar = """\
+            %token foo
+            %comment = '//' (~'\n' any)*
+            grammar = (foo ' '* '\n')+  end -> true
+
+            foo     = 'foo'
+            """
+        self.check(grammar, text='foo\nfoo\n', out=True)
+
+    def test_comment_pragma_without_tokens(self):
+        grammar = """\
+            %comment = '//' (~'\n' any)*
+            grammar = (foo ' '* '\n')+  end -> true
+
+            foo     = 'foo'
+            """
+        self.check(
+            grammar,
+            text='foo\nfoo\n',
+            grammar_err=(
+                'Errors were found:\n'
+                "  Can't set comment pragma without also defining tokens\n"
+            ),
+        )
+
+    def test_comment_style_pragma(self):
+        grammar = """\
+            %token foo
+            %comment_style python
+
+            grammar = (foo ' '* '\n')+  end -> true
+
+            foo     = 'foo'
+            """
+        self.check(grammar, text='foo\nfoo\n', out=True)
+
+    def test_comment_style_pragma_both_is_an_error(self):
+        grammar = """\
+            %token foo
+            %comment = '//' (~'\n' any)*
+            %comment_style python
+
+            grammar = (foo ' '* '\n')+  end -> true
+
+            foo     = 'foo'
+            """
+        self.check(
+            grammar,
+            text='foo\nfoo\n',
+            grammar_err="Errors were found:\n  Can't set both comment and comment_style pragmas\n",
+        )
+
+    def test_comment_style_pragma_without_tokens(self):
+        grammar = """\
+            %comment_style python
+
+            grammar = (foo ' '* '\n')+  end -> true
+
+            foo     = 'foo'
+            """
+        self.check(
+            grammar,
+            text='foo\nfoo\n',
+            grammar_err=(
+                'Errors were found:\n'
+                "  Can't set comment_style pragma without "
+                'also defining tokens\n'
+            ),
+        )
+
+    def test_cpp_style_comment_in_grammar(self):
         self.check(
             """\
             grammar = // ignore this line
@@ -444,10 +515,10 @@ class GrammarTestsMixin:
         self.check("grammar = 'a'* -> true", text='a', out=True)
         self.check("grammar = 'a'* -> true", text='aa', out=True)
 
-    def test_token(self):
+    def test_token_pragma(self):
         self.check(
             """\
-            %token bar
+            %token foo
             grammar = foo -> true
             foo     = bar
             bar     = 'baz'
@@ -456,7 +527,7 @@ class GrammarTestsMixin:
             out=True,
         )
 
-    def test_token_is_unknown(self):
+    def test_token_pragma_token_is_unknown(self):
         self.check(
             """\
             %token quux
@@ -468,8 +539,93 @@ class GrammarTestsMixin:
             grammar_err='Errors were found:\n  Unknown token rule "quux"\n',
         )
 
+    def test_tokens_pragma(self):
+        grammar = """\
+            %tokens foo bar
+            grammar = (foo bar)+ end -> true
+            foo     = 'foo'
+            bar     = 'bar'
+            """
+        self.check(grammar, text='foobar', out=True)
+
     def test_utoi(self):
         self.check('grammar = -> utoi("a")', text='', out=97)
+
+    def test_whitespace_pragma(self):
+        grammar = """\
+            %token foo
+            %whitespace = ' '
+           
+            grammar = foo foo end -> true
+
+            foo     = 'foo'
+            """
+        self.check(grammar, text='foofoo', out=True)
+
+    def test_whitespace_pragma_without_tokens(self):
+        grammar = """\
+            %whitespace = ' '
+           
+            grammar = foo foo end -> true
+
+            foo     = 'foo'
+            """
+        self.check(
+            grammar,
+            text='foofoo',
+            grammar_err=(
+                'Errors were found:\n'
+                "  Can't set whitespace pragma without also defining tokens\n"
+            ),
+        )
+
+    def test_whitespace_style_pragma(self):
+        grammar = """\
+            %token foo
+            %whitespace_style standard
+           
+            grammar = foo foo end -> true
+
+            foo     = 'foo'
+            """
+        self.check(grammar, text='foofoo', out=True)
+
+    def test_whitespace_style_pragma_both_is_an_error(self):
+        grammar = """\
+            %token foo
+            %whitespace = ' '
+            %whitespace_style standard
+           
+            grammar = foo foo end -> true
+
+            foo     = 'foo'
+            """
+        self.check(
+            grammar,
+            text='foofoo',
+            grammar_err=(
+                'Errors were found:\n'
+                "  Can't set both whitespace and whitespace_style pragmas\n"
+            ),
+        )
+
+    def test_whitespace_style_pragma_without_tokens(self):
+        grammar = """\
+            %whitespace_style standard
+           
+            grammar = foo foo end -> true
+
+            foo     = 'foo'
+            """
+        self.check(
+            grammar,
+            text='foofoo',
+            grammar_err=(
+                'Errors were found:\n'
+                "  Can't set whitespace_style pragma without "
+                'also defining tokens\n'
+            ),
+        )
 
 
 class Interpreter(unittest.TestCase, GrammarTestsMixin):

@@ -40,7 +40,12 @@ class Printer:
                     else:
                         cs = [(' '.join(node), '')]
                 else:
-                    assert rule_name in ('%comment', '%whitespace')
+                    assert rule_name in (
+                        '%comment',
+                        '%comment_style',
+                        '%whitespace',
+                        '%whitespace_style',
+                    )
                     cs = self._fmt_rule(node)
             else:
                 self.max_rule_len = max(len(rule_name), self.max_rule_len)
