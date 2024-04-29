@@ -28,6 +28,12 @@ class AnalysisError(Exception):
         return s
 
 
+def _update_rules(grammar):
+    for rule in grammar.ast[2]:
+        if rule[0] == 'rule':
+            grammar.rules[rule[1]] = rule[2][0]
+
+
 class Grammar:
     def __init__(self, ast):
         self.ast = ast
@@ -39,13 +45,14 @@ class Grammar:
         self.whitespace = None
         self.whitespace_style = None
 
-        for n in self.ast[1]:
+        has_starting_rule = False
+        for n in self.ast[2]:
             if n[0] == 'rule':
-                self.starting_rule = n[1]
-                break
-
-        for n in self.ast[1]:
-            if n[0] == 'pragma' and n[1] in ('token', 'tokens'):
+                if not has_starting_rule:
+                    self.starting_rule = n[1]
+                    has_starting_rule = True
+                self.rules[n[1]] = n[2][0]
+            elif n[0] == 'pragma' and n[1] in ('token', 'tokens'):
                 for t in n[2]:
                     self.tokens.add(t)
 
@@ -103,7 +110,7 @@ class _Analyzer:
         self.whitespace_style = None
 
     def analyze(self):
-        self.rules = set(n[1] for n in self.grammar.ast[1] if n[0] == 'rule')
+        self.rules = set(n[1] for n in self.grammar.ast[2] if n[0] == 'rule')
         self.walk(self.grammar.ast)
 
         self._check_pragmas()
@@ -120,42 +127,42 @@ class _Analyzer:
             # are being dereferenced in ll_var nodes.
             self.scopes.append([])
             vs = set()
-            for i, n in enumerate(node[1], start=1):
+            for i, n in enumerate(node[2], start=1):
                 if n[0] in ('action', 'pred'):
-                    self._vars_needed(n[1], i, vs)
-            for i, n in enumerate(node[1], start=1):
+                    self._vars_needed(n[2][0], i, vs)
+            for i, n in enumerate(node[2], start=1):
                 name = f'${i}'
-                if n[0] == 'label' and n[2][0] == '$':
+                if n[0] == 'label' and n[1][0] == '$':
                     self.errors.append(
                         (
                             f'"{name}" is a reserved variable name '
                             'and cannot be explicitly defined'
                         )
                     )
-                if name in vs and (n[0] != 'label' or n[2] != name):
-                    node[1][i - 1] = ['label', n, name]
+                if name in vs and (n[0] != 'label' or n[1] != name):
+                    node[2][i - 1] = ['label', name, [n]]
 
-            for n in node[1]:
+            for n in node[2]:
                 if n[0] == 'label':
-                    self.scopes[-1].append(n[2])
+                    self.scopes[-1].append(n[1])
 
         if ty == 'apply':
             if node[1] not in self.rules and node[1] not in ('any', 'end'):
                 self.errors.append(f'Unknown rule "{node[1]}"')
         if ty == 'll_qual':
-            assert node[1][0] == 'll_var'
-            name = node[1][1]
-            if node[2][0][0] == 'll_call':
+            assert node[2][0][0] == 'll_var'
+            name = node[2][0][1]
+            if node[2][1][0] == 'll_call':
                 if name not in BUILTIN_FUNCTIONS:
                     self.errors.append(f'Unknown function "{name}" called')
             else:
-                self.walk(node[1])
+                self.walk(node[2][0])
         if ty == 'll_var':
             if node[1] not in self.scopes[-1] and node[1][0] != '$':
                 self.errors.append(f'Unknown variable "{node[1]}" referenced')
 
         if ty in ('choice', 'll_arr', 'll_call', 'rules', 'seq'):
-            for n in node[1]:
+            for n in node[2]:
                 self.walk(n)
         elif ty == 'pragma':
             if node[1] in ('token', 'tokens'):
@@ -174,7 +181,7 @@ class _Analyzer:
                 assert node[1] == 'comment'
                 self.comment = node[2]
         elif ty == 'rule':
-            self.walk(node[2])
+            self.walk(node[2][0])
         elif ty in (
             'action',
             'label',
@@ -185,12 +192,12 @@ class _Analyzer:
             'post',
             'pred',
         ):
-            self.walk(node[1])
+            self.walk(node[2][0])
         elif ty in ('ll_plus', 'll_minus'):
-            self.walk(node[1])
-            self.walk(node[2])
+            self.walk(node[2][0])
+            self.walk(node[2][0])
         elif ty == 'll_qual':
-            for n in node[2]:
+            for n in node[2][1:]:
                 self.walk(n)
 
         if ty == 'seq':
@@ -208,13 +215,13 @@ class _Analyzer:
                 else:
                     vs.add(node[1])
         elif ty in ('ll_arr', 'll_call'):
-            for n in node[1]:
+            for n in node[2]:
                 self._vars_needed(n, max_num, vs)
         elif ty in ('ll_getitem', 'll_paren'):
-            self._vars_needed(node[1], max_num, vs)
+            self._vars_needed(node[2][0], max_num, vs)
         elif ty in ('ll_plus', 'll_minus'):
-            self._vars_needed(node[1], max_num, vs)
-            self._vars_needed(node[2], max_num, vs)
+            self._vars_needed(node[2][0], max_num, vs)
+            self._vars_needed(node[2][1], max_num, vs)
         elif ty in ('ll_qual'):
             for n in node[2]:
                 self._vars_needed(n, max_num, vs)
@@ -250,60 +257,64 @@ class _Analyzer:
             )
 
 
-def _rewrite_singles(grammar):
-    grammar.ast = _walk_singles(grammar.ast)
+class Visitor:
+    def __init__(self, grammar):
+        self.grammar = grammar
+
+    def visit_pre(self, node):  # pragma: no cover
+        return node
+
+    def process(self):  # pragma: no cover
+        pass
+
+    def visit_post(self, node, results):
+        return [node[0], node[1], results]
 
 
-def _walk_singles(node):
-    """Collapse seqs and choices with only one expr to just the expr."""
-    if node[0] == 'rules':
-        return [node[0], [_walk_singles(n) for n in node[1]]]
-    if node[0] == 'rule':
-        return [node[0], node[1], _walk_singles(node[2])]
-    if node[0] in ('choice', 'seq'):
-        # TODO: the apply check stops top-level sequences with only
-        # an apply from being inlined, messing up the compiler
-        # code generation. Figure out how to not have to special
-        # case this.
-        if len(node[1]) == 1 and node[1][0][0] != 'apply':
-            return _walk_singles(node[1][0])
-        return [node[0], [_walk_singles(n) for n in node[1]]]
-    if node[0] == 'paren':
-        return [node[0], _walk_singles(node[1])]
-    if node[0] in ('label', 'post'):
-        return [node[0], _walk_singles(node[1]), node[2]]
+def walk(node, visitor):
+    if node[0] == 'pragma':
+        return node
+    pre = visitor.visit_pre(node)
+    r = [walk(n, visitor) for n in pre[2]]
+    node = visitor.visit_post(pre, r)
     return node
+
+
+def _rewrite_singles(grammar):
+    grammar.ast = walk(grammar.ast, _SinglesVisitor(grammar))
+    _update_rules(grammar)
+
+
+class _SinglesVisitor(Visitor):
+    def visit_pre(self, node):
+        if node[0] in ('choice', 'seq'):
+            if len(node[2]) == 1 and node[2][0][0] != 'apply':
+                return self.visit_pre(node[2][0])
+        return node
 
 
 def _rewrite_left_recursion(grammar):
     """Rewrite the AST to insert leftrec nodes as needed."""
-    lr_rules = _check_for_left_recursion(grammar.ast)
+    lr_rules = _check_for_left_recursion(grammar)
     new_rules = []
-    for rule in grammar.ast[1]:
+    for rule in grammar.ast[2]:
         if rule[1] in lr_rules:
-            new_rule = [rule[0], rule[1], ['leftrec', rule[2], rule[1]]]
+            new_rule = [rule[0], rule[1], [['leftrec', rule[1], rule[2]]]]
         else:
             new_rule = rule
         new_rules.append(new_rule)
-    grammar.ast = ['rules', new_rules]
-    for n in grammar.ast[1]:
-        if n[0] == 'rule':
-            grammar.rules[n[1]] = n[2]
+    grammar.ast = ['rules', None, new_rules]
+    _update_rules(grammar)
 
 
-def _check_for_left_recursion(ast):
+def _check_for_left_recursion(grammar):
     """Returns a list of all potentially left-recursive rules."""
     lr_rules = set()
-    rules = {}
-    for ty, name, body in ast[1]:
-        if ty == 'pragma':
-            continue
-        rules[name] = body
-    for ty, name, body in ast[1]:
+    for ty, name, children in grammar.ast[2]:
         if ty == 'pragma':
             continue
         seen = set()
-        has_lr = _check_lr(name, body, rules, seen)
+        has_lr = _check_lr(name, children[0], grammar.rules, seen)
         if has_lr:
             lr_rules.add(name)
     return lr_rules
@@ -325,25 +336,25 @@ def _check_lr(name, node, rules, seen):
         seen.add(node[1])
         return _check_lr(name, rules[node[1]], rules, seen)
     if ty == 'choice':
-        return any(_check_lr(name, n, rules, seen) for n in node[1])
+        return any(_check_lr(name, n, rules, seen) for n in node[2])
     if ty == 'empty':
         return False
     if ty == 'label':
-        return _check_lr(name, node[1], rules, seen)
+        return _check_lr(name, node[2][0], rules, seen)
     if ty == 'lit':
         return False
     if ty == 'not':
-        return _check_lr(name, node[1], rules, seen)
+        return _check_lr(name, node[2][0], rules, seen)
     if ty == 'paren':
-        return _check_lr(name, node[1], rules, seen)
+        return _check_lr(name, node[2][0], rules, seen)
     if ty == 'post':
-        return _check_lr(name, node[1], rules, seen)
+        return _check_lr(name, node[2][0], rules, seen)
     if ty == 'pred':
         return False
     if ty == 'range':
         return False
     if ty == 'seq':
-        for subnode in node[1]:
+        for subnode in node[2]:
             if subnode[0] == 'lit':
                 return False
             r = _check_lr(name, subnode, rules, seen)
@@ -359,69 +370,6 @@ def _check_lr(name, node, rules, seen):
 def _rewrite_filler(grammar):
     _TokenVisitor(grammar).process()
     # _FillerVisitor(grammar).process()
-
-
-class Visitor:
-    def __init__(self, grammar):
-        self.grammar = grammar
-
-    def visit_pre(self, node):  # pragma: no cover
-        return node
-
-    def process(self):  # pragma: no cover
-        pass
-
-    def visit_post(self, node):  # pragma: no cover
-        pass
-
-
-def walk(node, visitor):
-    node = visitor.visit_pre(node)
-
-    ty = node[0]
-    if ty in (
-        'action',
-        'label',
-        'll_getitem',
-        'll_paren',
-        'not',
-        'post',
-        'pred',
-        'paren',
-    ):
-        walk(node[1], visitor)
-    elif ty == 'rule':
-        walk(node[2], visitor)
-    elif ty in ('ll_plus', 'll_minus'):
-        walk(node[1], visitor)
-        walk(node[2], visitor)
-    elif ty in (
-        'choice',
-        'll_arr',
-        'll_call',
-        'rules',
-        'seq',
-    ):
-        for n in node[1]:
-            walk(n, visitor)
-    elif ty == 'll_qual':
-        for n in node[2]:
-            walk(n, visitor)
-    else:
-        # The remaining nodes are all leaf nodes.
-        assert ty in (
-            'apply',
-            'empty',
-            'lit',
-            'll_const',
-            'll_var',
-            'll_num',
-            'pragma',
-            'range',
-            'unicat',
-        ), f'Unexpected AST node type "{ty}": {node}'
-
-    visitor.visit_post(node)
 
 
 class _TokenVisitor(Visitor):

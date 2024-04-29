@@ -26,7 +26,7 @@ THIS_DIR = pathlib.Path(__file__).parent
 
 class GrammarTestsMixin:
     def check(self, grammar, text, out=None, err=None, grammar_err=None):
-        p, p_err, _ = self.compile(textwrap.dedent(grammar))
+        p, p_err, _ = self.compile(grammar)
         self.assertEqual(grammar_err, p_err)
         if p:
             self.checkp(p, text, out, err)
@@ -262,6 +262,7 @@ class GrammarTestsMixin:
         h = floyd.host.Host()
         path = str(THIS_DIR / '../grammars/json5.g')
         p, err, _ = self.compile(h.read_text_file(path))
+        self.assertIsNone(err)
         self.checkp(p, text='123', out=123)
         self.checkp(p, text='Infinity', out=float('inf'))
         self.checkp(p, text='null', out=None)
@@ -379,22 +380,23 @@ class GrammarTestsMixin:
         self.check('grammar = -> (true)', text='', out=True)
 
     def test_plus(self):
+        g = "grammar = 'a'+ -> true"
         self.check(
-            "grammar = 'a'+ -> true",
+            g,
             text='',
             err='<string>:1 Unexpected end of input at column 1',
         )
 
-        self.check("grammar = 'a'+ -> true", text='a', out=True)
-        self.check("grammar = 'a'+ -> true", text='aa', out=True)
+        self.check(g, text='a', out=True)
+        self.check(g, text='aa', out=True)
 
     def test_pred(self):
         self.check('grammar = ?(true) end -> true', text='', out=True)
         self.check(
-            textwrap.dedent("""\
+            """\
             grammar = ?(false) end -> 'a'
                     | end -> 'b'
-            """),
+            """,
             text='',
             out='b',
         )
@@ -468,10 +470,10 @@ class GrammarTestsMixin:
         )
 
     def test_recursion_left_opt(self):
-        grammar = textwrap.dedent("""\
+        grammar = """\
             grammar = 'b'?:b grammar:g 'c' -> join('', b) + g + 'c'
                     | 'a'           -> 'a'
-            """)
+            """
         self.check(grammar, 'ac', 'ac')
         self.check(grammar, 'acc', 'acc')
 

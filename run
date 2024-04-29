@@ -100,9 +100,15 @@ class Runner:
             help='Set up a dev venv at //.venv with all the needed packages.',
         )
 
-        self.add_parser(
+        subp = self.add_parser(
             'presubmit',
             help='Run all the steps that should be run prior to commiting.',
+        )
+        subp.add_argument(
+            '-f',
+            '--failfast',
+            action='store_true',
+            help='Stop on first fail or error',
         )
 
         self.add_parser('coverage', help='Run tests and report code coverage.')

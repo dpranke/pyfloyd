@@ -45,6 +45,34 @@ class PrinterTest(unittest.TestCase):
             'Errors were found:\n  Unknown variable "foo" referenced\n',
         )
 
+    def test_comment(self):
+        grammar = textwrap.dedent("""\
+            %comment = '//' (~'\\n' any)*
+
+            %token foo
+
+            grammar  = foo end
+
+            foo      = 'foo'
+            """)
+        out, err = floyd.pretty_print(grammar)
+        self.assertEqual(grammar, out)
+        self.assertIsNone(err)
+
+    def test_comment_style(self):
+        grammar = textwrap.dedent("""\
+            %comment_style C++
+
+            %token foo
+
+            grammar        = foo end
+
+            foo            = 'foo'
+            """)
+        out, err = floyd.pretty_print(grammar)
+        self.assertEqual(grammar, out)
+        self.assertIsNone(err)
+
     def test_empty(self):
         grammar = textwrap.dedent("""\
             grammar = 'foo' |
@@ -90,6 +118,60 @@ class PrinterTest(unittest.TestCase):
             grammar = foo
 
             foo     = end
+            """)
+        out, err = floyd.pretty_print(grammar)
+        self.assertEqual(grammar, out)
+        self.assertIsNone(err)
+
+    def test_tokens(self):
+        grammar = textwrap.dedent("""\
+            %tokens foo bar
+
+            grammar = foo bar
+
+            foo     = 'foo'
+
+            bar     = 'bar'
+            """)
+        out, err = floyd.pretty_print(grammar)
+        self.assertEqual(grammar, out)
+        self.assertIsNone(err)
+
+    def test_tokens_only_one_token(self):
+        grammar = textwrap.dedent("""\
+            %tokens foo
+
+            grammar = foo
+
+            foo     = 'foo'
+            """)
+        out, err = floyd.pretty_print(grammar)
+        self.assertEqual(grammar.replace('%tokens', '%token'), out)
+        self.assertIsNone(err)
+
+    def test_whitespace(self):
+        grammar = textwrap.dedent("""\
+            %whitespace = ' '*
+
+            %token foo
+
+            grammar     = foo end
+
+            foo         = 'foo'
+            """)
+        out, err = floyd.pretty_print(grammar)
+        self.assertEqual(grammar, out)
+        self.assertIsNone(err)
+
+    def test_whitespace_style(self):
+        grammar = textwrap.dedent("""\
+            %whitespace_style standard
+           
+            %token foo
+
+            grammar           = foo end
+
+            foo               = 'foo'
             """)
         out, err = floyd.pretty_print(grammar)
         self.assertEqual(grammar, out)

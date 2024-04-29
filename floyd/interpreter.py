@@ -89,7 +89,7 @@ class Interpreter:
         return None, msg, self.errpos
 
     def _handle_action(self, node):
-        self._interpret(node[1])
+        self._interpret(node[2][0])
 
     def _handle_apply(self, node):
         rule_name = node[1]
@@ -110,12 +110,12 @@ class Interpreter:
 
     def _handle_choice(self, node):
         pos = self.pos
-        for rule in node[1][:-1]:
+        for rule in node[2][:-1]:
             self._interpret(rule)
             if not self.failed:
                 return
             self._rewind(pos)
-        self._interpret(node[1][-1])
+        self._interpret(node[2][-1])
         return
 
     def _handle_empty(self, node):
@@ -129,9 +129,9 @@ class Interpreter:
         self._succeed()
 
     def _handle_label(self, node):
-        self._interpret(node[1])
+        self._interpret(node[2][0])
         if not self.failed:
-            self.scopes[-1][node[2]] = self.val
+            self.scopes[-1][node[1]] = self.val
             self._succeed()
 
     def _handle_leftrec(self, node):
@@ -142,7 +142,7 @@ class Interpreter:
         # to work correctly. See the TODO about this (e.g., in
         # test_recursion_both() in grammar_test.py).
         pos = self.pos
-        rule_name = node[2]
+        rule_name = node[1]
         key = (rule_name, pos)
         seed = self.seeds.get(key)
         if seed:
@@ -151,7 +151,7 @@ class Interpreter:
         current = (None, True, self.pos)
         self.seeds[key] = current
         while True:
-            self._interpret(node[1])
+            self._interpret(node[2][0])
             if self.pos > current[2]:
                 current = (self.val, self.failed, self.pos)
                 self.seeds[key] = current
@@ -187,14 +187,14 @@ class Interpreter:
 
     def _handle_ll_arr(self, node):
         vals = []
-        for subnode in node[1]:
+        for subnode in node[2]:
             self._interpret(subnode)
             vals.append(self.val)
         self._succeed(vals)
 
     def _handle_ll_call(self, node):
         vals = []
-        for subnode in node[1]:
+        for subnode in node[2]:
             self._interpret(subnode)
             vals.append(self.val)
         self._succeed(['ll_call', vals])
@@ -212,7 +212,7 @@ class Interpreter:
             self._succeed(float('NaN'))
 
     def _handle_ll_getitem(self, node):
-        self._interpret(node[1])
+        self._interpret(node[2][0])
         if not self.failed:
             self._succeed(['ll_getitem', self.val])
 
@@ -223,20 +223,20 @@ class Interpreter:
             self._succeed(int(node[1]))
 
     def _handle_ll_paren(self, node):
-        self._interpret(node[1])
+        self._interpret(node[2][0])
 
     def _handle_ll_plus(self, node):
-        self._interpret(node[1])
+        self._interpret(node[2][0])
         v1 = self.val
-        self._interpret(node[2])
+        self._interpret(node[2][1])
         v2 = self.val
         self._succeed(v1 + v2)
 
     def _handle_ll_qual(self, node):
-        self._interpret(node[1])
+        self._interpret(node[2][0])
         assert not self.failed
         lhs = self.val
-        self._interpret(node[2][0])
+        self._interpret(node[2][1])
         assert not self.failed
         op, rhs = self.val
         if op == 'll_getitem':
@@ -262,7 +262,7 @@ class Interpreter:
     def _handle_not(self, node):
         pos = self.pos
         val = self.val
-        self._interpret(node[1])
+        self._interpret(node[2][0])
         if self.failed:
             self._succeed(val, newpos=pos)
         else:
@@ -271,7 +271,7 @@ class Interpreter:
 
     def _handle_opt(self, node):
         pos = self.pos
-        self._interpret(node[1])
+        self._interpret(node[2][0])
         if self.failed:
             self.failed = False
             self.val = []
@@ -280,25 +280,25 @@ class Interpreter:
             self.val = [self.val]
 
     def _handle_paren(self, node):
-        self._interpret(node[1])
+        self._interpret(node[2][0])
 
     def _handle_plus(self, node):
-        self._interpret(node[1])
+        self._interpret(node[2][0])
         hd = self.val
         if not self.failed:
             self._handle_star(node)
             self.val = [hd] + self.val
 
     def _handle_post(self, node):
-        if node[2] == '?':
+        if node[1] == '?':
             self._handle_opt(node)
-        elif node[2] == '*':
+        elif node[1] == '*':
             self._handle_star(node)
-        elif node[2] == '+':
+        elif node[1] == '+':
             self._handle_plus(node)
 
     def _handle_pred(self, node):
-        self._interpret(node[1])
+        self._interpret(node[2][0])
         if self.val is True:
             self._succeed(True)
         elif self.val is False:
@@ -311,11 +311,11 @@ class Interpreter:
             self._fail('Bad predicate value')
 
     def _handle_range(self, node):
-        assert node[1][0] == 'lit'
-        assert node[2][0] == 'lit'
+        assert node[2][0][0] == 'lit'
+        assert node[2][1][0] == 'lit'
         if (
             self.pos != self.end
-            and node[1][1] <= self.msg[self.pos] <= node[2][1]
+            and node[2][0][1] <= self.msg[self.pos] <= node[2][1][1]
         ):
             self._succeed(self.msg[self.pos], self.pos + 1)
             return
@@ -323,7 +323,7 @@ class Interpreter:
 
     def _handle_seq(self, node):
         self.scopes.append({})
-        for subnode in node[1]:
+        for subnode in node[2]:
             self._interpret(subnode)
             if self.failed:
                 break
@@ -333,7 +333,7 @@ class Interpreter:
         vs = []
         while not self.failed and self.pos < self.end:
             p = self.pos
-            self._interpret(node[1])
+            self._interpret(node[2][0])
             if self.failed:
                 self.pos = p
                 break

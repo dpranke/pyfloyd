@@ -27,7 +27,7 @@ class Printer:
 
     def _build_rules(self):
         rules = []
-        for ty, rule_name, node in self.grammar.ast[1]:
+        for ty, rule_name, node in self.grammar.ast[2]:
             if ty == 'pragma':
                 rule_name = '%' + rule_name
                 self.max_rule_len = max(len(rule_name), self.max_rule_len)
@@ -39,17 +39,19 @@ class Printer:
                         cs = [(node[0], '')]
                     else:
                         cs = [(' '.join(node), '')]
+                elif rule_name == '%comment_style':
+                    cs = [(node, '')]
+                elif rule_name == '%whitespace_style':
+                    cs = [(node, '')]
                 else:
                     assert rule_name in (
                         '%comment',
-                        '%comment_style',
                         '%whitespace',
-                        '%whitespace_style',
                     )
-                    cs = self._fmt_rule(node)
+                    cs = self._fmt_rule(node[0])
             else:
                 self.max_rule_len = max(len(rule_name), self.max_rule_len)
-                cs = self._fmt_rule(node)
+                cs = self._fmt_rule(node[0])
             rules.append((rule_name, cs))
         return rules
 
@@ -57,7 +59,7 @@ class Printer:
         single_line_str = self._proc(node)
         if len(single_line_str) > 36 and node[0] == 'choice':
             cs = []
-            for choice_node in node[1]:
+            for choice_node in node[2]:
                 choice, action = self._split_action(choice_node)
                 self.max_choice_len = max(len(choice), self.max_choice_len)
                 cs.append((choice, action))
@@ -68,9 +70,12 @@ class Printer:
         return cs
 
     def _split_action(self, node):
-        if node[0] != 'seq' or node[1][-1][0] != 'action':
+        if node[0] != 'seq' or node[2][-1][0] != 'action':
             return (self._proc(node), '')
-        return (self._proc(['seq', node[1][:-1]]), self._proc(node[1][-1]))
+        return (
+            self._proc(['seq', None, node[2][:-1]]),
+            self._proc(node[2][-1]),
+        )
 
     def _format_rules(self, rules):
         line_fmt = (
@@ -81,7 +86,12 @@ class Printer:
         )
         lines = []
         for rule_name, choices in rules:
-            if rule_name.startswith('%'):
+            if rule_name in (
+                '%comment_style',
+                '%token',
+                '%tokens',
+                '%whitespace_style',
+            ):
                 lines.append(rule_name + ' ' + ' '.join(c[0] for c in choices))
             else:
                 choice, act = choices[0]
@@ -102,23 +112,23 @@ class Printer:
     #
 
     def _action_(self, node):
-        return '-> %s' % self._proc(node[1])
+        return '-> %s' % self._proc(node[2][0])
 
     def _apply_(self, node):
         return node[1]
 
     def _choice_(self, node):
-        return ' | '.join(self._proc(e) for e in node[1])
+        return ' | '.join(self._proc(e) for e in node[2])
 
     def _empty_(self, node):
         del node
         return ''
 
     def _label_(self, node):
-        return '%s:%s' % (self._proc(node[1]), node[2])
+        return '%s:%s' % (self._proc(node[2][0]), node[1])
 
     def _leftrec_(self, node):
-        return self._proc(node[1])
+        return self._proc(node[2][0])
 
     def _lit_(self, node):
         return string_literal.encode(node[1])
@@ -127,51 +137,51 @@ class Printer:
         return '\\p{%s}' % node[1]
 
     def _ll_arr_(self, node):
-        return '[%s]' % ', '.join(self._proc(el) for el in node[1])
+        return '[%s]' % ', '.join(self._proc(el) for el in node[2])
 
     def _ll_call_(self, node):
-        return '(%s)' % ', '.join(self._proc(arg) for arg in node[1])
+        return '(%s)' % ', '.join(self._proc(arg) for arg in node[2])
 
     def _ll_const_(self, node):
         return node[1]
 
     def _ll_getitem_(self, node):
-        return '[%s]' % self._proc(node[1])
+        return '[%s]' % self._proc(node[2][0])
 
     def _ll_lit_(self, node):
         return self._lit_(node)
 
     def _ll_minus_(self, node):
-        return '%s - %s' % (self._proc(node[1]), self._proc(node[2]))
+        return '%s - %s' % (self._proc(node[2][0]), self._proc(node[2][1]))
 
     def _ll_num_(self, node):
         return str(node[1])
 
     def _ll_plus_(self, node):
-        return '%s + %s' % (self._proc(node[1]), self._proc(node[2]))
+        return '%s + %s' % (self._proc(node[2][0]), self._proc(node[2][1]))
 
     def _ll_qual_(self, node):
-        _, e, ops = node
-        v = self._proc(e)
-        return '%s%s' % (v, ''.join(self._proc(op) for op in ops))
+        _, _, ops = node
+        v = self._proc(ops[0])
+        return '%s%s' % (v, ''.join(self._proc(op) for op in ops[1:]))
 
     def _ll_var_(self, node):
         return node[1]
 
     def _range_(self, node):
-        return '%s..%s' % (self._proc(node[1]), self._proc(node[2]))
+        return '%s..%s' % (self._proc(node[2][0]), self._proc(node[2][1]))
 
     def _not_(self, node):
-        return '~%s' % self._proc(node[1])
+        return '~%s' % self._proc(node[2][0])
 
     def _pred_(self, node):
-        return '?(%s)' % self._proc(node[1])
+        return '?(%s)' % self._proc(node[2][0])
 
     def _post_(self, node):
-        return '%s%s' % (self._proc(node[1]), node[2])
+        return '%s%s' % (self._proc(node[2][0]), node[1])
 
     def _seq_(self, node):
-        return ' '.join(self._proc(e) for e in node[1])
+        return ' '.join(self._proc(e) for e in node[2])
 
     def _paren_(self, node):
-        return '(' + self._proc(node[1]) + ')'
+        return '(' + self._proc(node[2][0]) + ')'

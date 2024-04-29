@@ -616,14 +616,14 @@ class Compiler:
     def _choice_(self, rule, node, top_level=False):
         sub_rules = [
             self._compile(sub_node, rule, 'c', i, top_level)
-            for i, sub_node in enumerate(node[1])
+            for i, sub_node in enumerate(node[2])
         ]
         self._chain('choose', sub_rules)
 
     def _seq_(self, rule, node, top_level=False):
         sub_rules = [
             self._compile(sub_node, rule, 's', i)
-            for i, sub_node in enumerate(node[1])
+            for i, sub_node in enumerate(node[2])
         ]
         needs_scope = top_level and self._has_labels(node)
         if needs_scope:
@@ -644,26 +644,26 @@ class Compiler:
         self._flatten(['self._', method, '(', expr, ')'])
 
     def _label_(self, rule, node):
-        sub_rule = self._compile(node[1], rule + '_l')
+        sub_rule = self._compile(node[2][0], rule + '_l')
         self._flatten(
             [
                 'self._bind(',
                 sub_rule,
                 ', ',
-                string_literal.encode(node[2]),
+                string_literal.encode(node[1]),
                 ')',
             ]
         )
 
     def _leftrec_(self, rule, node):
-        sub_rule = self._compile(node[1], rule + '_l')
+        sub_rule = self._compile(node[2][0], rule + '_l')
         self._leftrec_needed = True
         needs_scope = self._has_labels(node)
         if needs_scope:
             self._bindings_needed = True
             self._flatten(["self._push('", rule, "')"])
         self._flatten(
-            ['self._leftrec(', OI, sub_rule, ',', "'", node[2], "'", OU, ')']
+            ['self._leftrec(', OI, sub_rule, ',', "'", node[1], "'", OU, ')']
         )
         if needs_scope:
             self._bindings_needed = True
@@ -673,7 +673,7 @@ class Compiler:
         self._depth = 0
         if self._has_labels(node):
             self._bindings_needed = True
-        obj = self._eval_rule(rule, node[1])
+        obj = self._eval_rule(rule, node[2][0])
         self._flatten(['self._succeed(', OI, obj, OU, ')'])
 
     def _empty_(self, rule, node):
@@ -682,28 +682,29 @@ class Compiler:
         self._flatten(['self._succeed(None)'])
 
     def _not_(self, rule, node):
-        sub_rule = self._compile(node[1], rule + '_n')
+        sub_rule = self._compile(node[2][0], rule + '_n')
         self._flatten(['self._not(', sub_rule, ')'])
 
     def _paren_(self, rule, node):
-        sub_rule = self._compile(node[1], rule + '_g')
+        sub_rule = self._compile(node[2][0], rule + '_g')
         if sub_rule.startswith('lambda:'):
             self._flatten([sub_rule[8:]])
         else:
             self._flatten(['(', sub_rule, ')()'])
 
     def _post_(self, rule, node):
-        sub_rule = self._compile(node[1], rule + '_p')
-        if node[2] == '?':
+        sub_rule = self._compile(node[2][0], rule + '_p')
+        if node[1] == '?':
             method = 'opt'
-        elif node[2] == '+':
+        elif node[1] == '+':
             method = 'plus'
         else:
+            assert node[1] == '*'
             method = 'star'
         self._flatten(['self._', method, '(', OI, sub_rule, OU, ')'])
 
     def _pred_(self, rule, node):
-        obj = self._eval_rule(rule, node[1])
+        obj = self._eval_rule(rule, node[2][0])
         # TODO: Figure out how to statically analyze predicates to
         # catch ones that don't return booleans, so that we don't need
         # the _ParsingRuntimeError exception
@@ -734,9 +735,9 @@ class Compiler:
         self._flatten(
             [
                 'self._range(',
-                string_literal.encode(node[1][1]),
+                string_literal.encode(node[2][0][1]),
                 ', ',
-                string_literal.encode(node[2][1]),
+                string_literal.encode(node[2][1][1]),
                 ')',
             ]
         )
@@ -751,24 +752,24 @@ class Compiler:
 
     def _ll_arr_(self, rule, node):
         line = ['[', OI]
-        if len(node[1]):
-            line.append(self._eval_rule(rule, node[1][0]))
-            for e in node[1][1:]:
+        if len(node[2]):
+            line.append(self._eval_rule(rule, node[2][0]))
+            for e in node[2][1:]:
                 line.extend([',', SN, self._eval_rule(rule, e)])
         line.extend([OU, ']'])
         return line
 
     def _ll_call_(self, rule, node):
         line = ['(', OI]
-        if len(node[1]):
-            line.append(self._eval_rule(rule, node[1][0]))
-            for e in node[1][1:]:
+        if len(node[2]):
+            line.append(self._eval_rule(rule, node[2][0]))
+            for e in node[2][1:]:
                 line.extend([',', SN, self._eval_rule(rule, e)])
         line.extend([OU, ')'])
         return line
 
     def _ll_getitem_(self, rule, node):
-        return ['['] + self._eval_rule(rule, node[1]) + [']']
+        return ['['] + self._eval_rule(rule, node[2][0]) + [']']
 
     def _ll_lit_(self, rule, node):
         del rule
@@ -776,9 +777,9 @@ class Compiler:
 
     def _ll_minus_(self, rule, node):
         return (
-            self._eval_rule(rule, node[1])
+            self._eval_rule(rule, node[2][0])
             + [SN, '- ']
-            + self._eval_rule(rule, node[2])
+            + self._eval_rule(rule, node[2][1])
         )
 
     def _ll_num_(self, rule, node):
@@ -786,25 +787,25 @@ class Compiler:
         return [node[1]]
 
     def _ll_paren_(self, rule, node):
-        return self._eval_rule(rule, node[1])
+        return self._eval_rule(rule, node[2][0])
 
     def _ll_plus_(self, rule, node):
         return (
-            self._eval_rule(rule, node[1])
+            self._eval_rule(rule, node[2][0])
             + [SN, '+ ']
-            + self._eval_rule(rule, node[2])
+            + self._eval_rule(rule, node[2][1])
         )
 
     def _ll_qual_(self, rule, node):
-        assert node[1][0] == 'll_var'
-        if node[2][0][0] == 'll_call':
+        assert node[2][0][0] == 'll_var'
+        if node[2][1][0] == 'll_call':
             # Unknown functions should have been caught in analysis.
-            assert node[1][1] in self.builtin_functions
-            self._builtin_functions_needed.add(node[1][1])
-            v = ['self._%s' % node[1][1]]
+            assert node[2][0][1] in self.builtin_functions
+            self._builtin_functions_needed.add(node[2][0][1])
+            v = ['self._%s' % node[2][0][1]]
         else:
-            v = self._eval_rule(rule, node[1])
-        for p in node[2]:
+            v = self._eval_rule(rule, node[2][0])
+        for p in node[2][1:]:
             v += self._eval_rule(rule, p)
         return [v]
 
