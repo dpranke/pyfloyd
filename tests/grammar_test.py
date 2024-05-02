@@ -74,6 +74,22 @@ class GrammarTestsMixin:
     def test_c_style_comment(self):
         self.check('grammar = /* foo */ end -> true', text='', out=True)
 
+    def test_c_comment_style_with_range(self):
+        # This tests both the 'C' comment style and that filler around
+        # ranges are handled properly.
+        grammar = textwrap.dedent("""\
+            %whitespace_style standard
+            %comment_style    C
+
+            grammar = num '+' num end -> true
+
+            num     = '1'..'9'
+            """)
+        p, err, _ = self.compile(grammar)
+        self.assertIsNone(err)
+        self.checkp(p, ' 1 + 2 ', out=True)
+        self.checkp(p, ' 1/* comment */+2', out=True)
+
     def test_choice(self):
         self.check(
             """\
@@ -103,22 +119,6 @@ class GrammarTestsMixin:
             """
         self.check(grammar, text='foo\nfoo\n', out=True)
 
-    def test_comment_pragma_without_tokens(self):
-        grammar = """\
-            %comment = '//' (~'\n' any)*
-            grammar = (foo ' '* '\n')+  end -> true
-
-            foo     = 'foo'
-            """
-        self.check(
-            grammar,
-            text='foo\nfoo\n',
-            grammar_err=(
-                'Errors were found:\n'
-                "  Can't set comment pragma without also defining tokens\n"
-            ),
-        )
-
     def test_comment_style_pragma(self):
         grammar = """\
             %token foo
@@ -144,24 +144,6 @@ class GrammarTestsMixin:
             grammar,
             text='foo\nfoo\n',
             grammar_err="Errors were found:\n  Can't set both comment and comment_style pragmas\n",
-        )
-
-    def test_comment_style_pragma_without_tokens(self):
-        grammar = """\
-            %comment_style python
-
-            grammar = (foo ' '* '\n')+  end -> true
-
-            foo     = 'foo'
-            """
-        self.check(
-            grammar,
-            text='foo\nfoo\n',
-            grammar_err=(
-                'Errors were found:\n'
-                "  Can't set comment_style pragma without "
-                'also defining tokens\n'
-            ),
         )
 
     def test_cpp_style_comment_in_grammar(self):
@@ -263,6 +245,9 @@ class GrammarTestsMixin:
         path = str(THIS_DIR / '../grammars/json5.g')
         p, err, _ = self.compile(h.read_text_file(path))
         self.assertIsNone(err)
+        self._common_json5_checks(p)
+
+    def _common_json5_checks(self, p):
         self.checkp(p, text='123', out=123)
         self.checkp(p, text='Infinity', out=float('inf'))
         self.checkp(p, text='null', out=None)
@@ -336,6 +321,14 @@ class GrammarTestsMixin:
                 ],
             },
         )
+
+    def test_json5_2(self):
+        h = floyd.host.Host()
+        path = str(THIS_DIR / '../grammars/json5_2.g')
+        grammar = h.read_text_file(path)
+        p, err, _ = self.compile(grammar)
+        self.assertIsNone(err)
+        self._common_json5_checks(p)
 
     def test_label(self):
         self.check("grammar = 'foobar':v -> v", text='foobar', out='foobar')
@@ -564,23 +557,6 @@ class GrammarTestsMixin:
             """
         self.check(grammar, text='foofoo', out=True)
 
-    def test_whitespace_pragma_without_tokens(self):
-        grammar = """\
-            %whitespace = ' '
-           
-            grammar = foo foo end -> true
-
-            foo     = 'foo'
-            """
-        self.check(
-            grammar,
-            text='foofoo',
-            grammar_err=(
-                'Errors were found:\n'
-                "  Can't set whitespace pragma without also defining tokens\n"
-            ),
-        )
-
     def test_whitespace_style_pragma(self):
         grammar = """\
             %token foo
@@ -608,24 +584,6 @@ class GrammarTestsMixin:
             grammar_err=(
                 'Errors were found:\n'
                 "  Can't set both whitespace and whitespace_style pragmas\n"
-            ),
-        )
-
-    def test_whitespace_style_pragma_without_tokens(self):
-        grammar = """\
-            %whitespace_style standard
-           
-            grammar = foo foo end -> true
-
-            foo     = 'foo'
-            """
-        self.check(
-            grammar,
-            text='foofoo',
-            grammar_err=(
-                'Errors were found:\n'
-                "  Can't set whitespace_style pragma without "
-                'also defining tokens\n'
             ),
         )
 

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import collections
+import copy
 
 
 class AnalysisError(Exception):
@@ -57,7 +58,7 @@ class Grammar:
                     self.tokens.add(t)
 
 
-def analyze(ast):
+def analyze(ast, rewrite_filler=True):
     """Analyze and optimize the AST.
 
     This runs any static analysis we can do over the grammars and
@@ -72,7 +73,8 @@ def analyze(ast):
     # Now optimize and rewrite the AST as needed.
     _rewrite_singles(g)
     _rewrite_left_recursion(g)
-    _rewrite_filler(g)
+    if rewrite_filler:
+        _rewrite_filler(g)
     return g
 
 
@@ -112,6 +114,10 @@ class _Analyzer:
     def analyze(self):
         self.rules = set(n[1] for n in self.grammar.ast[2] if n[0] == 'rule')
         self.walk(self.grammar.ast)
+        self.grammar.comment = self.comment
+        self.grammar.comment_style = self.comment_style
+        self.grammar.whitespace = self.whitespace
+        self.grammar.whitespace_style = self.whitespace_style
 
         self._check_pragmas()
 
@@ -174,12 +180,12 @@ class _Analyzer:
             elif node[1] == 'whitespace_style':
                 self.whitespace_style = node[2]
             elif node[1] == 'whitespace':
-                self.whitespace = node[2]
+                self.whitespace = node[2][0]
             elif node[1] == 'comment_style':
                 self.comment_style = node[2]
             else:
                 assert node[1] == 'comment'
-                self.comment = node[2]
+                self.comment = node[2][0]
         elif ty == 'rule':
             self.walk(node[2][0])
         elif ty in (
@@ -239,22 +245,6 @@ class _Analyzer:
             self.errors.append(
                 "Can't set both whitespace and whitespace_style pragmas"
             )
-        if self.comment and not self.tokens:
-            self.errors.append(
-                "Can't set comment pragma without also defining tokens"
-            )
-        if self.comment_style and not self.tokens:
-            self.errors.append(
-                "Can't set comment_style pragma without also defining tokens"
-            )
-        if self.whitespace and not self.tokens:
-            self.errors.append(
-                "Can't set whitespace pragma without also defining tokens"
-            )
-        if self.whitespace_style and not self.tokens:
-            self.errors.append(
-                "Can't set whitespace_style pragma without also defining tokens"
-            )
 
 
 class Visitor:
@@ -262,7 +252,7 @@ class Visitor:
         self.grammar = grammar
 
     def visit_pre(self, node):  # pragma: no cover
-        return node
+        return node, True
 
     def process(self):  # pragma: no cover
         pass
@@ -274,8 +264,14 @@ class Visitor:
 def walk(node, visitor):
     if node[0] == 'pragma':
         return node
-    pre = visitor.visit_pre(node)
-    r = [walk(n, visitor) for n in pre[2]]
+    assert len(node) == 3
+    pre, keep_going = visitor.visit_pre(node)
+    if not keep_going:
+        return pre
+    r = []
+    for n in pre[2]:
+        sn = walk(n, visitor)
+        r.append(sn)
     node = visitor.visit_post(pre, r)
     return node
 
@@ -290,7 +286,7 @@ class _SinglesVisitor(Visitor):
         if node[0] in ('choice', 'seq'):
             if len(node[2]) == 1 and node[2][0][0] != 'apply':
                 return self.visit_pre(node[2][0])
-        return node
+        return node, True
 
 
 def _rewrite_left_recursion(grammar):
@@ -368,8 +364,21 @@ def _check_lr(name, node, rules, seen):
 
 
 def _rewrite_filler(grammar):
+    if (
+        not grammar.comment
+        and not grammar.comment_style
+        and not grammar.whitespace
+        and not grammar.whitespace_style
+    ):
+        return
+
+    # Compute the transitive closure of all the token rules.
     _TokenVisitor(grammar).process()
-    # _FillerVisitor(grammar).process()
+
+    # Now rewrite any literals, tokens, or 'end' to be filler nodes.
+    _FillerVisitor(grammar).process()
+
+    _update_rules(grammar)
 
 
 class _TokenVisitor(Visitor):
@@ -393,4 +402,136 @@ class _TokenVisitor(Visitor):
                 and rule_name not in BUILTIN_RULES
             ):
                 self.rules_to_process.add(rule_name)
-        return node
+        return node, True
+
+
+class _FillerVisitor(Visitor):
+    def __init__(self, grammar):
+        super().__init__(grammar)
+        if grammar.whitespace_style == 'standard':
+            grammar.whitespace = STANDARD_WHITESPACE
+        if grammar.comment_style in ('python', 'bash', 'shell'):
+            grammar.comment = BASH_COMMENT
+        elif grammar.comment_style == 'C':
+            grammar.comment = C_COMMENT
+        elif grammar.comment_style in ('C++', 'Java', 'JavaScript'):
+            grammar.comment = CPP_COMMENT
+        if grammar.whitespace:
+            grammar.rules['_whitespace'] = grammar.whitespace
+        if grammar.comment:
+            grammar.rules['_comment'] = grammar.comment
+
+    def visit_pre(self, node):
+        if node[0] == 'range':
+            return self._rewrite_with_filler(node), False
+        if node[0] == 'lit':
+            return self._rewrite_with_filler(node), False
+        if node[0] == 'apply' and (
+            node[1] in self.grammar.tokens or node[1] == 'end'
+        ):
+            return self._rewrite_with_filler(node), False
+        if node[0] == 'rule' and node[1] in self.grammar.tokens:
+            return node, False
+        return node, True
+
+    def process(self):
+        self.grammar.ast = walk(self.grammar.ast, self)
+
+    def _rewrite_with_filler(self, node):
+        if self.grammar.whitespace and self.grammar.comment:
+            subnode = [
+                'choice',
+                None,
+                [
+                    ['apply', '_whitespace', []],
+                    ['apply', '_comment', []],
+                ],
+            ]
+        elif self.grammar.whitespace:
+            subnode = ['apply', '_whitespace', []]
+        else:
+            subnode = ['apply', '_comment', []]
+
+        return [
+            'paren',
+            None,
+            [
+                [
+                    'seq',
+                    None,
+                    [
+                        ['post', '*', [subnode]],
+                        copy.deepcopy(node),
+                    ],
+                ]
+            ],
+        ]
+
+
+# (' '|'\n'|'\r'|'\t')*
+STANDARD_WHITESPACE = [
+    'choice',
+    None,
+    [
+        ['lit', ' ', []],
+        ['lit', '\r', []],
+        ['lit', '\n', []],
+        ['lit', '\t', []],
+    ],
+]
+
+
+def _eol_comment(lit):
+    # $lit (~'\n' any)*
+    return [
+        'seq',
+        None,
+        [
+            ['lit', lit, []],
+            [
+                'post',
+                '*',
+                [
+                    [
+                        'seq',
+                        None,
+                        [
+                            ['not', None, [['lit', '\n', []]]],
+                            ['apply', 'any', []],
+                        ],
+                    ]
+                ],
+            ],
+        ],
+    ]
+
+
+BASH_COMMENT = _eol_comment('#')
+
+
+# '/*' (~'*/' any)* '*/'
+C_COMMENT = [
+    'seq',
+    None,
+    [
+        ['lit', '/*', []],
+        [
+            'post',
+            '*',
+            [
+                [
+                    'seq',
+                    None,
+                    [
+                        ['not', None, [['lit', '*/', []]]],
+                        ['apply', 'any', []],
+                    ],
+                ],
+            ],
+        ],
+        ['lit', '*/', []],
+    ],
+]
+
+
+CPP_COMMENT = ['choice', None, [_eol_comment('//'), C_COMMENT]]

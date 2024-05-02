@@ -106,7 +106,7 @@ def pretty_print(
         return None, err
 
     try:
-        grammar = analyzer.analyze(ast)
+        grammar = analyzer.analyze(ast, rewrite_filler=False)
         return Printer(grammar).dumps(), None
     except analyzer.AnalysisError as e:
         return None, str(e)
