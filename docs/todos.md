@@ -54,15 +54,6 @@
 * Maybe add `_pos` built-in rule (and _pos() built-in function), 
   `_text` built-in value.
 
-* Implement support for automatic whitespace and comment insertion in
-  grammars.
-  - You end up with four kinds of things: whitespace, comments, tokens
-    (or terminals)?, and nonterminals.
-  - Whitespace and comments are only automatically inserted in
-    nonterminals, not tokens.
-  - Need some kind of better name for nonterminals. Rules?
-  - Enforce that tokens can be expressed as regexps.
-
 * Figure out how to notate for associativity and precedence without
   having to encode it in the ordering of rules, e.g. so you can write
   `expr = expr '*' expr` rather than `expr = expr '*' add_expr`.
