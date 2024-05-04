@@ -353,6 +353,9 @@ class GrammarTestsMixin:
     def test_lit_str(self):
         self.check("grammar = ('foo')* -> true", text='foofoo', out=True)
 
+    def test_ll_getitem(self):
+        self.check("grammar = end -> ['a', 'b'][1]", text='', out='b')
+
     def test_ll_plus(self):
         self.check(
             "grammar = 'a':a 'b'*:bs -> a + join('', bs)",
@@ -419,6 +422,18 @@ class GrammarTestsMixin:
             """,
             'a+a+a',
             [['a', '+', 'a'], '+', 'a'],
+        )
+
+    def test_recursion_without_a_label(self):
+        # This covers the code path where left recursion happens but
+        # we don't need to save the value from it.
+        self.check(
+            """\
+            grammar = grammar 'a'
+                    | 'a'
+            """,
+            'aaa',
+            out='a',
         )
 
     def test_recursion_direct_right(self):

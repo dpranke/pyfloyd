@@ -195,7 +195,7 @@ _HELPER_METHODS = """\
 
     def _star(self, rule, vs=None):
         vs = vs or []
-        while not self.failed:
+        while True:
             p = self.pos
             rule()
             if self.failed:
@@ -761,10 +761,14 @@ class Compiler:
 
     def _ll_call_(self, rule, node):
         line = ['(', OI]
-        if len(node[2]):
-            line.append(self._eval_rule(rule, node[2][0]))
-            for e in node[2][1:]:
-                line.extend([',', SN, self._eval_rule(rule, e)])
+
+        # There are no built-in functions that take no arguments, so make
+        # sure we're not being called that way.
+        assert len(node[2]) != 0
+
+        line.append(self._eval_rule(rule, node[2][0]))
+        for e in node[2][1:]:
+            line.extend([',', SN, self._eval_rule(rule, e)])
         line.extend([OU, ')'])
         return line
 
@@ -797,7 +801,6 @@ class Compiler:
         )
 
     def _ll_qual_(self, rule, node):
-        assert node[2][0][0] == 'll_var'
         if node[2][1][0] == 'll_call':
             # Unknown functions should have been caught in analysis.
             assert node[2][0][1] in self.builtin_functions

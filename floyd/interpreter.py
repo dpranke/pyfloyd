@@ -197,6 +197,7 @@ class Interpreter:
         for subnode in node[2]:
             self._interpret(subnode)
             vals.append(self.val)
+        # Return 'll_call' as a tag here so we can check it in ll_qual.
         self._succeed(['ll_call', vals])
 
     def _handle_ll_const(self, node):
@@ -208,13 +209,15 @@ class Interpreter:
             self._succeed(None)
         elif node[1] == 'Infinity':
             self._succeed(float('inf'))
-        elif node[1] == 'NaN':
+        else:
+            assert node[1] == 'NaN'
             self._succeed(float('NaN'))
 
     def _handle_ll_getitem(self, node):
         self._interpret(node[2][0])
-        if not self.failed:
-            self._succeed(['ll_getitem', self.val])
+        assert not self.failed
+        # Return 'll_getitem' as a tag here so we can check it in ll_qual.
+        self._succeed(['ll_getitem', self.val])
 
     def _handle_ll_num(self, node):
         if node[1].startswith('0x'):
@@ -294,7 +297,8 @@ class Interpreter:
             self._handle_opt(node)
         elif node[1] == '*':
             self._handle_star(node)
-        elif node[1] == '+':
+        else:
+            assert node[1] == '+'
             self._handle_plus(node)
 
     def _handle_pred(self, node):

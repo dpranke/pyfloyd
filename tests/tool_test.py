@@ -93,11 +93,14 @@ class ToolTest(unittest.TestCase):
         try:
             path = d + '/grammar.g'
             host.write_text_file(path, "grammar = 'foo'* -> true\n")
-            floyd.tool.main(['-c', '--main', path])
+
+            # This specifies a filename for `-o`; the other integration
+            # test takes the default filename to cover both code paths.
+            floyd.tool.main(['-c', '--main', '-o', d + '/foo.py', path])
 
             host.write_text_file(d + '/foo.inp', 'foofoo')
             proc = subprocess.run(
-                [sys.executable, d + '/grammar.py', d + '/foo.inp'],
+                [sys.executable, d + '/foo.py', d + '/foo.inp'],
                 capture_output=True,
                 check=False,
                 text=True,

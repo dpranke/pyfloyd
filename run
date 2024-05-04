@@ -194,6 +194,7 @@ class Runner:
                 '-m',
                 'coverage',
                 'run',
+                '--branch',
                 '-m',
                 'unittest',
                 'discover',

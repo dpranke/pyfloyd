@@ -156,9 +156,8 @@ class _Analyzer:
             if node[1] not in self.rules and node[1] not in ('any', 'end'):
                 self.errors.append(f'Unknown rule "{node[1]}"')
         if ty == 'll_qual':
-            assert node[2][0][0] == 'll_var'
-            name = node[2][0][1]
             if node[2][1][0] == 'll_call':
+                name = node[2][0][1]
                 if name not in BUILTIN_FUNCTIONS:
                     self.errors.append(f'Unknown function "{name}" called')
             else:

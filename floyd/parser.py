@@ -94,7 +94,7 @@ class Parser:
 
     def _star(self, rule, vs=None):
         vs = vs or []
-        while not self.failed:
+        while True:
             p = self.pos
             rule()
             if self.failed:
