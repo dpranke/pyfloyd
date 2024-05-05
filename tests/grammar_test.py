@@ -255,6 +255,19 @@ class GrammarTestsMixin:
         self.assertEqual(out[0], 'rules')
         self.assertIsNone(err)
 
+    def test_floyd2(self):
+        h = floyd.host.Host()
+        path = str(THIS_DIR / '../grammars/floyd2.g')
+        grammar = h.read_text_file(path)
+        p, err, _ = self.compile(grammar, path)
+        self.assertIsNone(err)
+        out, err, _ = p.parse(grammar, '../grammars/floyd2.g')
+        # We don't check the actual output here because it is too long
+        # and we don't want the test to be so sensitive to the AST for
+        # the floyd grammar.
+        self.assertEqual(out[0], 'rules')
+        self.assertIsNone(err)
+
     def test_hex_digits_in_value(self):
         self.check('grammar = -> 0x20', text='', out=32)
 
@@ -383,7 +396,7 @@ class GrammarTestsMixin:
         self.check("grammar = end -> ['a', 'b'][1]", text='', out='b')
 
     def test_ll_minus(self):
-        self.check("grammar = end -> 1 - 4", text='', out=-3)
+        self.check('grammar = end -> 1 - 4', text='', out=-3)
 
     def test_ll_plus(self):
         self.check(

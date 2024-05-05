@@ -9,8 +9,8 @@ eol         = '\x0D' '\x0A' | '\x0D' | '\x0A'
 comment     = '//' (~eol any)*
             | '/*' (~'*/' any)* '*/'
 
-pragma      = '%tokens' ((~eol ws)+ ident)+:ts    -> ['pragma', 'tokens', ts]
-            | '%token' (~eol ws)+ ident:t         -> ['pragma', 'token', [t]]
+pragma      = '%tokens' ident_list:is             -> ['pragma', 'tokens', is]
+            | '%token' sp ident:i                 -> ['pragma', 'token', [i]]
             | '%whitespace_style' sp ident:i      -> ['pragma',
                                                       'whitespace_style', i]
             | '%whitespace' sp '=' sp choice:cs   -> ['pragma', 'whitespace',
@@ -19,6 +19,8 @@ pragma      = '%tokens' ((~eol ws)+ ident)+:ts    -> ['pragma', 'tokens', ts]
                                                   -> ['pragma',
                                                       'comment_style', c]
             | '%comment' sp '=' sp choice:cs      -> ['pragma', 'comment', [cs]]
+
+ident_list  = (sp ident:i sp ~'=' -> i)+:is       -> is
 
 rule        = ident:i sp '=' sp choice:cs sp ','? -> ['rule', i, [cs]]
 
