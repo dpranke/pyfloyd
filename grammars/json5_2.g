@@ -1,6 +1,18 @@
-%comment_style    C++
-%whitespace_style standard  // should be 'unicode'
-%tokens           ident num_literal string
+%comment_style C++
+
+%whitespace    = ' '
+               | '\t'
+               | '\n'
+               | '\r'
+               | '\v'
+               | '\f'
+               | '\xa0'
+               | '\u2028'
+               | '\u2029'
+               | '\ufeff'
+               | \p{Zs}
+
+%tokens        ident num_literal string
 
 grammar        = value:v end                         -> v
 

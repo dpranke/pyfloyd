@@ -446,21 +446,10 @@ class Parser:
         self._pop('pragma__c2')
 
     def _pragma__c2__s2_(self):
-        self._bind(self._pragma__c2__s2_l_, 's')
-
-    def _pragma__c2__s2_l_(self):
-        (self._pragma__c2__s2_l_g_)()
-
-    def _pragma__c2__s2_l_g_(self):
-        self._choose(
-            [
-                lambda: self._str('standard'),
-                lambda: self._str('unicode'),
-            ]
-        )
+        self._bind(self._ident_, 'i')
 
     def _pragma__c2__s3_(self):
-        self._succeed(['pragma', 'whitespace_style', self._get('s')])
+        self._succeed(['pragma', 'whitespace_style', self._get('i')])
 
     def _pragma__c3_(self):
         self._push('pragma__c3')
@@ -504,12 +493,11 @@ class Parser:
         self._choose(
             [
                 lambda: self._str('C++'),
-                lambda: self._str('C#'),
-                self._pragma__c4__s2_l_g__c2_,
+                self._pragma__c4__s2_l_g__c1_,
             ]
         )
 
-    def _pragma__c4__s2_l_g__c2_(self):
+    def _pragma__c4__s2_l_g__c1_(self):
         self._seq(
             [
                 self._ident_,

@@ -236,6 +236,22 @@ class _Analyzer:
             assert False, f'Unexpected AST node type: {ty}'
 
     def _check_pragmas(self):
+        if self.whitespace_style and self.whitespace_style != 'standard':
+            self.errors.append(
+                'Unknown %%whitespace_style "%s"' % self.whitespace_style
+            )
+        if self.comment_style and self.comment_style not in (
+            'C',
+            'C++',
+            'Java',
+            'JavaScript',
+            'Python',
+            'shell',
+        ):
+            self.errors.append(
+                'Unknown %%comment_style "%s"' % self.comment_style
+            )
+
         if self.comment and self.comment_style:
             self.errors.append(
                 "Can't set both comment and comment_style pragmas"
@@ -409,12 +425,14 @@ class _FillerVisitor(Visitor):
         super().__init__(grammar)
         if grammar.whitespace_style == 'standard':
             grammar.whitespace = STANDARD_WHITESPACE
-        if grammar.comment_style in ('python', 'bash', 'shell'):
-            grammar.comment = BASH_COMMENT
-        elif grammar.comment_style == 'C':
-            grammar.comment = C_COMMENT
-        elif grammar.comment_style in ('C++', 'Java', 'JavaScript'):
-            grammar.comment = CPP_COMMENT
+        if grammar.comment_style:
+            if grammar.comment_style in ('Python', 'shell'):
+                grammar.comment = BASH_COMMENT
+            elif grammar.comment_style == 'C':
+                grammar.comment = C_COMMENT
+            else:
+                assert grammar.comment_style in ('C++', 'Java', 'JavaScript')
+                grammar.comment = CPP_COMMENT
         if grammar.whitespace:
             grammar.rules['_whitespace'] = grammar.whitespace
         if grammar.comment:

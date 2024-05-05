@@ -122,19 +122,36 @@ class GrammarTestsMixin:
     def test_comment_style_pragma(self):
         grammar = """\
             %token foo
-            %comment_style python
+            %comment_style Python
 
             grammar = (foo ' '* '\n')+  end -> true
 
             foo     = 'foo'
             """
         self.check(grammar, text='foo\nfoo\n', out=True)
+        self.check(grammar, text='foo # bar\nfoo\n', out=True)
+
+    def test_comment_style_unknown(self):
+        grammar = """\
+            %token foo
+            %comment_style X
+            grammar = foo
+
+            foo     = "foo"
+            """
+        self.check(
+            grammar,
+            text='foo',
+            grammar_err=(
+                'Errors were found:\n' '  Unknown %comment_style "X"\n'
+            ),
+        )
 
     def test_comment_style_pragma_both_is_an_error(self):
         grammar = """\
             %token foo
             %comment = '//' (~'\n' any)*
-            %comment_style python
+            %comment_style Python
 
             grammar = (foo ' '* '\n')+  end -> true
 
@@ -582,6 +599,21 @@ class GrammarTestsMixin:
             foo     = 'foo'
             """
         self.check(grammar, text='foofoo', out=True)
+
+        grammar = """\
+            %token foo
+            %whitespace_style X
+            grammar = foo
+
+            foo     = "foo"
+            """
+        self.check(
+            grammar,
+            text='foo',
+            grammar_err=(
+                'Errors were found:\n' '  Unknown %whitespace_style "X"\n'
+            ),
+        )
 
     def test_whitespace_style_pragma_both_is_an_error(self):
         grammar = """\
