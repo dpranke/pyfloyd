@@ -219,6 +219,13 @@ class Interpreter:
         # Return 'll_getitem' as a tag here so we can check it in ll_qual.
         self._succeed(['ll_getitem', self.val])
 
+    def _handle_ll_minus(self, node):
+        self._interpret(node[2][0])
+        v1 = self.val
+        self._interpret(node[2][1])
+        v2 = self.val
+        self._succeed(v1 - v2)
+
     def _handle_ll_num(self, node):
         if node[1].startswith('0x'):
             self._succeed(int(node[1], base=16))

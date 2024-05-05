@@ -266,6 +266,11 @@ class GrammarTestsMixin:
 
     def _common_json5_checks(self, p):
         self.checkp(p, text='123', out=123)
+        self.checkp(p, text='1.5', out=1.5)
+        self.checkp(p, text='+1.5', out=1.5)
+        self.checkp(p, text='-1.5', out=-1.5)
+        self.checkp(p, text='1.5e2', out=150)
+        self.checkp(p, text='.5e-2', out=0.005)
         self.checkp(p, text='Infinity', out=float('inf'))
         self.checkp(p, text='null', out=None)
         self.checkp(p, text='true', out=True)
@@ -372,6 +377,9 @@ class GrammarTestsMixin:
 
     def test_ll_getitem(self):
         self.check("grammar = end -> ['a', 'b'][1]", text='', out='b')
+
+    def test_ll_minus(self):
+        self.check("grammar = end -> 1 - 4", text='', out=-3)
 
     def test_ll_plus(self):
         self.check(
