@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import collections
-import copy
 
 
 class AnalysisError(Exception):
@@ -267,7 +266,7 @@ class Visitor:
         self.grammar = grammar
 
     def visit_pre(self, node):  # pragma: no cover
-        return node, True
+        return node, False
 
     def process(self):  # pragma: no cover
         pass
@@ -280,8 +279,8 @@ def walk(node, visitor):
     if node[0] == 'pragma':
         return node
     assert len(node) == 3
-    pre, keep_going = visitor.visit_pre(node)
-    if not keep_going:
+    pre, stop = visitor.visit_pre(node)
+    if stop:
         return pre
     r = []
     for n in pre[2]:
@@ -301,7 +300,7 @@ class _SinglesVisitor(Visitor):
         if node[0] in ('choice', 'seq'):
             if len(node[2]) == 1 and node[2][0][0] != 'apply':
                 return self.visit_pre(node[2][0])
-        return node, True
+        return node, False
 
 
 def _rewrite_left_recursion(grammar):
@@ -417,72 +416,44 @@ class _TokenVisitor(Visitor):
                 and rule_name not in BUILTIN_RULES
             ):
                 self.rules_to_process.add(rule_name)
-        return node, True
+        return node, False
 
 
 class _FillerVisitor(Visitor):
-    def __init__(self, grammar):
-        super().__init__(grammar)
-        if grammar.whitespace_style == 'standard':
-            grammar.whitespace = STANDARD_WHITESPACE
-        if grammar.comment_style:
-            if grammar.comment_style in ('Python', 'shell'):
-                grammar.comment = BASH_COMMENT
-            elif grammar.comment_style == 'C':
-                grammar.comment = C_COMMENT
-            else:
-                assert grammar.comment_style in ('C++', 'Java', 'JavaScript')
-                grammar.comment = CPP_COMMENT
-        if grammar.whitespace:
-            grammar.rules['_whitespace'] = grammar.whitespace
-        if grammar.comment:
-            grammar.rules['_comment'] = grammar.comment
-
     def visit_pre(self, node):
-        if node[0] == 'range':
-            return self._rewrite_with_filler(node), False
-        if node[0] == 'lit':
-            return self._rewrite_with_filler(node), False
-        if node[0] == 'apply' and (
-            node[1] in self.grammar.tokens or node[1] == 'end'
-        ):
-            return self._rewrite_with_filler(node), False
+        fnode = ['apply', '_filler', []]
+
         if node[0] == 'rule' and node[1] in self.grammar.tokens:
-            return node, False
-        return node, True
+            return node, True
+        if node[0] == 'seq':
+            children = []
+            for child in node[2]:
+                if self.should_fill(child):
+                    children.append(fnode)
+                    children.append(child)
+                else:
+                    sn = walk(child, self)
+                    children.append(sn)
+            return (['seq', None, children], True)
+        if self.should_fill(node):
+            return ['paren', None, [self.fill(node)]], True
+        return node, False
 
     def process(self):
+        _add_filler_rules(self.grammar)
         self.grammar.ast = walk(self.grammar.ast, self)
 
-    def _rewrite_with_filler(self, node):
-        if self.grammar.whitespace and self.grammar.comment:
-            subnode = [
-                'choice',
-                None,
-                [
-                    ['apply', '_whitespace', []],
-                    ['apply', '_comment', []],
-                ],
-            ]
-        elif self.grammar.whitespace:
-            subnode = ['apply', '_whitespace', []]
-        else:
-            subnode = ['apply', '_comment', []]
+    def should_fill(self, node):
+        if node[0] in ('escape', 'lit', 'range'):
+            return True
+        if node[0] == 'apply' and (
+            node[1] == 'end' or node[1] in self.grammar.tokens
+        ):
+            return True
+        return False
 
-        return [
-            'paren',
-            None,
-            [
-                [
-                    'seq',
-                    None,
-                    [
-                        ['post', '*', [subnode]],
-                        copy.deepcopy(node),
-                    ],
-                ]
-            ],
-        ]
+    def fill(self, node):
+        return ['seq', None, [['apply', '_filler', None], node]]
 
 
 # (' '|'\n'|'\r'|'\t')*
@@ -552,3 +523,51 @@ C_COMMENT = [
 
 
 CPP_COMMENT = ['choice', None, [_eol_comment('//'), C_COMMENT]]
+
+
+def _add_filler_rules(grammar):
+    if grammar.whitespace_style == 'standard':
+        grammar.whitespace = STANDARD_WHITESPACE
+    if grammar.comment_style:
+        if grammar.comment_style in ('Python', 'shell'):
+            grammar.comment = BASH_COMMENT
+        elif grammar.comment_style == 'C':
+            grammar.comment = C_COMMENT
+        else:
+            assert grammar.comment_style in ('C++', 'Java', 'JavaScript')
+            grammar.comment = CPP_COMMENT
+    if grammar.whitespace:
+        grammar.rules['_whitespace'] = grammar.whitespace
+    if grammar.comment:
+        grammar.rules['_comment'] = grammar.comment
+    if grammar.whitespace and grammar.comment:
+        grammar.rules['_filler'] = [
+            'post',
+            '*',
+            [
+                [
+                    'choice',
+                    None,
+                    [
+                        ['apply', '_whitespace', []],
+                        ['apply', '_comment', []],
+                    ],
+                ]
+            ],
+        ]
+    elif grammar.comment:
+        grammar.rules['_filler'] = [
+            'post',
+            '*',
+            [
+                ['apply', '_comment', []],
+            ],
+        ]
+    elif grammar.whitespace:
+        grammar.rules['_filler'] = [
+            'post',
+            '*',
+            [
+                ['apply', '_whitespace', []],
+            ],
+        ]
