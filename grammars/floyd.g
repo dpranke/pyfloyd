@@ -46,8 +46,10 @@ prim_expr   = lit:i sp '..' sp lit:j              -> ['range', null, [i, j]]
             | escape:e                            -> e
             | ident:i ~(sp '=')                   -> ['apply', i, []]
             | '->' sp ll_expr:e                   -> ['action', null, [e]]
+            | '{' sp ll_expr:e sp '}'             -> ['action', null, [e]]
             | '~' prim_expr:e                     -> ['not', null, [e]]
             | '?(' sp ll_expr:e sp ')'            -> ['pred', null, [e]]
+            | '?{' sp ll_expr:e sp '}'            -> ['pred', null, [e]]
             | '(' sp choice:e sp ')'              -> ['paren', null, [e]]
 
 lit         = squote sqchar*:cs squote            -> ['lit', cat(cs), []]

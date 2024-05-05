@@ -804,6 +804,8 @@ class Parser:
                 self._prim_expr__c5_,
                 self._prim_expr__c6_,
                 self._prim_expr__c7_,
+                self._prim_expr__c8_,
+                self._prim_expr__c9_,
             ]
         )
 
@@ -915,44 +917,44 @@ class Parser:
         self._push('prim_expr__c5')
         self._seq(
             [
-                lambda: self._ch('~'),
-                self._prim_expr__c5__s1_,
+                lambda: self._ch('{'),
+                self._sp_,
                 self._prim_expr__c5__s2_,
+                self._sp_,
+                lambda: self._ch('}'),
+                self._prim_expr__c5__s5_,
             ]
         )
         self._pop('prim_expr__c5')
 
-    def _prim_expr__c5__s1_(self):
-        self._bind(self._prim_expr_, 'e')
-
     def _prim_expr__c5__s2_(self):
-        self._succeed(['not', None, [self._get('e')]])
+        self._bind(self._ll_expr_, 'e')
+
+    def _prim_expr__c5__s5_(self):
+        self._succeed(['action', None, [self._get('e')]])
 
     def _prim_expr__c6_(self):
         self._push('prim_expr__c6')
         self._seq(
             [
-                lambda: self._str('?('),
-                self._sp_,
+                lambda: self._ch('~'),
+                self._prim_expr__c6__s1_,
                 self._prim_expr__c6__s2_,
-                self._sp_,
-                lambda: self._ch(')'),
-                self._prim_expr__c6__s5_,
             ]
         )
         self._pop('prim_expr__c6')
 
-    def _prim_expr__c6__s2_(self):
-        self._bind(self._ll_expr_, 'e')
+    def _prim_expr__c6__s1_(self):
+        self._bind(self._prim_expr_, 'e')
 
-    def _prim_expr__c6__s5_(self):
-        self._succeed(['pred', None, [self._get('e')]])
+    def _prim_expr__c6__s2_(self):
+        self._succeed(['not', None, [self._get('e')]])
 
     def _prim_expr__c7_(self):
         self._push('prim_expr__c7')
         self._seq(
             [
-                lambda: self._ch('('),
+                lambda: self._str('?('),
                 self._sp_,
                 self._prim_expr__c7__s2_,
                 self._sp_,
@@ -963,9 +965,49 @@ class Parser:
         self._pop('prim_expr__c7')
 
     def _prim_expr__c7__s2_(self):
-        self._bind(self._choice_, 'e')
+        self._bind(self._ll_expr_, 'e')
 
     def _prim_expr__c7__s5_(self):
+        self._succeed(['pred', None, [self._get('e')]])
+
+    def _prim_expr__c8_(self):
+        self._push('prim_expr__c8')
+        self._seq(
+            [
+                lambda: self._str('?{'),
+                self._sp_,
+                self._prim_expr__c8__s2_,
+                self._sp_,
+                lambda: self._ch('}'),
+                self._prim_expr__c8__s5_,
+            ]
+        )
+        self._pop('prim_expr__c8')
+
+    def _prim_expr__c8__s2_(self):
+        self._bind(self._ll_expr_, 'e')
+
+    def _prim_expr__c8__s5_(self):
+        self._succeed(['pred', None, [self._get('e')]])
+
+    def _prim_expr__c9_(self):
+        self._push('prim_expr__c9')
+        self._seq(
+            [
+                lambda: self._ch('('),
+                self._sp_,
+                self._prim_expr__c9__s2_,
+                self._sp_,
+                lambda: self._ch(')'),
+                self._prim_expr__c9__s5_,
+            ]
+        )
+        self._pop('prim_expr__c9')
+
+    def _prim_expr__c9__s2_(self):
+        self._bind(self._choice_, 'e')
+
+    def _prim_expr__c9__s5_(self):
         self._succeed(['paren', None, [self._get('e')]])
 
     def _lit_(self):

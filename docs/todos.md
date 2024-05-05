@@ -49,8 +49,6 @@
 
 * Add bounded qualifiers like `foo^3`, `foo^3+`, `foo^3,4` or something.
 
-* Use `?{}` for semantic predicate instead of `?()`, or use `?<>` maybe?
-
 * Maybe add `_pos` built-in rule (and _pos() built-in function), 
   `_text` built-in value.
 

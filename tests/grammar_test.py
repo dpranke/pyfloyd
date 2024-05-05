@@ -41,6 +41,10 @@ class GrammarTestsMixin:
         self.assertIsNone(p)
         self.assertEqual(err, p_err)
 
+    def test_action(self):
+        self.check('grammar = end -> true', text='', out=True)
+        self.check('grammar = end { true }', text='', out=True)
+
     def test_any_fails(self):
         self.check(
             'grammar = any',
@@ -413,6 +417,7 @@ class GrammarTestsMixin:
 
     def test_pred(self):
         self.check('grammar = ?(true) end -> true', text='', out=True)
+        self.check('grammar = ?{true} end { true }', text='', out=True)
         self.check(
             """\
             grammar = ?(false) end -> 'a'
