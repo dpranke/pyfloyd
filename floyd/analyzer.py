@@ -563,7 +563,8 @@ def _add_filler_rules(grammar):
                 ['apply', '_comment', []],
             ],
         ]
-    elif grammar.whitespace:
+    else:
+        assert grammar.whitespace
         grammar.rules['_filler'] = [
             'post',
             '*',

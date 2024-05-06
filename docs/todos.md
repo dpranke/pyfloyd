@@ -16,9 +16,6 @@
   when one will never be thrown). See where I had to add `# pragma: no cover`
   to get the code coverage of floyd/parser.py to 100%.
 
-* compiler.py: Figure out how to prune any methods that aren't actually
-  needed for the parser.
-
 * compiler.py: Figure out how to handle inlining methods more consistently
   in _compile so that we don't have the special-casing logic here. Same
   thing in analyzer.py rewrite_singles().

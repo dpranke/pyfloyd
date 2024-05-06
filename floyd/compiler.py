@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import enum
-import textwrap
 
 from floyd import string_literal
 
@@ -39,11 +38,7 @@ SN = Whitespace.SpaceOrNewline
 UN = Whitespace.Unindent
 
 
-_DEFAULT_HEADER = """\
-# pylint: disable=line-too-long,too-many-lines,unnecessary-lambda
-
-import unicodedata  # noqa: F401 pylint: disable=unused-import
-"""
+_DEFAULT_HEADER = '{unicodedata_import}'
 
 
 _DEFAULT_FOOTER = ''
@@ -52,14 +47,11 @@ _DEFAULT_FOOTER = ''
 _MAIN_HEADER = """\
 #!/usr/bin/env python
 
-# pylint: disable=line-too-long,too-many-lines,unnecessary-lambda
-
 import argparse
 import json
 import os
 import sys
-import unicodedata  # noqa: F401 pylint: disable=unused-import
-
+{unicodedata_import}
 
 def main(
     argv=sys.argv[1:],
@@ -77,51 +69,124 @@ def main(
         fname = '<stdin>'
         fp = stdin
     elif not exists(args.file):
-        print('Error: file "%%s" not found.' %% args.file, file=stderr)
+        print('Error: file "%s" not found.' % args.file, file=stderr)
         return 1
     else:
         fname = args.file
         fp = opener(fname)
 
     msg = fp.read()
-    obj, err, _ = %s(msg, fname).parse()
+    obj, err, _ = {classname}(msg, fname).parse()
     if err:
         print(err, file=stderr)
         return 1
     print(json.dumps(obj, indent=2))
     return 0
+
 """
 
 
 _MAIN_FOOTER = """\
+
 if __name__ == '__main__':
     sys.exit(main())
 """
 
 
-_PUBLIC_METHODS = """\
-{exception}
+_PARSING_RUNTIME_EXCEPTION = """\
+class _ParsingRuntimeError(Exception):
+    pass
+"""
+
+_CLASS = """\
 class {classname}:
     def __init__(self, msg, fname):
         self.msg = msg
         self.end = len(self.msg)
-        self.fname = fname
-        self.val = None
-        self.pos = 0
-        self.failed = False
         self.errpos = 0
-        self._scopes = []
-        self._cache = {{}}
-        self._seeds = {{}}
+        self.failed = False
+        self.fname = fname
+        self.pos = 0
+        self.val = None
+"""
 
+
+_PARSE = """\
     def parse(self):
-{start}
+        self._{starting_rule}_()
         if self.failed:
             return None, self._err_str(), self.errpos
         return self.val, None, self.pos
 """
 
-_HELPER_METHODS = """\
+
+_PARSE_WITH_EXCEPTION = """\
+    def parse(self):
+        try:
+            self._{starting_rule}_()
+            if self.failed:
+                return None, self._err_str(), self.errpos
+            return self.val, None, self.pos
+        except _ParsingRuntimeError as e:  # pragma: no cover
+            lineno, _ = self._err_offsets()
+            return (
+                None,
+                self.fname + ':' + str(lineno) + ' ' + str(e),
+                self.errpos,
+            )
+"""
+
+
+_BUILTINS = """\
+    def _any_(self):
+        if self.pos < self.end:
+            self._succeed(self.msg[self.pos], self.pos + 1)
+        else:
+            self._fail()
+
+    def _bind(self, rule, var):
+        rule()
+        if not self.failed:
+            self._set(var, self.val)
+
+    def _cat(self, strs):
+        return ''.join(strs)
+
+    def _ch(self, ch):
+        p = self.pos
+        if p < self.end and self.msg[p] == ch:
+            self._succeed(ch, self.pos + 1)
+        else:
+            self._fail()
+
+    def _choose(self, rules):
+        p = self.pos
+        for rule in rules[:-1]:
+            rule()
+            if not self.failed:
+                return
+            self._rewind(p)
+        rules[-1]()
+
+    def _dict(self, pairs):
+         return dict(pairs)
+
+    def _end_(self):
+        if self.pos == self.end:
+            self._succeed(None)
+        else:
+            self._fail()
+
+    def _err_offsets(self):
+        lineno = 1
+        colno = 1
+        for i in range(self.errpos):
+            if self.msg[i] == '\\n':
+                lineno += 1
+                colno = 1
+            else:
+                colno += 1
+        return lineno, colno
 
     def _err_str(self):
         lineno, colno = self._err_offsets()
@@ -136,35 +201,48 @@ _HELPER_METHODS = """\
             colno,
         )
 
-    def _err_offsets(self):
-        lineno = 1
-        colno = 1
-        for i in range(self.errpos):
-            if self.msg[i] == '\\n':
-                lineno += 1
-                colno = 1
-            else:
-                colno += 1
-        return lineno, colno
-
-    def _succeed(self, v, newpos=None):
-        self.val = v
-        self.failed = False
-        if newpos is not None:
-            self.pos = newpos
-
     def _fail(self):
         self.val = None
         self.failed = True
         self.errpos = max(self.errpos, self.pos)
 
-    def _rewind(self, newpos):
-        self._succeed(None, newpos)
+    def _float(self, str):
+          return float(str)
 
-    def _bind(self, rule, var):
-        rule()
-        if not self.failed:
-            self._set(var, self.val)
+    def _get(self, var):
+        return self.scopes[-1][1][var]
+
+    def _hex(self, str):
+        return int(str, base=16)
+
+    def _is_unicat(self, var, cat):
+        return unicodedata.category(var) == cat
+
+    def _itou(self, n):
+        return chr(n)
+
+    def _join(self, s, vs):
+        return s.join(vs)
+
+    def _leftrec(self, rule, rule_name):
+        pos = self.pos
+        key = (rule_name, pos)
+        seed = self.seeds.get(key)
+        if seed:
+            self.val, self.failed, self.pos = seed
+            return
+        current = (None, True, self.pos)
+        self.seeds[key] = current
+        while True:
+            rule()
+            if self.pos > current[2]:
+                current = (self.val, self.failed, self.pos)
+                self.seeds[key] = current
+                self.pos = pos
+            else:
+                del self.seeds[key]
+                self.val, self.failed, self.pos = current
+                return
 
     def _not(self, rule):
         p = self.pos
@@ -193,6 +271,32 @@ _HELPER_METHODS = """\
             return
         self._star(rule, vs)
 
+    def _pop(self, name):
+        actual_name, _ = self.scopes.pop()
+        assert name == actual_name
+
+    def _push(self, name):
+        self.scopes.append((name, {}))
+
+    def _range(self, i, j):
+        p = self.pos
+        if p != self.end and ord(i) <= ord(self.msg[p]) <= ord(j):
+            self._succeed(self.msg[p], self.pos + 1)
+        else:
+            self._fail()
+
+    def _rewind(self, newpos):
+        self._succeed(None, newpos)
+
+    def _seq(self, rules):
+        for rule in rules:
+            rule()
+            if self.failed:
+                return
+
+    def _set(self, var, val):
+        self.scopes[-1][1][var] = val
+
     def _star(self, rule, vs=None):
         vs = vs or []
         while True:
@@ -204,243 +308,113 @@ _HELPER_METHODS = """\
             vs.append(self.val)
         self._succeed(vs)
 
-    def _seq(self, rules):
-        for rule in rules:
-            rule()
-            if self.failed:
-                return
-
-    def _choose(self, rules):
-        p = self.pos
-        for rule in rules[:-1]:
-            rule()
-            if not self.failed:
-                return
-            self._rewind(p)
-        rules[-1]()
-
-    def _unicat(self, cat):  # pragma: no cover
-        # TODO: Figure out how to omit this if it isn't needed.
-        p = self.pos
-        if p < self.end and unicodedata.category(self.msg[p]) == cat:
-            self._succeed(self.msg[p], self.pos + 1)
-        else:
-            self._fail()
-"""
-
-
-_EXPECT = """\
-
-    def _ch(self, ch):
-        p = self.pos
-        if p < self.end and self.msg[p] == ch:
-            self._succeed(ch, self.pos + 1)
-        else:
-            self._fail()
-
     def _str(self, s):
         for ch in s:
             self._ch(ch)
             if self.failed:
                 return
         self.val = s
-"""
 
+    def _succeed(self, v, newpos=None):
+        self.val = v
+        self.failed = False
+        if newpos is not None:
+            self.pos = newpos
 
-_LEFTREC = """\
-
-    def _leftrec(self, rule, rule_name):
-        pos = self.pos
-        key = (rule_name, pos)
-        seed = self._seeds.get(key)
-        if seed:
-            self.val, self.failed, self.pos = seed
-            return
-        current = (None, True, self.pos)
-        self._seeds[key] = current
-        while True:
-            rule()
-            if self.pos > current[2]:
-                current = (self.val, self.failed, self.pos)
-                self._seeds[key] = current
-                self.pos = pos
-            else:
-                del self._seeds[key]
-                self.val, self.failed, self.pos = current
-                return
-"""
-
-
-_RANGE = """\
-
-    def _range(self, i, j):
+    def _unicat(self, cat):
         p = self.pos
-        if p != self.end and ord(i) <= ord(self.msg[p]) <= ord(j):
+        if p < self.end and unicodedata.category(self.msg[p]) == cat:
             self._succeed(self.msg[p], self.pos + 1)
         else:
             self._fail()
+
+    def _utoi(self, s):
+        return ord(s)
+
+    def _xtoi(self, s):
+        return int(s, base=16)
+
+    def _xtou(self, s):
+        return chr(int(s, base=16))
 """
-
-
-_BINDINGS = """\
-
-    def _push(self, name):
-        self._scopes.append((name, {}))
-
-    def _pop(self, name):
-        actual_name, _ = self._scopes.pop()
-        assert name == actual_name
-
-    def _get(self, var):
-        return self._scopes[-1][1][var]
-
-    def _set(self, var, val):
-        self._scopes[-1][1][var] = val
-"""
-
-
-def d(s):
-    return textwrap.dedent(s).splitlines()
-
-
-_DEFAULT_FUNCTIONS = {
-    'cat': d("""\
-        def _cat(self, strs):
-            return ''.join(strs)
-        """),
-    'dict': d("""\
-        def _dict(self, pairs):
-              return dict(pairs)
-        """),
-    'float': d("""\
-        def _float(self, str):
-              return float(str)
-        """),
-    'hex': d("""\
-        def _hex(self, str):
-             return int(str, base=16)
-        """),
-    'is_unicat': d("""\
-        def _is_unicat(self, var, cat):
-            return unicodedata.category(var) == cat
-        """),
-    'itou': d("""\
-        def _itou(self, n):
-            return chr(n)
-        """),
-    'join': d("""\
-        def _join(self, s, vs):
-            return s.join(vs)
-        """),
-    'utoi': d("""\
-        def _utoi(self, s):
-            return ord(s)
-        """),
-    'xtoi': d("""\
-        def _xtoi(self, s):
-            return int(s, base=16)
-        """),
-    'xtou': d("""\
-        def _xtou(self, s):
-            return chr(int(s, base=16))
-        """),
-}
-
-
-_DEFAULT_RULES = {
-    'any': d("""\
-        def _any_(self):
-            if self.pos < self.end:
-                self._succeed(self.msg[self.pos], self.pos + 1)
-            else:
-                self._fail()
-    """),
-    'end': d("""\
-        def _end_(self):
-            if self.pos == self.end:
-                self._succeed(None)
-            else:
-                self._fail()
-    """),
-}
 
 
 class Compiler:
     def __init__(self, grammar, classname, main_wanted=True, memoize=True):
-        self.grammar = grammar
-        self.classname = classname
+        self._grammar = grammar
+        self._classname = classname
         self._depth = 0
-        if main_wanted:
-            self.header = _MAIN_HEADER % self.classname
-            self.footer = _MAIN_FOOTER
-        else:
-            self.header = _DEFAULT_HEADER
-            self.footer = _DEFAULT_FOOTER
-        self.builtin_functions = _DEFAULT_FUNCTIONS
-        self.builtin_rules = _DEFAULT_RULES
-        self.memoize = memoize
-
-        self._builtin_functions_needed = set()
-        self._builtin_rules_needed = set()
-        self._bindings_needed = False
-        self._exception_needed = False
-        self._expect_needed = False
-        self._leftrec_needed = False
-        self._range_needed = False
+        self._main_wanted = main_wanted
+        self._memoize = memoize
+        self._needed = set()
         self._methods = {}
         self._method_lines = []
+        self._exception_needed = False
+        self._unicodedata_needed = False
 
     def compile(self):
-        for rule, node in self.grammar.rules.items():
+        for rule, node in self._grammar.rules.items():
             self._compile(node, rule, top_level=True)
 
-        if self._exception_needed:
-            exception = textwrap.dedent("""\
+        if self._unicodedata_needed:
+            unicodedata_import = 'import unicodedata\n'
+        else:
+            unicodedata_import = ''
 
-                class _ParsingRuntimeError(Exception):
-                    pass
+        # These methods are always needed.
+        self._needed.update(
+            {
+                'err_offsets',
+                'err_str',
+                'fail',
+                'rewind',
+                'succeed',
+            }
+        )
 
-                """)
-            start = (
-                '        try:\n'
-                '            self._%s_()\n'
-                '        except _ParsingRuntimeError as e:  '
-                '# pragma: no cover\n'
-                '            lineno, _ = self._err_offsets()\n'
-                '            return (\n'
-                '                None,\n'
-                "                self.fname + ':' + str(lineno) + ' ' "
-                '+ str(e),\n'
-                '                self.errpos,\n'
-                '            )' % self.grammar.starting_rule
+        if self._main_wanted:
+            text = _MAIN_HEADER.format(
+                classname=self._classname,
+                unicodedata_import=unicodedata_import,
             )
         else:
-            exception = ''
-            start = '        self._%s_()' % self.grammar.starting_rule
-        public_methods = _PUBLIC_METHODS.format(
-            exception=exception, start=start, classname=self.classname
-        )
-        text = self.header + '\n' + public_methods + _HELPER_METHODS
+            text = _DEFAULT_HEADER.format(
+                unicodedata_import=unicodedata_import
+            )
 
-        if self._expect_needed:
-            text += _EXPECT
-        if self._leftrec_needed:
-            text += _LEFTREC
-        if self._range_needed:
-            text += _RANGE
-        if self._bindings_needed:
-            text += _BINDINGS
+        if self._exception_needed:
+            text += _PARSING_RUNTIME_EXCEPTION
 
-        for name in sorted(self._builtin_functions_needed):
-            text += '\n'
-            for line in self.builtin_functions[name]:
-                text += '    %s\n' % line
+        text += _CLASS.format(classname=self._classname)
+
+        if self._memoize:
+            text += '        self.cache = {}\n'
+        if 'bind' in self._needed:
+            text += '        self.scopes = []\n'
+            self._needed.update(
+                {
+                    'get',
+                    'push',
+                    'pop',
+                    'set',
+                }
+            )
+        if 'leftrec' in self._needed:
+            text += '        self.seeds= {}\n'
+        text += '\n'
+
+        if self._exception_needed:
+            text += _PARSE_WITH_EXCEPTION.format(
+                starting_rule=self._grammar.starting_rule
+            )
+        else:
+            text += _PARSE.format(starting_rule=self._grammar.starting_rule)
 
         methods = set()
-        for rule in self.grammar.rules.keys():
+        for rule in self._grammar.rules.keys():
             methods.add(rule)
             text += self._method_text(
-                rule, self._methods[rule], memoize=self.memoize
+                rule, self._methods[rule], memoize=self._memoize
             )
 
             # Do not memoize the internal rules; it's not clear if that'd
@@ -456,20 +430,34 @@ class Compiler:
                     name, self._methods[name], memoize=False
                 )
 
-        for name in sorted(self._builtin_rules_needed):
-            text += '\n'
-            for line in self.builtin_rules[name]:
-                text += '    %s\n' % line
+        builtins = self._load_builtins()
+        text += '\n'.join(builtins[name] for name in sorted(self._needed))
 
-        if self.footer:
-            text += '\n\n' + self.footer
+        if self._main_wanted:
+            text += _MAIN_FOOTER
+        else:
+            text += _DEFAULT_FOOTER
         return text, None
+
+    def _load_builtins(self):
+        blocks = _BUILTINS.split('\n    def ')
+        blocks[0] = blocks[0][8:]
+        builtins = {}
+        for block in blocks:
+            name = block[1 : block.find('(')]
+            if name == 'end_':
+                name = 'end'
+            if name == 'any_':
+                name = 'any'
+            text = '    def ' + block
+            builtins[name] = text
+        return builtins
 
     def _method_text(self, name, lines, memoize):
         text = '\n'
         text += '    def _%s_(self):\n' % name
         if memoize:
-            text += '        r = self._cache.get(("%s", self.pos))\n' % name
+            text += '        r = self.cache.get(("%s", self.pos))\n' % name
             text += '        if r is not None:\n'
             text += '            self.val, self.failed, self.pos = r\n'
             text += '            return\n'
@@ -477,8 +465,9 @@ class Compiler:
         for line in lines:
             text += '        %s\n' % line
         if memoize:
-            text += '        self._cache[("%s", pos)] = (' % name
+            text += '        self.cache[("%s", pos)] = (' % name
             text += 'self.val, self.failed, self.pos)\n'
+        text += '\n'
         return text
 
     def _compile(self, node, rule, sub_type='', index=0, top_level=False):
@@ -489,14 +478,16 @@ class Compiler:
         if node[0] == 'apply':
             # Unknown rules were caught in analysis so if the rule isn't
             # one of the ones in the grammar it must be a built-in one.
-            if node[1] not in self.grammar.rules:
-                self._builtin_rules_needed.add(node[1])
+            if node[1] not in self._grammar.rules:
+                self._needed.add(node[1])
             return 'self._%s_' % node[1]
         if node[0] == 'lit' and not top_level:
-            self._expect_needed = True
             expr = string_literal.encode(node[1])
             if len(node[1]) == 1:
+                self._needed.add('ch')
                 return 'lambda: self._ch(%s)' % (expr,)
+            self._needed.add('ch')
+            self._needed.add('str')
             return 'lambda: self._str(%s)' % (expr,)
         if sub_type:
             sub_rule = '%s__%s%d' % (rule, sub_type, index)
@@ -614,6 +605,7 @@ class Compiler:
     #
 
     def _choice_(self, rule, node, top_level=False):
+        self._needed.add('choose')
         sub_rules = [
             self._compile(sub_node, rule, 'c', i, top_level)
             for i, sub_node in enumerate(node[2])
@@ -621,13 +613,13 @@ class Compiler:
         self._chain('choose', sub_rules)
 
     def _seq_(self, rule, node, top_level=False):
+        self._needed.add('seq')
         sub_rules = [
             self._compile(sub_node, rule, 's', i)
             for i, sub_node in enumerate(node[2])
         ]
         needs_scope = top_level and self._has_labels(node)
         if needs_scope:
-            self._bindings_needed = True
             self._flatten(["self._push('", rule, "')"])
         self._chain('seq', sub_rules)
         if needs_scope:
@@ -635,15 +627,17 @@ class Compiler:
 
     def _lit_(self, rule, node):
         del rule
-        self._expect_needed = True
         expr = string_literal.encode(node[1])
         if len(node[1]) == 1:
             method = 'ch'
         else:
             method = 'str'
+            self._needed.add('ch')
+        self._needed.add(method)
         self._flatten(['self._', method, '(', expr, ')'])
 
     def _label_(self, rule, node):
+        self._needed.add('bind')
         sub_rule = self._compile(node[2][0], rule + '_l')
         self._flatten(
             [
@@ -657,22 +651,18 @@ class Compiler:
 
     def _leftrec_(self, rule, node):
         sub_rule = self._compile(node[2][0], rule + '_l')
-        self._leftrec_needed = True
+        self._needed.add('leftrec')
         needs_scope = self._has_labels(node)
         if needs_scope:
-            self._bindings_needed = True
             self._flatten(["self._push('", rule, "')"])
         self._flatten(
             ['self._leftrec(', OI, sub_rule, ',', "'", node[1], "'", OU, ')']
         )
         if needs_scope:
-            self._bindings_needed = True
             self._flatten(["self._pop('", rule, "')"])
 
     def _action_(self, rule, node):
         self._depth = 0
-        if self._has_labels(node):
-            self._bindings_needed = True
         obj = self._eval_rule(rule, node[2][0])
         self._flatten(['self._succeed(', OI, obj, OU, ')'])
 
@@ -682,6 +672,7 @@ class Compiler:
         self._flatten(['self._succeed(None)'])
 
     def _not_(self, rule, node):
+        self._needed.add('not')
         sub_rule = self._compile(node[2][0], rule + '_n')
         self._flatten(['self._not(', sub_rule, ')'])
 
@@ -698,9 +689,11 @@ class Compiler:
             method = 'opt'
         elif node[1] == '+':
             method = 'plus'
+            self._needed.add('star')
         else:
             assert node[1] == '*'
             method = 'star'
+        self._needed.add(method)
         self._flatten(['self._', method, '(', OI, sub_rule, OU, ')'])
 
     def _pred_(self, rule, node):
@@ -731,7 +724,7 @@ class Compiler:
 
     def _range_(self, rule, node):
         del rule
-        self._range_needed = True
+        self._needed.add('range')
         self._flatten(
             [
                 'self._range(',
@@ -744,6 +737,8 @@ class Compiler:
 
     def _unicat_(self, rule, node):
         del rule
+        self._unicodedata_needed = True
+        self._needed.add('unicat')
         self._flatten(['self._unicat(', string_literal.encode(node[1]), ')'])
 
     #
@@ -802,9 +797,7 @@ class Compiler:
 
     def _ll_qual_(self, rule, node):
         if node[2][1][0] == 'll_call':
-            # Unknown functions should have been caught in analysis.
-            assert node[2][0][1] in self.builtin_functions
-            self._builtin_functions_needed.add(node[2][0][1])
+            self._needed.add(node[2][0][1])
             v = ['self._%s' % node[2][0][1]]
         else:
             v = self._eval_rule(rule, node[2][0])
