@@ -429,6 +429,7 @@ class Compiler:
                 text += self._method_text(
                     name, self._methods[name], memoize=False
                 )
+        text += '\n'
 
         builtins = self._load_builtins()
         text += '\n'.join(builtins[name] for name in sorted(self._needed))
@@ -467,7 +468,6 @@ class Compiler:
         if memoize:
             text += '        self.cache[("%s", pos)] = (' % name
             text += 'self.val, self.failed, self.pos)\n'
-        text += '\n'
         return text
 
     def _compile(self, node, rule, sub_type='', index=0, top_level=False):
