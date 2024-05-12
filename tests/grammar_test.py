@@ -523,17 +523,22 @@ class GrammarTestsMixin:
             grammar = 'b'?:b grammar:g 'c' -> join('', b) + g + 'c'
                     | 'a'           -> 'a'
             """
-        # self.check(grammar, 'ac', 'ac')
-        # self.check(grammar, 'acc', 'acc')
+        self.check(grammar, 'ac', 'ac')
+        self.check(grammar, 'acc', 'acc')
 
-        # This result, while counter-intuitive, is correct (I think).
-        # The initial invocation parses a 'b', then invokes grammar
-        # recursively, then expects there to be a 'c' left over.
-        # However, because grammar is left-recursive, once it gets
-        # going it consumes all of the remaining c's (as per the line
-        # above), and doesn't leave any left over for the first invocation.
-        # self.check(grammar, 'bac', 'bac')
+        # This result happens because grammar is left-associative by
+        # default, and so when grammar is invoked the second time,
+        # it is blocked and fails to recurse a third time; that allows
+        # it to consume the 'a' and then complete. The first invocation
+        # is then free to consume the 'c'.
+        self.check(grammar, 'bac', 'bac')
 
+        # Now, since the grammar is now declared to be right-associative,
+        # when grammar is invoked for the second time, it is not blocked,
+        # and it can consume the 'a' and then the 'c' before completing.
+        # Once that completes, there is no longer any input left for the
+        # first invocation to consume and so it fails to find the 'c' it
+        # needs.
         grammar = """\
             %assoc grammar_1 right
             grammar = 'b'?:b grammar:g 'c' -> join('', b) + g + 'c'
