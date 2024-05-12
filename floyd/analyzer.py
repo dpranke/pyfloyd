@@ -44,6 +44,7 @@ class Grammar:
         self.tokens = set()
         self.whitespace = None
         self.whitespace_style = None
+        self.assoc = {}
 
         has_starting_rule = False
         for n in self.ast[2]:
@@ -109,6 +110,7 @@ class _Analyzer:
         self.tokens = set()
         self.whitespace = None
         self.whitespace_style = None
+        self.assoc = {}
 
     def analyze(self):
         self.rules = set(n[1] for n in self.grammar.ast[2] if n[0] == 'rule')
@@ -117,6 +119,7 @@ class _Analyzer:
         self.grammar.comment_style = self.comment_style
         self.grammar.whitespace = self.whitespace
         self.grammar.whitespace_style = self.whitespace_style
+        self.grammar.assoc = self.assoc
 
         self._check_pragmas()
 
@@ -181,9 +184,11 @@ class _Analyzer:
                 self.whitespace = node[2][0]
             elif node[1] == 'comment_style':
                 self.comment_style = node[2]
-            else:
-                assert node[1] == 'comment'
+            elif node[1] == 'comment':
                 self.comment = node[2][0]
+            else:
+                assert node[1] == 'assoc'
+                self.assoc[node[2][0]] = node[2][1]
         elif ty == 'rule':
             self.walk(node[2][0])
         elif ty in (
@@ -305,16 +310,25 @@ class _SinglesVisitor(Visitor):
 
 def _rewrite_left_recursion(grammar):
     """Rewrite the AST to insert leftrec nodes as needed."""
-    lr_rules = _check_for_left_recursion(grammar)
     new_rules = []
     for rule in grammar.ast[2]:
-        if rule[1] in lr_rules:
-            new_rule = [rule[0], rule[1], [['leftrec', rule[1], rule[2]]]]
-        else:
-            new_rule = rule
-        new_rules.append(new_rule)
-    grammar.ast = ['rules', None, new_rules]
-    _update_rules(grammar)
+        if rule[0] == 'pragma':
+            continue
+        name = rule[1]
+        seen = set()
+        if not _check_lr(name, rule[2][0], grammar.rules, seen):
+            continue
+        if rule[2][0][0] != 'choice':
+            continue
+        for i, child in enumerate(rule[2][0][2]):
+            seen = set()
+            has_lr = _check_lr(name, child, grammar.rules, seen)
+            if has_lr:
+                rule[2][0][2][i] = [
+                    'leftrec',
+                    '%s_%d' % (name, i + 1),
+                    [child],
+                ]
 
 
 def _check_for_left_recursion(grammar):
@@ -351,6 +365,8 @@ def _check_lr(name, node, rules, seen):
         return False
     if ty == 'label':
         return _check_lr(name, node[2][0], rules, seen)
+    if ty == 'leftrec':
+        return False
     if ty == 'lit':
         return False
     if ty == 'not':

@@ -19,6 +19,9 @@ pragma      = '%tokens' ident_list:is             -> ['pragma', 'tokens', is]
                                                   -> ['pragma',
                                                       'comment_style', c]
             | '%comment' sp '=' sp choice:cs      -> ['pragma', 'comment', [cs]]
+            | '%assoc' sp (~ws any)+:op sp 
+               ('left'|'right'):dir               -> ['pragma', 'assoc',
+                                                      [join('', op), dir]] 
 
 ident_list  = (sp ident:i sp ~'=' -> i)+:is       -> is
 

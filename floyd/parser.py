@@ -196,6 +196,7 @@ class Parser:
                 self._pragma__c3_,
                 self._pragma__c4_,
                 self._pragma__c5_,
+                self._pragma__c6_,
             ]
         )
 
@@ -327,6 +328,63 @@ class Parser:
 
     def _pragma__c5__s5_(self):
         self._succeed(['pragma', 'comment', [self._get('cs')]])
+
+    def _pragma__c6_(self):
+        self._push('pragma__c6')
+        self._seq(
+            [
+                lambda: self._str('%assoc'),
+                self._sp_,
+                self._pragma__c6__s2_,
+                self._sp_,
+                self._pragma__c6__s4_,
+                self._pragma__c6__s5_,
+            ]
+        )
+        self._pop('pragma__c6')
+
+    def _pragma__c6__s2_(self):
+        self._bind(self._pragma__c6__s2_l_, 'op')
+
+    def _pragma__c6__s2_l_(self):
+        self._plus(self._pragma__c6__s2_l_p_)
+
+    def _pragma__c6__s2_l_p_(self):
+        (self._pragma__c6__s2_l_p_g_)()
+
+    def _pragma__c6__s2_l_p_g_(self):
+        self._seq(
+            [
+                self._pragma__c6__s2_l_p_g__s0_,
+                self._any_,
+            ]
+        )
+
+    def _pragma__c6__s2_l_p_g__s0_(self):
+        self._not(self._ws_)
+
+    def _pragma__c6__s4_(self):
+        self._bind(self._pragma__c6__s4_l_, 'dir')
+
+    def _pragma__c6__s4_l_(self):
+        (self._pragma__c6__s4_l_g_)()
+
+    def _pragma__c6__s4_l_g_(self):
+        self._choose(
+            [
+                lambda: self._str('left'),
+                lambda: self._str('right'),
+            ]
+        )
+
+    def _pragma__c6__s5_(self):
+        self._succeed(
+            [
+                'pragma',
+                'assoc',
+                [self._join('', self._get('op')), self._get('dir')],
+            ]
+        )
 
     def _ident_list_(self):
         self._push('ident_list')
@@ -1791,6 +1849,9 @@ class Parser:
 
     def _get(self, var):
         return self.scopes[-1][1][var]
+
+    def _join(self, s, vs):
+        return s.join(vs)
 
     def _not(self, rule):
         p = self.pos

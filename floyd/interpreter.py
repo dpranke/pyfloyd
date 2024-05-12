@@ -45,6 +45,7 @@ class Interpreter:
         self.errpos = 0
         self.scopes = []
 
+        # self.debug = True
         self._interpret(self.grammar.rules[self.grammar.starting_rule])
         if self.failed:
             return self._format_error()
@@ -178,24 +179,23 @@ class Interpreter:
     def _handle_leftrec(self, node):
         # This approach to handling left-recursion is based on the approach
         # described in "Parsing Expression Grammars Made Practical" by
-        # Laurent and Mens, 2016. It does not contain the mechanism for
-        # making the rule be left-associative, because that didn't seem
-        # to work correctly. See the TODO about this (e.g., in
-        # test_recursion_both() in grammar_test.py).
+        # Laurent and Mens, 2016.
         pos = self.pos
         rule_name = node[1]
+        assoc = self.grammar.assoc.get(rule_name, 'left')
         key = (rule_name, pos)
         seed = self.seeds.get(key)
         if seed:
             self.val, self.failed, self.pos = seed
             return
-        # if rule_name in self.blocked:
-        #     self.val = None
-        #     self.failed = True
-        #     return
+        if rule_name in self.blocked:
+            self.val = None
+            self.failed = True
+            return
         current = (None, True, self.pos)
         self.seeds[key] = current
-        # self.blocked.add(rule_name)
+        if assoc == 'left':
+            self.blocked.add(rule_name)
         while True:
             self._interpret(node[2][0])
             if self.pos > current[2]:
@@ -207,7 +207,8 @@ class Interpreter:
             else:
                 del self.seeds[key]
                 self.val, self.failed, self.pos = current
-                # self.blocked.remove(rule_name)
+                if assoc == 'left':
+                    self.blocked.remove(rule_name)
                 if self.debug:
                     print('%s-- exit' % ('  ' * self.depth))
                 return
