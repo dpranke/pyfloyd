@@ -197,6 +197,7 @@ class Parser:
                 self._pragma__c4_,
                 self._pragma__c5_,
                 self._pragma__c6_,
+                self._pragma__c7_,
             ]
         )
 
@@ -344,32 +345,102 @@ class Parser:
         self._pop('pragma__c6')
 
     def _pragma__c6__s2_(self):
-        self._bind(self._pragma__c6__s2_l_, 'op')
+        self._bind(self._op_, 'o')
 
-    def _pragma__c6__s2_l_(self):
-        self._plus(self._pragma__c6__s2_l_p_)
+    def _pragma__c6__s4_(self):
+        self._bind(self._dir_, 'd')
 
-    def _pragma__c6__s2_l_p_(self):
-        (self._pragma__c6__s2_l_p_g_)()
+    def _pragma__c6__s5_(self):
+        self._succeed(['pragma', 'assoc', [self._get('o'), self._get('d')]])
 
-    def _pragma__c6__s2_l_p_g_(self):
+    def _pragma__c7_(self):
+        self._push('pragma__c7')
         self._seq(
             [
-                self._pragma__c6__s2_l_p_g__s0_,
+                lambda: self._str('%prec'),
+                self._pragma__c7__s1_,
+                self._pragma__c7__s2_,
+            ]
+        )
+        self._pop('pragma__c7')
+
+    def _pragma__c7__s1_(self):
+        self._bind(self._pragma__c7__s1_l_, 'os')
+
+    def _pragma__c7__s1_l_(self):
+        self._plus(self._pragma__c7__s1_l_p_)
+
+    def _pragma__c7__s1_l_p_(self):
+        (self._pragma__c7__s1_l_p_g_)()
+
+    def _pragma__c7__s1_l_p_g_(self):
+        self._seq(
+            [
+                self._sp_,
+                self._pragma__c7__s1_l_p_g__s1_,
+                self._pragma__c7__s1_l_p_g__s2_,
+            ]
+        )
+
+    def _pragma__c7__s1_l_p_g__s1_(self):
+        self._bind(self._op_, 'o')
+
+    def _pragma__c7__s1_l_p_g__s2_(self):
+        self._succeed(self._get('o'))
+
+    def _pragma__c7__s2_(self):
+        self._succeed(['pragma', 'prec', self._get('os')])
+
+    def _op_(self):
+        self._push('op')
+        self._seq(
+            [
+                self._op__s0_,
+                self._op__s1_,
+            ]
+        )
+        self._pop('op')
+
+    def _op__s0_(self):
+        self._bind(self._op__s0_l_, 'op')
+
+    def _op__s0_l_(self):
+        self._plus(self._op__s0_l_p_)
+
+    def _op__s0_l_p_(self):
+        (self._op__s0_l_p_g_)()
+
+    def _op__s0_l_p_g_(self):
+        self._seq(
+            [
+                self._op__s0_l_p_g__s0_,
                 self._any_,
             ]
         )
 
-    def _pragma__c6__s2_l_p_g__s0_(self):
+    def _op__s0_l_p_g__s0_(self):
         self._not(self._ws_)
 
-    def _pragma__c6__s4_(self):
-        self._bind(self._pragma__c6__s4_l_, 'dir')
+    def _op__s1_(self):
+        self._succeed(self._join('', self._get('op')))
 
-    def _pragma__c6__s4_l_(self):
-        (self._pragma__c6__s4_l_g_)()
+    def _dir_(self):
+        self._push('dir')
+        self._seq(
+            [
+                self._dir__s0_,
+                self._dir__s1_,
+            ]
+        )
+        self._pop('dir')
 
-    def _pragma__c6__s4_l_g_(self):
+    def _dir__s0_(self):
+        self._bind(self._dir__s0_l_, 'd')
+
+    def _dir__s0_l_(self):
+        (self._dir__s0_l_g_)()
+
+    def _dir__s0_l_g_(self):
         self._choose(
             [
                 lambda: self._str('left'),
@@ -377,14 +448,8 @@ class Parser:
             ]
         )
 
-    def _pragma__c6__s5_(self):
-        self._succeed(
-            [
-                'pragma',
-                'assoc',
-                [self._join('', self._get('op')), self._get('dir')],
-            ]
-        )
+    def _dir__s1_(self):
+        self._succeed(self._get('d'))
 
     def _ident_list_(self):
         self._push('ident_list')

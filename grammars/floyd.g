@@ -19,9 +19,12 @@ pragma      = '%tokens' ident_list:is             -> ['pragma', 'tokens', is]
                                                   -> ['pragma',
                                                       'comment_style', c]
             | '%comment' sp '=' sp choice:cs      -> ['pragma', 'comment', [cs]]
-            | '%assoc' sp (~ws any)+:op sp 
-               ('left'|'right'):dir               -> ['pragma', 'assoc',
-                                                      [join('', op), dir]] 
+            | '%assoc' sp op:o sp dir:d           -> ['pragma', 'assoc', [o, d]]
+            | '%prec' (sp op:o -> o)+:os          -> ['pragma', 'prec', os]
+
+op          = (~ws any)+:op                       -> join('', op)
+
+dir         = ('left'|'right'):d                  -> d
 
 ident_list  = (sp ident:i sp ~'=' -> i)+:is       -> is
 
