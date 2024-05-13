@@ -1,5 +1,5 @@
-%assoc expr_1 left
-%assoc expr_2 right
+%assoc expr#1 left
+%assoc expr#2 right
 
 grammar = expr -> $1
 

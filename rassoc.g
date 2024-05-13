@@ -1,4 +1,4 @@
-%assoc expr_1 right
+%assoc expr#1 right
 
 grammar = expr end -> $1
 
