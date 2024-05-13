@@ -20,7 +20,7 @@ pragma      = '%tokens' ident_list:is             -> ['pragma', 'tokens', is]
                                                       'comment_style', c]
             | '%comment' sp '=' sp choice:cs      -> ['pragma', 'comment', [cs]]
             | '%assoc' sp op:o sp dir:d           -> ['pragma', 'assoc', [o, d]]
-            | '%prec' (sp op:o -> o)+:os          -> ['pragma', 'prec', os]
+            | '%prec' (~eol ws op:o -> o)+:os     -> ['pragma', 'prec', os]
 
 op          = (~ws any)+:op                       -> join('', op)
 

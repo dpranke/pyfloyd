@@ -45,6 +45,7 @@ class Grammar:
         self.whitespace = None
         self.whitespace_style = None
         self.assoc = {}
+        self.prec = {}
 
         has_starting_rule = False
         for n in self.ast[2]:
@@ -111,6 +112,8 @@ class _Analyzer:
         self.whitespace = None
         self.whitespace_style = None
         self.assoc = {}
+        self.prec = {}
+        self.current_prec = 0
 
     def analyze(self):
         self.rules = set(n[1] for n in self.grammar.ast[2] if n[0] == 'rule')
@@ -120,6 +123,7 @@ class _Analyzer:
         self.grammar.whitespace = self.whitespace
         self.grammar.whitespace_style = self.whitespace_style
         self.grammar.assoc = self.assoc
+        self.grammar.prec = self.prec
 
         self._check_pragmas()
 
@@ -186,6 +190,10 @@ class _Analyzer:
                 self.comment_style = node[2]
             elif node[1] == 'comment':
                 self.comment = node[2][0]
+            elif node[1] == 'prec':
+                for op in node[2]:
+                    self.prec[op] = self.current_prec
+                self.current_prec += 2
             else:
                 assert node[1] == 'assoc'
                 self.assoc[node[2][0]] = node[2][1]
@@ -310,7 +318,6 @@ class _SinglesVisitor(Visitor):
 
 def _rewrite_left_recursion(grammar):
     """Rewrite the AST to insert leftrec nodes as needed."""
-    new_rules = []
     for rule in grammar.ast[2]:
         if rule[0] == 'pragma':
             continue

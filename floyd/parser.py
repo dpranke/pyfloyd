@@ -376,16 +376,20 @@ class Parser:
     def _pragma__c7__s1_l_p_g_(self):
         self._seq(
             [
-                self._sp_,
-                self._pragma__c7__s1_l_p_g__s1_,
+                self._pragma__c7__s1_l_p_g__s0_,
+                self._ws_,
                 self._pragma__c7__s1_l_p_g__s2_,
+                self._pragma__c7__s1_l_p_g__s3_,
             ]
         )
 
-    def _pragma__c7__s1_l_p_g__s1_(self):
-        self._bind(self._op_, 'o')
+    def _pragma__c7__s1_l_p_g__s0_(self):
+        self._not(self._eol_)
 
     def _pragma__c7__s1_l_p_g__s2_(self):
+        self._bind(self._op_, 'o')
+
+    def _pragma__c7__s1_l_p_g__s3_(self):
         self._succeed(self._get('o'))
 
     def _pragma__c7__s2_(self):
