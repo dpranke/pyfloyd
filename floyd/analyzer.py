@@ -326,7 +326,7 @@ def _rewrite_left_recursion(grammar):
             if has_lr:
                 rule[2][0][2][i] = [
                     'leftrec',
-                    '%s_%d' % (name, i + 1),
+                    '%s#%d' % (name, i + 1),
                     [child],
                 ]
 

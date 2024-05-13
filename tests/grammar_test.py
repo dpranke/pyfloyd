@@ -540,7 +540,7 @@ class GrammarTestsMixin:
         # first invocation to consume and so it fails to find the 'c' it
         # needs.
         grammar = """\
-            %assoc grammar_1 right
+            %assoc grammar#1 right
             grammar = 'b'?:b grammar:g 'c' -> join('', b) + g + 'c'
                     | 'a'           -> 'a'
             """
