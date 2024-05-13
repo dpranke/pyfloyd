@@ -324,24 +324,11 @@ def _rewrite_left_recursion(grammar):
             seen = set()
             has_lr = _check_lr(name, child, grammar.rules, seen)
             if has_lr:
-                rule[2][0][2][i] = [
-                    'leftrec',
-                    '%s#%d' % (name, i + 1),
-                    [child],
-                ]
+                rule[2][0][2][i] = _leftrec_op(name, i + 1, child)
 
 
-def _check_for_left_recursion(grammar):
-    """Returns a list of all potentially left-recursive rules."""
-    lr_rules = set()
-    for ty, name, children in grammar.ast[2]:
-        if ty == 'pragma':
-            continue
-        seen = set()
-        has_lr = _check_lr(name, children[0], grammar.rules, seen)
-        if has_lr:
-            lr_rules.add(name)
-    return lr_rules
+def _leftrec_op(name, num, child):
+    return ['leftrec', '%s#%d' % (name, num), [child]]
 
 
 def _check_lr(name, node, rules, seen):
