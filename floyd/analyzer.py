@@ -72,8 +72,8 @@ def analyze(ast, rewrite_filler=True):
     a.analyze()
 
     # Now optimize and rewrite the AST as needed.
+    _rewrite_recursion(g)
     _rewrite_singles(g)
-    _rewrite_left_recursion(g)
     if rewrite_filler:
         _rewrite_filler(g)
     return g
@@ -316,22 +316,19 @@ class _SinglesVisitor(Visitor):
         return node, False
 
 
-def _rewrite_left_recursion(grammar):
+def _rewrite_recursion(grammar):
     """Rewrite the AST to insert leftrec nodes as needed."""
-    for rule in grammar.ast[2]:
-        if rule[0] == 'pragma':
+    for node in grammar.ast[2]:
+        if node[0] == 'pragma':
             continue
-        name = rule[1]
-        seen = set()
-        if not _check_lr(name, rule[2][0], grammar.rules, seen):
-            continue
-        if rule[2][0][0] != 'choice':
-            continue
-        for i, child in enumerate(rule[2][0][2]):
+        name = node[1]
+        assert node[2][0][0] == 'choice'
+        choices = node[2][0][2]
+        for i, choice in enumerate(choices):
             seen = set()
-            has_lr = _check_lr(name, child, grammar.rules, seen)
+            has_lr = _check_lr(name, choice, grammar.rules, seen)
             if has_lr:
-                rule[2][0][2][i] = _leftrec_op(name, i + 1, child)
+                choices[i] = _leftrec_op(name, i + 1, choice)
 
 
 def _leftrec_op(name, num, child):
