@@ -391,7 +391,7 @@ class Interpreter:
         for choice in node[2]:
             if choice[2][index] == ['lit', op, []]:
                 return choice
-        assert False, 'Could not find op in choices'
+        assert False, 'Could not find op in choices'  # pragma: no cover
 
     def _handle_opt(self, node):
         pos = self.pos
