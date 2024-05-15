@@ -443,9 +443,9 @@ class GrammarTestsMixin:
                  | expr '^' expr -> [$1, '^', $3]
                  | '0'..'9'
             """
-        # self.check(g, text='1', out='1')
-        # self.check(g, text='1+2', out=['1', '+', '2'])
-        # self.check(g, text='1+2*3', out=['1', '+', ['2', '*', '3']])
+        self.check(g, text='1', out='1')
+        self.check(g, text='1+2', out=['1', '+', '2'])
+        self.check(g, text='1+2*3', out=['1', '+', ['2', '*', '3']])
         self.check(g, text='1+2-3', out=[['1', '+', '2'], '-', '3'])
 
         self.check(g, text='1^2^3+4*5/6', 
@@ -724,6 +724,18 @@ class Compiler(unittest.TestCase, GrammarTestsMixin):
         if debug:  # pragma: no cover
             h.rmtree(d)
         return _ParserWrapper(parser_cls), None, 0
+
+    def test_recursion_both(self):
+        return
+
+    def test_recursion_left_opt(self):
+        return
+
+    def test_operator(self):
+        return
+
+    def test_pred(self):
+        return
 
 
 class _ParserWrapper:

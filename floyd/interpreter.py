@@ -31,7 +31,6 @@ class Interpreter:
         self.scopes = []
         self.seeds = {}
         self.blocked = set()
-        self.debug = False
         self.depth = 0
 
         self.current_prec = 0
@@ -52,39 +51,10 @@ class Interpreter:
         self.errpos = 0
         self.scopes = []
 
-        # self.debug = True
         self._interpret(self.grammar.rules[self.grammar.starting_rule])
         if self.failed:
             return self._format_error()
         return self.val, None, self.pos
-
-    def log_start(self, rule_name):
-        if not self.debug:
-            return
-        print('%s%s @ %s start' % ('  ' * self.depth, rule_name, self.pos))
-        self.depth += 1
-
-    def log_end(self, rule_name, pos):
-        if not self.debug:
-            return
-        self.depth -= 1
-        if self.failed:
-            print('%s%s @ %s %s' % ('  ' * self.depth, rule_name, pos, 'fail'))
-        else:
-            print(
-                '%s%s @ %s %s -> %s'
-                % ('  ' * self.depth, rule_name, pos, 'succ', repr(self.val))
-            )
-
-    def log_match(self, match, pos, res):
-        if not self.debug:
-            return
-        print("%s'%s' @ %s %s" % ('  ' * self.depth, match, pos, res))
-
-    def log_range(self, low, hi, pos, res):
-        if not self.debug:
-            return
-        print("%s'%s'..'%s' @ %s %s" % ('  ' * self.depth, low, hi, pos, res))
 
     def _interpret(self, node):
         node_handler = getattr(self, '_handle_' + node[0], None)
@@ -133,32 +103,25 @@ class Interpreter:
     def _handle_apply(self, node):
         rule_name = node[1]
         pos = self.pos
-        self.log_start(rule_name)
         if rule_name == 'end':
             self._handle_end()
-            self.log_end(rule_name, pos)
             return
 
         if rule_name == 'any':
             if self.pos != self.end:
                 self._succeed(self.msg[self.pos], self.pos + 1)
-                self.log_end(rule_name, pos)
                 return
             self._fail()
-            self.log_end(rule_name, pos)
             return
 
         # Unknown rules should have been caught in analysis, so we don't
         # need to worry about one here and can jump straight to the rule.
         self._interpret(self.grammar.rules[rule_name])
-        self.log_end(rule_name, pos)
 
     def _handle_choice(self, node):
         count = 1
         pos = self.pos
         for rule in node[2][:-1]:
-            if self.debug:
-                print('%s-- choice %s' % ('  ' * self.depth, count))
             self._interpret(rule)
             if not self.failed:
                 return
@@ -209,15 +172,11 @@ class Interpreter:
                 current = (self.val, self.failed, self.pos)
                 self.seeds[key] = current
                 self.pos = pos
-                if self.debug:
-                    print('%s-- loop' % ('  ' * self.depth))
             else:
                 del self.seeds[key]
                 self.val, self.failed, self.pos = current
                 if assoc == 'left':
                     self.blocked.remove(rule_name)
-                if self.debug:
-                    print('%s-- exit' % ('  ' * self.depth))
                 return
 
     def _handle_lit(self, node):
@@ -234,10 +193,8 @@ class Interpreter:
             i += 1
         if i == lit_len:
             self._succeed(self.msg[pos : self.pos])
-            self.log_match(lit, pos, 'succ')
         else:
             self._fail()
-            self.log_match(lit, pos, 'fail')
 
     def _handle_unicat(self, node):
         p = self.pos
@@ -444,10 +401,8 @@ class Interpreter:
             and node[2][0][1] <= self.msg[self.pos] <= node[2][1][1]
         ):
             self._succeed(self.msg[self.pos], self.pos + 1)
-            self.log_range(node[2][0][1], node[2][1][1], pos, 'succ')
             return
         self._fail()
-        self.log_range(node[2][0][1], node[2][1][1], pos, 'fail')
 
     def _handle_seq(self, node):
         self.scopes.append({})

@@ -291,11 +291,7 @@ class Visitor:
 def walk(node, visitor):
     if node[0] == 'pragma':
         return node
-    try:
-        assert len(node) == 3
-    except Exception as e:
-        import pdb; pdb.set_trace()
-        pass
+    assert len(node) == 3
     pre, stop = visitor.visit_pre(node)
     if stop:
         return pre
