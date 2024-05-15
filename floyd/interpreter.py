@@ -34,6 +34,13 @@ class Interpreter:
         self.debug = False
         self.depth = 0
 
+        self.current_prec = 0
+        self.prec_ops = {}
+        for op in grammar.prec:
+            self.prec_ops.setdefault(grammar.prec[op], []).append(op)
+        self.precs = sorted(self.prec_ops, reverse=True)
+        self.operator_count = 0
+
     def parse(self, msg, fname):
         self.msg = msg
         self.fname = fname
@@ -46,6 +53,7 @@ class Interpreter:
         self.scopes = []
 
         # self.debug = True
+        import pdb; pdb.set_trace()
         self._interpret(self.grammar.rules[self.grammar.starting_rule])
         if self.failed:
             return self._format_error()
@@ -332,6 +340,59 @@ class Interpreter:
         else:
             self.pos = pos
             self._fail(val)
+
+    def _handle_operator(self, node):
+        pos = self.pos
+        rule_name = node[1]
+        key = (rule_name, self.pos)
+        seed = self.seeds.get(key)
+        if seed:
+            self.val, self.failed, self.pos = seed
+            return
+
+        self.operator_count += 1
+        current = (None, True, self.pos)
+        self.seeds[key] = current
+        min_prec = self.current_prec
+
+        i = 0
+        while i < len(self.precs):
+            prec = self.precs[i]
+            if prec < min_prec:
+                break
+            self.current_prec = prec
+            if self.grammar.assoc.get(self.prec_ops[prec][0]) == 'left':
+                self.current_prec += 1
+
+            j = 0
+            while j < len(self.prec_ops[prec]):
+                op = self.prec_ops[prec][j]
+                choice = self._find_choice(node, op)
+                self._interpret(choice)
+                if not self.failed and self.pos > pos:
+                    current = (self.val, self.failed, self.pos)
+                    self.seeds[key] = current
+                    break
+                else:
+                    self._rewind(pos)
+                j += 1
+            i += 1
+
+        del self.seeds[key]
+        self.operator_count -= 1
+        if self.operator_count == 0:
+            self.current_prec = 0
+        self.val, self.failed, self.pos = current
+
+    def _find_choice(self, node, op):
+        if len(node[2][0][2]) == 6:
+            index = 2
+        else:
+            index = 1
+        for choice in node[2]:
+            if choice[2][index] == ['lit', op, []]:
+                return choice
+        assert False, 'Could not find op in choices'
 
     def _handle_opt(self, node):
         pos = self.pos

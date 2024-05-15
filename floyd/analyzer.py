@@ -172,7 +172,7 @@ class _Analyzer:
             if node[1] not in self.scopes[-1] and node[1][0] != '$':
                 self.errors.append(f'Unknown variable "{node[1]}" referenced')
 
-        if ty in ('choice', 'll_arr', 'll_call', 'rules', 'seq'):
+        if ty in ('choice', 'll_arr', 'll_call', 'operator', 'rules', 'seq'):
             for n in node[2]:
                 self.walk(n)
         elif ty == 'pragma':
@@ -291,7 +291,11 @@ class Visitor:
 def walk(node, visitor):
     if node[0] == 'pragma':
         return node
-    assert len(node) == 3
+    try:
+        assert len(node) == 3
+    except Exception as e:
+        import pdb; pdb.set_trace()
+        pass
     pre, stop = visitor.visit_pre(node)
     if stop:
         return pre
@@ -317,23 +321,51 @@ class _SinglesVisitor(Visitor):
 
 
 def _rewrite_recursion(grammar):
-    """Rewrite the AST to insert leftrec nodes as needed."""
+    """Rewrite the AST to insert leftrec and operator nodes as needed."""
     for node in grammar.ast[2]:
         if node[0] == 'pragma':
             continue
         name = node[1]
         assert node[2][0][0] == 'choice'
         choices = node[2][0][2]
+
+        operator_node = _check_operator(grammar, name, choices)
+        if operator_node:
+            node[2] = [operator_node]
+            grammar.rules[name] = operator_node
+            continue
+
         for i, choice in enumerate(choices):
             seen = set()
             has_lr = _check_lr(name, choice, grammar.rules, seen)
             if has_lr:
-                choices[i] = _leftrec_op(name, i + 1, choice)
+                choices[i] = ['leftrec', '%s#%d' % (name, i + 1), [choice]]
 
 
-def _leftrec_op(name, num, child):
-    return ['leftrec', '%s#%d' % (name, num), [child]]
-
+def _check_operator(grammar, name, choices):
+    if len(choices) == 1:
+        return None
+    for choice in choices[:-1]:
+        assert choice[0] == 'seq'
+        if len(choice[2]) != 4:
+            return None
+        if choice[2][0] != ['label', '$1', [['apply', name, []]]]:
+            return None
+        if choice[2][1][0] != 'lit' or choice[2][1][1] not in grammar.prec:
+            return None
+        if choice[2][2] != ['label', '$3', [['apply', name, []]]]:
+            return None
+        if choice[2][3][0] != 'action':
+            return None
+    choice = choices[-1]
+    if len(choice[2]) != 1:
+        return None
+    return [
+        'choice', 
+        None, 
+        [['operator', name, choices[:-1]], choices[-1]]
+    ]
+            
 
 def _check_lr(name, node, rules, seen):
     # pylint: disable=too-many-branches
@@ -362,6 +394,8 @@ def _check_lr(name, node, rules, seen):
         return False
     if ty == 'not':
         return _check_lr(name, node[2][0], rules, seen)
+    if ty == 'operator':
+        return False
     if ty == 'paren':
         return _check_lr(name, node[2][0], rules, seen)
     if ty == 'post':
