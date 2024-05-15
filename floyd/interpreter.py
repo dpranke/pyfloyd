@@ -53,7 +53,6 @@ class Interpreter:
         self.scopes = []
 
         # self.debug = True
-        import pdb; pdb.set_trace()
         self._interpret(self.grammar.rules[self.grammar.starting_rule])
         if self.failed:
             return self._format_error()
@@ -357,27 +356,27 @@ class Interpreter:
 
         i = 0
         while i < len(self.precs):
+            repeat = False
             prec = self.precs[i]
             if prec < min_prec:
                 break
             self.current_prec = prec
-            if self.grammar.assoc.get(self.prec_ops[prec][0]) == 'left':
+            if self.grammar.assoc.get(self.prec_ops[prec][0], 'left') == 'left':
                 self.current_prec += 1
 
-            j = 0
-            while j < len(self.prec_ops[prec]):
+            for j in range(len(self.prec_ops[prec])):
                 op = self.prec_ops[prec][j]
                 choice = self._find_choice(node, op)
                 self._interpret(choice)
                 if not self.failed and self.pos > pos:
                     current = (self.val, self.failed, self.pos)
                     self.seeds[key] = current
+                    repeat = True
                     break
                 else:
                     self._rewind(pos)
-                j += 1
-            i += 1
-
+            if not repeat:
+                i += 1
         del self.seeds[key]
         self.operator_count -= 1
         if self.operator_count == 0:

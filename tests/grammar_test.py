@@ -446,6 +446,8 @@ class GrammarTestsMixin:
         # self.check(g, text='1', out='1')
         # self.check(g, text='1+2', out=['1', '+', '2'])
         # self.check(g, text='1+2*3', out=['1', '+', ['2', '*', '3']])
+        self.check(g, text='1+2-3', out=[['1', '+', '2'], '-', '3'])
+
         self.check(g, text='1^2^3+4*5/6', 
                    out=[['1', '^', ['2', '^', '3']], '+',
                         [['4', '*', '5'], '/', '6']])
