@@ -224,15 +224,21 @@ _BUILTINS = """\
     def _join(self, s, vs):
         return s.join(vs)
 
-    def _leftrec(self, rule, rule_name):
+    def _leftrec(self, rule, rule_name, left_assoc):
         pos = self.pos
         key = (rule_name, pos)
         seed = self.seeds.get(key)
         if seed:
             self.val, self.failed, self.pos = seed
             return
+        if rule_name in self.blocked:
+            self.val = None
+            self.failed = True
+            return
         current = (None, True, self.pos)
         self.seeds[key] = current
+        if left_assoc:
+            self.blocked.add(rule_name)
         while True:
             rule()
             if self.pos > current[2]:
@@ -242,6 +248,8 @@ _BUILTINS = """\
             else:
                 del self.seeds[key]
                 self.val, self.failed, self.pos = current
+                if left_assoc:
+                    self.blocked.remove(rule_name)
                 return
 
     def _not(self, rule):
@@ -400,7 +408,8 @@ class Compiler:
                 }
             )
         if 'leftrec' in self._needed:
-            text += '        self.seeds= {}\n'
+            text += '        self.seeds = {}\n'
+            text += '        self.blocked = set()\n'
         text += '\n'
 
         if self._exception_needed:
@@ -531,47 +540,51 @@ class Compiler:
         for i in range(current_depth, max_depth):
             lines = []
             s = ''
-            for el in obj:
-                if isinstance(el, str):
-                    s += el
-                elif el == IN:
-                    lines.append(self._indent(s))
-                    self._depth += 1
-                    s = ''
-                elif el == NL:
-                    lines.append(self._indent(s))
-                    s = ''
-                elif el == OI:
-                    if i > 0:
+            try:
+                for el in obj:
+                    if isinstance(el, str):
+                        s += el
+                    elif el == IN:
                         lines.append(self._indent(s))
                         self._depth += 1
                         s = ''
-                elif el == OU:
-                    if i > 0:
+                    elif el == NL:
+                        lines.append(self._indent(s))
+                        s = ''
+                    elif el == OI:
+                        if i > 0:
+                            lines.append(self._indent(s))
+                            self._depth += 1
+                            s = ''
+                    elif el == OU:
+                        if i > 0:
+                            lines.append(self._indent(s))
+                            self._depth -= 1
+                            s = ''
+                    elif el == SN:
+                        if i == 0:
+                            s += ' '
+                        else:
+                            lines.append(self._indent(s))
+                            s = ''
+                    elif el == UN:
                         lines.append(self._indent(s))
                         self._depth -= 1
                         s = ''
-                elif el == SN:
-                    if i == 0:
-                        s += ' '
-                    else:
-                        lines.append(self._indent(s))
-                        s = ''
-                elif el == UN:
-                    lines.append(self._indent(s))
-                    self._depth -= 1
-                    s = ''
-                else:  # el must be an obj
-                    new_lines = self._flatten_rec(el, max(i - 1, 0), max(i, 1))
-                    s += new_lines[0]
-                    if len(new_lines) > 1:
-                        lines.append(s)
-                        lines.extend(new_lines[1:-1])
-                        s = new_lines[-1]
+                    else:  # el must be an obj
+                        new_lines = self._flatten_rec(el, max(i - 1, 0), max(i, 1))
+                        s += new_lines[0]
+                        if len(new_lines) > 1:
+                            lines.append(s)
+                            lines.extend(new_lines[1:-1])
+                            s = new_lines[-1]
 
-            lines.append(s)
-            if all(self._fits(line) for line in lines):
-                break
+                lines.append(s)
+                if all(self._fits(line) for line in lines):
+                    break
+            except TypeError as e:
+                import pdb; pdb.set_trace()
+                pass
         return lines
 
     def _max_depth(self, obj):
@@ -652,11 +665,13 @@ class Compiler:
     def _leftrec_(self, rule, node):
         sub_rule = self._compile(node[2][0], rule + '_l')
         self._needed.add('leftrec')
+        left_assoc = self._grammar.assoc.get(node[1], 'left') == 'left'
         needs_scope = self._has_labels(node)
         if needs_scope:
             self._flatten(["self._push('", rule, "')"])
         self._flatten(
-            ['self._leftrec(', OI, sub_rule, ',', "'", node[1], "'", OU, ')']
+            ['self._leftrec(', OI, sub_rule, ',', "'", node[1], "'", 
+             ',', str(left_assoc), OU, ')']
         )
         if needs_scope:
             self._flatten(["self._pop('", rule, "')"])
