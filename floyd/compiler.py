@@ -263,6 +263,45 @@ _BUILTINS = """\
             self.errpos = errpos
             self._fail()
 
+    def _operator(self, rule_name, rule):
+        pos = self.pos
+        key = (rule_name, self.pos)
+        seed = self.seeds.get(key)
+        if seed:
+            self.val, self.failed, self.pos = seed
+            return
+        self.operator_count += 1
+        current = (None, True, self.pos)
+        self.seeds[key] = current
+        min_prec = self.current_prec
+        i = 0
+        while i < len(self.precs):
+            repeat = False
+            prec = self.precs[i]
+            if prec < min_prec:
+                break
+            self.current_prec = prec
+            if self.assoc.get(self.prec_ops[prec][0], 'left') == 'left':
+                self.current_prec += 1
+            for j in range(len(self.prec_ops[prec])):
+                op = self.prec_ops[prec][j]
+                self.choices[op]()
+                if not self.failed and self.pos > pos:
+                    current = (self.val, self.failed, self.pos)
+                    self.seeds[key] =  current
+                    repeat = True
+                    break
+                else:
+                    self._rewind(pos)
+            if not repeat:
+                i += 1
+
+        del self.seeds[key]
+        self.operator_count -= 1
+        if self.operator_count == 0:
+            self.current_prec = 0
+        self.val, self.failed, self.pos = current
+
     def _opt(self, rule):
         p = self.pos
         rule()
@@ -359,6 +398,9 @@ class Compiler:
         self._method_lines = []
         self._exception_needed = False
         self._unicodedata_needed = False
+        self._assoc = {}
+        self._prec_ops = {}
+        self._choices = {}
 
     def compile(self):
         for rule, node in self._grammar.rules.items():
@@ -407,9 +449,29 @@ class Compiler:
                     'set',
                 }
             )
-        if 'leftrec' in self._needed:
+        if 'leftrec' in self._needed or 'operator' in self._needed:
             text += '        self.seeds = {}\n'
+        if 'leftrec' in self._needed:
             text += '        self.blocked = set()\n'
+        if 'operator' in self._needed:
+            text += '        self.operator_count = 0\n'
+            text += '        self.current_prec = 0\n'
+            text += '        self.prec_ops = {\n'
+            for prec in sorted(self._prec_ops):
+                text += '          %d: [' % prec
+                for op in self._prec_ops[prec]:
+                    text += "'%s'," % op
+                text += '],\n'
+            text += '        }\n'
+            text += '        self.precs = sorted(self.prec_ops, reverse=True)\n'
+            text += '        self.assoc = {\n'
+            for op in self._assoc:
+                text += "            '%s': '%s',\n" % (op, self._assoc[op])
+            text += '        }\n'
+            text += '        self.choices = {\n'
+            for op in self._choices:
+                text += "          '%s': self._%s,\n" % (op, self._choices[op])
+            text += '        }\n'
         text += '\n'
 
         if self._exception_needed:
@@ -690,6 +752,19 @@ class Compiler:
         self._needed.add('not')
         sub_rule = self._compile(node[2][0], rule + '_n')
         self._flatten(['self._not(', sub_rule, ')'])
+
+    def _operator_(self, rule, node):
+        self._needed.add('operator')
+        ops = list(self._grammar.prec.keys())
+        for i, sub_rule in enumerate(node[2]):
+            op = ops[i]
+            self._prec_ops.setdefault(self._grammar.prec[op], []).append(op)
+            self._assoc[op] = self._grammar.assoc.get(op, 'left')
+            self._choices[op] = '%s__o%d_' % (rule, i)
+            self._compile(
+                sub_rule, rule, 'o', i, self._has_labels(sub_rule)
+            )
+        self._flatten(['self._operator(', "'%s'" % rule, ',', '[]', ')'])
 
     def _paren_(self, rule, node):
         sub_rule = self._compile(node[2][0], rule + '_g')
