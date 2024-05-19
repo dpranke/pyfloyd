@@ -408,6 +408,48 @@ class GrammarTestsMixin:
     def test_long_unicode_literals(self):
         self.check("grammar = '\\U00000020' -> true", text=' ', out=True)
 
+    def test_not_quite_operators(self):
+        # This tests things that will currently not be classified as
+        # operator expressions.
+
+        # Too many terms.
+        self.check("expr = expr '+' expr '++' expr | 'x'", 'x+x++x', out='x')
+
+        # Can't use a range instead of a literal as an operator.
+        self.check("expr = expr '0'..'9' expr | 'x'", 'x', out='x')
+
+        # The precedence of '+' is not specified. TODO: handle this.
+        self.check("expr = expr '+' expr | 'x'", 'x+x', out='x')
+
+        # rhs isn't recursive.
+        self.check("""
+            %prec +
+            expr = expr '+' '0'
+                 | 'x'
+            """, 'x+0', out='0')
+
+        # Too many base cases. TODO: handle this.
+        self.check("""
+            %prec +
+            expr = expr '+' expr
+                 | '0'
+                 | 'x'
+            """, '0+x', out='x')
+
+        # Base case isn't a single expr. TODO: handle this.
+        self.check("""
+            %prec +
+            expr = expr '+' expr
+                 | 'x' 'y'
+            """, 'xy', out='y')
+
+        # Fourth term isn't an action: TODO: handle 'end' as a special case.
+        self.check("""
+            %prec +
+            expr = expr '+' expr end
+                | 'x'
+            """, 'x+x', out=None)
+
     def test_opt(self):
         self.check("grammar = 'a' 'b'? -> true", text='a', out=True)
 

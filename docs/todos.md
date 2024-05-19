@@ -1,9 +1,5 @@
 # Things TODO
 
-* grammars that are both left- and right-recursive end up being
-  right-associative. Figure out how to make them be (optionally?)
-  left-associative instead.
-
 * analyzer.py: Change the floyd parser to use proper nodes that contain
   line number and column info so that when we catch errors in analysis
   we can actually point to where the error is happening.
@@ -49,7 +45,9 @@
 * Maybe add `_pos` built-in rule (and _pos() built-in function), 
   `_text` built-in value.
 
-* Figure out how to notate for associativity and precedence without
-  having to encode it in the ordering of rules, e.g. so you can write
-  `expr = expr '*' expr` rather than `expr = expr '*' add_expr`.
-  - Also figure out how to implement it :).
+* Handle more types of operator expressions. See test_not_quite_operators
+  for some examples.
+
+* analyzer.py: Figure out if it is possible to mix operator expressions and
+  left-recursive expressions so that we trip the unexpected AST node
+  assertion in _check_lr

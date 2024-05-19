@@ -344,17 +344,19 @@ def _check_operator(grammar, name, choices):
     operators = []
     for choice in choices[:-1]:
         assert choice[0] == 'seq'
-        if len(choice[2]) != 4:
+        if len(choice[2]) not in (3, 4):
             return None
-        if choice[2][0] != ['label', '$1', [['apply', name, []]]]:
+        if (choice[2][0] != ['label', '$1', [['apply', name, []]]] and
+            choice[2][0] != ['apply', name, []]):
             return None
         if choice[2][1][0] != 'lit' or choice[2][1][1] not in grammar.prec:
             return None
         operator = choice[2][1][1]
         prec = grammar.prec[operator]
-        if choice[2][2] != ['label', '$3', [['apply', name, []]]]:
+        if (choice[2][2] != ['label', '$3', [['apply', name, []]]] and
+            choice[2][2] != ['apply', name, []]):
             return None
-        if choice[2][3][0] != 'action':
+        if len(choice[2]) == 4 and choice[2][3][0] != 'action':
             return None
         operators.append(['op', [operator, prec], [choice]])
     choice = choices[-1]
@@ -390,8 +392,6 @@ def _check_lr(name, node, rules, seen):
         return False
     if ty == 'not':
         return _check_lr(name, node[2][0], rules, seen)
-    if ty == 'operator':
-        return False
     if ty == 'paren':
         return _check_lr(name, node[2][0], rules, seen)
     if ty == 'post':
@@ -411,6 +411,9 @@ def _check_lr(name, node, rules, seen):
     if ty == 'unicat':
         return False
 
+    # If we get here, either this is an unknown AST node type, or
+    # it is one we think we shouldn't be able to reach, like an
+    # operator node or a ll_* node.
     assert False, 'unexpected AST node type %s' % ty  # pragma: no cover
 
 
