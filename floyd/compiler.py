@@ -98,6 +98,21 @@ if __name__ == '__main__':
 _PARSING_RUNTIME_EXCEPTION = """\
 class _ParsingRuntimeError(Exception):
     pass
+
+
+"""
+
+_OPERATOR_CLASS = """\
+class _OperatorState:
+    def __init__(self):
+        self.current_depth = 0
+        self.current_prec = 0
+        self.prec_ops = {}
+        self.precs = []
+        self.rassoc = set()
+        self.choices = {}
+
+
 """
 
 _CLASS = """\
@@ -266,28 +281,30 @@ _BUILTINS = """\
             self._fail()
 
     def _operator(self, rule_name, rule):
+        o = self.operators[rule_name]
         pos = self.pos
         key = (rule_name, self.pos)
         seed = self.seeds.get(key)
         if seed:
             self.val, self.failed, self.pos = seed
             return
-        self.operator_count[rule_name] += 1
+        o.current_depth += 1
         current = (None, True, self.pos)
         self.seeds[key] = current
-        min_prec = self.current_prec[rule_name]
+        min_prec = o.current_prec
         i = 0
-        while i < len(self.precs[rule_name]):
+        while i < len(o.precs):
             repeat = False
-            prec = self.precs[rule_name][i]
+            prec = o.precs[i]
+            prec_ops = o.prec_ops[prec]
             if prec < min_prec:
                 break
-            self.current_prec[rule_name] = prec
-            if self.prec_ops[rule_name][prec][0] not in self.rassoc[rule_name]:
-                self.current_prec[rule_name] += 1
-            for j in range(len(self.prec_ops[rule_name][prec])):
-                op = self.prec_ops[rule_name][prec][j]
-                self.choices[rule_name][op]()
+            o.current_prec = prec
+            if prec_ops[0] not in o.rassoc:
+                o.current_prec += 1
+            for j in range(len(prec_ops)):
+                op = prec_ops[j]
+                o.choices[op]()
                 if not self.failed and self.pos > pos:
                     current = (self.val, self.failed, self.pos)
                     self.seeds[key] = current
@@ -299,9 +316,9 @@ _BUILTINS = """\
                 i += 1
 
         del self.seeds[key]
-        self.operator_count[rule_name] -= 1
-        if self.operator_count[rule_name] == 0:
-            self.current_prec[rule_name] = 0
+        o.current_depth -= 1
+        if o.current_depth == 0:
+            o.current_prec = 0
         self.val, self.failed, self.pos = current
 
     def _opt(self, rule):
@@ -437,6 +454,9 @@ class Compiler:
         if self._exception_needed:
             text += _PARSING_RUNTIME_EXCEPTION
 
+        if 'operator' in self._needed:
+            text += _OPERATOR_CLASS
+
         text += _CLASS.format(classname=self._classname)
 
         if self._memoize:
@@ -456,16 +476,10 @@ class Compiler:
         if 'leftrec' in self._needed:
             text += '        self.blocked = set()\n'
         if 'operator' in self._needed:
-            text += '        self.operator_count = {}\n'
-            text += '        self.current_prec = {}\n'
-            text += '        self.prec_ops = {}\n'
-            text += '        self.precs = {}\n'
-            text += '        self.rassoc = {}\n'
-            text += '        self.choices = {}\n'
+            text += '        self.operators = {}\n'
             for rule in self._prec_ops:
-                text += "        self.operator_count['%s'] = 0\n" % rule
-                text += "        self.current_prec['%s'] = 0\n" % rule
-                text += "        self.prec_ops['%s'] = {\n" % rule
+                text += "        o = _OperatorState()\n"
+                text += "        o.prec_ops = {\n"
                 for prec in sorted(self._prec_ops[rule]):
                     text += '            %d: [' % prec
                     text += ', '.join(
@@ -473,20 +487,18 @@ class Compiler:
                     )
                     text += '],\n'
                 text += '        }\n'
-                text += "        self.precs['%s'] = sorted(\n" % rule
-                text += '            '
-                text += "self.prec_ops['%s'], reverse=True\n" % rule
-                text += '        )\n'
-                text += "        self.rassoc['%s'] = set([" % rule
+                text += "        o.precs = sorted(o.prec_ops, reverse=True)\n"
+                text += "        o.rassoc = set(["
                 text += ', '.join("'%s'" % op for op in self._rassoc[rule])
                 text += '])\n'
-                text += "        self.choices['%s'] = {\n" % rule
+                text += "        o.choices = {\n"
                 for op in self._choices[rule]:
                     text += "            '%s': self._%s,\n" % (
                         op,
                         self._choices[rule][op],
                     )
                 text += '        }\n'
+                text += "        self.operators['%s'] = o\n" % rule
         text += '\n'
 
         if self._exception_needed:
