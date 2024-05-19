@@ -405,6 +405,13 @@ _BUILTINS = """\
 """
 
 
+class _CompilerOperatorState:
+    def __init__(self):
+        self.prec_ops = {}
+        self.rassoc = set()
+        self.choices = {}
+
+
 class Compiler:
     def __init__(self, grammar, classname, main_wanted=True, memoize=True):
         self._grammar = grammar
@@ -417,9 +424,7 @@ class Compiler:
         self._method_lines = []
         self._exception_needed = False
         self._unicodedata_needed = False
-        self._rassoc = {}
-        self._prec_ops = {}
-        self._choices = {}
+        self._operators = {}
 
     def compile(self):
         for rule, node in self._grammar.rules.items():
@@ -454,7 +459,7 @@ class Compiler:
         if self._exception_needed:
             text += _PARSING_RUNTIME_EXCEPTION
 
-        if 'operator' in self._needed:
+        if self._operators:
             text += _OPERATOR_CLASS
 
         text += _CLASS.format(classname=self._classname)
@@ -475,27 +480,25 @@ class Compiler:
             text += '        self.seeds = {}\n'
         if 'leftrec' in self._needed:
             text += '        self.blocked = set()\n'
-        if 'operator' in self._needed:
+        if self._operators:
             text += '        self.operators = {}\n'
-            for rule in self._prec_ops:
-                text += "        o = _OperatorState()\n"
-                text += "        o.prec_ops = {\n"
-                for prec in sorted(self._prec_ops[rule]):
+            for rule, o in self._operators.items():
+                text += '        o = _OperatorState()\n'
+                text += '        o.prec_ops = {\n'
+                for prec in sorted(o.prec_ops):
                     text += '            %d: [' % prec
-                    text += ', '.join(
-                        "'%s'" % op for op in self._prec_ops[rule][prec]
-                    )
+                    text += ', '.join("'%s'" % op for op in o.prec_ops[prec])
                     text += '],\n'
                 text += '        }\n'
-                text += "        o.precs = sorted(o.prec_ops, reverse=True)\n"
-                text += "        o.rassoc = set(["
-                text += ', '.join("'%s'" % op for op in self._rassoc[rule])
+                text += '        o.precs = sorted(o.prec_ops, reverse=True)\n'
+                text += '        o.rassoc = set(['
+                text += ', '.join("'%s'" % op for op in o.rassoc)
                 text += '])\n'
-                text += "        o.choices = {\n"
-                for op in self._choices[rule]:
+                text += '        o.choices = {\n'
+                for op in o.choices:
                     text += "            '%s': self._%s,\n" % (
                         op,
-                        self._choices[rule][op],
+                        o.choices[op],
                     )
                 text += '        }\n'
                 text += "        self.operators['%s'] = o\n" % rule
@@ -794,18 +797,16 @@ class Compiler:
 
     def _operator_(self, rule, node):
         self._needed.add('operator')
+        o = _CompilerOperatorState()
         ops = list(self._grammar.prec.keys())
-        self._prec_ops[rule] = {}
-        self._choices[rule] = {}
-        self._rassoc[rule] = set()
-        po = self._prec_ops[rule]
         for i, sub_rule in enumerate(node[2]):
             op = ops[i]
-            po.setdefault(self._grammar.prec[op], []).append(op)
+            o.prec_ops.setdefault(self._grammar.prec[op], []).append(op)
             if self._grammar.assoc.get(op) == 'right':
-                self._rassoc[rule].add(op)
-            self._choices[rule][op] = '%s__o%d_' % (rule, i)
+                o.rassoc.add(op)
+            o.choices[op] = '%s__o%d_' % (rule, i)
             self._compile(sub_rule, rule, 'o', i, self._has_labels(sub_rule))
+        self._operators[rule] = o
         self._flatten(['self._operator(', "'%s'" % rule, ',', SN, '[]', ')'])
 
     def _paren_(self, rule, node):
