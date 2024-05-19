@@ -318,7 +318,10 @@ class Interpreter:
             if prec < min_prec:
                 break
             self.current_prec = prec
-            if self.grammar.assoc.get(self.prec_ops[prec][0], 'left') == 'left':
+            if (
+                self.grammar.assoc.get(self.prec_ops[prec][0], 'left')
+                == 'left'
+            ):
                 self.current_prec += 1
 
             for j in range(len(self.prec_ops[prec])):

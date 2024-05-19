@@ -356,12 +356,8 @@ def _check_operator(grammar, name, choices):
     choice = choices[-1]
     if len(choice[2]) != 1:
         return None
-    return [
-        'choice', 
-        None, 
-        [['operator', name, choices[:-1]], choices[-1]]
-    ]
-            
+    return ['choice', None, [['operator', name, choices[:-1]], choices[-1]]]
+
 
 def _check_lr(name, node, rules, seen):
     # pylint: disable=too-many-branches

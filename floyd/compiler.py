@@ -83,10 +83,12 @@ def main(
     print(json.dumps(obj, indent=2))
     return 0
 
+
 """
 
 
 _MAIN_FOOTER = """\
+
 
 if __name__ == '__main__':
     sys.exit(main())
@@ -270,25 +272,25 @@ _BUILTINS = """\
         if seed:
             self.val, self.failed, self.pos = seed
             return
-        self.operator_count += 1
+        self.operator_count[rule_name] += 1
         current = (None, True, self.pos)
         self.seeds[key] = current
-        min_prec = self.current_prec
+        min_prec = self.current_prec[rule_name]
         i = 0
-        while i < len(self.precs):
+        while i < len(self.precs[rule_name]):
             repeat = False
-            prec = self.precs[i]
+            prec = self.precs[rule_name][i]
             if prec < min_prec:
                 break
-            self.current_prec = prec
-            if self.assoc.get(self.prec_ops[prec][0], 'left') == 'left':
-                self.current_prec += 1
-            for j in range(len(self.prec_ops[prec])):
-                op = self.prec_ops[prec][j]
-                self.choices[op]()
+            self.current_prec[rule_name] = prec
+            if self.prec_ops[rule_name][prec][0] not in self.rassoc[rule_name]:
+                self.current_prec[rule_name] += 1
+            for j in range(len(self.prec_ops[rule_name][prec])):
+                op = self.prec_ops[rule_name][prec][j]
+                self.choices[rule_name][op]()
                 if not self.failed and self.pos > pos:
                     current = (self.val, self.failed, self.pos)
-                    self.seeds[key] =  current
+                    self.seeds[key] = current
                     repeat = True
                     break
                 else:
@@ -297,9 +299,9 @@ _BUILTINS = """\
                 i += 1
 
         del self.seeds[key]
-        self.operator_count -= 1
-        if self.operator_count == 0:
-            self.current_prec = 0
+        self.operator_count[rule_name] -= 1
+        if self.operator_count[rule_name] == 0:
+            self.current_prec[rule_name] = 0
         self.val, self.failed, self.pos = current
 
     def _opt(self, rule):
@@ -398,7 +400,7 @@ class Compiler:
         self._method_lines = []
         self._exception_needed = False
         self._unicodedata_needed = False
-        self._assoc = {}
+        self._rassoc = {}
         self._prec_ops = {}
         self._choices = {}
 
@@ -454,24 +456,37 @@ class Compiler:
         if 'leftrec' in self._needed:
             text += '        self.blocked = set()\n'
         if 'operator' in self._needed:
-            text += '        self.operator_count = 0\n'
-            text += '        self.current_prec = 0\n'
-            text += '        self.prec_ops = {\n'
-            for prec in sorted(self._prec_ops):
-                text += '          %d: [' % prec
-                for op in self._prec_ops[prec]:
-                    text += "'%s'," % op
-                text += '],\n'
-            text += '        }\n'
-            text += '        self.precs = sorted(self.prec_ops, reverse=True)\n'
-            text += '        self.assoc = {\n'
-            for op in self._assoc:
-                text += "            '%s': '%s',\n" % (op, self._assoc[op])
-            text += '        }\n'
-            text += '        self.choices = {\n'
-            for op in self._choices:
-                text += "          '%s': self._%s,\n" % (op, self._choices[op])
-            text += '        }\n'
+            text += '        self.operator_count = {}\n'
+            text += '        self.current_prec = {}\n'
+            text += '        self.prec_ops = {}\n'
+            text += '        self.precs = {}\n'
+            text += '        self.rassoc = {}\n'
+            text += '        self.choices = {}\n'
+            for rule in self._prec_ops:
+                text += "        self.operator_count['%s'] = 0\n" % rule
+                text += "        self.current_prec['%s'] = 0\n" % rule
+                text += "        self.prec_ops['%s'] = {\n" % rule
+                for prec in sorted(self._prec_ops[rule]):
+                    text += '            %d: [' % prec
+                    text += ', '.join(
+                        "'%s'" % op for op in self._prec_ops[rule][prec]
+                    )
+                    text += '],\n'
+                text += '        }\n'
+                text += "        self.precs['%s'] = sorted(\n" % rule
+                text += '            '
+                text += "self.prec_ops['%s'], reverse=True\n" % rule
+                text += '        )\n'
+                text += "        self.rassoc['%s'] = set([" % rule
+                text += ', '.join("'%s'" % op for op in self._rassoc[rule])
+                text += '])\n'
+                text += "        self.choices['%s'] = {\n" % rule
+                for op in self._choices[rule]:
+                    text += "            '%s': self._%s,\n" % (
+                        op,
+                        self._choices[rule][op],
+                    )
+                text += '        }\n'
         text += '\n'
 
         if self._exception_needed:
@@ -634,7 +649,9 @@ class Compiler:
                         self._depth -= 1
                         s = ''
                     else:  # el must be an obj
-                        new_lines = self._flatten_rec(el, max(i - 1, 0), max(i, 1))
+                        new_lines = self._flatten_rec(
+                            el, max(i - 1, 0), max(i, 1)
+                        )
                         s += new_lines[0]
                         if len(new_lines) > 1:
                             lines.append(s)
@@ -645,7 +662,6 @@ class Compiler:
                 if all(self._fits(line) for line in lines):
                     break
             except TypeError as e:
-                import pdb; pdb.set_trace()
                 pass
         return lines
 
@@ -732,8 +748,19 @@ class Compiler:
         if needs_scope:
             self._flatten(["self._push('", rule, "')"])
         self._flatten(
-            ['self._leftrec(', OI, sub_rule, ',', "'", node[1], "'", 
-             ',', str(left_assoc), OU, ')']
+            [
+                'self._leftrec(',
+                OI,
+                sub_rule,
+                ',',
+                "'",
+                node[1],
+                "'",
+                ',',
+                str(left_assoc),
+                OU,
+                ')',
+            ]
         )
         if needs_scope:
             self._flatten(["self._pop('", rule, "')"])
@@ -756,15 +783,18 @@ class Compiler:
     def _operator_(self, rule, node):
         self._needed.add('operator')
         ops = list(self._grammar.prec.keys())
+        self._prec_ops[rule] = {}
+        self._choices[rule] = {}
+        self._rassoc[rule] = set()
+        po = self._prec_ops[rule]
         for i, sub_rule in enumerate(node[2]):
             op = ops[i]
-            self._prec_ops.setdefault(self._grammar.prec[op], []).append(op)
-            self._assoc[op] = self._grammar.assoc.get(op, 'left')
-            self._choices[op] = '%s__o%d_' % (rule, i)
-            self._compile(
-                sub_rule, rule, 'o', i, self._has_labels(sub_rule)
-            )
-        self._flatten(['self._operator(', "'%s'" % rule, ',', '[]', ')'])
+            po.setdefault(self._grammar.prec[op], []).append(op)
+            if self._grammar.assoc.get(op) == 'right':
+                self._rassoc[rule].add(op)
+            self._choices[rule][op] = '%s__o%d_' % (rule, i)
+            self._compile(sub_rule, rule, 'o', i, self._has_labels(sub_rule))
+        self._flatten(['self._operator(', "'%s'" % rule, ',', SN, '[]', ')'])
 
     def _paren_(self, rule, node):
         sub_rule = self._compile(node[2][0], rule + '_g')
