@@ -428,7 +428,7 @@ class GrammarTestsMixin:
         self.check(g, text='a', out=True)
         self.check(g, text='aa', out=True)
 
-    def test_operator(self):
+    def test_operators(self):
         # For now, precedence has no effect but this at least tests
         # that the pragmas get parsed.
         g = """
@@ -458,6 +458,33 @@ class GrammarTestsMixin:
             ],
         )
 
+    def test_operators_with_whitespace(self):
+        # For now, precedence has no effect but this at least tests
+        # that the pragmas get parsed.
+        g = """
+            %whitespace_style standard
+            %prec + -
+            %prec * /
+            %prec ^
+            %assoc ^ right
+            expr = expr '+' expr -> [$1, '+', $3]
+                 | expr '-' expr -> [$1, '-', $3]
+                 | expr '*' expr -> [$1, '*', $3]
+                 | expr '/' expr -> [$1, '/', $3]
+                 | expr '^' expr -> [$1, '^', $3]
+                 | '0'..'9'
+            """
+        self.check(g, text='1', out='1')
+        self.check(g, text='1 + 2', out=['1', '+', '2'])
+        self.check(
+            g,
+            text='1^2^3 + 4 * 5 / 6',
+            out=[
+                ['1', '^', ['2', '^', '3']],
+                '+',
+                [['4', '*', '5'], '/', '6'],
+            ],
+        )
     def test_pred(self):
         self.check('grammar = ?(true) end -> true', text='', out=True)
         self.check('grammar = ?{true} end { true }', text='', out=True)
