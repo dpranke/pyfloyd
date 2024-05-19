@@ -25,12 +25,37 @@ format the code. `./run --help` is your friend to find out more.
 ## Publishing a version
 
 1. Run `./run build`
-2. Run `./run publish --test]` or `./run publish --prod` to upload to PyPI. 
+2. Run `./run publish --test]` or `./run publish --prod` to upload to PyPI.
    If you pass `--test`, the package will be uploaded to TestPyPI instead
    of the production instance.
 
 ## Version History / Release Notes
 
+* v0.8.0 (2024-05-19)
+    * get left association in expressions that are both left- and
+      right-recursive working properly.
+* v0.7.0 (2024-05-05)
+   * Add support for `?{...}` for semantic predicates and `{...}` for
+     semantic actions in addition to `?( ... )` and `-> ...`. For now,
+     both syntaxes will be supported.
+* v0.6.0
+   * This version number was skipped.
+* v0.5.0 (2024-05-04)
+   * Get automatic whitespace and comment insertion working. The
+     two collectively are known as "filler".
+   * You can now declare "tokens" that can consist of compound expressions
+     that will not have filler interleaved.
+   * Add support for positional labels in addition to named labels, i.e.
+     you can write an expression as `num '+' num -> $1 + $3` in addition
+     to `num:l '+' num:r -> l + r`. Both syntaxes will be supported for
+     now.
+   * Do much more semantic analysis to catch a broader set of errors.
+   * Add support for unicode character classes via `\p{X}`.
+   * Turn `--memoize` and `--main` off by default in floyd.tool.
+   * Got left recursion working.
+   * Added type hints to the API.
+* v0.4.0
+    * This version number was skipped.
 * v0.3.0 (2024-04-02)
     * Changed the interpreter so that it no longer relies on runtime
       compilation.
