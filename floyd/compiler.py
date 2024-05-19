@@ -38,7 +38,11 @@ SN = Whitespace.SpaceOrNewline
 UN = Whitespace.Unindent
 
 
-_DEFAULT_HEADER = '{unicodedata_import}'
+_DEFAULT_HEADER = """\
+{unicodedata_import}# pylint: disable=too-many-lines
+
+
+"""
 
 
 _DEFAULT_FOOTER = ''
@@ -52,6 +56,9 @@ import json
 import os
 import sys
 {unicodedata_import}
+
+# pylint: disable=too-many-lines
+
 
 def main(
     argv=sys.argv[1:],
@@ -426,12 +433,12 @@ class Compiler:
         self._unicodedata_needed = False
         self._operators = {}
 
-    def compile(self):
+    def compile(self):  # pylint: disable=too-many-statements
         for rule, node in self._grammar.rules.items():
             self._compile(node, rule, top_level=True)
 
         if self._unicodedata_needed:
-            unicodedata_import = 'import unicodedata\n'
+            unicodedata_import = 'import unicodedata\n\n'
         else:
             unicodedata_import = ''
 
@@ -632,52 +639,47 @@ class Compiler:
         for i in range(current_depth, max_depth):
             lines = []
             s = ''
-            try:
-                for el in obj:
-                    if isinstance(el, str):
-                        s += el
-                    elif el == IN:
+            for el in obj:
+                if isinstance(el, str):
+                    s += el
+                elif el == IN:
+                    lines.append(self._indent(s))
+                    self._depth += 1
+                    s = ''
+                elif el == NL:
+                    lines.append(self._indent(s))
+                    s = ''
+                elif el == OI:
+                    if i > 0:
                         lines.append(self._indent(s))
                         self._depth += 1
                         s = ''
-                    elif el == NL:
-                        lines.append(self._indent(s))
-                        s = ''
-                    elif el == OI:
-                        if i > 0:
-                            lines.append(self._indent(s))
-                            self._depth += 1
-                            s = ''
-                    elif el == OU:
-                        if i > 0:
-                            lines.append(self._indent(s))
-                            self._depth -= 1
-                            s = ''
-                    elif el == SN:
-                        if i == 0:
-                            s += ' '
-                        else:
-                            lines.append(self._indent(s))
-                            s = ''
-                    elif el == UN:
+                elif el == OU:
+                    if i > 0:
                         lines.append(self._indent(s))
                         self._depth -= 1
                         s = ''
-                    else:  # el must be an obj
-                        new_lines = self._flatten_rec(
-                            el, max(i - 1, 0), max(i, 1)
-                        )
-                        s += new_lines[0]
-                        if len(new_lines) > 1:
-                            lines.append(s)
-                            lines.extend(new_lines[1:-1])
-                            s = new_lines[-1]
+                elif el == SN:
+                    if i == 0:
+                        s += ' '
+                    else:
+                        lines.append(self._indent(s))
+                        s = ''
+                elif el == UN:
+                    lines.append(self._indent(s))
+                    self._depth -= 1
+                    s = ''
+                else:  # el must be an obj
+                    new_lines = self._flatten_rec(el, max(i - 1, 0), max(i, 1))
+                    s += new_lines[0]
+                    if len(new_lines) > 1:
+                        lines.append(s)
+                        lines.extend(new_lines[1:-1])
+                        s = new_lines[-1]
 
-                lines.append(s)
-                if all(self._fits(line) for line in lines):
-                    break
-            except TypeError as e:
-                pass
+            lines.append(s)
+            if all(self._fits(line) for line in lines):
+                break
         return lines
 
     def _max_depth(self, obj):

@@ -1,3 +1,6 @@
+# pylint: disable=too-many-lines
+
+
 class Parser:
     def __init__(self, msg, fname):
         self.msg = msg

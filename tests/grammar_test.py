@@ -485,6 +485,7 @@ class GrammarTestsMixin:
                 [['4', '*', '5'], '/', '6'],
             ],
         )
+
     def test_pred(self):
         self.check('grammar = ?(true) end -> true', text='', out=True)
         self.check('grammar = ?{true} end { true }', text='', out=True)

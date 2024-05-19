@@ -105,7 +105,6 @@ class Interpreter:
 
     def _handle_apply(self, node):
         rule_name = node[1]
-        pos = self.pos
         if rule_name == 'end':
             self._handle_end()
             return
@@ -336,16 +335,14 @@ class Interpreter:
             if ops[0] not in o.rassoc:
                 o.current_prec += 1
 
-            for j in range(len(ops)):
-                op = ops[j]
+            for op in ops:
                 self._interpret(o.choices[op][0])
                 if not self.failed and self.pos > pos:
                     current = (self.val, self.failed, self.pos)
                     self.seeds[key] = current
                     repeat = True
                     break
-                else:
-                    self._rewind(pos)
+                self._rewind(pos)
             if not repeat:
                 i += 1
         del self.seeds[key]
@@ -399,7 +396,6 @@ class Interpreter:
     def _handle_range(self, node):
         assert node[2][0][0] == 'lit'
         assert node[2][1][0] == 'lit'
-        pos = self.pos
         if (
             self.pos != self.end
             and node[2][0][1] <= self.msg[self.pos] <= node[2][1][1]
