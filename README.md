@@ -31,6 +31,13 @@ format the code. `./run --help` is your friend to find out more.
 
 ## Version History / Release Notes
 
+* v0.9.0 (2024-05-19)
+    * get operator expressions working: you can now declare the precedence
+      and associativity of different operators in an expression and they
+      will be handled correctly. Note that there is a fair amount of
+      special-casing logic for this so that only some of the expressions
+      you might think would work will actually work. It's also unclear
+      how well this will play with memoization.
 * v0.8.0 (2024-05-19)
     * get left association in expressions that are both left- and
       right-recursive working properly.
