@@ -725,9 +725,6 @@ class Compiler(unittest.TestCase, GrammarTestsMixin):
             h.rmtree(d)
         return _ParserWrapper(parser_cls), None, 0
 
-    #def test_operator(self):
-    #    return
-
 
 class _ParserWrapper:
     def __init__(self, parser_cls):
