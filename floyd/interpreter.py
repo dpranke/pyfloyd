@@ -15,6 +15,16 @@
 import unicodedata
 
 
+class _OperatorState:
+    def __init__(self):
+        self.current_depth = 0
+        self.current_prec = 0
+        self.prec_ops = {}
+        self.precs = []
+        self.rassoc = set()
+        self.choices = {}
+
+
 class Interpreter:
     def __init__(self, grammar, memoize):
         self.memoize = memoize
@@ -31,14 +41,7 @@ class Interpreter:
         self.scopes = []
         self.seeds = {}
         self.blocked = set()
-        self.depth = 0
-
-        self.current_prec = 0
-        self.prec_ops = {}
-        for op in grammar.prec:
-            self.prec_ops.setdefault(grammar.prec[op], []).append(op)
-        self.precs = sorted(self.prec_ops, reverse=True)
-        self.operator_count = 0
+        self.operators = {}
 
     def parse(self, msg, fname):
         self.msg = msg
@@ -306,28 +309,36 @@ class Interpreter:
             self.val, self.failed, self.pos = seed
             return
 
-        self.operator_count += 1
+        o = self.operators.get(node[1])
+        if o is None:
+            o = _OperatorState()
+            for op_node in node[2]:
+                op, prec = op_node[1]
+                o.prec_ops.setdefault(prec, []).append(op)
+                if self.grammar.assoc.get(op) == 'right':
+                    o.rassoc.add(op)
+                o.choices[op] = op_node[2]
+            o.precs = sorted(o.prec_ops, reverse=True)
+            self.operators[node[1]] = o
+
+        o.current_depth += 1
         current = (None, True, self.pos)
         self.seeds[key] = current
-        min_prec = self.current_prec
-
+        min_prec = o.current_prec
         i = 0
-        while i < len(self.precs):
+        while i < len(o.precs):
             repeat = False
-            prec = self.precs[i]
+            prec = o.precs[i]
             if prec < min_prec:
                 break
-            self.current_prec = prec
-            if (
-                self.grammar.assoc.get(self.prec_ops[prec][0], 'left')
-                == 'left'
-            ):
-                self.current_prec += 1
+            o.current_prec = prec
+            ops = o.prec_ops[prec]
+            if ops[0] not in o.rassoc:
+                o.current_prec += 1
 
-            for j in range(len(self.prec_ops[prec])):
-                op = self.prec_ops[prec][j]
-                choice = self._find_choice(node, op)
-                self._interpret(choice)
+            for j in range(len(ops)):
+                op = ops[j]
+                self._interpret(o.choices[op][0])
                 if not self.failed and self.pos > pos:
                     current = (self.val, self.failed, self.pos)
                     self.seeds[key] = current
@@ -338,20 +349,10 @@ class Interpreter:
             if not repeat:
                 i += 1
         del self.seeds[key]
-        self.operator_count -= 1
-        if self.operator_count == 0:
-            self.current_prec = 0
+        o.current_depth -= 1
+        if o.current_depth == 0:
+            o.current_prec = 0
         self.val, self.failed, self.pos = current
-
-    def _find_choice(self, node, op):
-        if len(node[2][0][2]) == 6:
-            index = 2
-        else:
-            index = 1
-        for choice in node[2]:
-            if choice[2][index] == ['lit', op, []]:
-                return choice
-        assert False, 'Could not find op in choices'  # pragma: no cover
 
     def _handle_opt(self, node):
         pos = self.pos

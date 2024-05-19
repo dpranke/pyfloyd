@@ -341,6 +341,7 @@ def _rewrite_recursion(grammar):
 def _check_operator(grammar, name, choices):
     if len(choices) == 1:
         return None
+    operators = []
     for choice in choices[:-1]:
         assert choice[0] == 'seq'
         if len(choice[2]) != 4:
@@ -349,14 +350,17 @@ def _check_operator(grammar, name, choices):
             return None
         if choice[2][1][0] != 'lit' or choice[2][1][1] not in grammar.prec:
             return None
+        operator = choice[2][1][1]
+        prec = grammar.prec[operator]
         if choice[2][2] != ['label', '$3', [['apply', name, []]]]:
             return None
         if choice[2][3][0] != 'action':
             return None
+        operators.append(['op', [operator, prec], [choice]])
     choice = choices[-1]
     if len(choice[2]) != 1:
         return None
-    return ['choice', None, [['operator', name, choices[:-1]], choices[-1]]]
+    return ['choice', None, [['operator', name, operators], choices[-1]]]
 
 
 def _check_lr(name, node, rules, seen):

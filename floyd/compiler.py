@@ -798,10 +798,11 @@ class Compiler:
     def _operator_(self, rule, node):
         self._needed.add('operator')
         o = _CompilerOperatorState()
-        ops = list(self._grammar.prec.keys())
-        for i, sub_rule in enumerate(node[2]):
-            op = ops[i]
-            o.prec_ops.setdefault(self._grammar.prec[op], []).append(op)
+        for i, operator in enumerate(node[2]):
+            op = operator[1][0]
+            prec = operator[1][1]
+            sub_rule = operator[2][0]
+            o.prec_ops.setdefault(prec, []).append(op)
             if self._grammar.assoc.get(op) == 'right':
                 o.rassoc.add(op)
             o.choices[op] = '%s__o%d_' % (rule, i)
