@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import pathlib
 import textwrap
 import unittest
@@ -21,6 +22,20 @@ import floyd.host
 
 
 THIS_DIR = pathlib.Path(__file__).parent
+
+
+SKIP = os.environ.get('SKIP', '')
+
+
+def skip(kind):
+    def decorator(fn):
+        def wrapper(obj):
+            if kind in SKIP:
+                obj.skipTest(kind)
+            else:
+                fn(obj)
+        return wrapper
+    return decorator
 
 
 class PrinterTest(unittest.TestCase):
@@ -92,6 +107,7 @@ class PrinterTest(unittest.TestCase):
         self.assertMultiLineEqual(grammar, out)
         self.assertIsNone(err)
 
+    @skip('integration')
     def test_json5(self):
         host = floyd.host.Host()
         grammar = host.read_text_file(THIS_DIR / '../grammars/json5.g')

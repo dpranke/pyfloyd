@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import math
+import os
 import pathlib
 import textwrap
 import unittest
@@ -22,6 +23,18 @@ import floyd.host
 
 
 THIS_DIR = pathlib.Path(__file__).parent
+
+SKIP = os.environ.get('SKIP', '')
+
+def skip(kind):
+    def decorator(fn):
+        def wrapper(obj):
+            if kind in SKIP:
+                obj.skipTest(kind)
+            else:
+                fn(obj)
+        return wrapper
+    return decorator
 
 
 class GrammarTestsMixin:
@@ -242,6 +255,7 @@ class GrammarTestsMixin:
             'grammar = "\\n\\\'\\"foo" -> true', text='\n\'"foo', out=True
         )
 
+    @skip('integration')
     def test_floyd(self):
         h = floyd.host.Host()
         path = str(THIS_DIR / '../grammars/floyd.g')
@@ -255,6 +269,7 @@ class GrammarTestsMixin:
         self.assertEqual(out[0], 'rules')
         self.assertIsNone(err)
 
+    @skip('integration')
     def test_floyd2(self):
         h = floyd.host.Host()
         path = str(THIS_DIR / '../grammars/floyd2.g')
@@ -274,6 +289,7 @@ class GrammarTestsMixin:
     def test_itou(self):
         self.check('grammar = -> itou(97)', text='', out='a')
 
+    @skip('integration')
     def test_json5(self):
         h = floyd.host.Host()
         path = str(THIS_DIR / '../grammars/json5.g')
@@ -361,6 +377,7 @@ class GrammarTestsMixin:
             },
         )
 
+    @skip('integration')
     def test_json5_2(self):
         h = floyd.host.Host()
         path = str(THIS_DIR / '../grammars/json5_2.g')
@@ -408,6 +425,7 @@ class GrammarTestsMixin:
     def test_long_unicode_literals(self):
         self.check("grammar = '\\U00000020' -> true", text=' ', out=True)
 
+    @skip('operators')
     def test_not_quite_operators(self):
         # This tests things that will currently not be classified as
         # operator expressions.
@@ -470,6 +488,7 @@ class GrammarTestsMixin:
         self.check(g, text='a', out=True)
         self.check(g, text='aa', out=True)
 
+    @skip('operators')
     def test_operators(self):
         # For now, precedence has no effect but this at least tests
         # that the pragmas get parsed.
@@ -500,6 +519,7 @@ class GrammarTestsMixin:
             ],
         )
 
+    @skip('operators')
     def test_operators_with_whitespace(self):
         # For now, precedence has no effect but this at least tests
         # that the pragmas get parsed.
@@ -718,7 +738,7 @@ class GrammarTestsMixin:
         grammar = """\
             %token foo
             %whitespace = ' '
-           
+
             grammar = foo foo end -> true
 
             foo     = 'foo'
@@ -729,7 +749,7 @@ class GrammarTestsMixin:
         grammar = """\
             %token foo
             %whitespace_style standard
-           
+
             grammar = foo foo end -> true
 
             foo     = 'foo'
@@ -756,7 +776,7 @@ class GrammarTestsMixin:
             %token foo
             %whitespace = ' '
             %whitespace_style standard
-           
+
             grammar = foo foo end -> true
 
             foo     = 'foo'

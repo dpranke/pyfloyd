@@ -111,7 +111,16 @@ class Runner:
             help='Stop on first fail or error',
         )
 
-        self.add_parser('coverage', help='Run tests and report code coverage.')
+        subp = self.add_parser(
+            'coverage', help='Run tests and report code coverage.'
+        )
+        subp.add_argument('--omit',
+            help='Omit files whose paths match one of these patterns.'
+        )
+        subp.add_argument(
+            '-u', '--unit', action='store_true', help='Only run unit tests.'
+        )
+
         subp = self.add_parser(
             'format', help='Format the source code with ruff.'
         )
@@ -153,6 +162,9 @@ class Runner:
             action='store_true',
             help='Stop on first fail or error',
         )
+        subp.add_argument(
+            '-u', '--unit', action='store_true', help='Only run unit tests.'
+        )
 
         self.args = self.parser.parse_args(argv)
         self.no_execute = self.args.no_execute
@@ -188,6 +200,10 @@ class Runner:
         self.call([path, 'clean', '-fd'])
 
     def run_coverage(self):
+        env = os.environ.copy()
+        if self.args.unit:
+            env['SKIP'] = 'integration'
+            self.args.omit = '*_test.py'
         self.call(
             [
                 sys.executable,
@@ -201,10 +217,12 @@ class Runner:
                 '-p',
                 '*_test.py',
             ],
+            env=env,
         )
-        self.call(
-            [sys.executable, '-m', 'coverage', 'report', '--show-missing']
-        )
+        cmd = [sys.executable, '-m', 'coverage', 'report', '--show-missing']
+        if self.args.omit:
+            cmd.append('--omit=%s' % self.args.omit)
+        self.call(cmd)
 
     def run_devenv(self):
         path = shutil.which('uv')
@@ -277,7 +295,10 @@ class Runner:
             cmd.append('-v')
         if self.args.failfast:
             cmd.append('-f')
-        self.call(cmd)
+        env = os.environ.copy()
+        if self.args.unit:
+            env['SKIP'] = 'integration'
+        self.call(cmd, env=env)
 
     def set_func(self, subp, method):
         subp.set_defaults(func=lambda _: method())
