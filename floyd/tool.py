@@ -79,9 +79,6 @@ def _parse_args(host, argv):
         action='store_true',
         help='compile grammar instead of interpreting it',
     )
-    ap.add_argument(
-        '-i', '--input', default='-', help='path to read data from'
-    )
     ap.add_argument('-o', '--output', help='path to write output to')
     ap.add_argument(
         '-p',
@@ -120,6 +117,9 @@ def _parse_args(host, argv):
         nargs='?',
         help='grammar file to interpret or compiled. '
         'Usually a required argument.',
+    )
+    ap.add_argument(
+        'input', nargs='?', default='-', help='path to read data from'
     )
 
     args = ap.parse_args(argv)

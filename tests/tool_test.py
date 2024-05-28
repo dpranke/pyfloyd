@@ -115,7 +115,7 @@ class ToolTest(unittest.TestCase):
         host.files['grammar.g'] = 'grammar = "Hello" end -> true'
         host.files['input.txt'] = 'Hello'
         self.assertEqual(
-            floyd.tool.main(['-i', 'input.txt', 'grammar.g'], host), 0
+            floyd.tool.main(['grammar.g', 'input.txt'], host), 0
         )
         self.assertEqual(host.stdout.getvalue(), 'true\n')
         self.assertEqual(host.stderr.getvalue(), '')
@@ -125,7 +125,7 @@ class ToolTest(unittest.TestCase):
         host.write_text_file('grammar.g', 'grammar = "Hello" end -> true')
         host.stdin.write('Hello')
         host.stdin.seek(0)
-        ret = floyd.tool.main(['-i', '-', 'grammar.g'], host=host)
+        ret = floyd.tool.main(['grammar.g'], host=host)
         self.assertEqual(ret, 0)
         self.assertEqual(host.stderr.getvalue(), '')
         self.assertEqual(host.stdout.getvalue(), 'true\n')
