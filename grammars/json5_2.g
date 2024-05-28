@@ -105,7 +105,7 @@ id_continue    = ascii_id_start
                | '\u200d'
 
 num_literal    = '-' num_literal                 { 0 - $2 }
-               | '+' num_literal                 { float($2) }
+               | '+' num_literal                 { $2 }
                | dec_literal ~id_start           { float($1) }
                | hex_literal                     { hex($1) }
                | 'Infinity'                      { Infinity }
