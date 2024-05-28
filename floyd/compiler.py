@@ -231,7 +231,10 @@ _BUILTINS = """\
         self.errpos = max(self.errpos, self.pos)
 
     def _float(self, str):
-          return float(str)
+          if '.' in str or 'e' in str or 'E' in str:
+              return float(str)
+          else:
+              return int(str)
 
     def _get(self, var):
         return self.scopes[-1][1][var]

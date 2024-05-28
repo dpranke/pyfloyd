@@ -88,6 +88,14 @@ class GrammarTestsMixin:
     def test_bind(self):
         self.check("grammar = 'a'*:v -> v", text='aa', out=['a', 'a'])
 
+    def test_big_int(self):
+        self.check('grammar = { float("505874924095815700") }',
+                   text='',
+                   out=505874924095815700)
+        self.check('grammar = { 505874924095815700 }',
+                   text='',
+                   out=505874924095815700)
+
     def test_c_style_comment(self):
         self.check('grammar = /* foo */ end -> true', text='', out=True)
 

@@ -249,6 +249,8 @@ class Interpreter:
     def _handle_ll_num(self, node):
         if node[1].startswith('0x'):
             self._succeed(int(node[1], base=16))
+        elif '.' in node[1] or 'e' in node[1] or 'E' in node[1]:
+            self._succeed(float(node[1]))
         else:
             self._succeed(int(node[1]))
 
@@ -430,7 +432,10 @@ class Interpreter:
         return dict(val)
 
     def _builtin_fn_float(self, val):
-        return float(val)
+        if '.' in val or 'e' in val or 'E' in val:
+            return float(val)
+        else:
+            return int(val)
 
     def _builtin_fn_hex(self, val):
         return int(val, base=16)
