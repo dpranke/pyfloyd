@@ -53,24 +53,14 @@ class Compiler:
         self._depth = 0
         self._main_wanted = main_wanted
         self._memoize = memoize
-        self._needed = set()
         self._methods = {}
         self._method_lines = []
         self._exception_needed = False
         self._unicodedata_needed = False
         self._operators = {}
 
-    def compile(self):  # pylint: disable=too-many-statements
-        for rule, node in self._grammar.rules.items():
-            self._compile(node, rule, top_level=True)
-
-        if self._unicodedata_needed:
-            unicodedata_import = 'import unicodedata\n\n'
-        else:
-            unicodedata_import = ''
-
         # These methods are always needed.
-        self._needed.update(
+        self._needed = set(
             {
                 'err_offsets',
                 'err_str',
@@ -79,6 +69,17 @@ class Compiler:
                 'succeed',
             }
         )
+
+    def compile(self):  # pylint: disable=too-many-statements
+        for rule, node in self._grammar.rules.items():
+            self._compile(node, rule, top_level=True)
+
+        return self._gen_text()
+
+    def _gen_text(self):
+        unicodedata_import = ''
+        if self._unicodedata_needed:
+            unicodedata_import = 'import unicodedata\n\n'
 
         if self._main_wanted:
             text = py.MAIN_HEADER.format(
@@ -98,6 +99,24 @@ class Compiler:
 
         text += py.CLASS.format(classname=self._classname)
 
+        text += self._state()
+
+        if self._exception_needed:
+            text += py.PARSE_WITH_EXCEPTION.format(
+                starting_rule=self._grammar.starting_rule
+            )
+        else:
+            text += py.PARSE.format(starting_rule=self._grammar.starting_rule)
+
+        text += self._gen_methods()
+        if self._main_wanted:
+            text += py.MAIN_FOOTER
+        else:
+            text += py.DEFAULT_FOOTER
+        return text
+
+    def _state(self):
+        text = ''
         if self._memoize:
             text += '        self.cache = {}\n'
         if 'bind' in self._needed:
@@ -115,65 +134,34 @@ class Compiler:
         if 'leftrec' in self._needed:
             text += '        self.blocked = set()\n'
         if self._operators:
-            text += '        self.operators = {}\n'
-            for rule, o in self._operators.items():
-                text += '        o = _OperatorState()\n'
-                text += '        o.prec_ops = {\n'
-                for prec in sorted(o.prec_ops):
-                    text += '            %d: [' % prec
-                    text += ', '.join("'%s'" % op for op in o.prec_ops[prec])
-                    text += '],\n'
-                text += '        }\n'
-                text += '        o.precs = sorted(o.prec_ops, reverse=True)\n'
-                text += '        o.rassoc = set(['
-                text += ', '.join("'%s'" % op for op in o.rassoc)
-                text += '])\n'
-                text += '        o.choices = {\n'
-                for op in o.choices:
-                    text += "            '%s': self._%s,\n" % (
-                        op,
-                        o.choices[op],
-                    )
-                text += '        }\n'
-                text += "        self.operators['%s'] = o\n" % rule
-        text += '\n'
+            text += self._operator_state()
+            text += '\n'
 
-        if self._exception_needed:
-            text += py.PARSE_WITH_EXCEPTION.format(
-                starting_rule=self._grammar.starting_rule
-            )
-        else:
-            text += py.PARSE.format(starting_rule=self._grammar.starting_rule)
+        return text
 
-        methods = set()
-        for rule in self._grammar.rules.keys():
-            methods.add(rule)
-            text += self._method_text(
-                rule, self._methods[rule], memoize=self._memoize
-            )
-
-            # Do not memoize the internal rules; it's not clear if that'd
-            # ever be useful.
-            names = [
-                m
-                for m in self._methods
-                if m.startswith(rule + '_') and m not in methods
-            ]
-            for name in sorted(names):
-                methods.add(name)
-                text += self._method_text(
-                    name, self._methods[name], memoize=False
+    def _operator_state(self):
+        text = '        self.operators = {}\n'
+        for rule, o in self._operators.items():
+            text += '        o = _OperatorState()\n'
+            text += '        o.prec_ops = {\n'
+            for prec in sorted(o.prec_ops):
+                text += '            %d: [' % prec
+                text += ', '.join("'%s'" % op for op in o.prec_ops[prec])
+                text += '],\n'
+            text += '        }\n'
+            text += '        o.precs = sorted(o.prec_ops, reverse=True)\n'
+            text += '        o.rassoc = set(['
+            text += ', '.join("'%s'" % op for op in o.rassoc)
+            text += '])\n'
+            text += '        o.choices = {\n'
+            for op in o.choices:
+                text += "            '%s': self._%s,\n" % (
+                    op,
+                    o.choices[op],
                 )
-        text += '\n'
-
-        builtins = self._load_builtins()
-        text += '\n'.join(builtins[name] for name in sorted(self._needed))
-
-        if self._main_wanted:
-            text += py.MAIN_FOOTER
-        else:
-            text += py.DEFAULT_FOOTER
-        return text, None
+            text += '        }\n'
+            text += "        self.operators['%s'] = o\n" % rule
+        return text
 
     def _load_builtins(self):
         blocks = py.BUILTINS.split('\n    def ')
@@ -188,6 +176,34 @@ class Compiler:
             text = '    def ' + block
             builtins[name] = text
         return builtins
+
+    def _gen_methods(self):
+        text = ''
+        methods = set()
+        for rule in self._grammar.rules.keys():
+            methods.add(rule)
+            text += self._method_text(
+                rule, self._methods[rule], memoize=self._memoize
+            )
+
+            # Do not memoize the internal rules; it's not clear if that'd
+            # ever be useful.
+            names = [
+                m
+                for m in self._methods
+                if m.startswith(rule + '_') and m not in methods
+            ]
+
+            for name in sorted(names):
+                methods.add(name)
+                text += self._method_text(
+                    name, self._methods[name], memoize=False
+                )
+        text += '\n'
+
+        builtins = self._load_builtins()
+        text += '\n'.join(builtins[name] for name in sorted(self._needed))
+        return text
 
     def _method_text(self, name, lines, memoize):
         text = '\n'

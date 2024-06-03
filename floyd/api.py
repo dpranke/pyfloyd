@@ -76,8 +76,8 @@ def generate_parser(
         return None, err, endpos
     try:
         grammar = analyzer.analyze(ast)
-        text, err = Compiler(grammar, class_name, main, memoize).compile()
-        return text, err, 0
+        text = Compiler(grammar, class_name, main, memoize).compile()
+        return text, None, 0
     except analyzer.AnalysisError as e:
         return None, str(e), 0
 
