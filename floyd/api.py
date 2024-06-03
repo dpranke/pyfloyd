@@ -15,10 +15,10 @@
 from typing import Any, Optional, Tuple
 
 from floyd import analyzer
-from floyd.compiler import Compiler
 from floyd.interpreter import Interpreter
 from floyd.parser import Parser
 from floyd.printer import Printer
+from floyd.python_compiler import Compiler
 
 
 class ParserInterface:
