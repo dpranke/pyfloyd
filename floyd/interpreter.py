@@ -434,8 +434,7 @@ class Interpreter:
     def _builtin_fn_float(self, val):
         if '.' in val or 'e' in val or 'E' in val:
             return float(val)
-        else:
-            return int(val)
+        return int(val)
 
     def _builtin_fn_hex(self, val):
         return int(val, base=16)

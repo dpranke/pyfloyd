@@ -62,7 +62,7 @@ def main(
     if err:
         print(err, file=stderr)
         return 1
-    print(json.dumps(obj, indent=2))
+    print(json.dumps(obj, indent=2), file=stdout)
     return 0
 
 
@@ -265,7 +265,7 @@ BUILTINS = """\
             self.errpos = errpos
             self._fail()
 
-    def _operator(self, rule_name, rule):
+    def _operator(self, rule_name):
         o = self.operators[rule_name]
         pos = self.pos
         key = (rule_name, self.pos)
@@ -287,7 +287,7 @@ BUILTINS = """\
             o.current_prec = prec
             if prec_ops[0] not in o.rassoc:
                 o.current_prec += 1
-            for j in range(len(prec_ops)):
+            for j, _ in enumerate(prec_ops):
                 op = prec_ops[j]
                 o.choices[op]()
                 if not self.failed and self.pos > pos:
@@ -295,8 +295,7 @@ BUILTINS = """\
                     self.seeds[key] = current
                     repeat = True
                     break
-                else:
-                    self._rewind(pos)
+                self._rewind(pos)
             if not repeat:
                 i += 1
 

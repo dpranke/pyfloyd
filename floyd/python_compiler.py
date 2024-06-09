@@ -202,10 +202,10 @@ class Compiler:
 
     def _chain(self, name, sub_rules):
         lines = [f'self._{name}([']
-        l = len(sub_rules)
+        n_sub_rules = len(sub_rules)
         for i, sub_rule in enumerate(sub_rules):
             line = f'    self._{sub_rule}_'
-            if i < l - 1:
+            if i < n_sub_rules - 1:
                 line += ','
             lines.append(line)
         lines.append('])')
@@ -225,7 +225,6 @@ class Compiler:
         if node[1] not in self._grammar.rules:
             self._needed.add(node[1])
         self._methods[rule] = [f'self._{node[1]}_()']
-        return
 
     def _choice_(self, rule, node):
         self._needed.add('choose')
@@ -275,7 +274,7 @@ class Compiler:
         self._needed.add('not')
         sub_rule = rule + '_n'
         self._methods[rule] = [f'self._not(self._{sub_rule}_)']
-        sub_rule = self._compile(node[2][0], sub_rule)
+        self._compile(node[2][0], sub_rule)
 
     def _operator_(self, rule, node):
         self._needed.add('operator')
@@ -292,7 +291,7 @@ class Compiler:
             o.choices[op] = '%s__o%d_' % (rule, i)
             self._compile(sub_rule, f'{o.choices[op]}')
         self._operators[rule] = o
-        lines.append(f'self._operator("{rule}", [])')
+        lines.append(f'self._operator("{rule}")')
 
     def _paren_(self, rule, node):
         sub_rule = rule + '_g'
