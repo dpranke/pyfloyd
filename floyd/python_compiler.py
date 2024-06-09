@@ -12,8 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import enum
+
 from floyd import python_templates as py
 from floyd import string_literal
+
+
+Whitespace = enum.Enum(
+    'Whitespace',
+    [
+        'Indent',
+        'Newline',
+        'OptionalIndent',
+        'OptionalUnindent',
+        'SpaceOrNewline',
+        'SpaceOrIndent',
+        'Unindent',
+    ],
+)
+
+IN = Whitespace.Indent
+NL = Whitespace.Newline
+OI = Whitespace.OptionalIndent
+OU = Whitespace.OptionalUnindent
+SN = Whitespace.SpaceOrNewline
+UN = Whitespace.Unindent
 
 
 class _CompilerOperatorState:
@@ -199,17 +222,84 @@ class Compiler:
 
     def _gen_method_call(self, name, args):
         method_len = len(name) + 10
-        method_len += sum(len(arg) + 2 for arg in args)
-        if method_len <= 82:
-            arg_txt = ', '.join(args)
-            if method_len <= 73:
-                return [f'self._{name}([' + arg_txt + '])']
-            return [f'self._{name}(', f'    [{arg_txt}]', ')']
+        args_txt = ', '.join(args)
+        args_len = len(args_txt)
+        if method_len + args_len <= 72:
+            return [f'self._{name}([' + args_txt + '])']
+        if args_len <= 66:
+            return [f'self._{name}(', f'    [{args_txt}]', ')']
         lines = [f'self._{name}(', '    [']
         for arg in args:
             lines.append(f'        {arg},')
         lines.extend(['    ]', ')'])
         return lines
+
+    def _indent(self, s):
+        return self._depth * '    ' + s
+
+    def _flatten(self, obj):
+        return self._flatten_rec(obj, 0, self._max_depth(obj) + 1)
+        for line in lines:
+            lines.append(line.rstrip())
+
+        # TODO: Figure out how to handle blank lines at the end of a method
+        # better. There will be a blank line if obj[-1] == UN.
+        return lines
+
+    def _flatten_rec(self, obj, current_depth, max_depth):
+        for i in range(current_depth, max_depth):
+            lines = []
+            s = ''
+            for el in obj:
+                if isinstance(el, str):
+                    s += el
+                elif el == IN:
+                    lines.append(self._indent(s))
+                    self._depth += 1
+                    s = ''
+                elif el == NL:
+                    lines.append(self._indent(s))
+                    s = ''
+                elif el == OI:
+                    if i > 0:
+                        lines.append(self._indent(s))
+                        self._depth += 1
+                        s = ''
+                elif el == OU:
+                    if i > 0:
+                        lines.append(self._indent(s))
+                        self._depth -= 1
+                        s = ''
+                elif el == SN:
+                    if i == 0:
+                        s += ' '
+                    else:
+                        lines.append(self._indent(s))
+                        s = ''
+                elif el == UN:
+                    lines.append(self._indent(s))
+                    self._depth -= 1
+                    s = ''
+                else:  # el must be an obj
+                    new_lines = self._flatten_rec(el, max(i - 1, 0), max(i, 1))
+                    s += new_lines[0]
+                    if len(new_lines) > 1:
+                        lines.append(s)
+                        lines.extend(new_lines[1:-1])
+                        s = new_lines[-1]
+
+            lines.append(s)
+            if all(self._fits(line) for line in lines):
+                break
+        return lines
+
+    def _fits(self, line):
+        return len(line) < 72
+
+    def _max_depth(self, obj):
+        if isinstance(obj, list):
+            return max(self._max_depth(el) + 1 for el in obj)
+        return 1
 
     #
     # Handlers for each non-host node in the glop AST follow.
@@ -217,7 +307,9 @@ class Compiler:
 
     def _action_(self, rule, node):
         obj = self._eval(node[2][0])
-        self._methods[rule] = ['self._succeed(' + obj + ')']
+        self._methods[rule] = self._flatten(
+            ['self._succeed(', OI, obj, OU, ')']
+        )
 
     def _apply_(self, rule, node):
         # Unknown rules were caught in analysis so if the rule isn't
@@ -365,61 +457,58 @@ class Compiler:
     #
     # Handlers for the host nodes in the AST
     #
-
     def _ll_arr_(self, node):
-        txt = '['
+        line = ['[', OI]
         if len(node[2]):
-            txt += self._eval(node[2][0])
+            line.append(self._eval(node[2][0]))
             for e in node[2][1:]:
-                txt += ', '
-                txt += self._eval(e)
-        txt += ']'
-        return txt
+                line.extend([',', SN, self._eval(e)])
+        line.extend([OU, ']'])
+        return line
 
     def _ll_call_(self, node):
-        txt = '('
+        line = ['(', OI]
 
         # There are no built-in functions that take no arguments, so make
         # sure we're not being called that way.
         assert len(node[2]) != 0
 
-        txt += self._eval(node[2][0])
+        line.append(self._eval(node[2][0]))
         for e in node[2][1:]:
-            txt += ', '
-            txt += self._eval(e)
-        txt += ')'
-        return txt
+            line.extend([',', SN, self._eval(e)])
+        line.extend([OU, ')'])
+        return line
 
     def _ll_getitem_(self, node):
-        return '[' + self._eval(node[2][0]) + ']'
+        return ['['] + self._eval(node[2][0]) + [']']
 
     def _ll_lit_(self, node):
-        return string_literal.encode(node[1])
+        return [string_literal.encode(node[1])]
 
     def _ll_minus_(self, node):
-        return f'{self._eval(node[2][0])} - {self._eval(node[2][1])}'
+        return self._eval(node[2][0]) + [SN, '- '] + self._eval(node[2][1])
 
     def _ll_num_(self, node):
-        return node[1]
+        return [node[1]]
 
     def _ll_paren_(self, node):
         return self._eval(node[2][0])
 
     def _ll_plus_(self, node):
-        return f'{self._eval(node[2][0])} + {self._eval(node[2][1])}'
+        return self._eval(node[2][0]) + [SN, '+ '] + self._eval(node[2][1])
 
     def _ll_qual_(self, node):
         if node[2][1][0] == 'll_call':
             self._needed.add(node[2][0][1])
-            txt = 'self._%s' % node[2][0][1]
+            v = ['self._%s' % node[2][0][1]]
         else:
-            txt = self._eval(node[2][0])
+            v = self._eval(node[2][0])
         for p in node[2][1:]:
-            txt += self._eval(p)
-        return txt
+            v += self._eval(p)
+        return [v]
 
     def _ll_var_(self, node):
-        return "self._get('%s')" % node[1]
+        return ["self._get('%s')" % node[1]]
 
     def _ll_const_(self, node):
         if node[1] == 'false':
