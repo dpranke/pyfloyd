@@ -197,15 +197,18 @@ class Compiler:
                 return True
         return False
 
-    def _chain(self, name, sub_rules):
-        lines = [f'self._{name}([']
-        n_sub_rules = len(sub_rules)
-        for i, sub_rule in enumerate(sub_rules):
-            line = f'    self._{sub_rule}_'
-            if i < n_sub_rules - 1:
-                line += ','
-            lines.append(line)
-        lines.append('])')
+    def _gen_method_call(self, name, args):
+        method_len = len(name) + 10
+        method_len += sum(len(arg) + 2 for arg in args)
+        if method_len <= 82:
+            arg_txt = ', '.join(args)
+            if method_len <= 73:
+                return [f'self._{name}([' + arg_txt + '])']
+            return [f'self._{name}(', f'    [{arg_txt}]', ')']
+        lines = [f'self._{name}(', '    [']
+        for arg in args:
+            lines.append(f'        {arg},')
+        lines.extend(['    ]', ')'])
         return lines
 
     #
@@ -225,10 +228,10 @@ class Compiler:
 
     def _choice_(self, rule, node):
         self._needed.add('choose')
-        sub_rules = [f'{rule}_c{i}' for i, _ in enumerate(node[2])]
-        self._methods[rule] = self._chain('choose', sub_rules)
+        args = [f'self._{rule}_c{i}_' for i, _ in enumerate(node[2])]
+        self._methods[rule] = self._gen_method_call('choose', args)
         for i, sub_node in enumerate(node[2]):
-            self._compile(sub_node, sub_rules[i])
+            self._compile(sub_node, f'{rule}_c{i}')
 
     def _empty_(self, rule, node):
         del node
@@ -340,17 +343,17 @@ class Compiler:
 
     def _seq_(self, rule, node):
         self._needed.add('seq')
-        sub_rules = [f'{rule}_s{i}' for i, _ in enumerate(node[2])]
+        args = [f'self._{rule}_s{i}_' for i, _ in enumerate(node[2])]
         needs_scope = self._has_labels(node)
         lines = []
         if needs_scope:
             lines.append(f"self._push('{rule}')")
-        lines.extend(self._chain('seq', sub_rules))
+        lines.extend(self._gen_method_call('seq', args))
         if needs_scope:
             lines.append(f"self._pop('{rule}')")
         self._methods[rule] = lines
         for i, sub_node in enumerate(node[2]):
-            self._compile(sub_node, sub_rules[i])
+            self._compile(sub_node, f'{rule}_s{i}')
 
     def _unicat_(self, rule, node):
         self._unicodedata_needed = True
