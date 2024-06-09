@@ -133,7 +133,7 @@ class Compiler:
             text += '])\n'
             text += '        o.choices = {\n'
             for op in o.choices:
-                text += "            '%s': self._%s,\n" % (
+                text += "            '%s': self._%s_,\n" % (
                     op,
                     o.choices[op],
                 )
@@ -158,7 +158,7 @@ class Compiler:
     def _gen_methods(self):
         text = ''
         for rule, method_body in self._methods.items():
-            memoize = self._memoize and rule in self.grammar.rules
+            memoize = self._memoize and rule in self._grammar.rules
             text += self._gen_method_text(rule, method_body, memoize)
 
         text += '\n'
@@ -171,26 +171,26 @@ class Compiler:
         text = '\n'
         text += '    def _%s_(self):\n' % method_name
         if memoize:
-            text += '        r = self.cache.get(("%s", '
-            text += 'self.pos))\n' % method_name
+            text += '        r = self.cache.get(("%s", ' % method_name
+            text += 'self.pos))\n'
             text += '        if r is not None:\n'
             text += '            self.val, self.failed, self.pos = r\n'
             text += '            return\n'
             text += '        pos = self.pos\n'
         for line in method_body:
-            text += '        %s\n' % line
+            text += f'        {line}\n'
         if memoize:
-            text += '        self.cache[("%s", pos)] = (' % method_name
+            text += f'        self.cache[("{method_name}", pos)] = ('
             text += 'self.val, self.failed, self.pos)\n'
         return text
 
     def _compile(self, node, rule):
-        fn = getattr(self, '_%s_' % node[0])
+        fn = getattr(self, f'_{node[0]}_')
         fn(rule, node)
 
-    def _eval_rule(self, rule, node):
-        fn = getattr(self, '_' + node[0] + '_')
-        return fn(rule, node)
+    def _eval(self, node):
+        fn = getattr(self, f'_{node[0]}_')
+        return fn(node)
 
     def _has_labels(self, node):
         if node and node[0] in ('label', 'll_var'):
@@ -206,7 +206,7 @@ class Compiler:
         for i, sub_rule in enumerate(sub_rules):
             line = f'    self._{sub_rule}_'
             if i < l - 1:
-                line += ', '
+                line += ','
             lines.append(line)
         lines.append('])')
         return lines
@@ -216,7 +216,7 @@ class Compiler:
     #
 
     def _action_(self, rule, node):
-        obj = self._eval_rule(rule, node[2][0])
+        obj = self._eval(node[2][0])
         self._methods[rule] = ['self._succeed(' + obj + ')']
 
     def _apply_(self, rule, node):
@@ -232,7 +232,7 @@ class Compiler:
         sub_rules = [f'{rule}_c{i}' for i in range(len(node[2]))]
         self._methods[rule] = self._chain('choose', sub_rules)
         for i in range(len(node[2])):
-            self._compile(sub_rules[i], node[2][i])
+            self._compile(node[2][i], sub_rules[i])
 
     def _empty_(self, rule, node):
         del node
@@ -241,7 +241,7 @@ class Compiler:
     def _label_(self, rule, node):
         self._needed.add('bind')
         sub_rule = rule + '_l'
-        self._methods[rule] = ['self._bind(self._%s, %s)' % (
+        self._methods[rule] = ['self._bind(self._%s_, %s)' % (
             sub_rule, string_literal.encode(node[1])
         )]
         self._compile(node[2][0], sub_rule)
@@ -254,8 +254,8 @@ class Compiler:
         lines = []
         if needs_scope:
             lines.append(f"self._push('{rule}')")
-        lines.append(f'self._leftrec(self._{sub_rule}, ' +
-                     f'{node[1]}, {str(left_assoc)})')
+        lines.append(f'self._leftrec(self._{sub_rule}_, ' +
+                     f"'{node[1]}', {str(left_assoc)})")
         if needs_scope:
             lines.append(f"self._pop('{rule}')")
         self._methods[rule] = lines
@@ -274,7 +274,7 @@ class Compiler:
     def _not_(self, rule, node):
         self._needed.add('not')
         sub_rule = rule + '_n'
-        self._methods[rule] = ['self._not(self._{sub_rule})']
+        self._methods[rule] = [f'self._not(self._{sub_rule}_)']
         sub_rule = self._compile(node[2][0], sub_rule)
 
     def _operator_(self, rule, node):
@@ -290,13 +290,13 @@ class Compiler:
             if self._grammar.assoc.get(op) == 'right':
                 o.rassoc.add(op)
             o.choices[op] = '%s__o%d_' % (rule, i)
-            self._operators[rule] = o
-            lines.append(f'self._operator("{rule}", [])')
-            self._compile(sub_rule, rule, 'o', i, self._has_labels(sub_rule))
+            self._compile(sub_rule, f'{o.choices[op]}')
+        self._operators[rule] = o
+        lines.append(f'self._operator("{rule}", [])')
 
     def _paren_(self, rule, node):
         sub_rule = rule + '_g'
-        self._methods[rule] = [f'self._{sub_rule}()']
+        self._methods[rule] = [f'self._{sub_rule}_()']
         self._compile(node[2][0], sub_rule)
 
     def _post_(self, rule, node):
@@ -310,11 +310,11 @@ class Compiler:
             assert node[1] == '*'
             method = 'star'
         self._needed.add(method)
-        self._methods[rule] = [f'self._{method}(self._{sub_rule})']
+        self._methods[rule] = [f'self._{method}(self._{sub_rule}_)']
         self._compile(node[2][0], sub_rule)
 
     def _pred_(self, rule, node):
-        obj = self._eval_rule(rule, node[2][0])
+        obj = self._eval(node[2][0])
         # TODO: Figure out how to statically analyze predicates to
         # catch ones that don't return booleans, so that we don't need
         # the _ParsingRuntimeError exception
@@ -363,72 +363,62 @@ class Compiler:
     # Handlers for the host nodes in the AST
     #
 
-    def _ll_arr_(self, rule, node):
+    def _ll_arr_(self, node):
         txt = '['
         if len(node[2]):
-            txt += self._eval_rule(rule, node[2][0])
+            txt += self._eval(node[2][0])
             for e in node[2][1:]:
                 txt += ', '
-                txt += self._eval_rule(rule, e)
+                txt += self._eval(e)
         txt += ']'
         return txt
 
-    def _ll_call_(self, rule, node):
+    def _ll_call_(self, node):
         txt = '('
 
         # There are no built-in functions that take no arguments, so make
         # sure we're not being called that way.
         assert len(node[2]) != 0
 
-        txt += self._eval_rule(rule, node[2][0])
+        txt += self._eval(node[2][0])
         for e in node[2][1:]:
             txt += ', '
-            txt += self._eval_rule(rule, e)
+            txt += self._eval(e)
         txt += ')'
         return txt
 
-    def _ll_getitem_(self, rule, node):
-        return '[' + self._eval_rule(rule, node[2][0]) + ']'
+    def _ll_getitem_(self, node):
+        return '[' + self._eval(node[2][0]) + ']'
 
-    def _ll_lit_(self, rule, node):
-        del rule
+    def _ll_lit_(self, node):
         return string_literal.encode(node[1])
 
-    def _ll_minus_(self, rule, node):
-        return '%s - %s' % (
-            self._eval_rule(rule, node[2][0]),
-            self._eval_rule(rule, node[2][1])
-        )
+    def _ll_minus_(self, node):
+        return f'{self._eval(node[2][0])} - {self._eval(node[2][1])}'
 
-    def _ll_num_(self, rule, node):
-        del rule
+    def _ll_num_(self, node):
         return node[1]
 
-    def _ll_paren_(self, rule, node):
-        return self._eval_rule(rule, node[2][0])
+    def _ll_paren_(self, node):
+        return self._eval(node[2][0])
 
-    def _ll_plus_(self, rule, node):
-        return '%s + %s' % (
-            self._eval_rule(rule, node[2][0]),
-            self._eval_rule(rule, node[2][1])
-        )
+    def _ll_plus_(self, node):
+        return f'{self._eval(node[2][0])} + {self._eval(node[2][1])}'
 
-    def _ll_qual_(self, rule, node):
+    def _ll_qual_(self, node):
         if node[2][1][0] == 'll_call':
             self._needed.add(node[2][0][1])
             txt = 'self._%s' % node[2][0][1]
         else:
-            txt = self._eval_rule(rule, node[2][0])
+            txt = self._eval(node[2][0])
         for p in node[2][1:]:
-            txt += self._eval_rule(rule, p)
+            txt += self._eval(p)
         return txt
 
-    def _ll_var_(self, rule, node):
-        del rule
+    def _ll_var_(self, node):
         return "self._get('%s')" % node[1]
 
-    def _ll_const_(self, rule, node):
-        del rule
+    def _ll_const_(self, node):
         if node[1] == 'false':
             return 'False'
         if node[1] == 'null':
