@@ -133,10 +133,7 @@ class Compiler:
             text += '])\n'
             text += '        o.choices = {\n'
             for op in o.choices:
-                text += "            '%s': self._%s_,\n" % (
-                    op,
-                    o.choices[op],
-                )
+                text += "            '%s': self._%s_,\n" % (op, o.choices[op])
             text += '        }\n'
             text += "        self.operators['%s'] = o\n" % rule
         return text
@@ -240,9 +237,10 @@ class Compiler:
     def _label_(self, rule, node):
         self._needed.add('bind')
         sub_rule = rule + '_l'
-        self._methods[rule] = ['self._bind(self._%s_, %s)' % (
-            sub_rule, string_literal.encode(node[1])
-        )]
+        self._methods[rule] = [
+            'self._bind(self._%s_, %s)'
+            % (sub_rule, string_literal.encode(node[1]))
+        ]
         self._compile(node[2][0], sub_rule)
 
     def _leftrec_(self, rule, node):
@@ -253,8 +251,10 @@ class Compiler:
         lines = []
         if needs_scope:
             lines.append(f"self._push('{rule}')")
-        lines.append(f'self._leftrec(self._{sub_rule}_, ' +
-                     f"'{node[1]}', {str(left_assoc)})")
+        lines.append(
+            f'self._leftrec(self._{sub_rule}_, '
+            + f"'{node[1]}', {str(left_assoc)})"
+        )
         if needs_scope:
             lines.append(f"self._pop('{rule}')")
         self._methods[rule] = lines
@@ -288,7 +288,7 @@ class Compiler:
             o.prec_ops.setdefault(prec, []).append(op)
             if self._grammar.assoc.get(op) == 'right':
                 o.rassoc.add(op)
-            o.choices[op] = '%s__o%d_' % (rule, i)
+            o.choices[op] = '%s_o%d' % (rule, i)
             self._compile(sub_rule, f'{o.choices[op]}')
         self._operators[rule] = o
         lines.append(f'self._operator("{rule}")')
@@ -331,7 +331,8 @@ class Compiler:
     def _range_(self, rule, node):
         self._needed.add('range')
         self._methods[rule] = [
-            'self._range(%s, %s)' % (
+            'self._range(%s, %s)'
+            % (
                 string_literal.encode(node[2][0][1]),
                 string_literal.encode(node[2][1][1]),
             )

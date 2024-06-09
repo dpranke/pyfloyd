@@ -346,15 +346,17 @@ def _check_operator(grammar, name, choices):
         assert choice[0] == 'seq'
         if len(choice[2]) not in (3, 4):
             return None
-        if (choice[2][0] != ['label', '$1', [['apply', name, []]]] and
-            choice[2][0] != ['apply', name, []]):
+        if choice[2][0] != ['label', '$1', [['apply', name, []]]] and choice[
+            2
+        ][0] != ['apply', name, []]:
             return None
         if choice[2][1][0] != 'lit' or choice[2][1][1] not in grammar.prec:
             return None
         operator = choice[2][1][1]
         prec = grammar.prec[operator]
-        if (choice[2][2] != ['label', '$3', [['apply', name, []]]] and
-            choice[2][2] != ['apply', name, []]):
+        if choice[2][2] != ['label', '$3', [['apply', name, []]]] and choice[
+            2
+        ][2] != ['apply', name, []]:
             return None
         if len(choice[2]) == 4 and choice[2][3][0] != 'action':
             return None

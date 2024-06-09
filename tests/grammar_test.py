@@ -26,6 +26,7 @@ THIS_DIR = pathlib.Path(__file__).parent
 
 SKIP = os.environ.get('SKIP', '')
 
+
 def skip(kind):
     def decorator(fn):
         def wrapper(obj):
@@ -33,7 +34,9 @@ def skip(kind):
                 obj.skipTest(kind)
             else:
                 fn(obj)
+
         return wrapper
+
     return decorator
 
 
@@ -89,12 +92,14 @@ class GrammarTestsMixin:
         self.check("grammar = 'a'*:v -> v", text='aa', out=['a', 'a'])
 
     def test_big_int(self):
-        self.check('grammar = { float("505874924095815700") }',
-                   text='',
-                   out=505874924095815700)
-        self.check('grammar = { 505874924095815700 }',
-                   text='',
-                   out=505874924095815700)
+        self.check(
+            'grammar = { float("505874924095815700") }',
+            text='',
+            out=505874924095815700,
+        )
+        self.check(
+            'grammar = { 505874924095815700 }', text='', out=505874924095815700
+        )
 
     def test_c_style_comment(self):
         self.check('grammar = /* foo */ end -> true', text='', out=True)
@@ -448,33 +453,49 @@ class GrammarTestsMixin:
         self.check("expr = expr '+' expr | 'x'", 'x+x', out='x')
 
         # rhs isn't recursive.
-        self.check("""
+        self.check(
+            """
             %prec +
             expr = expr '+' '0'
                  | 'x'
-            """, 'x+0', out='0')
+            """,
+            'x+0',
+            out='0',
+        )
 
         # Too many base cases. TODO: handle this.
-        self.check("""
+        self.check(
+            """
             %prec +
             expr = expr '+' expr
                  | '0'
                  | 'x'
-            """, '0+x', out='x')
+            """,
+            '0+x',
+            out='x',
+        )
 
         # Base case isn't a single expr. TODO: handle this.
-        self.check("""
+        self.check(
+            """
             %prec +
             expr = expr '+' expr
                  | 'x' 'y'
-            """, 'xy', out='y')
+            """,
+            'xy',
+            out='y',
+        )
 
         # Fourth term isn't an action: TODO: handle 'end' as a special case.
-        self.check("""
+        self.check(
+            """
             %prec +
             expr = expr '+' expr end
                 | 'x'
-            """, 'x+x', out=None)
+            """,
+            'x+x',
+            out=None,
+        )
 
     def test_opt(self):
         self.check("grammar = 'a' 'b'? -> true", text='a', out=True)

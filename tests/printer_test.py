@@ -34,7 +34,9 @@ def skip(kind):
                 obj.skipTest(kind)
             else:
                 fn(obj)
+
         return wrapper
+
     return decorator
 
 

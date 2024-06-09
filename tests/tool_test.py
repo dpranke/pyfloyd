@@ -114,9 +114,7 @@ class ToolTest(unittest.TestCase):
         host = FakeHost()
         host.files['grammar.g'] = 'grammar = "Hello" end -> true'
         host.files['input.txt'] = 'Hello'
-        self.assertEqual(
-            floyd.tool.main(['grammar.g', 'input.txt'], host), 0
-        )
+        self.assertEqual(floyd.tool.main(['grammar.g', 'input.txt'], host), 0)
         self.assertEqual(host.stdout.getvalue(), 'true\n')
         self.assertEqual(host.stderr.getvalue(), '')
 

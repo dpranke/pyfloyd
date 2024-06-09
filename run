@@ -114,8 +114,9 @@ class Runner:
         subp = self.add_parser(
             'coverage', help='Run tests and report code coverage.'
         )
-        subp.add_argument('--omit',
-            help='Omit files whose paths match one of these patterns.'
+        subp.add_argument(
+            '--omit',
+            help='Omit files whose paths match one of these patterns.',
         )
         subp.add_argument(
             '-u', '--unit', action='store_true', help='Only run unit tests.'
