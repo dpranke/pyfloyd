@@ -228,10 +228,10 @@ class Compiler:
 
     def _choice_(self, rule, node):
         self._needed.add('choose')
-        sub_rules = [f'{rule}_c{i}' for i in range(len(node[2]))]
+        sub_rules = [f'{rule}_c{i}' for i, _ in enumerate(node[2])]
         self._methods[rule] = self._chain('choose', sub_rules)
-        for i in range(len(node[2])):
-            self._compile(node[2][i], sub_rules[i])
+        for i, sub_node in enumerate(node[2]):
+            self._compile(sub_node, sub_rules[i])
 
     def _empty_(self, rule, node):
         del node
@@ -339,7 +339,7 @@ class Compiler:
 
     def _seq_(self, rule, node):
         self._needed.add('seq')
-        sub_rules = [f'{rule}_s{i}' for i in range(len(node[2]))]
+        sub_rules = [f'{rule}_s{i}' for i, _ in enumerate(node[2])]
         needs_scope = self._has_labels(node)
         lines = []
         if needs_scope:
@@ -348,8 +348,8 @@ class Compiler:
         if needs_scope:
             lines.append(f"self._pop('{rule}')")
         self._methods[rule] = lines
-        for i in range(len(node[2])):
-            self._compile(node[2][i], sub_rules[i])
+        for i, sub_node in enumerate(node[2]):
+            self._compile(sub_node, sub_rules[i])
 
     def _unicat_(self, rule, node):
         self._unicodedata_needed = True
