@@ -18,27 +18,6 @@ from floyd import python_templates as py
 from floyd import string_literal
 
 
-Whitespace = enum.Enum(
-    'Whitespace',
-    [
-        'Indent',
-        'Newline',
-        'OptionalIndent',
-        'OptionalUnindent',
-        'SpaceOrNewline',
-        'SpaceOrIndent',
-        'Unindent',
-    ],
-)
-
-IN = Whitespace.Indent
-NL = Whitespace.Newline
-OI = Whitespace.OptionalIndent
-OU = Whitespace.OptionalUnindent
-SN = Whitespace.SpaceOrNewline
-UN = Whitespace.Unindent
-
-
 class _CompilerOperatorState:
     def __init__(self):
         self.prec_ops = {}
@@ -221,76 +200,60 @@ class Compiler:
         return False
 
     def _gen_method_call(self, name, args):
-        method_len = len(name) + 10
-        args_txt = ', '.join(args)
-        args_len = len(args_txt)
-        if method_len + args_len <= 72:
-            return [f'self._{name}([' + args_txt + '])']
-        if args_len <= 66:
-            return [f'self._{name}(', f'    [{args_txt}]', ')']
-        lines = [f'self._{name}(', '    [']
-        for arg in args:
-            lines.append(f'        {arg},')
-        lines.extend(['    ]', ')'])
-        return lines
+        return self._flatten(
+            [f'self._{name}(', ['[', self._gen_argv(args), ']', ], ')']
+        )
+
+    def _gen_argv(self, args):
+        argv = []
+        for arg in args[:-1]:
+            argv.append(arg + ', ')
+        if args:
+            argv.append(args[-1])
+        return argv
 
     def _indent(self, s):
         return self._depth * '    ' + s
 
     def _flatten(self, obj):
-        return self._flatten_rec(obj, 0, self._max_depth(obj) + 1)
-        for line in lines:
-            lines.append(line.rstrip())
+        depth = 0
+        last_num_lines = 0
+        while True:
+            lines = [l.rstrip() for l in self._flatten_rec(obj, 0, depth)]
+            if all(len(line) < 72 for line in lines):
+                return lines
+            num_lines = len(lines)
+            if num_lines == last_num_lines:
+                return lines
+            depth += 1
+            last_num_lines = num_lines
 
         # TODO: Figure out how to handle blank lines at the end of a method
         # better. There will be a blank line if obj[-1] == UN.
         return lines
 
     def _flatten_rec(self, obj, current_depth, max_depth):
-        for i in range(current_depth, max_depth):
-            lines = []
-            s = ''
-            for el in obj:
-                if isinstance(el, str):
+        lines = []
+        s = ''
+        for el in obj:
+            if isinstance(el, str):
+                if current_depth == max_depth:
                     s += el
-                elif el == IN:
-                    lines.append(self._indent(s))
-                    self._depth += 1
-                    s = ''
-                elif el == NL:
-                    lines.append(self._indent(s))
-                    s = ''
-                elif el == OI:
-                    if i > 0:
-                        lines.append(self._indent(s))
-                        self._depth += 1
-                        s = ''
-                elif el == OU:
-                    if i > 0:
-                        lines.append(self._indent(s))
-                        self._depth -= 1
-                        s = ''
-                elif el == SN:
-                    if i == 0:
-                        s += ' '
-                    else:
-                        lines.append(self._indent(s))
-                        s = ''
-                elif el == UN:
-                    lines.append(self._indent(s))
-                    self._depth -= 1
-                    s = ''
-                else:  # el must be an obj
-                    new_lines = self._flatten_rec(el, max(i - 1, 0), max(i, 1))
-                    s += new_lines[0]
-                    if len(new_lines) > 1:
+                else:
+                    lines.append(el)
+            else:
+                if current_depth == max_depth:
+                    s += self._flatten_rec(el, current_depth, max_depth)[0]
+                else:
+                    if s:
                         lines.append(s)
-                        lines.extend(new_lines[1:-1])
-                        s = new_lines[-1]
-
+                    for l in self._flatten_rec(
+                        el, current_depth + 1, max_depth
+                    ):
+                        lines.append('    ' + l)
+                    s = ''
+        if s:
             lines.append(s)
-            if all(self._fits(line) for line in lines):
-                break
         return lines
 
     def _fits(self, line):
@@ -307,9 +270,7 @@ class Compiler:
 
     def _action_(self, rule, node):
         obj = self._eval(node[2][0])
-        self._methods[rule] = self._flatten(
-            ['self._succeed(', OI, obj, OU, ')']
-        )
+        self._methods[rule] = self._flatten(['self._succeed(', obj, ')'])
 
     def _apply_(self, rule, node):
         # Unknown rules were caught in analysis so if the rule isn't
@@ -426,8 +387,7 @@ class Compiler:
     def _range_(self, rule, node):
         self._needed.add('range')
         self._methods[rule] = [
-            'self._range(%s, %s)'
-            % (
+            'self._range(%s, %s)' % (
                 string_literal.encode(node[2][0][1]),
                 string_literal.encode(node[2][1][1]),
             )
@@ -440,7 +400,7 @@ class Compiler:
         lines = []
         if needs_scope:
             lines.append(f"self._push('{rule}')")
-        lines.extend(self._gen_method_call('seq', args))
+        lines += self._gen_method_call('seq', args)
         if needs_scope:
             lines.append(f"self._pop('{rule}')")
         self._methods[rule] = lines
@@ -458,35 +418,34 @@ class Compiler:
     # Handlers for the host nodes in the AST
     #
     def _ll_arr_(self, node):
-        line = ['[', OI]
-        if len(node[2]):
-            line.append(self._eval(node[2][0]))
-            for e in node[2][1:]:
-                line.extend([',', SN, self._eval(e)])
-        line.extend([OU, ']'])
-        return line
+        args = []
+        for n in node[2]:
+            args += self._eval(n)
+        return ['[', self._gen_argv(args), ']']
 
     def _ll_call_(self, node):
-        line = ['(', OI]
-
         # There are no built-in functions that take no arguments, so make
         # sure we're not being called that way.
         assert len(node[2]) != 0
-
-        line.append(self._eval(node[2][0]))
-        for e in node[2][1:]:
-            line.extend([',', SN, self._eval(e)])
-        line.extend([OU, ')'])
-        return line
+        args = []
+        for n in node[2]:
+            args += self._eval(n)
+        return ['(', self._gen_argv(args), ')']
 
     def _ll_getitem_(self, node):
-        return ['['] + self._eval(node[2][0]) + [']']
+        return ['[', self._eval(node[2][0]), ']']
 
     def _ll_lit_(self, node):
         return [string_literal.encode(node[1])]
 
     def _ll_minus_(self, node):
-        return self._eval(node[2][0]) + [SN, '- '] + self._eval(node[2][1])
+        left = self._eval(node[2][0])
+        right = self._eval(node[2][1])
+        lines = left
+        lines[-1] += ' '
+        lines.append('- ' + right[0])
+        lines += right[1:]
+        return lines
 
     def _ll_num_(self, node):
         return [node[1]]
@@ -495,12 +454,18 @@ class Compiler:
         return self._eval(node[2][0])
 
     def _ll_plus_(self, node):
-        return self._eval(node[2][0]) + [SN, '+ '] + self._eval(node[2][1])
+        left = self._eval(node[2][0])
+        right = self._eval(node[2][1])
+        lines = left
+        lines[-1] += ' '
+        lines.append('+ ' + right[0])
+        lines += right[1:]
+        return lines
 
     def _ll_qual_(self, node):
         if node[2][1][0] == 'll_call':
             self._needed.add(node[2][0][1])
-            v = ['self._%s' % node[2][0][1]]
+            v = 'self._%s' % node[2][0][1]
         else:
             v = self._eval(node[2][0])
         for p in node[2][1:]:
@@ -512,12 +477,12 @@ class Compiler:
 
     def _ll_const_(self, node):
         if node[1] == 'false':
-            return 'False'
+            return ['False']
         if node[1] == 'null':
-            return 'None'
+            return ['None']
         if node[1] == 'true':
-            return 'True'
+            return ['True']
         if node[1] == 'Infinity':
-            return "float('inf')"
+            return ["float('inf')"]
         assert node[1] == 'NaN'
-        return "float('NaN')"
+        return ["float('NaN')"]
