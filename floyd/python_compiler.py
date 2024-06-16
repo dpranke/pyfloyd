@@ -18,6 +18,9 @@ from floyd import python_templates as py
 from floyd import string_literal
 
 
+NBSP = '\xa0'
+
+
 class _CompilerOperatorState:
     def __init__(self):
         self.prec_ops = {}
@@ -200,69 +203,7 @@ class Compiler:
         return False
 
     def _gen_method_call(self, name, args):
-        return self._flatten(
-            [f'self._{name}(', ['[', self._gen_argv(args), ']', ], ')']
-        )
-
-    def _gen_argv(self, args):
-        argv = []
-        for arg in args[:-1]:
-            argv.append(arg + ', ')
-        if args:
-            argv.append(args[-1])
-        return argv
-
-    def _indent(self, s):
-        return self._depth * '    ' + s
-
-    def _flatten(self, obj):
-        depth = 0
-        last_num_lines = 0
-        while True:
-            lines = [l.rstrip() for l in self._flatten_rec(obj, 0, depth)]
-            if all(len(line) < 72 for line in lines):
-                return lines
-            num_lines = len(lines)
-            if num_lines == last_num_lines:
-                return lines
-            depth += 1
-            last_num_lines = num_lines
-
-        # TODO: Figure out how to handle blank lines at the end of a method
-        # better. There will be a blank line if obj[-1] == UN.
-        return lines
-
-    def _flatten_rec(self, obj, current_depth, max_depth):
-        lines = []
-        s = ''
-        for el in obj:
-            if isinstance(el, str):
-                if current_depth == max_depth:
-                    s += el
-                else:
-                    lines.append(el)
-            else:
-                if current_depth == max_depth:
-                    s += self._flatten_rec(el, current_depth, max_depth)[0]
-                else:
-                    if s:
-                        lines.append(s)
-                    for l in self._flatten_rec(
-                        el, current_depth + 1, max_depth
-                    ):
-                        lines.append('    ' + l)
-                    s = ''
-        if s:
-            lines.append(s)
-        return lines
-
-    def _fits(self, line):
-        return len(line) < 72
-
-    def _max_depth(self, obj):
-        if isinstance(obj, list):
-            return max(self._max_depth(el) + 1 for el in obj)
-        return 1
+        return flatten([f'self._{name}(', Argv('[', args, ']'), ')'])
 
     #
     # Handlers for each non-host node in the glop AST follow.
@@ -270,7 +211,7 @@ class Compiler:
 
     def _action_(self, rule, node):
         obj = self._eval(node[2][0])
-        self._methods[rule] = self._flatten(['self._succeed(', obj, ')'])
+        self._methods[rule] = flatten(['self._succeed(', obj, ')'])
 
     def _apply_(self, rule, node):
         # Unknown rules were caught in analysis so if the rule isn't
@@ -421,16 +362,13 @@ class Compiler:
         args = []
         for n in node[2]:
             args += self._eval(n)
-        return ['[', self._gen_argv(args), ']']
+        return Argv('[', args, ']')
 
     def _ll_call_(self, node):
         # There are no built-in functions that take no arguments, so make
         # sure we're not being called that way.
         assert len(node[2]) != 0
-        args = []
-        for n in node[2]:
-            args += self._eval(n)
-        return ['(', self._gen_argv(args), ')']
+        return Argv('(', [self._eval(n) for n in args], ')')
 
     def _ll_getitem_(self, node):
         return ['[', self._eval(node[2][0]), ']']
@@ -439,13 +377,7 @@ class Compiler:
         return [string_literal.encode(node[1])]
 
     def _ll_minus_(self, node):
-        left = self._eval(node[2][0])
-        right = self._eval(node[2][1])
-        lines = left
-        lines[-1] += ' '
-        lines.append('- ' + right[0])
-        lines += right[1:]
-        return lines
+        return Tree(self._eval(node[2][0]), '-', self._eval(node[2][1]))
 
     def _ll_num_(self, node):
         return [node[1]]
@@ -454,13 +386,7 @@ class Compiler:
         return self._eval(node[2][0])
 
     def _ll_plus_(self, node):
-        left = self._eval(node[2][0])
-        right = self._eval(node[2][1])
-        lines = left
-        lines[-1] += ' '
-        lines.append('+ ' + right[0])
-        lines += right[1:]
-        return lines
+        return Tree(self._eval(node[2][0]), '+', self._eval(node[2][1]))
 
     def _ll_qual_(self, node):
         if node[2][1][0] == 'll_call':
@@ -486,3 +412,93 @@ class Compiler:
             return ["float('inf')"]
         assert node[1] == 'NaN'
         return ["float('NaN')"]
+
+
+def flatten(obj):
+    depth = 0
+    last_num_lines = 0
+    while True:
+        lines = fmt(obj, 0, depth)
+        if all(len(line) <= 72 for line in lines):
+            return lines
+        num_lines = len(lines)
+        if num_lines == last_num_lines:
+            return lines
+        depth += 1
+        last_num_lines = num_lines
+
+    return lines
+
+
+def fmt(obj, current_depth, max_depth):
+    if current_depth == max_depth:
+        s = ''
+        if isinstance(obj, FormatObj):
+            return obj.fmt(current_depth, max_depth)
+        for el in obj:
+            if isinstance(el, str):
+                s += el
+            elif isinstance(el, FormatObj):
+                s += el.fmt(current_depth, max_depth)[0]
+            else:
+                s += fmt(el, current_depth, max_depth)[0]
+        return [s]
+    lines = []
+    if isinstance(obj, FormatObj):
+        return obj.fmt(current_depth, max_depth)
+    for el in obj:
+        if isinstance(el, str):
+            lines.append(el)
+        elif isinstance(el, FormatObj):
+            lines += ['    ' + l for l in el.fmt(current_depth + 1, max_depth)]
+        else:
+            for l in fmt(el, current_depth + 1, max_depth):
+                 lines.append('    ' + l)
+    return lines
+
+
+class FormatObj:
+    def fmt(self, current_depth, max_depth):
+        raise NotImplementedError
+
+
+class Argv(FormatObj):
+    def __init__(self, start, args, end):
+        self.start = start
+        self.args = args
+        self.end = end
+
+    def __repr__(self):
+        return 'Argv(' + self.fmt(0, 0)[0] + ')'
+
+    def fmt(self, current_depth, max_depth):
+        if current_depth == max_depth:
+            return [self.start + ', '.join(self.args) + self.end]
+        lines = [self.start]
+        for arg in self.args:
+            lines.append('    ' + arg + ',')
+        lines.append(self.end)
+        return lines
+
+
+class Tree(FormatObj):
+    def __init__(self, left, op, right):
+        self.left = left
+        self.op = op
+        self.right = right
+
+    def __repr__(self):
+        return 'Tree(' + self.fmt(0, 0)[0] + ')'
+
+    def fmt(self, current_depth, max_depth):
+        if current_depth == max_depth:
+            s = fmt(self.left, current_depth, max_depth)[0]
+            s += ' ' + self.op + ' '
+            s += fmt(self.right, current_depth, max_depth)[0]
+            return [s]
+        lines = fmt(self.left, current_depth, max_depth)
+        right = fmt(self.right, current_depth, max_depth)
+        lines.append(self.op + ' ' + right[0])
+        if right[1:]:
+            lines += right[1:]
+        return lines
