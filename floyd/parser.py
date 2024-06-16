@@ -1522,11 +1522,9 @@ class Parser:
 
     def _unicode_esc_c0_s5_(self):
         self._succeed(
-            self._xtou(
-                self._get('h1')
-                + self._get('h2')
-                + self._get('h3')
-                + self._get('h4')
+            self._xtou
+            (
+                    self._get('h1') + self._get('h2') + self._get('h3') + self._get('h4'),
             )
         )
 
@@ -1601,15 +1599,9 @@ class Parser:
 
     def _unicode_esc_c1_s9_(self):
         self._succeed(
-            self._xtou(
-                self._get('h1')
-                + self._get('h2')
-                + self._get('h3')
-                + self._get('h4')
-                + self._get('h5')
-                + self._get('h6')
-                + self._get('h7')
-                + self._get('h8')
+            self._xtou
+            (
+                    self._get('h1') + self._get('h2') + self._get('h3') + self._get('h4') + self._get('h5') + self._get('h6') + self._get('h7') + self._get('h8'),
             )
         )
 

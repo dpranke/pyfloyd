@@ -25,6 +25,10 @@ class FormatterTests(unittest.TestCase):
         t = CommaList(['1', '2', '3'])
         self.assertEqual(['foo(1, 2, 3)'], flatten(['foo(', t, ')']))
 
+        t = CommaList(['1', ['[', CommaList(['2']), ']']])
+        self.assertEqual(['foo(1, [2])'], flatten(['foo(', t, ')']))
+        
+        # This tests an array that can fit onto one line of its own.
         t = CommaList(
             [
                 "'long string 1'",
@@ -43,6 +47,7 @@ class FormatterTests(unittest.TestCase):
             flatten(['self._succeed(', ['[', t, ']'], ')'])
         )
 
+        # This tests an array that needs to span multiple lines.
         t = CommaList(
             [
                 'self._long_rule_1',
@@ -66,8 +71,11 @@ class FormatterTests(unittest.TestCase):
         ) 
 
     def test_commalist_repr(self):
-        self.assertEqual('CommaList(1, 2)',
+        self.assertEqual("CommaList(['1', '2'])",
                          repr(CommaList(['1', '2'])))
+        self.assertEqual("CommaList(['1', CommaList(['2'])])",
+                         repr(CommaList(['1', CommaList(['2'])])))
+
 
     def test_line_too_long(self):
         long_str = (

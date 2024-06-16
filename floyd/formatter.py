@@ -32,6 +32,8 @@ def flatten(obj):
 def fmt(obj, current_depth, max_depth):
     if isinstance(obj, Formatter):
         return obj.fmt(current_depth, max_depth)
+    if isinstance(obj, str):
+        return [obj]
     assert isinstance(obj, list)
     if current_depth == max_depth:
         return _fmt_on_one_line(obj, current_depth, max_depth)
@@ -56,7 +58,7 @@ def _fmt_on_multiple_lines(obj, current_depth, max_depth):
     for el in obj:
         if isinstance(el, str):
             lines.append(el)
-        elif isinstance(el, Formatter) or isinstance(el, list):
+        else:
             for l in fmt(el, current_depth + 1, max_depth):
                 lines.append('    ' + l)
     return lines
@@ -73,19 +75,22 @@ class CommaList(Formatter):
 
     If we need to format a list of arguments across multiple lines, we
     want each to appear on its own line with a trailing comma, even on
-    the last line where the trailing comma is unnecessary. Each line
-    must also be indented.
+    the last line where the trailing comma is unnecessary.
     """
     def __init__(self, args):
-        self.args = args
+        # Ensure that if we were passed a generator we can hold onto the values.
+        self.args = list(args)
 
     def __repr__(self):
-        return 'CommaList(' + self.fmt(0, 0)[0] + ')'
+        return 'CommaList(' + repr(self.args) + ')'
 
     def fmt(self, current_depth, max_depth):
         if current_depth == max_depth:
-            return [', '.join(self.args)]
-        return [arg + ',' for arg in self.args]
+            return [', '.join(fmt(arg, current_depth, max_depth)[0]
+                              for arg in self.args)]
+        return [
+            fmt(arg, current_depth, max_depth)[0] + ',' for arg in self.args
+        ]
 
 
 class Tree(Formatter):
