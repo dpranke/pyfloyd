@@ -203,7 +203,7 @@ class Compiler:
         return False
 
     def _gen_method_call(self, name, args):
-        return flatten([f'self._{name}(', Argv('[', args, ']'), ')'])
+        return flatten([f'self._{name}(', ['[', Argv(args), ']'], ')'])
 
     #
     # Handlers for each non-host node in the glop AST follow.
@@ -362,13 +362,13 @@ class Compiler:
         args = []
         for n in node[2]:
             args += self._eval(n)
-        return Argv('[', args, ']')
+        return ['[', Argv(args), ']']
 
     def _ll_call_(self, node):
         # There are no built-in functions that take no arguments, so make
         # sure we're not being called that way.
         assert len(node[2]) != 0
-        return Argv('(', [self._eval(n) for n in args], ')')
+        return ['(', Argv(self._eval(n) for n in args), ')']
 
     def _ll_getitem_(self, node):
         return ['[', self._eval(node[2][0]), ']']
@@ -431,57 +431,75 @@ def flatten(obj):
 
 
 def fmt(obj, current_depth, max_depth):
-    if current_depth == max_depth:
-        s = ''
-        if isinstance(obj, FormatObj):
-            return obj.fmt(current_depth, max_depth)
-        for el in obj:
-            if isinstance(el, str):
-                s += el
-            elif isinstance(el, FormatObj):
-                s += el.fmt(current_depth, max_depth)[0]
-            else:
-                s += fmt(el, current_depth, max_depth)[0]
-        return [s]
-    lines = []
     if isinstance(obj, FormatObj):
         return obj.fmt(current_depth, max_depth)
+    assert isinstance(obj, list)
+    if current_depth == max_depth:
+        return _fmt_on_one_line(obj, current_depth, max_depth)
+    return _fmt_on_multiple_lines(obj, current_depth, max_depth)
+
+
+
+def _fmt_on_one_line(obj, current_depth, max_depth):
+    s = ''
+    for el in obj:
+        if isinstance(el, str):
+            s += el
+        elif isinstance(el, FormatObj):
+            s += el.fmt(current_depth, max_depth)[0]
+        else:
+            s += fmt(el, current_depth, max_depth)[0]
+    return [s]
+
+
+def _fmt_on_multiple_lines(obj, current_depth, max_depth):
+    lines = []
     for el in obj:
         if isinstance(el, str):
             lines.append(el)
-        elif isinstance(el, FormatObj):
-            lines += ['    ' + l for l in el.fmt(current_depth + 1, max_depth)]
-        else:
+        elif isinstance(el, FormatObj) or isinstance(el, list):
             for l in fmt(el, current_depth + 1, max_depth):
-                 lines.append('    ' + l)
+                lines.append('    ' + l)
     return lines
 
 
 class FormatObj:
     def fmt(self, current_depth, max_depth):
+        """Returns a list of strings, each representing a line."""
         raise NotImplementedError
 
 
 class Argv(FormatObj):
-    def __init__(self, start, args, end):
-        self.start = start
+    """Format a comma-separated list of arguments.
+
+    If we need to format a list of arguments across multiple lines, we
+    want each to appear on its own line with a trailing comma, even on
+    the last line where the trailing comma is unnecessary. Each line
+    must also be indented.
+    """
+    def __init__(self, args):
         self.args = args
-        self.end = end
 
     def __repr__(self):
         return 'Argv(' + self.fmt(0, 0)[0] + ')'
 
     def fmt(self, current_depth, max_depth):
         if current_depth == max_depth:
-            return [self.start + ', '.join(self.args) + self.end]
-        lines = [self.start]
-        for arg in self.args:
-            lines.append('    ' + arg + ',')
-        lines.append(self.end)
-        return lines
+            return [', '.join(self.args)]
+        return ['    ' + arg + ',' for arg in self.args]
 
 
 class Tree(FormatObj):
+    """Format a tree of expressions.
+
+    This formats a tree of expressions, like `1 + 2 - 3`. If the expressions
+    need to be split across multiple lines, we want the lines to be split
+    before each operator, e.g.:
+        1
+        + 2
+        - 3
+    This requires some surgery when walking the tree."""
+
     def __init__(self, left, op, right):
         self.left = left
         self.op = op
