@@ -249,8 +249,6 @@ class Interpreter:
     def _handle_ll_num(self, node):
         if node[1].startswith('0x'):
             self._succeed(int(node[1], base=16))
-        elif '.' in node[1] or 'e' in node[1] or 'E' in node[1]:
-            self._succeed(float(node[1]))
         else:
             self._succeed(int(node[1]))
 

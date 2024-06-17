@@ -30,7 +30,7 @@ SKIP = os.environ.get('SKIP', '')
 def skip(kind):
     def decorator(fn):
         def wrapper(obj):
-            if kind in SKIP:
+            if kind in SKIP:  # pragma: no cover
                 obj.skipTest(kind)
             else:
                 fn(obj)
@@ -202,6 +202,11 @@ class GrammarTestsMixin:
             text='',
             out=True,
         )
+
+    def test_cpp_style_comment_eol(self):
+        self.check('grammar = //\rend -> true', text='', out=True)
+        self.check('grammar = //\r\nend -> true', text='', out=True)
+        self.check('grammar = //\nend -> true', text='', out=True)
 
     def test_empty(self):
         self.check('grammar = ', text='', out=None, err=None)
@@ -427,6 +432,10 @@ class GrammarTestsMixin:
 
     def test_ll_minus(self):
         self.check('grammar = end -> 1 - 4', text='', out=-3)
+
+    def test_ll_num(self):
+        self.check('grammar = end -> 1', text='', out=1)
+        self.check('grammar = end -> 0x20', text='', out=32)
 
     def test_ll_plus(self):
         self.check(

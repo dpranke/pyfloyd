@@ -30,7 +30,7 @@ SKIP = os.environ.get('SKIP', '')
 def skip(kind):
     def decorator(fn):
         def wrapper(obj):
-            if kind in SKIP:
+            if kind in SKIP:  # pragma: no cover
                 obj.skipTest(kind)
             else:
                 fn(obj)
