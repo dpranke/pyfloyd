@@ -87,28 +87,10 @@ class Runner:
 
         self.add_parser('build', help='Build the package.')
         self.add_parser('check', help='Lint the source code with ruff.')
-        self.add_parser(
-            'check-regen',
-            help=(
-                'Check to ensure that floyd/parser.py is up to date '
-                'with grammars/floyd.py.'
-            ),
-        )
         self.add_parser('clean', help='Remove any local files.')
         self.add_parser(
             'devenv',
             help='Set up a dev venv at //.venv with all the needed packages.',
-        )
-
-        subp = self.add_parser(
-            'presubmit',
-            help='Run all the steps that should be run prior to commiting.',
-        )
-        subp.add_argument(
-            '-f',
-            '--failfast',
-            action='store_true',
-            help='Stop on first fail or error',
         )
 
         subp = self.add_parser(
@@ -143,6 +125,24 @@ class Runner:
 
         self.add_parser('mypy', help='Typecheck the code with mypy.')
 
+        subp = self.add_parser(
+            'presubmit',
+            help='Run all the steps that should be run prior to commiting.',
+        )
+        subp.add_argument(
+            '-f',
+            '--failfast',
+            action='store_true',
+            help='Stop on first fail or error',
+        )
+        subp.add_argument(
+            '-u', '--unit', action='store_true', help='Only run unit tests.'
+        )
+        subp.add_argument(
+            '--omit',
+            help='Omit files whose paths match one of these patterns.',
+        )
+
         subp = self.add_parser('publish', help='Upload packages to PyPI.')
         subp.add_argument(
             '--test',
@@ -155,7 +155,13 @@ class Runner:
             help='Upload to the real PyPI instance.',
         )
 
-        self.add_parser('regen', help='Regenerate floyd/parser.py.')
+        subp = self.add_parser('regen', help='Regenerate floyd/parser.py.')
+        subp.add_argument(
+            '--check',
+            action='store_true',
+            help='Just check to see if any files would be modified.',
+        )
+
         subp = self.add_parser('tests', help='Run the tests.')
         subp.add_argument(
             '-f',
@@ -179,18 +185,6 @@ class Runner:
 
     def run_check(self):
         self.call([sys.executable, '-m', 'ruff', 'check'])
-
-    def run_check_regen(self):
-        with open('floyd/parser.py', encoding='utf-8') as fp:
-            old = fp.read()
-        self._gen_parser()
-        with open('parser.py', encoding='utf-8') as fp:
-            new = fp.read()
-        os.remove('parser.py')
-        if old != new:
-            print('Need to regenerate the parser with `run regen`.')
-            sys.exit(1)
-        print('floyd/parser.py is up to date.')
 
     def run_clean(self):
         path = shutil.which('git')
@@ -254,7 +248,7 @@ class Runner:
 
     def run_presubmit(self):
         self.args.check = True
-        self.run_check_regen()
+        self.run_regen()
         self.run_format()
         self.run_check()
         self.run_lint()
@@ -287,8 +281,19 @@ class Runner:
         self.call(cmd)
 
     def run_regen(self):
+        with open('floyd/parser.py', encoding='utf-8') as fp:
+            old = fp.read()
         self._gen_parser()
-        os.rename('parser.py', 'floyd/parser.py')
+        with open('parser.py', encoding='utf-8') as fp:
+            new = fp.read()
+        if self.args.check:
+            os.remove('parser.py')
+            if old != new:
+                print('Need to regenerate the parser with `run regen`.')
+                sys.exit(1)
+            print('floyd/parser.py is up to date.')
+        else:
+            os.rename('parser.py', 'floyd/parser.py')
 
     def run_tests(self):
         cmd = [sys.executable, '-m', 'unittest', 'discover', '-p', '*_test.py']
