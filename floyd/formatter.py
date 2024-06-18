@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 def flatten(obj):
     "Flatten an object into a list of 1 or more strings"
     depth = 0
@@ -38,7 +39,6 @@ def fmt(obj, current_depth, max_depth):
     if current_depth == max_depth:
         return _fmt_on_one_line(obj, current_depth, max_depth)
     return _fmt_on_multiple_lines(obj, current_depth, max_depth)
-
 
 
 def _fmt_on_one_line(obj, current_depth, max_depth):
@@ -79,6 +79,7 @@ class CommaList(Formatter):
     want each to appear on its own line with a trailing comma, even on
     the last line where the trailing comma is unnecessary.
     """
+
     def __init__(self, args):
         # Ensure that if we were passed a generator we can hold onto the values.
         self.args = list(args)
@@ -88,8 +89,11 @@ class CommaList(Formatter):
 
     def fmt(self, current_depth, max_depth):
         if current_depth == max_depth:
-            return [', '.join(fmt(arg, current_depth, max_depth)[0]
-                              for arg in self.args)]
+            return [
+                ', '.join(
+                    fmt(arg, current_depth, max_depth)[0] for arg in self.args
+                )
+            ]
         lines = []
         for arg in self.args:
             arg_lines = fmt(arg, current_depth, max_depth)
@@ -116,7 +120,9 @@ class Tree(Formatter):
 
     def __repr__(self):
         return 'Tree(%s, %s, %s)' % (
-            repr(self.left), repr(self.op), repr(self.right)
+            repr(self.left),
+            repr(self.op),
+            repr(self.right),
         )
 
     def fmt(self, current_depth, max_depth):

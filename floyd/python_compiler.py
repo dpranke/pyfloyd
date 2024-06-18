@@ -324,7 +324,8 @@ class Compiler:
     def _range_(self, rule, node):
         self._needed.add('range')
         self._methods[rule] = [
-            'self._range(%s, %s)' % (
+            'self._range(%s, %s)'
+            % (
                 string_literal.encode(node[2][0][1]),
                 string_literal.encode(node[2][1][1]),
             )

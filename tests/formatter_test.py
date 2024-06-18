@@ -42,9 +42,9 @@ class FormatterTests(unittest.TestCase):
                 'self._succeed(',
                 "    ['long string 1', 'long string 2', "
                 "'long string 3', 'long string 4']",
-             ')'
+                ')',
             ],
-            flatten(['self._succeed(', ['[', [t], ']'], ')'])
+            flatten(['self._succeed(', ['[', [t], ']'], ')']),
         )
 
         # This tests an array that needs to span multiple lines.
@@ -67,15 +67,15 @@ class FormatterTests(unittest.TestCase):
                 '    self._long_rule_5,',
                 ')',
             ],
-            flatten(['foo(', [t], ')'])
+            flatten(['foo(', [t], ')']),
         )
 
     def test_commalist_repr(self):
-        self.assertEqual("CommaList(['1', '2'])",
-                         repr(CommaList(['1', '2'])))
-        self.assertEqual("CommaList(['1', CommaList(['2'])])",
-                         repr(CommaList(['1', CommaList(['2'])])))
-
+        self.assertEqual("CommaList(['1', '2'])", repr(CommaList(['1', '2'])))
+        self.assertEqual(
+            "CommaList(['1', CommaList(['2'])])",
+            repr(CommaList(['1', CommaList(['2'])])),
+        )
 
     def test_line_too_long(self):
         long_str = (
@@ -99,8 +99,8 @@ class FormatterTests(unittest.TestCase):
                                     Tree(
                                         "self._get('long_variable_2')",
                                         '+',
-                                        "self._get('long_variable_3')"
-                                    )
+                                        "self._get('long_variable_3')",
+                                    ),
                                 )
                             ]
                         )
@@ -120,7 +120,7 @@ class FormatterTests(unittest.TestCase):
                 '    )',
                 ')',
             ],
-            lines
+            lines,
         )
 
     def test_tree(self):
@@ -135,11 +135,9 @@ class FormatterTests(unittest.TestCase):
                 Tree(
                     ["'long string 3'"],
                     '+',
-                    Tree(
-                        ["'long string 4'"], '+', ["'long string5'"]
-                    )
-                )
-            )
+                    Tree(["'long string 4'"], '+', ["'long string5'"]),
+                ),
+            ),
         )
         self.assertEqual(
             [
@@ -149,13 +147,14 @@ class FormatterTests(unittest.TestCase):
                 "    + 'long string 3'",
                 "    + 'long string 4'",
                 "    + 'long string5'",
-                ')'
+                ')',
             ],
-            flatten(['foo(', [t], ')'])
+            flatten(['foo(', [t], ')']),
         )
 
     def test_tree_repr(self):
-        self.assertEqual("Tree('1', '+', '2')",
-                         repr(Tree('1', '+', '2')))
-        self.assertEqual("Tree('1', '+', Tree('2', '+', '3'))",
-                         repr(Tree('1', '+', Tree('2', '+', '3'))))
+        self.assertEqual("Tree('1', '+', '2')", repr(Tree('1', '+', '2')))
+        self.assertEqual(
+            "Tree('1', '+', Tree('2', '+', '3'))",
+            repr(Tree('1', '+', Tree('2', '+', '3'))),
+        )
