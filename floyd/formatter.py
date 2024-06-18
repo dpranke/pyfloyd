@@ -58,9 +58,11 @@ def _fmt_on_multiple_lines(obj, current_depth, max_depth):
     for el in obj:
         if isinstance(el, str):
             lines.append(el)
+        elif isinstance(el, Formatter):
+            lines += el.fmt(current_depth, max_depth)
         else:
-            for l in fmt(el, current_depth + 1, max_depth):
-                lines.append('    ' + l)
+            for line in fmt(el, current_depth + 1, max_depth):
+                lines.append('    ' + line)
     return lines
 
 
@@ -88,9 +90,12 @@ class CommaList(Formatter):
         if current_depth == max_depth:
             return [', '.join(fmt(arg, current_depth, max_depth)[0]
                               for arg in self.args)]
-        return [
-            fmt(arg, current_depth, max_depth)[0] + ',' for arg in self.args
-        ]
+        lines = []
+        for arg in self.args:
+            arg_lines = fmt(arg, current_depth, max_depth)
+            lines += arg_lines
+            lines[-1] += ','
+        return lines
 
 
 class Tree(Formatter):
@@ -110,7 +115,9 @@ class Tree(Formatter):
         self.right = right
 
     def __repr__(self):
-        return 'Tree(' + self.fmt(0, 0)[0] + ')'
+        return 'Tree(%s, %s, %s)' % (
+            repr(self.left), repr(self.op), repr(self.right)
+        )
 
     def fmt(self, current_depth, max_depth):
         if current_depth == max_depth:

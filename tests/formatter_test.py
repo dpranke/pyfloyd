@@ -23,11 +23,11 @@ class FormatterTests(unittest.TestCase):
 
     def test_commalist(self):
         t = CommaList(['1', '2', '3'])
-        self.assertEqual(['foo(1, 2, 3)'], flatten(['foo(', t, ')']))
+        self.assertEqual(['foo(1, 2, 3)'], flatten(['foo(', [t], ')']))
 
         t = CommaList(['1', ['[', CommaList(['2']), ']']])
-        self.assertEqual(['foo(1, [2])'], flatten(['foo(', t, ')']))
-        
+        self.assertEqual(['foo(1, [2])'], flatten(['foo(', [t], ')']))
+
         # This tests an array that can fit onto one line of its own.
         t = CommaList(
             [
@@ -44,7 +44,7 @@ class FormatterTests(unittest.TestCase):
                 "'long string 3', 'long string 4']",
              ')'
             ],
-            flatten(['self._succeed(', ['[', t, ']'], ')'])
+            flatten(['self._succeed(', ['[', [t], ']'], ')'])
         )
 
         # This tests an array that needs to span multiple lines.
@@ -67,8 +67,8 @@ class FormatterTests(unittest.TestCase):
                 '    self._long_rule_5,',
                 ')',
             ],
-            flatten(['foo(', t, ')'])
-        ) 
+            flatten(['foo(', [t], ')'])
+        )
 
     def test_commalist_repr(self):
         self.assertEqual("CommaList(['1', '2'])",
@@ -84,11 +84,50 @@ class FormatterTests(unittest.TestCase):
         )
         self.assertEqual([long_str], flatten([long_str]))
 
+    def test_mix(self):
+        lines = flatten(
+            [
+                'self._succeed(',
+                [
+                    'self.xtou(',
+                    [
+                        CommaList(
+                            [
+                                Tree(
+                                    "self._get('long_variable_1')",
+                                    '+',
+                                    Tree(
+                                        "self._get('long_variable_2')",
+                                        '+',
+                                        "self._get('long_variable_3')"
+                                    )
+                                )
+                            ]
+                        )
+                    ],
+                    ')',
+                ],
+                ')',
+            ]
+        )
+        self.assertEqual(
+            [
+                'self._succeed(',
+                '    self.xtou(',
+                "        self._get('long_variable_1')",
+                "        + self._get('long_variable_2')",
+                "        + self._get('long_variable_3'),",
+                '    )',
+                ')',
+            ],
+            lines
+        )
+
     def test_tree(self):
         t = Tree(['1'], '+', ['2'])
         self.assertEqual(['foo(1 + 2)'], flatten(['foo(', t, ')']))
         t = Tree(
-            ["'long string 1'"], 
+            ["'long string 1'"],
             '+',
             Tree(
                 ["'long string 2'"],
@@ -112,10 +151,11 @@ class FormatterTests(unittest.TestCase):
                 "    + 'long string5'",
                 ')'
             ],
-            flatten(['foo(', t, ')'])
+            flatten(['foo(', [t], ')'])
         )
 
     def test_tree_repr(self):
-        self.assertEqual('Tree(1 + 2)',
-                         repr(Tree(['1'], '+', ['2'])))
-
+        self.assertEqual("Tree('1', '+', '2')",
+                         repr(Tree('1', '+', '2')))
+        self.assertEqual("Tree('1', '+', Tree('2', '+', '3'))",
+                         repr(Tree('1', '+', Tree('2', '+', '3'))))

@@ -199,7 +199,7 @@ class Compiler:
         return False
 
     def _gen_method_call(self, name, args):
-        return flatten([f'self._{name}(', ['[', CommaList(args), ']'], ')'])
+        return flatten([f'self._{name}(', ['[', [CommaList(args)], ']'], ')'])
 
     #
     # Handlers for each non-host node in the glop AST follow.
@@ -356,9 +356,11 @@ class Compiler:
     #
     def _ll_arr_(self, node):
         args = []
+        if len(node[2]) == 0:
+            return ['[]']
         for n in node[2]:
             args.append(self._eval(n))
-        return ['[', CommaList(args), ']']
+        return ['[', [CommaList(args)], ']']
 
     def _ll_call_(self, node):
         # There are no built-in functions that take no arguments, so make
@@ -366,8 +368,8 @@ class Compiler:
         assert len(node[2]) != 0
         args = []
         for n in node[2]:
-            args.append(self._eval(n))
-        return ['(', CommaList(args), ')']
+            args += self._eval(n)
+        return ['(', [CommaList(args)], ')']
 
     def _ll_getitem_(self, node):
         return ['[', self._eval(node[2][0]), ']']
@@ -391,11 +393,17 @@ class Compiler:
         if node[2][1][0] == 'll_call':
             self._needed.add(node[2][0][1])
             v = ['self._%s' % node[2][0][1]]
+            call = True
         else:
             v = self._eval(node[2][0])
+            call = False
         for p in node[2][1:]:
             x = self._eval(p)
-            v += x
+            if call:
+                v[0] += x[0]
+                v += x[1:]
+            else:
+                v += x
         return v
 
     def _ll_var_(self, node):

@@ -43,6 +43,10 @@ Changelog = "https://github.com/dpranke/floyd-python/blob/master/README.md"
 [project.scripts]
 floyd = "floyd.tool:main"
 
+[tool.black]
+line-length = 79
+skip-string-normalization = true
+
 [tool.ruff]
 include = [ "run", "*/*.py" ]
 line-length = 79
