@@ -263,18 +263,23 @@ class Interpreter:
         self._succeed(v1 + v2)
 
     def _handle_ll_qual(self, node):
+        # TODO: is it possible for this to fail?
         self._interpret(node[2][0])
         assert not self.failed
-        lhs = self.val
-        self._interpret(node[2][1])
-        assert not self.failed
-        op, rhs = self.val
-        if op == 'll_getitem':
-            self.val = lhs[rhs]
-        else:
-            assert op == 'll_call'
-            fn = getattr(self, '_builtin_fn_' + lhs)
-            self.val = fn(*rhs)
+        for n in node[2][1:]:
+            lhs = self.val
+            # TODO: is it possible for this to fail?
+            self._interpret(n)
+            assert not self.failed
+            op, rhs = self.val
+            if op == 'll_getitem':
+                self.val = lhs[rhs]
+            else:
+                assert op == 'll_call'
+                # Note that unknown functions were caught during analysis
+                # so it's safe to dereference this without checking.
+                fn = getattr(self, '_builtin_fn_' + lhs, None)
+                self.val = fn(*rhs)
 
     def _handle_ll_lit(self, node):
         self._succeed(node[1])

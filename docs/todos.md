@@ -51,6 +51,3 @@
 * analyzer.py: Figure out if it is possible to mix operator expressions and
   left-recursive expressions so that we trip the unexpected AST node
   assertion in _check_lr
-
-* Figure out how to format longer series of quals. See `test_quals` in
-  grammar_test for the commented-out test that fails.

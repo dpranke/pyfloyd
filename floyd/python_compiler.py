@@ -28,14 +28,14 @@ class Compiler:
     def __init__(self, grammar, classname, main_wanted=True, memoize=True):
         self._grammar = grammar
         self._classname = classname
-        self._depth = 0
+        self._builtins = self._load_builtins()
+        self._exception_needed = False
         self._main_wanted = main_wanted
         self._memoize = memoize
         self._methods = {}
         self._method_lines = []
-        self._exception_needed = False
-        self._unicodedata_needed = False
         self._operators = {}
+        self._unicodedata_needed = False
 
         # These methods are always needed.
         self._needed = set(
@@ -161,8 +161,9 @@ class Compiler:
 
         text += '\n'
 
-        builtins = self._load_builtins()
-        text += '\n'.join(builtins[name] for name in sorted(self._needed))
+        text += '\n'.join(
+            self._builtins[name] for name in sorted(self._needed)
+        )
         return text
 
     def _gen_method_text(self, method_name, method_body, memoize):
@@ -389,19 +390,28 @@ class Compiler:
         return Tree(self._eval(node[2][0]), '+', self._eval(node[2][1]))
 
     def _ll_qual_(self, node):
-        if node[2][1][0] == 'll_call':
-            self._needed.add(node[2][0][1])
-            start = f'self._{node[2][0][1]}('
-            mid = Comma([self._eval(arg) for arg in node[2][1][2]])
-            end = ')'
-            return Saw(start, mid, end)
-        # TODO: Figure out how to handle longer series of quals. See
-        # grammar_test.test_quals. See also comment above about _ll_call_.
-        assert node[2][0][0] in ('ll_var', 'll_arr')
-        start = ''
-        mid = self._eval(node[2][0])
-        end = self._eval(node[2][1])
-        return Saw(start, mid, end)
+        if node[2][0][0] == 'll_var':
+            if node[2][1][0] == 'll_call':
+                fn = node[2][0][1]
+                self._needed.add(fn)
+                # Note that unknown functions were caught during analysis
+                # so we don't have to worry about that here.
+                start = f'self._{fn}'
+            else:
+                start = self._eval(node[2][0])
+            saw = self._eval(node[2][1])
+            saw.start = start + saw.start
+            i = 2
+        else:
+            saw = self._eval(node[2][0])
+            i = 1
+        next_saw = saw
+        for n in node[2][i:]:
+            new_saw = self._eval(n)
+            new_saw.start = next_saw.end + new_saw.start
+            next_saw.end = new_saw
+            next_saw = new_saw
+        return saw
 
     def _ll_var_(self, node):
         return "self._get('%s')" % node[1]
