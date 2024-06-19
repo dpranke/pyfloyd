@@ -13,13 +13,16 @@
 # limitations under the License.
 
 
-def flatten(obj):
-    "Flatten an object into a list of 1 or more strings"
+def flatten(obj, max_length=72, indent='    '):
+    """Flatten an object into a list of 1 or more strings.
+
+    Each string must be shorter than `max_length` characters, if possible.
+    """
     depth = 0
     last_num_lines = 0
     while True:
-        lines = fmt(obj, 0, depth)
-        if all(len(line) <= 72 for line in lines):
+        lines = fmt(obj, 0, depth, indent)
+        if all(len(line) <= max_length for line in lines):
             return lines
         num_lines = len(lines)
         if num_lines == last_num_lines:
@@ -30,49 +33,61 @@ def flatten(obj):
     return lines
 
 
-def fmt(obj, current_depth, max_depth):
-    if isinstance(obj, Formatter):
-        return obj.fmt(current_depth, max_depth)
+def fmt(obj, current_depth, max_depth, indent):
     if isinstance(obj, str):
         return [obj]
-    assert isinstance(obj, list)
-    if current_depth == max_depth:
-        return _fmt_on_one_line(obj, current_depth, max_depth)
-    return _fmt_on_multiple_lines(obj, current_depth, max_depth)
-
-
-def _fmt_on_one_line(obj, current_depth, max_depth):
-    s = ''
-    for el in obj:
-        if isinstance(el, str):
-            s += el
-        elif isinstance(el, Formatter):
-            s += el.fmt(current_depth, max_depth)[0]
-        else:
-            s += fmt(el, current_depth, max_depth)[0]
-    return [s]
-
-
-def _fmt_on_multiple_lines(obj, current_depth, max_depth):
-    lines = []
-    for el in obj:
-        if isinstance(el, str):
-            lines.append(el)
-        elif isinstance(el, Formatter):
-            lines += el.fmt(current_depth, max_depth)
-        else:
-            for line in fmt(el, current_depth + 1, max_depth):
-                lines.append('    ' + line)
-    return lines
+    return obj.fmt(current_depth, max_depth, indent)
 
 
 class Formatter:
-    def fmt(self, current_depth, max_depth):
+    def fmt(self, current_depth, max_depth, indent):
         """Returns a list of strings, each representing a line."""
         raise NotImplementedError  # pragma: no cover
 
 
-class CommaList(Formatter):
+class Saw(Formatter):
+    """Formats series of calls and lists as a saw-shaped pattern.
+
+    Expressions of the form `foo(x)`, `[4]`, and `foo(x)[4]` can be called
+    saw-shaped, as when the arguments are long, the rest can be a series
+    of alternating lines and indented regions, e.g.
+
+    ```
+    foo(
+        x
+    )[
+        4
+    ]
+
+    where the unindented parts are all on a single line and the indented
+    parts may be on one or more lines.
+    """
+
+    def __init__(self, start, mid, end):
+        self.start = start
+        self.mid = mid
+        self.end = end
+
+    def __repr__(self):
+        return f'Saw({repr(self.start)}, {repr(self.mid)}, {repr(self.end)})'
+
+    def fmt(self, current_depth, max_depth, indent):
+        if current_depth == max_depth:
+            s = (
+                fmt(self.start, current_depth, max_depth, indent)[0]
+                + fmt(self.mid, current_depth, max_depth, indent)[0]
+                + fmt(self.end, current_depth, max_depth, indent)[0]
+            )
+            return [s]
+        lines = [self.start]
+        for l in fmt(self.mid, current_depth + 1, max_depth, indent):
+            lines.append(indent + l)
+        for l in fmt(self.end, current_depth, max_depth, indent):
+            lines.append(l)
+        return lines
+
+
+class Comma(Formatter):
     """Format a comma-separated list of arguments.
 
     If we need to format a list of arguments across multiple lines, we
@@ -85,18 +100,17 @@ class CommaList(Formatter):
         self.args = list(args)
 
     def __repr__(self):
-        return 'CommaList(' + repr(self.args) + ')'
+        return 'Comma(' + repr(self.args) + ')'
 
-    def fmt(self, current_depth, max_depth):
+    def fmt(self, current_depth, max_depth, indent):
         if current_depth == max_depth:
-            return [
-                ', '.join(
-                    fmt(arg, current_depth, max_depth)[0] for arg in self.args
-                )
-            ]
+            s = fmt(self.args[0], current_depth, max_depth, indent)[0]
+            for arg in self.args[1:]:
+                s += ', ' + fmt(arg, current_depth, max_depth, indent)[0]
+            return [s]
         lines = []
         for arg in self.args:
-            arg_lines = fmt(arg, current_depth, max_depth)
+            arg_lines = fmt(arg, current_depth, max_depth, indent)
             lines += arg_lines
             lines[-1] += ','
         return lines
@@ -125,14 +139,14 @@ class Tree(Formatter):
             repr(self.right),
         )
 
-    def fmt(self, current_depth, max_depth):
+    def fmt(self, current_depth, max_depth, indent):
         if current_depth == max_depth:
-            s = fmt(self.left, current_depth, max_depth)[0]
+            s = fmt(self.left, current_depth, max_depth, indent)[0]
             s += ' ' + self.op + ' '
-            s += fmt(self.right, current_depth, max_depth)[0]
+            s += fmt(self.right, current_depth, max_depth, indent)[0]
             return [s]
-        lines = fmt(self.left, current_depth, max_depth)
-        right = fmt(self.right, current_depth, max_depth)
+        lines = fmt(self.left, current_depth, max_depth, indent)
+        right = fmt(self.right, current_depth, max_depth, indent)
         lines.append(self.op + ' ' + right[0])
         if right[1:]:
             lines += right[1:]

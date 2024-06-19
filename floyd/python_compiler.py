@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from floyd.formatter import flatten, CommaList, Tree
+from floyd.formatter import flatten, Comma, Saw, Tree
 from floyd import python_templates as py
 from floyd import string_literal
 
@@ -199,7 +199,7 @@ class Compiler:
         return False
 
     def _gen_method_call(self, name, args):
-        return flatten([f'self._{name}(', ['[', [CommaList(args)], ']'], ')'])
+        return flatten(Saw(f'self._{name}(', Saw('[', Comma(args), ']'), ')'))
 
     #
     # Handlers for each non-host node in the glop AST follow.
@@ -207,7 +207,11 @@ class Compiler:
 
     def _action_(self, rule, node):
         obj = self._eval(node[2][0])
-        self._methods[rule] = flatten(['self._succeed(', obj, ')'])
+        try:
+            self._methods[rule] = flatten(Saw('self._succeed(', obj, ')'))
+        except Exception as e:
+            import pdb; pdb.set_trace()
+            pass
 
     def _apply_(self, rule, node):
         # Unknown rules were caught in analysis so if the rule isn't
@@ -333,11 +337,11 @@ class Compiler:
 
     def _seq_(self, rule, node):
         self._needed.add('seq')
-        args = [f'self._{rule}_s{i}_' for i, _ in enumerate(node[2])]
         needs_scope = self._has_labels(node)
         lines = []
         if needs_scope:
             lines.append(f"self._push('{rule}')")
+        args = [f'self._{rule}_s{i}_' for i, _ in enumerate(node[2])]
         lines += self._gen_method_call('seq', args)
         if needs_scope:
             lines.append(f"self._pop('{rule}')")
@@ -356,68 +360,60 @@ class Compiler:
     # Handlers for the host nodes in the AST
     #
     def _ll_arr_(self, node):
-        args = []
         if len(node[2]) == 0:
-            return ['[]']
-        for n in node[2]:
-            args.append(self._eval(n))
-        return ['[', [CommaList(args)], ']']
+            return '[]'
+        args = [self._eval(n) for n in node[2]]
+        return Saw('[', Comma(args), ']')
 
     def _ll_call_(self, node):
         # There are no built-in functions that take no arguments, so make
         # sure we're not being called that way.
         assert len(node[2]) != 0
-        args = []
-        for n in node[2]:
-            args += self._eval(n)
-        return ['(', [CommaList(args)], ')']
+        args = [self._eval(n) for n in node[2]]
+        return Saw('(', Comma(args), ')')
 
     def _ll_getitem_(self, node):
-        return ['[', self._eval(node[2][0]), ']']
+        return Saw('[', self._eval(node[2][0]), ']')
 
     def _ll_lit_(self, node):
-        return [string_literal.encode(node[1])]
+        return string_literal.encode(node[1])
 
     def _ll_minus_(self, node):
-        return [Tree(self._eval(node[2][0]), '-', self._eval(node[2][1]))]
+        return Tree(self._eval(node[2][0]), '-', self._eval(node[2][1]))
 
     def _ll_num_(self, node):
-        return [node[1]]
+        return node[1]
 
     def _ll_paren_(self, node):
         return self._eval(node[2][0])
 
     def _ll_plus_(self, node):
-        return [Tree(self._eval(node[2][0]), '+', self._eval(node[2][1]))]
+        return Tree(self._eval(node[2][0]), '+', self._eval(node[2][1]))
 
     def _ll_qual_(self, node):
         if node[2][1][0] == 'll_call':
             self._needed.add(node[2][0][1])
-            v = ['self._%s' % node[2][0][1]]
-            call = True
-        else:
-            v = self._eval(node[2][0])
-            call = False
-        for p in node[2][1:]:
-            x = self._eval(p)
-            if call:
-                v[0] += x[0]
-                v += x[1:]
-            else:
-                v += x
-        return v
+            start = f'self._{node[2][0][1]}('
+            mid = Comma([self._eval(arg) for arg in node[2][1][2]])
+            end = ')'
+            return Saw(start, mid, end)
+        assert(node[2][0][0] in('ll_var', 'll_arr'))
+        start = ''
+        mid = self._eval(node[2][0])
+        end = self._eval(node[2][1])
+        return Saw(start, mid, end)
 
     def _ll_var_(self, node):
-        return ["self._get('%s')" % node[1]]
+        return "self._get('%s')" % node[1]
 
     def _ll_const_(self, node):
         if node[1] == 'false':
-            return ['False']
+            return 'False'
         if node[1] == 'null':
-            return ['None']
+            return 'None'
         if node[1] == 'true':
-            return ['True']
+            return 'True'
         if node[1] == 'Infinity':
-            return ["float('inf')"]
+            return "float('inf')"
         assert node[1] == 'NaN'
-        return ["float('NaN')"]
+        return "float('NaN')"
