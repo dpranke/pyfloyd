@@ -76,8 +76,8 @@ class GrammarTestsMixin:
         )
 
     def test_quals(self):
-        self.check("g = -> utoi(' ')", text='', out=32) 
-        self.check("g = 'x'*:l -> l[0]", text ='xx', out='x')
+        self.check("g = -> utoi(' ')", text='', out=32)
+        self.check("g = 'x'*:l -> l[0]", text='xx', out='x')
         self.check("g = -> ['a', 'b'][1]", text='', out='b')
 
         # TODO: get this to work w/ both interpreter and compiler

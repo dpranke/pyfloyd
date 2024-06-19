@@ -80,10 +80,10 @@ class Saw(Formatter):
             )
             return [s]
         lines = [self.start]
-        for l in fmt(self.mid, current_depth + 1, max_depth, indent):
-            lines.append(indent + l)
-        for l in fmt(self.end, current_depth, max_depth, indent):
-            lines.append(l)
+        for line in fmt(self.mid, current_depth + 1, max_depth, indent):
+            lines.append(indent + line)
+        for line in fmt(self.end, current_depth, max_depth, indent):
+            lines.append(line)
         return lines
 
 

@@ -65,9 +65,9 @@ class FormatterTests(unittest.TestCase):
 
     def test_mix(self):
         lines = flatten(
-            Saw( 
+            Saw(
                 'self._succeed(',
-                Saw( 
+                Saw(
                     'self.xtou(',
                     Comma(
                         [
@@ -103,19 +103,21 @@ class FormatterTests(unittest.TestCase):
     def test_saw(self):
         t = Saw('foo(', "'bar'", ')')
         self.assertEqual(["foo('bar')"], flatten(t))
-        
+
         t = Saw('foo(', "'bar'", Saw(')(', "'baz'", ')'))
         self.assertEqual(["foo('bar')('baz')"], flatten(t))
 
         # test that the right length of args can fit on a line by itself.
         t = Saw(
             'foo(',
-            Comma([
-                'self._long_rule_1',
-                'self._long_rule_2',
-                'self._long_rule_3',
-                'self._long_',
-            ]),
+            Comma(
+                [
+                    'self._long_rule_1',
+                    'self._long_rule_2',
+                    'self._long_rule_3',
+                    'self._long_',
+                ]
+            ),
             ')',
         )
         self.assertEqual(
@@ -123,21 +125,24 @@ class FormatterTests(unittest.TestCase):
                 'foo(',
                 '    self._long_rule_1, self._long_rule_2, self._long_rule_3, '
                 'self._long_',
-                ')'
+                ')',
             ],
-            flatten(t)
+            flatten(t),
         )
         t = Saw(
             'foo(',
-            Comma([
-                'self._long_rule_1',
-                'self._long_rule_2',
-                'self._long_rule_3',
-                'self._long_rule_4',
-                'self._long_rule_5',
-                'self._long_rule_6',
-            ]),
-            ')')
+            Comma(
+                [
+                    'self._long_rule_1',
+                    'self._long_rule_2',
+                    'self._long_rule_3',
+                    'self._long_rule_4',
+                    'self._long_rule_5',
+                    'self._long_rule_6',
+                ]
+            ),
+            ')',
+        )
         self.assertEqual(
             [
                 'foo(',
@@ -149,7 +154,8 @@ class FormatterTests(unittest.TestCase):
                 '    self._long_rule_6,',
                 ')',
             ],
-            flatten(t))
+            flatten(t),
+        )
 
         t2 = Saw(')[', '4', ']')
         t.end = t2
@@ -166,7 +172,7 @@ class FormatterTests(unittest.TestCase):
                 '    4',
                 ']',
             ],
-            flatten(t)
+            flatten(t),
         )
 
     def test_tree(self):

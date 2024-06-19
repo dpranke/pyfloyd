@@ -207,11 +207,7 @@ class Compiler:
 
     def _action_(self, rule, node):
         obj = self._eval(node[2][0])
-        try:
-            self._methods[rule] = flatten(Saw('self._succeed(', obj, ')'))
-        except Exception as e:
-            import pdb; pdb.set_trace()
-            pass
+        self._methods[rule] = flatten(Saw('self._succeed(', obj, ')'))
 
     def _apply_(self, rule, node):
         # Unknown rules were caught in analysis so if the rule isn't
@@ -368,6 +364,8 @@ class Compiler:
     def _ll_call_(self, node):
         # There are no built-in functions that take no arguments, so make
         # sure we're not being called that way.
+        # TODO: Figure out if we need this routine or not when we also
+        # fix the quals.
         assert len(node[2]) != 0
         args = [self._eval(n) for n in node[2]]
         return Saw('(', Comma(args), ')')
@@ -397,7 +395,9 @@ class Compiler:
             mid = Comma([self._eval(arg) for arg in node[2][1][2]])
             end = ')'
             return Saw(start, mid, end)
-        assert(node[2][0][0] in('ll_var', 'll_arr'))
+        # TODO: Figure out how to handle longer series of quals. See
+        # grammar_test.test_quals. See also comment above about _ll_call_.
+        assert node[2][0][0] in ('ll_var', 'll_arr')
         start = ''
         mid = self._eval(node[2][0])
         end = self._eval(node[2][1])
