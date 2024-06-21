@@ -305,7 +305,7 @@ class Compiler:
             method = 'star'
         self._needed.add(method)
         if self._can_inline(node[2][0]):
-            txt = self._inline(node[2][0])
+            txt = self._inline(node[2][0], sub_rule)
             self._methods[rule] = [f'self._{method}({txt})']
         else:
             self._methods[rule] = [f'self._{method}(self._{sub_rule}_)']
@@ -360,32 +360,37 @@ class Compiler:
         sub_rules = []
         i = 0
         for child in children:
+            sub_rule = f'{rule}_{sub_rule_type}{i}'
             if self._can_inline(child):
-                args.append(self._inline(child))
+                args.append(self._inline(child, sub_rule))
             else:
-                sub_rule = f'{rule}_{sub_rule_type}{i}'
                 args.append(f'self._{sub_rule}_')
                 sub_rules.append((sub_rule, child))
                 i += 1
         return args, sub_rules
 
     def _can_inline(self, node):
-        if node[0] in ('lit', 'apply'):
+        if node[0] in ('apply', 'lit', 'paren'):
             return True
         if node[0] == 'seq' and len(node[2]) == 1:
             return True
-        if node[0] == 'post' and node[2][0][0] in ('lit', 'apply'):
+        if node[0] == 'post' and self._can_inline(node[2][0]):
             return True
         return False
 
-    def _inline(self, node):
+    def _inline(self, node, rule):
         if node[0] == 'apply':
             if node[1] not in self._grammar.rules:
                 self._needed.add(node[1])
             return f'self._{node[1]}_'
-        self._compile(node, 'tmp')
-        txt = self._methods['tmp'][0]
-        del self._methods['tmp']
+        if node[0] == 'seq' and len(node[2]) == 1 and  node[2][0][0] == 'apply':
+            if node[2][0][1] not in self._grammar.rules:
+                self._needed.add(node[2][0][1])
+            return f'self._{node[2][0][1]}_'
+        sub_rule = f'{rule}_t'
+        self._compile(node, sub_rule)
+        txt = self._methods[sub_rule][0]
+        del self._methods[sub_rule]
         return 'lambda: ' + txt
 
     #
