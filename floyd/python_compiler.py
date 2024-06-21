@@ -14,7 +14,7 @@
 
 from floyd.formatter import flatten, Comma, Saw, Tree
 from floyd import python_templates as py
-from floyd import string_literal
+from floyd import string_literal as lit
 
 
 class _CompilerOperatorState:
@@ -49,6 +49,7 @@ class Compiler:
         )
 
     def compile(self):
+        # import pdb; pdb.set_trace()
         for rule, node in self._grammar.rules.items():
             self._compile(node, rule)
 
@@ -219,10 +220,10 @@ class Compiler:
 
     def _choice_(self, rule, node):
         self._needed.add('choose')
-        args = [f'self._{rule}_c{i}_' for i, _ in enumerate(node[2])]
+        args, sub_rules = self._inline_args(rule, 'c', node[2])
         self._methods[rule] = self._gen_method_call('choose', args)
-        for i, sub_node in enumerate(node[2]):
-            self._compile(sub_node, f'{rule}_c{i}')
+        for sub_rule, sub_node in sub_rules:
+            self._compile(sub_node, sub_rule)
 
     def _empty_(self, rule, node):
         del node
@@ -233,7 +234,7 @@ class Compiler:
         sub_rule = rule + '_l'
         self._methods[rule] = [
             'self._bind(self._%s_, %s)'
-            % (sub_rule, string_literal.encode(node[1]))
+            % (sub_rule, lit.encode(node[1]))
         ]
         self._compile(node[2][0], sub_rule)
 
@@ -255,7 +256,7 @@ class Compiler:
         self._compile(node[2][0], sub_rule)
 
     def _lit_(self, rule, node):
-        expr = string_literal.encode(node[1])
+        expr = lit.encode(node[1])
         if len(node[1]) == 1:
             method = 'ch'
         else:
@@ -303,8 +304,12 @@ class Compiler:
             assert node[1] == '*'
             method = 'star'
         self._needed.add(method)
-        self._methods[rule] = [f'self._{method}(self._{sub_rule}_)']
-        self._compile(node[2][0], sub_rule)
+        if self._can_inline(node[2][0]):
+            txt = self._inline(node[2][0])
+            self._methods[rule] = [f'self._{method}({txt})']
+        else:
+            self._methods[rule] = [f'self._{method}(self._{sub_rule}_)']
+            self._compile(node[2][0], sub_rule)
 
     def _pred_(self, rule, node):
         obj = self._eval(node[2][0])
@@ -326,10 +331,7 @@ class Compiler:
         self._needed.add('range')
         self._methods[rule] = [
             'self._range(%s, %s)'
-            % (
-                string_literal.encode(node[2][0][1]),
-                string_literal.encode(node[2][1][1]),
-            )
+            % (lit.encode(node[2][0][1]), lit.encode(node[2][1][1]))
         ]
 
     def _seq_(self, rule, node):
@@ -338,20 +340,53 @@ class Compiler:
         lines = []
         if needs_scope:
             lines.append(f"self._push('{rule}')")
-        args = [f'self._{rule}_s{i}_' for i, _ in enumerate(node[2])]
+        args, sub_rules = self._inline_args(rule, 's', node[2])
         lines += self._gen_method_call('seq', args)
         if needs_scope:
             lines.append(f"self._pop('{rule}')")
         self._methods[rule] = lines
-        for i, sub_node in enumerate(node[2]):
-            self._compile(sub_node, f'{rule}_s{i}')
+        for sub_rule, sub_node in sub_rules:
+            self._compile(sub_node, sub_rule)
 
     def _unicat_(self, rule, node):
         self._unicodedata_needed = True
         self._needed.add('unicat')
         self._methods[rule] = [
-            'self._unicat(%s)' % string_literal.encode(node[1])
+            'self._unicat(%s)' % lit.encode(node[1])
         ]
+
+    def _inline_args(self, rule, sub_rule_type, children):
+        args = []
+        sub_rules = []
+        i = 0
+        for child in children:
+            if self._can_inline(child):
+                args.append(self._inline(child))
+            else:
+                sub_rule = f'{rule}_{sub_rule_type}{i}'
+                args.append(f'self._{sub_rule}_')
+                sub_rules.append((sub_rule, child))
+                i += 1
+        return args, sub_rules
+
+    def _can_inline(self, node):
+        if node[0] in ('lit', 'apply'):
+            return True
+        if node[0] == 'seq' and len(node[2]) == 1:
+            return True
+        if node[0] == 'post' and node[2][0][0] in ('lit', 'apply'):
+            return True
+        return False
+
+    def _inline(self, node):
+        if node[0] == 'apply':
+            if node[1] not in self._grammar.rules:
+                self._needed.add(node[1])
+            return f'self._{node[1]}_'
+        self._compile(node, 'tmp')
+        txt = self._methods['tmp'][0]
+        del self._methods['tmp']
+        return 'lambda: ' + txt
 
     #
     # Handlers for the host nodes in the AST
@@ -375,7 +410,7 @@ class Compiler:
         return Saw('[', self._eval(node[2][0]), ']')
 
     def _ll_lit_(self, node):
-        return string_literal.encode(node[1])
+        return lit.encode(node[1])
 
     def _ll_minus_(self, node):
         return Tree(self._eval(node[2][0]), '-', self._eval(node[2][1]))
