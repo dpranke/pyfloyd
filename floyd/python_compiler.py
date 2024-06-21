@@ -232,11 +232,17 @@ class Compiler:
     def _label_(self, rule, node):
         self._needed.add('bind')
         sub_rule = rule + '_l'
-        self._methods[rule] = [
-            'self._bind(self._%s_, %s)'
-            % (sub_rule, lit.encode(node[1]))
-        ]
-        self._compile(node[2][0], sub_rule)
+        if self._can_inline(node[2][0]):
+            txt = self._inline(node[2][0], sub_rule)
+            self._methods[rule] = [
+                f'self._bind({txt}, {lit.encode(node[1])})'
+            ]
+        else:
+            self._methods[rule] = [
+                'self._bind(self._%s_, %s)'
+                % (sub_rule, lit.encode(node[1]))
+            ]
+            self._compile(node[2][0], sub_rule)
 
     def _leftrec_(self, rule, node):
         sub_rule = 'rule' + '_l'
@@ -268,8 +274,12 @@ class Compiler:
     def _not_(self, rule, node):
         self._needed.add('not')
         sub_rule = rule + '_n'
-        self._methods[rule] = [f'self._not(self._{sub_rule}_)']
-        self._compile(node[2][0], sub_rule)
+        if self._can_inline(node[2][0]):
+            txt = self._inline(node[2][0], sub_rule)
+            self._methods[rule] = [f'self._not({txt})']
+        else:
+            self._methods[rule] = [f'self._not(self._{sub_rule}_)']
+            self._compile(node[2][0], sub_rule)
 
     def _operator_(self, rule, node):
         self._needed.add('operator')
@@ -372,9 +382,11 @@ class Compiler:
     def _can_inline(self, node):
         if node[0] in ('apply', 'lit', 'paren'):
             return True
+        if node[0] == 'label' and node[2][0][0] == 'apply':
+            return True
         if node[0] == 'seq' and len(node[2]) == 1:
             return True
-        if node[0] == 'post' and self._can_inline(node[2][0]):
+        if node[0] in ('not', 'post') and self._can_inline(node[2][0]):
             return True
         return False
 
