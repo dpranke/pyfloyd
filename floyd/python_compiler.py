@@ -18,6 +18,9 @@ from floyd.formatter import flatten, Comma, Saw, Tree
 from floyd import python_templates as py
 from floyd import string_literal as lit
 
+# This is used to optimize inlined methods, see _inline().
+METHOD_RE = re.compile(r'(self\._[_a-z0-9]*_)\(\)')
+
 
 class _CompilerOperatorState:
     def __init__(self):
@@ -401,10 +404,6 @@ class Compiler:
         return False
 
     def _inline(self, node, rule):
-        if node[0] == 'apply':
-            if node[1] not in self._grammar.rules:
-                self._needed.add(node[1])
-            return f'self._{node[1]}_'
         if node[0] == 'seq' and len(node[2]) == 1 and  node[2][0][0] == 'apply':
             if node[2][0][1] not in self._grammar.rules:
                 self._needed.add(node[2][0][1])
@@ -417,7 +416,7 @@ class Compiler:
         # If a node compiled down to just invoking a rule, we can
         # return the name of the method instead of a lambda function
         # that invokes the method.
-        m = re.match(r'(self\._[_a-z0-9]*_)\(\)', txt)
+        m = METHOD_RE.match(txt)
         if m:
             return m.group(1)
         return 'lambda: ' + txt
