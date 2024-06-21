@@ -49,8 +49,10 @@ class GrammarTestsMixin:
 
     def checkp(self, parser, text, out=None, err=None):
         actual_out, actual_err, _ = parser.parse(text)
-        self.assertEqual(out, actual_out)
+        # Test err before out because it's probably more helpful to display
+        # an unexpected error than it is to display an unexpected output.
         self.assertEqual(err, actual_err)
+        self.assertEqual(out, actual_out)
 
     def check_grammar_error(self, grammar, err):
         p, p_err, _ = self.compile(grammar)
@@ -309,6 +311,15 @@ class GrammarTestsMixin:
 
     def test_hex_digits_in_value(self):
         self.check('grammar = -> 0x20', text='', out=32)
+
+    def test_inline_parens(self):
+        # This is a regression test for a subtle bug found when working
+        # on the inlining code in the compiler; the method for the second
+        # choice was overwriting the method for the first choice.
+        self.check("""
+            g  = (sp '*') | (sp '+')
+            sp = ' '
+            """, text=' *', out='*')
 
     def test_itou(self):
         self.check('grammar = -> itou(97)', text='', out='a')

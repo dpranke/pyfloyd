@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
+
 from floyd.formatter import flatten, Comma, Saw, Tree
 from floyd import python_templates as py
 from floyd import string_literal as lit
@@ -376,7 +378,12 @@ class Compiler:
             else:
                 args.append(f'self._{sub_rule}_')
                 sub_rules.append((sub_rule, child))
-                i += 1
+            # Even if the sub_rule is being inlined, the name might be
+            # used as a prefix for inner expressions that aren't inlined.
+            # Thus we need to increment i regardless of whether the outer
+            # expression was inlined, in order to guarantee that the inner
+            # rules get unique names.
+            i += 1
         return args, sub_rules
 
     def _can_inline(self, node):
@@ -406,6 +413,13 @@ class Compiler:
         self._compile(node, sub_rule)
         txt = self._methods[sub_rule][0]
         del self._methods[sub_rule]
+
+        # If a node compiled down to just invoking a rule, we can
+        # return the name of the method instead of a lambda function
+        # that invokes the method.
+        m = re.match(r'(self\._[_a-z0-9]*_)\(\)', txt)
+        if m:
+            return m.group(1)
         return 'lambda: ' + txt
 
     #
