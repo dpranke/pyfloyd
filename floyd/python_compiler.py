@@ -388,6 +388,9 @@ class Compiler:
             return True
         if node[0] in ('not', 'post') and self._can_inline(node[2][0]):
             return True
+        if (node[0] == 'action' and len(node[2]) == 1 and
+            node[2][0][0] in ('ll_lit', 'll_var')):
+            return True
         return False
 
     def _inline(self, node, rule):

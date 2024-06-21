@@ -230,13 +230,10 @@ class Parser:
                 lambda: self._not(self._eol_),
                 self._ws_,
                 lambda: self._bind(self._op_, 'o'),
-                self._pragma_c7_s0_l_t_p_t_g_s0_,
+                lambda: self._succeed(self._get('o')),
             ]
         )
         self._pop('pragma_c7_s0_l_t_p_t_g')
-
-    def _pragma_c7_s0_l_t_p_t_g_s0_(self):
-        self._succeed(self._get('o'))
 
     def _pragma_c7_s0_(self):
         self._bind(lambda: self._plus(lambda: self._pragma_c7_s0_l_t_p_t_g_()), 'os')
@@ -260,7 +257,7 @@ class Parser:
 
     def _dir_(self):
         self._push('dir')
-        self._seq([self._dir_s0_, self._dir_s1_])
+        self._seq([self._dir_s0_, lambda: self._succeed(self._get('d'))])
         self._pop('dir')
 
     def _dir_s0_l_t_g_(self):
@@ -269,12 +266,11 @@ class Parser:
     def _dir_s0_(self):
         self._bind(lambda: self._dir_s0_l_t_g_(), 'd')
 
-    def _dir_s1_(self):
-        self._succeed(self._get('d'))
-
     def _ident_list_(self):
         self._push('ident_list')
-        self._seq([self._ident_list_s0_, self._ident_list_s1_])
+        self._seq(
+            [self._ident_list_s0_, lambda: self._succeed(self._get('is'))]
+        )
         self._pop('ident_list')
 
     def _ident_list_s0_l_t_p_t_g_(self):
@@ -285,19 +281,13 @@ class Parser:
                 lambda: self._bind(self._ident_, 'i'),
                 self._sp_,
                 lambda: self._not(lambda: self._ch('=')),
-                self._ident_list_s0_l_t_p_t_g_s0_,
+                lambda: self._succeed(self._get('i')),
             ]
         )
         self._pop('ident_list_s0_l_t_p_t_g')
 
-    def _ident_list_s0_l_t_p_t_g_s0_(self):
-        self._succeed(self._get('i'))
-
     def _ident_list_s0_(self):
         self._bind(lambda: self._plus(lambda: self._ident_list_s0_l_t_p_t_g_()), 'is')
-
-    def _ident_list_s1_(self):
-        self._succeed(self._get('is'))
 
     def _rule_(self):
         self._push('rule')
@@ -479,21 +469,23 @@ class Parser:
 
     def _prim_expr_c1_(self):
         self._push('prim_expr_c1')
-        self._seq([lambda: self._bind(self._lit_, 'l'), self._prim_expr_c1_s0_])
+        self._seq(
+            [
+                lambda: self._bind(self._lit_, 'l'),
+                lambda: self._succeed(self._get('l')),
+            ]
+        )
         self._pop('prim_expr_c1')
-
-    def _prim_expr_c1_s0_(self):
-        self._succeed(self._get('l'))
 
     def _prim_expr_c2_(self):
         self._push('prim_expr_c2')
         self._seq(
-            [lambda: self._bind(self._escape_, 'e'), self._prim_expr_c2_s0_]
+            [
+                lambda: self._bind(self._escape_, 'e'),
+                lambda: self._succeed(self._get('e')),
+            ]
         )
         self._pop('prim_expr_c2')
-
-    def _prim_expr_c2_s0_(self):
-        self._succeed(self._get('e'))
 
     def _prim_expr_c3_s0_t_n_t_g_(self):
         self._seq([self._sp_, lambda: self._ch('=')])
@@ -647,13 +639,10 @@ class Parser:
             [
                 self._bslash_,
                 lambda: self._bind(self._esc_char_, 'c'),
-                self._sqchar_c0_s0_,
+                lambda: self._succeed(self._get('c')),
             ]
         )
         self._pop('sqchar_c0')
-
-    def _sqchar_c0_s0_(self):
-        self._succeed(self._get('c'))
 
     def _sqchar_c1_(self):
         self._push('sqchar_c1')
@@ -661,13 +650,10 @@ class Parser:
             [
                 lambda: self._not(self._squote_),
                 lambda: self._bind(self._any_, 'c'),
-                self._sqchar_c1_s0_,
+                lambda: self._succeed(self._get('c')),
             ]
         )
         self._pop('sqchar_c1')
-
-    def _sqchar_c1_s0_(self):
-        self._succeed(self._get('c'))
 
     def _dqchar_(self):
         self._choose([self._dqchar_c0_, self._dqchar_c1_])
@@ -678,13 +664,10 @@ class Parser:
             [
                 self._bslash_,
                 lambda: self._bind(self._esc_char_, 'c'),
-                self._dqchar_c0_s0_,
+                lambda: self._succeed(self._get('c')),
             ]
         )
         self._pop('dqchar_c0')
-
-    def _dqchar_c0_s0_(self):
-        self._succeed(self._get('c'))
 
     def _dqchar_c1_(self):
         self._push('dqchar_c1')
@@ -692,13 +675,10 @@ class Parser:
             [
                 lambda: self._not(self._dquote_),
                 lambda: self._bind(self._any_, 'c'),
-                self._dqchar_c1_s0_,
+                lambda: self._succeed(self._get('c')),
             ]
         )
         self._pop('dqchar_c1')
-
-    def _dqchar_c1_s0_(self):
-        self._succeed(self._get('c'))
 
     def _bslash_(self):
         self._ch('\\')
@@ -727,81 +707,51 @@ class Parser:
         )
 
     def _esc_char_c0_(self):
-        self._seq([lambda: self._ch('b'), self._esc_char_c0_s0_])
-
-    def _esc_char_c0_s0_(self):
-        self._succeed('\b')
+        self._seq([lambda: self._ch('b'), lambda: self._succeed('\b')])
 
     def _esc_char_c1_(self):
-        self._seq([lambda: self._ch('f'), self._esc_char_c1_s0_])
-
-    def _esc_char_c1_s0_(self):
-        self._succeed('\f')
+        self._seq([lambda: self._ch('f'), lambda: self._succeed('\f')])
 
     def _esc_char_c2_(self):
-        self._seq([lambda: self._ch('n'), self._esc_char_c2_s0_])
-
-    def _esc_char_c2_s0_(self):
-        self._succeed('\n')
+        self._seq([lambda: self._ch('n'), lambda: self._succeed('\n')])
 
     def _esc_char_c3_(self):
-        self._seq([lambda: self._ch('r'), self._esc_char_c3_s0_])
-
-    def _esc_char_c3_s0_(self):
-        self._succeed('\r')
+        self._seq([lambda: self._ch('r'), lambda: self._succeed('\r')])
 
     def _esc_char_c4_(self):
-        self._seq([lambda: self._ch('t'), self._esc_char_c4_s0_])
-
-    def _esc_char_c4_s0_(self):
-        self._succeed('\t')
+        self._seq([lambda: self._ch('t'), lambda: self._succeed('\t')])
 
     def _esc_char_c5_(self):
-        self._seq([lambda: self._ch('v'), self._esc_char_c5_s0_])
-
-    def _esc_char_c5_s0_(self):
-        self._succeed('\v')
+        self._seq([lambda: self._ch('v'), lambda: self._succeed('\v')])
 
     def _esc_char_c6_(self):
-        self._seq([self._squote_, self._esc_char_c6_s0_])
-
-    def _esc_char_c6_s0_(self):
-        self._succeed("'")
+        self._seq([self._squote_, lambda: self._succeed("'")])
 
     def _esc_char_c7_(self):
-        self._seq([self._dquote_, self._esc_char_c7_s0_])
-
-    def _esc_char_c7_s0_(self):
-        self._succeed('"')
+        self._seq([self._dquote_, lambda: self._succeed('"')])
 
     def _esc_char_c8_(self):
-        self._seq([self._bslash_, self._esc_char_c8_s0_])
-
-    def _esc_char_c8_s0_(self):
-        self._succeed('\\')
+        self._seq([self._bslash_, lambda: self._succeed('\\')])
 
     def _esc_char_c9_(self):
         self._push('esc_char_c9')
         self._seq(
-            [lambda: self._bind(self._hex_esc_, 'c'), self._esc_char_c9_s0_]
+            [
+                lambda: self._bind(self._hex_esc_, 'c'),
+                lambda: self._succeed(self._get('c')),
+            ]
         )
         self._pop('esc_char_c9')
-
-    def _esc_char_c9_s0_(self):
-        self._succeed(self._get('c'))
 
     def _esc_char_c10_(self):
         self._push('esc_char_c10')
         self._seq(
             [
                 lambda: self._bind(self._unicode_esc_, 'c'),
-                self._esc_char_c10_s0_,
+                lambda: self._succeed(self._get('c')),
             ]
         )
         self._pop('esc_char_c10')
-
-    def _esc_char_c10_s0_(self):
-        self._succeed(self._get('c'))
 
     def _hex_esc_(self):
         self._push('hex_esc')
