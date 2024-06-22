@@ -31,6 +31,8 @@ format the code. `./run --help` is your friend to find out more.
 
 ## Version History / Release Notes
 
+* v0.10.2 (2024-06-22)
+    * Update test to use 79 cols instead of 80.
 * v0.10.1 (2024-06-22)
     * Change formatter to default to 79 cols and regen/reformat.
 * v0.10.0 (2024-06-22)
