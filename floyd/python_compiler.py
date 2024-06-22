@@ -105,12 +105,7 @@ class Compiler:
             text += '        self.cache = {}\n'
         if 'bind' in self._needed:
             text += '        self.scopes = []\n'
-            self._needed.update(
-                {
-                    'get',
-                    'set',
-                }
-            )
+            self._needed.update({'get', 'set'})
         if 'leftrec' in self._needed or 'operator' in self._needed:
             text += '        self.seeds = {}\n'
         if 'leftrec' in self._needed:
