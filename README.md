@@ -31,6 +31,10 @@ format the code. `./run --help` is your friend to find out more.
 
 ## Version History / Release Notes
 
+* v0.10.0 (2024-06-22)
+    * Clean up compiler code, rework how inlining methods works. At this
+      point the compiler code is probably about as reasonably clean and
+      fast as the inlining approach can be.
 * v0.9.0 (2024-05-19)
     * get operator expressions working: you can now declare the precedence
       and associativity of different operators in an expression and they

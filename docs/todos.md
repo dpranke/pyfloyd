@@ -12,13 +12,6 @@
   when one will never be thrown). See where I had to add `# pragma: no cover`
   to get the code coverage of floyd/parser.py to 100%.
 
-* compiler.py: Figure out how to handle inlining methods more consistently
-  in _compile so that we don't have the special-casing logic here. Same
-  thing in analyzer.py rewrite_singles().
-
-* compiler.py: Figure out how to handle blank lines at the end of a method
-  better in _flatten().
-
 * printer_test.py: Improve printer algorithm so that two choices with
   actions are not printed on a single line (see test_actions).
 
