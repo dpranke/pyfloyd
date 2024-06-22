@@ -20,7 +20,9 @@ class Parser:
 
     def _grammar_(self):
         self._push('grammar')
-        self._seq([self._grammar_s0_, self._sp_, self._end_, self._grammar_s3_])
+        self._seq(
+            [self._grammar_s0_, self._sp_, self._end_, self._grammar_s3_]
+        )
         self._pop('grammar')
 
     def _grammar_s0_l_t_p_t_g_s1_t_g_(self):
@@ -857,7 +859,9 @@ class Parser:
         self._pop('ll_exprs_c0')
 
     def _ll_exprs_c0_s1_l_t_p_t_g_(self):
-        self._seq([self._sp_, lambda: self._ch(','), self._sp_, self._ll_expr_])
+        self._seq(
+            [self._sp_, lambda: self._ch(','), self._sp_, self._ll_expr_]
+        )
 
     def _ll_exprs_c0_s1_(self):
         self._bind(lambda: self._star(self._ll_exprs_c0_s1_l_t_p_t_g_), 'es')
@@ -1011,7 +1015,9 @@ class Parser:
 
     def _ll_prim_c5_(self):
         self._push('ll_prim_c5')
-        self._seq([lambda: self._bind(self._ident_, 'i'), self._ll_prim_c5_s1_])
+        self._seq(
+            [lambda: self._bind(self._ident_, 'i'), self._ll_prim_c5_s1_]
+        )
         self._pop('ll_prim_c5')
 
     def _ll_prim_c5_s1_(self):

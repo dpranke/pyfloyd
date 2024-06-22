@@ -321,10 +321,14 @@ class GrammarTestsMixin:
         # This is a regression test for a subtle bug found when working
         # on the inlining code in the compiler; the method for the second
         # choice was overwriting the method for the first choice.
-        self.check("""
+        self.check(
+            """
             g  = (sp '*') | (sp '+')
             sp = ' '
-            """, text=' *', out='*')
+            """,
+            text=' *',
+            out='*',
+        )
 
     def test_itou(self):
         self.check('grammar = -> itou(97)', text='', out='a')

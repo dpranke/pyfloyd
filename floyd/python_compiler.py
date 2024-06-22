@@ -233,8 +233,11 @@ class Compiler:
             return True
         if node[0] in ('not', 'post') and self._can_inline(node[2][0]):
             return True
-        if (node[0] == 'action' and len(node[2]) == 1 and
-            node[2][0][0] in ('ll_lit', 'll_var')):
+        if (
+            node[0] == 'action'
+            and len(node[2]) == 1
+            and node[2][0][0] in ('ll_lit', 'll_var')
+        ):
             return True
         return False
 
@@ -283,13 +286,10 @@ class Compiler:
         sub_rule = rule + '_l'
         if self._can_inline(node[2][0]):
             txt = self._inline(node[2][0], sub_rule)
-            self._methods[rule] = [
-                f'self._bind({txt}, {lit.encode(node[1])})'
-            ]
+            self._methods[rule] = [f'self._bind({txt}, {lit.encode(node[1])})']
         else:
             self._methods[rule] = [
-                'self._bind(self._%s_, %s)'
-                % (sub_rule, lit.encode(node[1]))
+                'self._bind(self._%s_, %s)' % (sub_rule, lit.encode(node[1]))
             ]
             self._compile(node[2][0], sub_rule)
 
@@ -409,9 +409,7 @@ class Compiler:
     def _unicat_(self, rule, node):
         self._unicodedata_needed = True
         self._needed.add('unicat')
-        self._methods[rule] = [
-            'self._unicat(%s)' % lit.encode(node[1])
-        ]
+        self._methods[rule] = ['self._unicat(%s)' % lit.encode(node[1])]
 
     #
     # Handlers for the host nodes in the AST
