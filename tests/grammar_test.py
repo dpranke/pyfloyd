@@ -312,6 +312,11 @@ class GrammarTestsMixin:
     def test_hex_digits_in_value(self):
         self.check('grammar = -> 0x20', text='', out=32)
 
+    def test_inline_seq(self):
+        # This checks that we correctly include the builtin `end` rule
+        # when it is part of a parenthesized choice.
+        self.check("g = ('foo'|end) -> true", text='', out=True)
+
     def test_inline_parens(self):
         # This is a regression test for a subtle bug found when working
         # on the inlining code in the compiler; the method for the second

@@ -208,6 +208,57 @@ class Compiler:
     def _gen_method_call(self, name, args):
         return flatten(Saw(f'self._{name}(', Saw('[', Comma(args), ']'), ')'))
 
+    def _inline_args(self, rule, sub_rule_type, children):
+        args = []
+        sub_rules = []
+        i = 0
+        for child in children:
+            sub_rule = f'{rule}_{sub_rule_type}{i}'
+            if self._can_inline(child):
+                args.append(self._inline(child, sub_rule))
+            else:
+                args.append(f'self._{sub_rule}_')
+                sub_rules.append((sub_rule, child))
+            # Even if the sub_rule is being inlined, the name might be
+            # used as a prefix for inner expressions that aren't inlined.
+            # Thus we need to increment i regardless of whether the outer
+            # expression was inlined, in order to guarantee that the inner
+            # rules get unique names.
+            i += 1
+        return args, sub_rules
+
+    def _can_inline(self, node):
+        if node[0] in ('apply', 'lit', 'paren'):
+            return True
+        if node[0] == 'label' and node[2][0][0] == 'apply':
+            return True
+        if node[0] == 'seq' and len(node[2]) == 1:
+            return True
+        if node[0] in ('not', 'post') and self._can_inline(node[2][0]):
+            return True
+        if (node[0] == 'action' and len(node[2]) == 1 and
+            node[2][0][0] in ('ll_lit', 'll_var')):
+            return True
+        return False
+
+    def _inline(self, node, rule):
+        if node[0] == 'seq' and len(node[2]) == 1 and  node[2][0][0] == 'apply':
+            if node[2][0][1] not in self._grammar.rules:
+                self._needed.add(node[2][0][1])
+            return f'self._{node[2][0][1]}_'
+        sub_rule = f'{rule}_t'
+        self._compile(node, sub_rule)
+        txt = self._methods[sub_rule][0]
+        del self._methods[sub_rule]
+
+        # If a node compiled down to just invoking a rule, we can
+        # return the name of the method instead of a lambda function
+        # that invokes the method.
+        m = METHOD_RE.match(txt)
+        if m:
+            return m.group(1)
+        return 'lambda: ' + txt
+
     #
     # Handlers for each non-host node in the glop AST follow.
     #
@@ -279,12 +330,11 @@ class Compiler:
     def _not_(self, rule, node):
         self._needed.add('not')
         sub_rule = rule + '_n'
-        if self._can_inline(node[2][0]):
-            txt = self._inline(node[2][0], sub_rule)
-            self._methods[rule] = [f'self._not({txt})']
-        else:
-            self._methods[rule] = [f'self._not(self._{sub_rule}_)']
-            self._compile(node[2][0], sub_rule)
+        # A not will compile down to either a lambda expression
+        # or a method invocation, and both of those are inlineable.
+        assert self._can_inline(node[2][0])
+        txt = self._inline(node[2][0], sub_rule)
+        self._methods[rule] = [f'self._not({txt})']
 
     def _operator_(self, rule, node):
         self._needed.add('operator')
@@ -369,57 +419,6 @@ class Compiler:
         self._methods[rule] = [
             'self._unicat(%s)' % lit.encode(node[1])
         ]
-
-    def _inline_args(self, rule, sub_rule_type, children):
-        args = []
-        sub_rules = []
-        i = 0
-        for child in children:
-            sub_rule = f'{rule}_{sub_rule_type}{i}'
-            if self._can_inline(child):
-                args.append(self._inline(child, sub_rule))
-            else:
-                args.append(f'self._{sub_rule}_')
-                sub_rules.append((sub_rule, child))
-            # Even if the sub_rule is being inlined, the name might be
-            # used as a prefix for inner expressions that aren't inlined.
-            # Thus we need to increment i regardless of whether the outer
-            # expression was inlined, in order to guarantee that the inner
-            # rules get unique names.
-            i += 1
-        return args, sub_rules
-
-    def _can_inline(self, node):
-        if node[0] in ('apply', 'lit', 'paren'):
-            return True
-        if node[0] == 'label' and node[2][0][0] == 'apply':
-            return True
-        if node[0] == 'seq' and len(node[2]) == 1:
-            return True
-        if node[0] in ('not', 'post') and self._can_inline(node[2][0]):
-            return True
-        if (node[0] == 'action' and len(node[2]) == 1 and
-            node[2][0][0] in ('ll_lit', 'll_var')):
-            return True
-        return False
-
-    def _inline(self, node, rule):
-        if node[0] == 'seq' and len(node[2]) == 1 and  node[2][0][0] == 'apply':
-            if node[2][0][1] not in self._grammar.rules:
-                self._needed.add(node[2][0][1])
-            return f'self._{node[2][0][1]}_'
-        sub_rule = f'{rule}_t'
-        self._compile(node, sub_rule)
-        txt = self._methods[sub_rule][0]
-        del self._methods[sub_rule]
-
-        # If a node compiled down to just invoking a rule, we can
-        # return the name of the method instead of a lambda function
-        # that invokes the method.
-        m = METHOD_RE.match(txt)
-        if m:
-            return m.group(1)
-        return 'lambda: ' + txt
 
     #
     # Handlers for the host nodes in the AST
