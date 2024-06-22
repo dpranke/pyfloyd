@@ -108,8 +108,6 @@ class Compiler:
             self._needed.update(
                 {
                     'get',
-                    'push',
-                    'pop',
                     'set',
                 }
             )
@@ -242,10 +240,9 @@ class Compiler:
         return False
 
     def _inline(self, node, rule):
-        sub_rule = f'{rule}_t'
-        self._compile(node, sub_rule)
-        txt = self._methods[sub_rule][0]
-        del self._methods[sub_rule]
+        self._compile(node, rule)
+        txt = self._methods[rule][0]
+        del self._methods[rule]
 
         # If a node compiled down to just invoking a rule, we can
         # return the name of the method instead of a lambda function
@@ -300,13 +297,13 @@ class Compiler:
         needs_scope = self._has_labels(node)
         lines = []
         if needs_scope:
-            lines.append(f"self._push('{rule}')")
+            lines.append('self.scopes.append({})')
         lines.append(
             f'self._leftrec(self._{sub_rule}_, '
             + f"'{node[1]}', {str(left_assoc)})"
         )
         if needs_scope:
-            lines.append(f"self._pop('{rule}')")
+            lines.append('self.scopes.pop()')
         self._methods[rule] = lines
         self._compile(node[2][0], sub_rule)
 
@@ -397,11 +394,11 @@ class Compiler:
         needs_scope = self._has_labels(node)
         lines = []
         if needs_scope:
-            lines.append(f"self._push('{rule}')")
+            lines.append('self.scopes.append({})')
         args, sub_rules = self._inline_args(rule, 's', node[2])
         lines += self._gen_method_call('seq', args)
         if needs_scope:
-            lines.append(f"self._pop('{rule}')")
+            lines.append('self.scopes.pop()')
         self._methods[rule] = lines
         for sub_rule, sub_node in sub_rules:
             self._compile(sub_node, sub_rule)

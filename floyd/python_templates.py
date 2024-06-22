@@ -212,7 +212,7 @@ BUILTINS = """\
               return int(str)
 
     def _get(self, var):
-        return self.scopes[-1][1][var]
+        return self.scopes[-1][var]
 
     def _hex(self, str):
         return int(str, base=16)
@@ -321,13 +321,6 @@ BUILTINS = """\
             return
         self._star(rule, vs)
 
-    def _pop(self, name):
-        actual_name, _ = self.scopes.pop()
-        assert name == actual_name
-
-    def _push(self, name):
-        self.scopes.append((name, {}))
-
     def _range(self, i, j):
         p = self.pos
         if p != self.end and ord(i) <= ord(self.msg[p]) <= ord(j):
@@ -345,7 +338,7 @@ BUILTINS = """\
                 return
 
     def _set(self, var, val):
-        self.scopes[-1][1][var] = val
+        self.scopes[-1][var] = val
 
     def _star(self, rule, vs=None):
         vs = vs or []
