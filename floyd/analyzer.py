@@ -73,9 +73,9 @@ def analyze(ast, rewrite_filler=True):
 
     # Now optimize and rewrite the AST as needed.
     _rewrite_recursion(g)
-    _rewrite_singles(g)
     if rewrite_filler:
         _rewrite_filler(g)
+    _rewrite_singles(g)
     return g
 
 
@@ -305,14 +305,21 @@ def walk(node, visitor):
 
 def _rewrite_singles(grammar):
     grammar.ast = walk(grammar.ast, _SinglesVisitor(grammar))
+
+    # Any filler rules won't have been part of the AST, so we need to
+    # rewrite them separately.
+    for rule in ('_comment', '_filler', '_whitespace'):
+        if rule in grammar.rules:
+            grammar.rules[rule] = walk(
+                grammar.rules[rule], _SinglesVisitor(grammar)
+            )
     _update_rules(grammar)
 
 
 class _SinglesVisitor(Visitor):
     def visit_pre(self, node):
-        if node[0] in ('choice', 'seq'):
-            if len(node[2]) == 1 and node[2][0][0] != 'apply':
-                return self.visit_pre(node[2][0])
+        if node[0] in ('choice', 'seq') and len(node[2]) == 1:
+            return self.visit_pre(node[2][0])
         return node, False
 
 
@@ -495,7 +502,7 @@ class _FillerVisitor(Visitor):
         return False
 
     def fill(self, node):
-        return ['seq', None, [['apply', '_filler', None], node]]
+        return ['seq', None, [['apply', '_filler', []], node]]
 
 
 # (' '|'\n'|'\r'|'\t')*

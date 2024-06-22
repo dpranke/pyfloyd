@@ -54,7 +54,6 @@ class Compiler:
         )
 
     def compile(self):
-        # import pdb; pdb.set_trace()
         for rule, node in self._grammar.rules.items():
             self._compile(node, rule)
 
@@ -232,8 +231,6 @@ class Compiler:
             return True
         if node[0] == 'label' and node[2][0][0] == 'apply':
             return True
-        if node[0] == 'seq' and len(node[2]) == 1:
-            return True
         if node[0] in ('not', 'post') and self._can_inline(node[2][0]):
             return True
         if (node[0] == 'action' and len(node[2]) == 1 and
@@ -242,10 +239,6 @@ class Compiler:
         return False
 
     def _inline(self, node, rule):
-        if node[0] == 'seq' and len(node[2]) == 1 and  node[2][0][0] == 'apply':
-            if node[2][0][1] not in self._grammar.rules:
-                self._needed.add(node[2][0][1])
-            return f'self._{node[2][0][1]}_'
         sub_rule = f'{rule}_t'
         self._compile(node, sub_rule)
         txt = self._methods[sub_rule][0]
