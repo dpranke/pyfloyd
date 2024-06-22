@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-def flatten(obj, max_length=72, indent='    '):
+def flatten(obj, max_length=71, indent='    '):
     """Flatten an object into a list of 1 or more strings.
 
     Each string must be shorter than `max_length` characters, if possible.
