@@ -103,6 +103,12 @@ class Runner:
         subp.add_argument(
             '-u', '--unit', action='store_true', help='Only run unit tests.'
         )
+        subp.add_argument(
+            '-b',
+            '--branch',
+            action='store_true',
+            help='Report branch coverage.',
+        )
 
         subp = self.add_parser(
             'format', help='Format the source code with ruff.'
@@ -130,17 +136,23 @@ class Runner:
             help='Run all the steps that should be run prior to commiting.',
         )
         subp.add_argument(
+            '-b',
+            '--branch',
+            action='store_true',
+            help='Report branch coverage.',
+        )
+        subp.add_argument(
             '-f',
             '--failfast',
             action='store_true',
             help='Stop on first fail or error',
         )
         subp.add_argument(
-            '-u', '--unit', action='store_true', help='Only run unit tests.'
-        )
-        subp.add_argument(
             '--omit',
             help='Omit files whose paths match one of these patterns.',
+        )
+        subp.add_argument(
+            '-u', '--unit', action='store_true', help='Only run unit tests.'
         )
 
         subp = self.add_parser('publish', help='Upload packages to PyPI.')
@@ -199,21 +211,24 @@ class Runner:
         if self.args.unit:
             env['SKIP'] = 'integration'
             self.args.omit = '*_test.py'
-        self.call(
+        cmd = [
+            sys.executable,
+            '-m',
+            'coverage',
+            'run',
+        ]
+        if self.args.branch:
+            cmd.append('--branch')
+        cmd.extend(
             [
-                sys.executable,
-                '-m',
-                'coverage',
-                'run',
-                '--branch',
                 '-m',
                 'unittest',
                 'discover',
                 '-p',
                 '*_test.py',
             ],
-            env=env,
         )
+        self.call(cmd, env=env)
         cmd = [sys.executable, '-m', 'coverage', 'report', '--show-missing']
         if self.args.omit:
             cmd.append('--omit=%s' % self.args.omit)

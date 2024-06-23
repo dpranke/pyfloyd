@@ -165,14 +165,14 @@ class Compiler:
             text += '        r = self.cache.get(("%s", ' % method_name
             text += 'self.pos))\n'
             text += '        if r is not None:\n'
-            text += '            self.val, self.failed, self.pos = r\n'
+            text += '            self.val, self.ok, self.pos = r\n'
             text += '            return\n'
             text += '        pos = self.pos\n'
         for line in method_body:
             text += f'        {line}\n'
         if memoize:
             text += f'        self.cache[("{method_name}", pos)] = ('
-            text += 'self.val, self.failed, self.pos)\n'
+            text += 'self.val, self.ok, self.pos)\n'
         return text
 
     def _compile(self, node, rule):
@@ -241,7 +241,7 @@ class Compiler:
         lines = ['p = self.pos']
         for arg in args[:-1]:
             lines.extend(arg)
-            lines.append('if not self.failed:')
+            lines.append('if self.ok:')
             lines.append('    return')
             lines.append('self._rewind(p)')
         lines.extend(args[-1])
@@ -263,7 +263,7 @@ class Compiler:
             lines = [f'self._{sub_rule}_()']
         lines.extend(
             [
-                'if not self.failed:',
+                'if self.ok:',
                 f'    self._set({lit.encode(node[1])}, self.val)',
             ]
         )
@@ -272,7 +272,7 @@ class Compiler:
             self._compile(node[2][0], sub_rule)
 
     def _leftrec_(self, rule, node):
-        sub_rule = 'rule' + '_l'
+        sub_rule = rule + '_l'
         left_assoc = self._grammar.assoc.get(node[1], 'left') == 'left'
         self._needed.add('leftrec')
         needs_scope = self._has_labels(node)
@@ -312,7 +312,7 @@ class Compiler:
             ]
             + inlined_lines
             + [
-                'if self.failed:',
+                'if not self.ok:',
                 '    self._succeed(None, p)',
                 'else:',
                 '    self._rewind(p)',
@@ -360,7 +360,7 @@ class Compiler:
                 ]
                 + inlined_lines
                 + [
-                    'if self.failed:',
+                    'if not self.ok:',
                     '    self._succeed([], p)',
                     'else:',
                     '    self._succeed([self.val])',
@@ -373,7 +373,7 @@ class Compiler:
                 lines.extend(
                     [
                         'vs.append(self.val)',
-                        'if self.failed:',
+                        'if not self.ok:',
                         '    return',
                     ]
                 )
@@ -384,7 +384,7 @@ class Compiler:
                 ]
                 + ['    ' + line for line in inlined_lines]
                 + [
-                    '    if self.failed:',
+                    '    if not self.ok:',
                     '        self._rewind(p)',
                     '        break',
                     '    vs.append(self.val)',
@@ -426,7 +426,7 @@ class Compiler:
         args, sub_rules = self._inline_args(rule, 's', node[2])
         lines.extend(args[0])
         for arg in args[1:]:
-            lines.append('if not self.failed:')
+            lines.append('if self.ok:')
             lines.extend('    ' + line for line in arg)
         if needs_scope:
             lines.append('self.scopes.pop()')
