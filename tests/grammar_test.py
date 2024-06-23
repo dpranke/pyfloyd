@@ -147,6 +147,16 @@ class GrammarTestsMixin:
             out=False,
         )
 
+    def test_choice_with_rewind(self):
+        self.check(
+            """\
+            grammar = 'a' 'b' -> false 
+                    | 'a' 'c' -> true
+            """,
+            text='ac',
+            out=True,
+        )
+
     def test_comment_pragma(self):
         grammar = """\
             %token foo
@@ -472,6 +482,9 @@ class GrammarTestsMixin:
 
     def test_long_unicode_literals(self):
         self.check("grammar = '\\U00000020' -> true", text=' ', out=True)
+
+    def test_not_not(self):
+        self.check("grammar = ~~('a') 'a' -> true", text='a', out=True)
 
     @skip('operators')
     def test_not_quite_operators(self):

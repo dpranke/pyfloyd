@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
-
 from floyd.formatter import flatten, Comma, Saw, Tree
 from floyd import python_templates as py
 from floyd import string_literal as lit
@@ -193,9 +191,6 @@ class Compiler:
                 return True
         return False
 
-    def _gen_method_call(self, name, args):
-        return flatten(Saw(f'self._{name}(', Saw('[', Comma(args), ']'), ')'))
-
     def _inline_args(self, rule, sub_rule_type, children):
         args = []
         sub_rules = []
@@ -261,12 +256,20 @@ class Compiler:
     def _label_(self, rule, node):
         self._has_scopes = True
         sub_rule = rule + '_l'
-        self._methods[rule] = [
-            f'self._{sub_rule}_()',
-            'if not self.failed:',
-            f'    self._set({lit.encode(node[1])}, self.val)',
-        ]
-        self._compile(node[2][0], sub_rule)
+        can_inline = self._can_inline(node[2][0])
+        if can_inline:
+            lines = self._inline(node[2][0], sub_rule)
+        else:
+            lines = [f'self._{sub_rule}_()']
+        lines.extend(
+            [
+                'if not self.failed:',
+                f'    self._set({lit.encode(node[1])}, self.val)',
+            ]
+        )
+        self._methods[rule] = lines
+        if not can_inline:
+            self._compile(node[2][0], sub_rule)
 
     def _leftrec_(self, rule, node):
         sub_rule = 'rule' + '_l'
@@ -302,8 +305,6 @@ class Compiler:
             inlined_lines = self._inline(node[2][0], sub_rule)
         else:
             inlined_lines = [f'self._{sub_rule}_()']
-
-        inlined_lines = self._inline(node[2][0], sub_rule)
         lines = (
             [
                 'p = self.pos',
@@ -347,12 +348,11 @@ class Compiler:
 
     def _post_(self, rule, node):
         sub_rule = rule + '_p'
-        if self._can_inline(node[2][0]):
+        can_inline = self._can_inline(node[2][0])
+        if can_inline:
             inlined_lines = self._inline(node[2][0], sub_rule)
-            inlined = True
         else:
             inlined_lines = [f'self._{sub_rule}_()']
-            inlined = False
         if node[1] == '?':
             lines = (
                 [
@@ -392,7 +392,7 @@ class Compiler:
                 ]
             )
         self._methods[rule] = lines
-        if not inlined:
+        if not can_inline:
             self._compile(node[2][0], sub_rule)
 
     def _pred_(self, rule, node):

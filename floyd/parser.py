@@ -270,12 +270,9 @@ class _Parser:
         self.scopes.pop()
 
     def _pragma_c0_s1_(self):
-        self._pragma_c0_s1_l_()
+        self._ident_list_()
         if not self.failed:
             self._set('is', self.val)
-
-    def _pragma_c0_s1_l_(self):
-        self._ident_list_()
 
     def _pragma_c1_(self):
         self.scopes.append({})
@@ -295,12 +292,9 @@ class _Parser:
         self.scopes.pop()
 
     def _pragma_c1_s2_(self):
-        self._pragma_c1_s2_l_()
+        self._ident_()
         if not self.failed:
             self._set('i', self.val)
-
-    def _pragma_c1_s2_l_(self):
-        self._ident_()
 
     def _pragma_c2_(self):
         self.scopes.append({})
@@ -320,12 +314,9 @@ class _Parser:
         self.scopes.pop()
 
     def _pragma_c2_s2_(self):
-        self._pragma_c2_s2_l_()
+        self._ident_()
         if not self.failed:
             self._set('i', self.val)
-
-    def _pragma_c2_s2_l_(self):
-        self._ident_()
 
     def _pragma_c3_(self):
         self.scopes.append({})
@@ -353,12 +344,9 @@ class _Parser:
         self.scopes.pop()
 
     def _pragma_c3_s4_(self):
-        self._pragma_c3_s4_l_()
+        self._choice_()
         if not self.failed:
             self._set('cs', self.val)
-
-    def _pragma_c3_s4_l_(self):
-        self._choice_()
 
     def _pragma_c4_(self):
         self.scopes.append({})
@@ -377,14 +365,6 @@ class _Parser:
         self._succeed(['pragma', 'comment_style', self._get('c')])
         self.scopes.pop()
 
-    def _pragma_c4_s2_(self):
-        self._pragma_c4_s2_l_()
-        if not self.failed:
-            self._set('c', self.val)
-
-    def _pragma_c4_s2_l_(self):
-        self._pragma_c4_s2_l_g_()
-
     def _pragma_c4_s2_l_g_(self):
         p = self.pos
         self._str('C++')
@@ -392,6 +372,11 @@ class _Parser:
             return
         self._rewind(p)
         self._ident_()
+
+    def _pragma_c4_s2_(self):
+        self._pragma_c4_s2_l_g_()
+        if not self.failed:
+            self._set('c', self.val)
 
     def _pragma_c5_(self):
         self.scopes.append({})
@@ -419,12 +404,9 @@ class _Parser:
         self.scopes.pop()
 
     def _pragma_c5_s4_(self):
-        self._pragma_c5_s4_l_()
+        self._choice_()
         if not self.failed:
             self._set('cs', self.val)
-
-    def _pragma_c5_s4_l_(self):
-        self._choice_()
 
     def _pragma_c6_(self):
         self.scopes.append({})
@@ -452,20 +434,14 @@ class _Parser:
         self.scopes.pop()
 
     def _pragma_c6_s2_(self):
-        self._pragma_c6_s2_l_()
+        self._op_()
         if not self.failed:
             self._set('o', self.val)
 
-    def _pragma_c6_s2_l_(self):
-        self._op_()
-
     def _pragma_c6_s4_(self):
-        self._pragma_c6_s4_l_()
+        self._dir_()
         if not self.failed:
             self._set('d', self.val)
-
-    def _pragma_c6_s4_l_(self):
-        self._dir_()
 
     def _pragma_c7_(self):
         self.scopes.append({})
@@ -514,12 +490,9 @@ class _Parser:
             self._fail()
 
     def _pragma_c7_s1_l_p_g_s2_(self):
-        self._pragma_c7_s1_l_p_g_s2_l_()
+        self._op_()
         if not self.failed:
             self._set('o', self.val)
-
-    def _pragma_c7_s1_l_p_g_s2_l_(self):
-        self._op_()
 
     def _pragma_c7_s1_l_(self):
         vs = []
@@ -591,14 +564,6 @@ class _Parser:
         self._succeed(self._get('d'))
         self.scopes.pop()
 
-    def _dir_s0_(self):
-        self._dir_s0_l_()
-        if not self.failed:
-            self._set('d', self.val)
-
-    def _dir_s0_l_(self):
-        self._dir_s0_l_g_()
-
     def _dir_s0_l_g_(self):
         p = self.pos
         self._str('left')
@@ -606,6 +571,11 @@ class _Parser:
             return
         self._rewind(p)
         self._str('right')
+
+    def _dir_s0_(self):
+        self._dir_s0_l_g_()
+        if not self.failed:
+            self._set('d', self.val)
 
     def _ident_list_(self):
         self.scopes.append({})
@@ -643,12 +613,9 @@ class _Parser:
         self.scopes.pop()
 
     def _ident_list_s0_l_p_g_s1_(self):
-        self._ident_list_s0_l_p_g_s1_l_()
+        self._ident_()
         if not self.failed:
             self._set('i', self.val)
-
-    def _ident_list_s0_l_p_g_s1_l_(self):
-        self._ident_()
 
     def _ident_list_s0_l_p_g_s3_(self):
         p = self.pos
@@ -710,20 +677,14 @@ class _Parser:
         self.scopes.pop()
 
     def _rule_s0_(self):
-        self._rule_s0_l_()
+        self._ident_()
         if not self.failed:
             self._set('i', self.val)
 
-    def _rule_s0_l_(self):
-        self._ident_()
-
     def _rule_s4_(self):
-        self._rule_s4_l_()
+        self._choice_()
         if not self.failed:
             self._set('cs', self.val)
-
-    def _rule_s4_l_(self):
-        self._choice_()
 
     def _rule_s6_(self):
         p = self.pos
@@ -747,12 +708,9 @@ class _Parser:
         self.scopes.pop()
 
     def _ident_s0_(self):
-        self._ident_s0_l_()
+        self._id_start_()
         if not self.failed:
             self._set('hd', self.val)
-
-    def _ident_s0_l_(self):
-        self._id_start_()
 
     def _ident_s1_(self):
         self._ident_s1_l_()
@@ -814,12 +772,9 @@ class _Parser:
         self.scopes.pop()
 
     def _choice_s0_(self):
-        self._choice_s0_l_()
+        self._seq_()
         if not self.failed:
             self._set('s', self.val)
-
-    def _choice_s0_l_(self):
-        self._seq_()
 
     def _choice_s1_(self):
         self._choice_s1_l_()
@@ -871,12 +826,9 @@ class _Parser:
         self.scopes.pop()
 
     def _seq_c0_s0_(self):
-        self._seq_c0_s0_l_()
+        self._expr_()
         if not self.failed:
             self._set('e', self.val)
-
-    def _seq_c0_s0_l_(self):
-        self._expr_()
 
     def _seq_c0_s1_(self):
         self._seq_c0_s1_l_()
@@ -929,20 +881,14 @@ class _Parser:
         self.scopes.pop()
 
     def _expr_c0_s0_(self):
-        self._expr_c0_s0_l_()
+        self._post_expr_()
         if not self.failed:
             self._set('e', self.val)
 
-    def _expr_c0_s0_l_(self):
-        self._post_expr_()
-
     def _expr_c0_s2_(self):
-        self._expr_c0_s2_l_()
+        self._ident_()
         if not self.failed:
             self._set('l', self.val)
-
-    def _expr_c0_s2_l_(self):
-        self._ident_()
 
     def _post_expr_(self):
         p = self.pos
@@ -966,20 +912,14 @@ class _Parser:
         self.scopes.pop()
 
     def _post_expr_c0_s0_(self):
-        self._post_expr_c0_s0_l_()
+        self._prim_expr_()
         if not self.failed:
             self._set('e', self.val)
 
-    def _post_expr_c0_s0_l_(self):
-        self._prim_expr_()
-
     def _post_expr_c0_s1_(self):
-        self._post_expr_c0_s1_l_()
+        self._post_op_()
         if not self.failed:
             self._set('op', self.val)
-
-    def _post_expr_c0_s1_l_(self):
-        self._post_op_()
 
     def _post_op_(self):
         p = self.pos
@@ -1059,20 +999,14 @@ class _Parser:
         self.scopes.pop()
 
     def _prim_expr_c0_s0_(self):
-        self._prim_expr_c0_s0_l_()
+        self._lit_()
         if not self.failed:
             self._set('i', self.val)
 
-    def _prim_expr_c0_s0_l_(self):
-        self._lit_()
-
     def _prim_expr_c0_s4_(self):
-        self._prim_expr_c0_s4_l_()
+        self._lit_()
         if not self.failed:
             self._set('j', self.val)
-
-    def _prim_expr_c0_s4_l_(self):
-        self._lit_()
 
     def _prim_expr_c1_(self):
         self.scopes.append({})
@@ -1084,12 +1018,9 @@ class _Parser:
         self.scopes.pop()
 
     def _prim_expr_c1_s0_(self):
-        self._prim_expr_c1_s0_l_()
+        self._lit_()
         if not self.failed:
             self._set('l', self.val)
-
-    def _prim_expr_c1_s0_l_(self):
-        self._lit_()
 
     def _prim_expr_c2_(self):
         self.scopes.append({})
@@ -1101,12 +1032,9 @@ class _Parser:
         self.scopes.pop()
 
     def _prim_expr_c2_s0_(self):
-        self._prim_expr_c2_s0_l_()
+        self._escape_()
         if not self.failed:
             self._set('e', self.val)
-
-    def _prim_expr_c2_s0_l_(self):
-        self._escape_()
 
     def _prim_expr_c3_(self):
         self.scopes.append({})
@@ -1122,12 +1050,9 @@ class _Parser:
         self.scopes.pop()
 
     def _prim_expr_c3_s0_(self):
-        self._prim_expr_c3_s0_l_()
+        self._ident_()
         if not self.failed:
             self._set('i', self.val)
-
-    def _prim_expr_c3_s0_l_(self):
-        self._ident_()
 
     def _prim_expr_c3_s1_n_g_(self):
         self._sp_()
@@ -1164,12 +1089,9 @@ class _Parser:
         self.scopes.pop()
 
     def _prim_expr_c4_s2_(self):
-        self._prim_expr_c4_s2_l_()
+        self._ll_expr_()
         if not self.failed:
             self._set('e', self.val)
-
-    def _prim_expr_c4_s2_l_(self):
-        self._ll_expr_()
 
     def _prim_expr_c5_(self):
         self.scopes.append({})
@@ -1197,12 +1119,9 @@ class _Parser:
         self.scopes.pop()
 
     def _prim_expr_c5_s2_(self):
-        self._prim_expr_c5_s2_l_()
+        self._ll_expr_()
         if not self.failed:
             self._set('e', self.val)
-
-    def _prim_expr_c5_s2_l_(self):
-        self._ll_expr_()
 
     def _prim_expr_c6_(self):
         self.scopes.append({})
@@ -1218,12 +1137,9 @@ class _Parser:
         self.scopes.pop()
 
     def _prim_expr_c6_s1_(self):
-        self._prim_expr_c6_s1_l_()
+        self._prim_expr_()
         if not self.failed:
             self._set('e', self.val)
-
-    def _prim_expr_c6_s1_l_(self):
-        self._prim_expr_()
 
     def _prim_expr_c7_(self):
         self.scopes.append({})
@@ -1251,12 +1167,9 @@ class _Parser:
         self.scopes.pop()
 
     def _prim_expr_c7_s2_(self):
-        self._prim_expr_c7_s2_l_()
+        self._ll_expr_()
         if not self.failed:
             self._set('e', self.val)
-
-    def _prim_expr_c7_s2_l_(self):
-        self._ll_expr_()
 
     def _prim_expr_c8_(self):
         self.scopes.append({})
@@ -1284,12 +1197,9 @@ class _Parser:
         self.scopes.pop()
 
     def _prim_expr_c8_s2_(self):
-        self._prim_expr_c8_s2_l_()
+        self._ll_expr_()
         if not self.failed:
             self._set('e', self.val)
-
-    def _prim_expr_c8_s2_l_(self):
-        self._ll_expr_()
 
     def _prim_expr_c9_(self):
         self.scopes.append({})
@@ -1317,12 +1227,9 @@ class _Parser:
         self.scopes.pop()
 
     def _prim_expr_c9_s2_(self):
-        self._prim_expr_c9_s2_l_()
+        self._choice_()
         if not self.failed:
             self._set('e', self.val)
-
-    def _prim_expr_c9_s2_l_(self):
-        self._choice_()
 
     def _lit_(self):
         p = self.pos
@@ -1420,12 +1327,9 @@ class _Parser:
         self.scopes.pop()
 
     def _sqchar_c0_s1_(self):
-        self._sqchar_c0_s1_l_()
+        self._esc_char_()
         if not self.failed:
             self._set('c', self.val)
-
-    def _sqchar_c0_s1_l_(self):
-        self._esc_char_()
 
     def _sqchar_c1_(self):
         self.scopes.append({})
@@ -1452,12 +1356,9 @@ class _Parser:
             self._fail()
 
     def _sqchar_c1_s1_(self):
-        self._sqchar_c1_s1_l_()
+        self._any_()
         if not self.failed:
             self._set('c', self.val)
-
-    def _sqchar_c1_s1_l_(self):
-        self._any_()
 
     def _dqchar_(self):
         p = self.pos
@@ -1481,12 +1382,9 @@ class _Parser:
         self.scopes.pop()
 
     def _dqchar_c0_s1_(self):
-        self._dqchar_c0_s1_l_()
+        self._esc_char_()
         if not self.failed:
             self._set('c', self.val)
-
-    def _dqchar_c0_s1_l_(self):
-        self._esc_char_()
 
     def _dqchar_c1_(self):
         self.scopes.append({})
@@ -1513,12 +1411,9 @@ class _Parser:
             self._fail()
 
     def _dqchar_c1_s1_(self):
-        self._dqchar_c1_s1_l_()
+        self._any_()
         if not self.failed:
             self._set('c', self.val)
-
-    def _dqchar_c1_s1_l_(self):
-        self._any_()
 
     def _bslash_(self):
         self._ch('\\')
@@ -1637,12 +1532,9 @@ class _Parser:
         self.scopes.pop()
 
     def _esc_char_c9_s0_(self):
-        self._esc_char_c9_s0_l_()
+        self._hex_esc_()
         if not self.failed:
             self._set('c', self.val)
-
-    def _esc_char_c9_s0_l_(self):
-        self._hex_esc_()
 
     def _esc_char_c10_(self):
         self.scopes.append({})
@@ -1654,12 +1546,9 @@ class _Parser:
         self.scopes.pop()
 
     def _esc_char_c10_s0_(self):
-        self._esc_char_c10_s0_l_()
+        self._unicode_esc_()
         if not self.failed:
             self._set('c', self.val)
-
-    def _esc_char_c10_s0_l_(self):
-        self._unicode_esc_()
 
     def _hex_esc_(self):
         self.scopes.append({})
@@ -1679,20 +1568,14 @@ class _Parser:
         self.scopes.pop()
 
     def _hex_esc_s1_(self):
-        self._hex_esc_s1_l_()
+        self._hex_()
         if not self.failed:
             self._set('h1', self.val)
 
-    def _hex_esc_s1_l_(self):
-        self._hex_()
-
     def _hex_esc_s2_(self):
-        self._hex_esc_s2_l_()
+        self._hex_()
         if not self.failed:
             self._set('h2', self.val)
-
-    def _hex_esc_s2_l_(self):
-        self._hex_()
 
     def _unicode_esc_(self):
         p = self.pos
@@ -1735,36 +1618,24 @@ class _Parser:
         self.scopes.pop()
 
     def _unicode_esc_c0_s1_(self):
-        self._unicode_esc_c0_s1_l_()
+        self._hex_()
         if not self.failed:
             self._set('h1', self.val)
 
-    def _unicode_esc_c0_s1_l_(self):
-        self._hex_()
-
     def _unicode_esc_c0_s2_(self):
-        self._unicode_esc_c0_s2_l_()
+        self._hex_()
         if not self.failed:
             self._set('h2', self.val)
 
-    def _unicode_esc_c0_s2_l_(self):
-        self._hex_()
-
     def _unicode_esc_c0_s3_(self):
-        self._unicode_esc_c0_s3_l_()
+        self._hex_()
         if not self.failed:
             self._set('h3', self.val)
 
-    def _unicode_esc_c0_s3_l_(self):
-        self._hex_()
-
     def _unicode_esc_c0_s4_(self):
-        self._unicode_esc_c0_s4_l_()
+        self._hex_()
         if not self.failed:
             self._set('h4', self.val)
-
-    def _unicode_esc_c0_s4_l_(self):
-        self._hex_()
 
     def _unicode_esc_c1_(self):
         self.scopes.append({})
@@ -1819,68 +1690,44 @@ class _Parser:
         self.scopes.pop()
 
     def _unicode_esc_c1_s1_(self):
-        self._unicode_esc_c1_s1_l_()
+        self._hex_()
         if not self.failed:
             self._set('h1', self.val)
 
-    def _unicode_esc_c1_s1_l_(self):
-        self._hex_()
-
     def _unicode_esc_c1_s2_(self):
-        self._unicode_esc_c1_s2_l_()
+        self._hex_()
         if not self.failed:
             self._set('h2', self.val)
 
-    def _unicode_esc_c1_s2_l_(self):
-        self._hex_()
-
     def _unicode_esc_c1_s3_(self):
-        self._unicode_esc_c1_s3_l_()
+        self._hex_()
         if not self.failed:
             self._set('h3', self.val)
 
-    def _unicode_esc_c1_s3_l_(self):
-        self._hex_()
-
     def _unicode_esc_c1_s4_(self):
-        self._unicode_esc_c1_s4_l_()
+        self._hex_()
         if not self.failed:
             self._set('h4', self.val)
 
-    def _unicode_esc_c1_s4_l_(self):
-        self._hex_()
-
     def _unicode_esc_c1_s5_(self):
-        self._unicode_esc_c1_s5_l_()
+        self._hex_()
         if not self.failed:
             self._set('h5', self.val)
 
-    def _unicode_esc_c1_s5_l_(self):
-        self._hex_()
-
     def _unicode_esc_c1_s6_(self):
-        self._unicode_esc_c1_s6_l_()
+        self._hex_()
         if not self.failed:
             self._set('h6', self.val)
 
-    def _unicode_esc_c1_s6_l_(self):
-        self._hex_()
-
     def _unicode_esc_c1_s7_(self):
-        self._unicode_esc_c1_s7_l_()
+        self._hex_()
         if not self.failed:
             self._set('h7', self.val)
 
-    def _unicode_esc_c1_s7_l_(self):
-        self._hex_()
-
     def _unicode_esc_c1_s8_(self):
-        self._unicode_esc_c1_s8_l_()
+        self._hex_()
         if not self.failed:
             self._set('h8', self.val)
-
-    def _unicode_esc_c1_s8_l_(self):
-        self._hex_()
 
     def _escape_(self):
         self.scopes.append({})
@@ -1900,12 +1747,9 @@ class _Parser:
         self.scopes.pop()
 
     def _escape_s1_(self):
-        self._escape_s1_l_()
+        self._ident_()
         if not self.failed:
             self._set('i', self.val)
-
-    def _escape_s1_l_(self):
-        self._ident_()
 
     def _ll_exprs_(self):
         p = self.pos
@@ -1929,12 +1773,9 @@ class _Parser:
         self.scopes.pop()
 
     def _ll_exprs_c0_s0_(self):
-        self._ll_exprs_c0_s0_l_()
+        self._ll_expr_()
         if not self.failed:
             self._set('e', self.val)
-
-    def _ll_exprs_c0_s0_l_(self):
-        self._ll_expr_()
 
     def _ll_exprs_c0_s1_(self):
         self._ll_exprs_c0_s1_l_()
@@ -2002,20 +1843,14 @@ class _Parser:
         self.scopes.pop()
 
     def _ll_expr_c0_s0_(self):
-        self._ll_expr_c0_s0_l_()
+        self._ll_qual_()
         if not self.failed:
             self._set('e1', self.val)
 
-    def _ll_expr_c0_s0_l_(self):
-        self._ll_qual_()
-
     def _ll_expr_c0_s4_(self):
-        self._ll_expr_c0_s4_l_()
+        self._ll_expr_()
         if not self.failed:
             self._set('e2', self.val)
-
-    def _ll_expr_c0_s4_l_(self):
-        self._ll_expr_()
 
     def _ll_expr_c1_(self):
         self.scopes.append({})
@@ -2043,20 +1878,14 @@ class _Parser:
         self.scopes.pop()
 
     def _ll_expr_c1_s0_(self):
-        self._ll_expr_c1_s0_l_()
+        self._ll_qual_()
         if not self.failed:
             self._set('e1', self.val)
 
-    def _ll_expr_c1_s0_l_(self):
-        self._ll_qual_()
-
     def _ll_expr_c1_s4_(self):
-        self._ll_expr_c1_s4_l_()
+        self._ll_expr_()
         if not self.failed:
             self._set('e2', self.val)
-
-    def _ll_expr_c1_s4_l_(self):
-        self._ll_expr_()
 
     def _ll_qual_(self):
         p = self.pos
@@ -2080,12 +1909,9 @@ class _Parser:
         self.scopes.pop()
 
     def _ll_qual_c0_s0_(self):
-        self._ll_qual_c0_s0_l_()
+        self._ll_prim_()
         if not self.failed:
             self._set('e', self.val)
-
-    def _ll_qual_c0_s0_l_(self):
-        self._ll_prim_()
 
     def _ll_qual_c0_s1_(self):
         self._ll_qual_c0_s1_l_()
@@ -2141,12 +1967,9 @@ class _Parser:
         self.scopes.pop()
 
     def _ll_post_op_c0_s2_(self):
-        self._ll_post_op_c0_s2_l_()
+        self._ll_expr_()
         if not self.failed:
             self._set('e', self.val)
-
-    def _ll_post_op_c0_s2_l_(self):
-        self._ll_expr_()
 
     def _ll_post_op_c1_(self):
         self.scopes.append({})
@@ -2174,12 +1997,9 @@ class _Parser:
         self.scopes.pop()
 
     def _ll_post_op_c1_s2_(self):
-        self._ll_post_op_c1_s2_l_()
+        self._ll_exprs_()
         if not self.failed:
             self._set('es', self.val)
-
-    def _ll_post_op_c1_s2_l_(self):
-        self._ll_exprs_()
 
     def _ll_prim_(self):
         p = self.pos
@@ -2265,12 +2085,9 @@ class _Parser:
         self.scopes.pop()
 
     def _ll_prim_c5_s0_(self):
-        self._ll_prim_c5_s0_l_()
+        self._ident_()
         if not self.failed:
             self._set('i', self.val)
-
-    def _ll_prim_c5_s0_l_(self):
-        self._ident_()
 
     def _ll_prim_c6_(self):
         self.scopes.append({})
@@ -2286,12 +2103,9 @@ class _Parser:
         self.scopes.pop()
 
     def _ll_prim_c6_s1_(self):
-        self._ll_prim_c6_s1_l_()
+        self._hexdigits_()
         if not self.failed:
             self._set('hs', self.val)
-
-    def _ll_prim_c6_s1_l_(self):
-        self._hexdigits_()
 
     def _ll_prim_c7_(self):
         self.scopes.append({})
@@ -2303,12 +2117,9 @@ class _Parser:
         self.scopes.pop()
 
     def _ll_prim_c7_s0_(self):
-        self._ll_prim_c7_s0_l_()
+        self._digits_()
         if not self.failed:
             self._set('ds', self.val)
-
-    def _ll_prim_c7_s0_l_(self):
-        self._digits_()
 
     def _ll_prim_c8_(self):
         self.scopes.append({})
@@ -2320,12 +2131,9 @@ class _Parser:
         self.scopes.pop()
 
     def _ll_prim_c8_s0_(self):
-        self._ll_prim_c8_s0_l_()
+        self._lit_()
         if not self.failed:
             self._set('l', self.val)
-
-    def _ll_prim_c8_s0_l_(self):
-        self._lit_()
 
     def _ll_prim_c9_(self):
         self.scopes.append({})
@@ -2353,12 +2161,9 @@ class _Parser:
         self.scopes.pop()
 
     def _ll_prim_c9_s2_(self):
-        self._ll_prim_c9_s2_l_()
+        self._ll_expr_()
         if not self.failed:
             self._set('e', self.val)
-
-    def _ll_prim_c9_s2_l_(self):
-        self._ll_expr_()
 
     def _ll_prim_c10_(self):
         self.scopes.append({})
@@ -2386,12 +2191,9 @@ class _Parser:
         self.scopes.pop()
 
     def _ll_prim_c10_s2_(self):
-        self._ll_prim_c10_s2_l_()
+        self._ll_exprs_()
         if not self.failed:
             self._set('es', self.val)
-
-    def _ll_prim_c10_s2_l_(self):
-        self._ll_exprs_()
 
     def _digits_(self):
         self.scopes.append({})
