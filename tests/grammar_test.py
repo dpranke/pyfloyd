@@ -322,6 +322,18 @@ class GrammarTestsMixin:
     def test_hex_digits_in_value(self):
         self.check('grammar = -> 0x20', text='', out=32)
 
+    def test_hex_digits_invalid(self):
+        # '0xtt' is an invalid hex number, so that ll_prim check fails and
+        # we go on to digits, so '0' is parsed successfully. We next parse
+        # 'xtt' as an ident as the first part of the next rule but run out
+        # of input.
+        # TODO: Reject this earlier as an invalid hex/invalid num.
+        self.check(
+            'grammar = -> 0xtt',
+            text='',
+            grammar_err='<string>:1 Unexpected end of input at column 18',
+        )
+
     def test_inline_seq(self):
         # This checks that we correctly include the builtin `end` rule
         # when it is part of a parenthesized choice.
@@ -565,6 +577,28 @@ class GrammarTestsMixin:
         self.check(g, text='a', out=True)
         self.check(g, text='aa', out=True)
 
+    def test_operator_invalid(self):
+        # 'a' is not a valid operator; operators cannot contain valid
+        # parts of an identifier.
+        g = """
+           %prec a
+           expr = expr 'a' expr -> [$1, 'a', $3]
+                | '0'..'9'
+        """
+        self.check(
+            g, text='1', grammar_err='<string>:2 Unexpected "a" at column 7'
+        )
+
+    @skip('operators')
+    def test_operator_multichar_is_valid(self):
+        # This tests that operators do not have to be just a single character.
+        g = """
+           %prec ++
+           expr = expr '++' expr -> [$1, '++', $3]
+                | '0'..'9'
+        """
+        self.check(g, text='1++2', out=['1', '++', '2'])
+
     @skip('operators')
     def test_operators(self):
         # For now, precedence has no effect but this at least tests
@@ -574,6 +608,7 @@ class GrammarTestsMixin:
             %prec * /
             %prec ^
             %assoc ^ right
+            %assoc + left   // this is unnecessary but gets us coverage.
             expr = expr '+' expr -> [$1, '+', $3]
                  | expr '-' expr -> [$1, '-', $3]
                  | expr '*' expr -> [$1, '*', $3]
@@ -774,6 +809,16 @@ class GrammarTestsMixin:
         self.check("grammar = 'a'* -> true", text='', out=True)
         self.check("grammar = 'a'* -> true", text='a', out=True)
         self.check("grammar = 'a'* -> true", text='aa', out=True)
+
+    def test_tabs_are_whitespace(self):
+        self.check("grammar\t=\t'a'\t->\ttrue", text='a', out=True)
+
+    def test_token_is_invalid(self):
+        self.check(
+            '%tokens 1234',
+            text='',
+            grammar_err='<string>:1 Unexpected "1" at column 9',
+        )
 
     def test_token_pragma(self):
         self.check(

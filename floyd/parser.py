@@ -366,14 +366,22 @@ class _Parser:
             self._pragma_c6_s4_()
         if self.ok:
             self._succeed(
-                ['pragma', 'assoc', [self._get('o'), self._get('d')]]
+                ['pragma', 'assoc', [self._get('a'), self._get('d')]]
             )
         self.scopes.pop()
 
-    def _pragma_c6_s2_(self):
+    def _pragma_c6_s2_l_g_(self):
+        p = self.pos
         self._op_()
         if self.ok:
-            self._set('o', self.val)
+            return
+        self._rewind(p)
+        self._arm_()
+
+    def _pragma_c6_s2_(self):
+        self._pragma_c6_s2_l_g_()
+        if self.ok:
+            self._set('a', self.val)
 
     def _pragma_c6_s4_(self):
         self._dir_()
@@ -453,10 +461,18 @@ class _Parser:
         if self.ok:
             self._any_()
 
+    def _op_s0_l_p_g_s0_n_g_(self):
+        p = self.pos
+        self._ws_()
+        if self.ok:
+            return
+        self._rewind(p)
+        self._id_continue_()
+
     def _op_s0_l_p_g_s0_(self):
         p = self.pos
         errpos = self.errpos
-        self._ws_()
+        self._op_s0_l_p_g_s0_n_g_()
         if not self.ok:
             self._succeed(None, p)
         else:
@@ -478,6 +494,29 @@ class _Parser:
                 break
             vs.append(self.val)
         self._succeed(vs)
+
+    def _arm_(self):
+        self.scopes.append({})
+        self._arm_s0_()
+        if self.ok:
+            self._ch('#')
+        if self.ok:
+            self._arm_s2_()
+        if self.ok:
+            self._succeed(
+                self._get('i') + '#' + self._join('', self._get('ds'))
+            )
+        self.scopes.pop()
+
+    def _arm_s0_(self):
+        self._ident_()
+        if self.ok:
+            self._set('i', self.val)
+
+    def _arm_s2_(self):
+        self._digits_()
+        if self.ok:
+            self._set('ds', self.val)
 
     def _dir_(self):
         self.scopes.append({})

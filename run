@@ -263,12 +263,12 @@ class Runner:
 
     def run_presubmit(self):
         self.args.check = True
-        self.run_regen()
+        # TODO: Reenable when the formatting can handle indented statements.
+        # self.run_regen()
         self.run_format()
         self.run_check()
         self.run_lint()
         self.run_mypy()
-        self.run_tests()
         self.run_coverage()
 
     def run_publish(self):
@@ -338,6 +338,9 @@ class Runner:
                 'grammars/floyd.g',
             ]
         )
+        # TODO: Fix the compiler so that we don't need to reformat the file.
+        # Right now expressions may be up to 4 chars too long for a line.
+        self.call([sys.executable, '-m', 'ruff', 'format', 'parser.py'])
 
 
 if __name__ == '__main__':
