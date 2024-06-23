@@ -55,322 +55,736 @@ class _Parser:
 
     def _grammar_(self):
         self.scopes.append({})
-        self._seq(
-            [self._grammar_s0_, self._sp_, self._end_, self._grammar_s3_]
-        )
+        self._grammar_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._end_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['rules', None, self._get('vs')])
         self.scopes.pop()
 
+    def _grammar_s0_(self):
+        self._grammar_s0_l_()
+        if not self.failed:
+            self._set('vs', self.val)
+
     def _grammar_s0_l_p_g_s1_g_(self):
-        self._choose([self._pragma_, self._rule_])
+        p = self.pos
+        self._pragma_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._rule_()
 
     def _grammar_s0_l_p_g_(self):
-        self._seq([self._sp_, self._grammar_s0_l_p_g_s1_g_])
+        self._sp_()
+        if self.failed:
+            return
+        self._grammar_s0_l_p_g_s1_g_()
 
-    def _grammar_s0_(self):
-        self._bind(lambda: self._star(self._grammar_s0_l_p_g_), 'vs')
-
-    def _grammar_s3_(self):
-        self._succeed(['rules', None, self._get('vs')])
+    def _grammar_s0_l_(self):
+        vs = []
+        while True:
+            p = self.pos
+            self._grammar_s0_l_p_g_()
+            if self.failed:
+                self._rewind(p)
+                break
+            vs.append(self.val)
+        self._succeed(vs)
 
     def _sp_(self):
-        self._star(self._ws_)
+        vs = []
+        while True:
+            p = self.pos
+            self._ws_()
+            if self.failed:
+                self._rewind(p)
+                break
+            vs.append(self.val)
+        self._succeed(vs)
 
     def _ws_(self):
-        self._choose(
-            [
-                lambda: self._ch(' '),
-                lambda: self._ch('\t'),
-                self._eol_,
-                self._comment_,
-            ]
-        )
+        p = self.pos
+        self._ch(' ')
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._ch('\t')
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._eol_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._comment_()
 
     def _eol_(self):
-        self._choose(
-            [self._eol_c0_, lambda: self._ch('\r'), lambda: self._ch('\n')]
-        )
+        p = self.pos
+        self._eol_c0_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._ch('\r')
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._ch('\n')
 
     def _eol_c0_(self):
-        self._seq([lambda: self._ch('\r'), lambda: self._ch('\n')])
+        self._ch('\r')
+        if self.failed:
+            return
+        self._ch('\n')
 
     def _comment_(self):
-        self._choose([self._comment_c0_, self._comment_c1_])
-
-    def _comment_c0_s1_p_g_(self):
-        self._seq([lambda: self._not(self._eol_), self._any_])
+        p = self.pos
+        self._comment_c0_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._comment_c1_()
 
     def _comment_c0_(self):
-        self._seq(
-            [
-                lambda: self._str('//'),
-                lambda: self._star(self._comment_c0_s1_p_g_),
-            ]
-        )
+        self._str('//')
+        if self.failed:
+            return
+        self._comment_c0_s1_()
 
-    def _comment_c1_s1_p_g_(self):
-        self._seq([lambda: self._not(lambda: self._str('*/')), self._any_])
+    def _comment_c0_s1_p_g_(self):
+        self._comment_c0_s1_p_g_s0_()
+        if self.failed:
+            return
+        self._any_()
+
+    def _comment_c0_s1_p_g_s0_(self):
+        p = self.pos
+        errpos = self.errpos
+        self._eol_()
+        if self.failed:
+            self._succeed(None, p)
+        else:
+            self._rewind(p)
+            self.errpos = errpos
+            self._fail()
+
+    def _comment_c0_s1_(self):
+        vs = []
+        while True:
+            p = self.pos
+            self._comment_c0_s1_p_g_()
+            if self.failed:
+                self._rewind(p)
+                break
+            vs.append(self.val)
+        self._succeed(vs)
 
     def _comment_c1_(self):
-        self._seq(
-            [
-                lambda: self._str('/*'),
-                lambda: self._star(self._comment_c1_s1_p_g_),
-                lambda: self._str('*/'),
-            ]
-        )
+        self._str('/*')
+        if self.failed:
+            return
+        self._comment_c1_s1_()
+        if self.failed:
+            return
+        self._str('*/')
+
+    def _comment_c1_s1_p_g_(self):
+        self._comment_c1_s1_p_g_s0_()
+        if self.failed:
+            return
+        self._any_()
+
+    def _comment_c1_s1_p_g_s0_(self):
+        p = self.pos
+        errpos = self.errpos
+        self._str('*/')
+        if self.failed:
+            self._succeed(None, p)
+        else:
+            self._rewind(p)
+            self.errpos = errpos
+            self._fail()
+
+    def _comment_c1_s1_(self):
+        vs = []
+        while True:
+            p = self.pos
+            self._comment_c1_s1_p_g_()
+            if self.failed:
+                self._rewind(p)
+                break
+            vs.append(self.val)
+        self._succeed(vs)
 
     def _pragma_(self):
-        self._choose(
-            [
-                self._pragma_c0_,
-                self._pragma_c1_,
-                self._pragma_c2_,
-                self._pragma_c3_,
-                self._pragma_c4_,
-                self._pragma_c5_,
-                self._pragma_c6_,
-                self._pragma_c7_,
-            ]
-        )
+        p = self.pos
+        self._pragma_c0_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._pragma_c1_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._pragma_c2_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._pragma_c3_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._pragma_c4_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._pragma_c5_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._pragma_c6_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._pragma_c7_()
 
     def _pragma_c0_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._str('%tokens'),
-                lambda: self._bind(self._ident_list_, 'is'),
-                self._pragma_c0_s2_,
-            ]
-        )
+        self._str('%tokens')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._pragma_c0_s1_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['pragma', 'tokens', self._get('is')])
         self.scopes.pop()
 
-    def _pragma_c0_s2_(self):
-        self._succeed(['pragma', 'tokens', self._get('is')])
+    def _pragma_c0_s1_(self):
+        self._pragma_c0_s1_l_()
+        if not self.failed:
+            self._set('is', self.val)
+
+    def _pragma_c0_s1_l_(self):
+        self._ident_list_()
 
     def _pragma_c1_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._str('%token'),
-                self._sp_,
-                lambda: self._bind(self._ident_, 'i'),
-                self._pragma_c1_s3_,
-            ]
-        )
+        self._str('%token')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._pragma_c1_s2_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['pragma', 'token', [self._get('i')]])
         self.scopes.pop()
 
-    def _pragma_c1_s3_(self):
-        self._succeed(['pragma', 'token', [self._get('i')]])
+    def _pragma_c1_s2_(self):
+        self._pragma_c1_s2_l_()
+        if not self.failed:
+            self._set('i', self.val)
+
+    def _pragma_c1_s2_l_(self):
+        self._ident_()
 
     def _pragma_c2_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._str('%whitespace_style'),
-                self._sp_,
-                lambda: self._bind(self._ident_, 'i'),
-                self._pragma_c2_s3_,
-            ]
-        )
+        self._str('%whitespace_style')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._pragma_c2_s2_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['pragma', 'whitespace_style', self._get('i')])
         self.scopes.pop()
 
-    def _pragma_c2_s3_(self):
-        self._succeed(['pragma', 'whitespace_style', self._get('i')])
+    def _pragma_c2_s2_(self):
+        self._pragma_c2_s2_l_()
+        if not self.failed:
+            self._set('i', self.val)
+
+    def _pragma_c2_s2_l_(self):
+        self._ident_()
 
     def _pragma_c3_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._str('%whitespace'),
-                self._sp_,
-                lambda: self._ch('='),
-                self._sp_,
-                lambda: self._bind(self._choice_, 'cs'),
-                self._pragma_c3_s5_,
-            ]
-        )
+        self._str('%whitespace')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ch('=')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._pragma_c3_s4_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['pragma', 'whitespace', [self._get('cs')]])
         self.scopes.pop()
 
-    def _pragma_c3_s5_(self):
-        self._succeed(['pragma', 'whitespace', [self._get('cs')]])
+    def _pragma_c3_s4_(self):
+        self._pragma_c3_s4_l_()
+        if not self.failed:
+            self._set('cs', self.val)
+
+    def _pragma_c3_s4_l_(self):
+        self._choice_()
 
     def _pragma_c4_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._str('%comment_style'),
-                self._sp_,
-                self._pragma_c4_s2_,
-                self._pragma_c4_s3_,
-            ]
-        )
+        self._str('%comment_style')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._pragma_c4_s2_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['pragma', 'comment_style', self._get('c')])
         self.scopes.pop()
 
-    def _pragma_c4_s2_l_g_(self):
-        self._choose([lambda: self._str('C++'), self._ident_])
-
     def _pragma_c4_s2_(self):
-        self._bind(self._pragma_c4_s2_l_g_, 'c')
+        self._pragma_c4_s2_l_()
+        if not self.failed:
+            self._set('c', self.val)
 
-    def _pragma_c4_s3_(self):
-        self._succeed(['pragma', 'comment_style', self._get('c')])
+    def _pragma_c4_s2_l_(self):
+        self._pragma_c4_s2_l_g_()
+
+    def _pragma_c4_s2_l_g_(self):
+        p = self.pos
+        self._str('C++')
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._ident_()
 
     def _pragma_c5_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._str('%comment'),
-                self._sp_,
-                lambda: self._ch('='),
-                self._sp_,
-                lambda: self._bind(self._choice_, 'cs'),
-                self._pragma_c5_s5_,
-            ]
-        )
+        self._str('%comment')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ch('=')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._pragma_c5_s4_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['pragma', 'comment', [self._get('cs')]])
         self.scopes.pop()
 
-    def _pragma_c5_s5_(self):
-        self._succeed(['pragma', 'comment', [self._get('cs')]])
+    def _pragma_c5_s4_(self):
+        self._pragma_c5_s4_l_()
+        if not self.failed:
+            self._set('cs', self.val)
+
+    def _pragma_c5_s4_l_(self):
+        self._choice_()
 
     def _pragma_c6_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._str('%assoc'),
-                self._sp_,
-                lambda: self._bind(self._op_, 'o'),
-                self._sp_,
-                lambda: self._bind(self._dir_, 'd'),
-                self._pragma_c6_s5_,
-            ]
-        )
+        self._str('%assoc')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._pragma_c6_s2_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._pragma_c6_s4_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['pragma', 'assoc', [self._get('o'), self._get('d')]])
         self.scopes.pop()
 
-    def _pragma_c6_s5_(self):
-        self._succeed(['pragma', 'assoc', [self._get('o'), self._get('d')]])
+    def _pragma_c6_s2_(self):
+        self._pragma_c6_s2_l_()
+        if not self.failed:
+            self._set('o', self.val)
+
+    def _pragma_c6_s2_l_(self):
+        self._op_()
+
+    def _pragma_c6_s4_(self):
+        self._pragma_c6_s4_l_()
+        if not self.failed:
+            self._set('d', self.val)
+
+    def _pragma_c6_s4_l_(self):
+        self._dir_()
 
     def _pragma_c7_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._str('%prec'),
-                self._pragma_c7_s1_,
-                self._pragma_c7_s2_,
-            ]
-        )
-        self.scopes.pop()
-
-    def _pragma_c7_s1_l_p_g_(self):
-        self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._not(self._eol_),
-                self._ws_,
-                lambda: self._bind(self._op_, 'o'),
-                lambda: self._succeed(self._get('o')),
-            ]
-        )
+        self._str('%prec')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._pragma_c7_s1_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['pragma', 'prec', self._get('os')])
         self.scopes.pop()
 
     def _pragma_c7_s1_(self):
-        self._bind(lambda: self._plus(self._pragma_c7_s1_l_p_g_), 'os')
+        self._pragma_c7_s1_l_()
+        if not self.failed:
+            self._set('os', self.val)
 
-    def _pragma_c7_s2_(self):
-        self._succeed(['pragma', 'prec', self._get('os')])
+    def _pragma_c7_s1_l_p_g_(self):
+        self.scopes.append({})
+        self._pragma_c7_s1_l_p_g_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ws_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._pragma_c7_s1_l_p_g_s2_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(self._get('o'))
+        self.scopes.pop()
+
+    def _pragma_c7_s1_l_p_g_s0_(self):
+        p = self.pos
+        errpos = self.errpos
+        self._eol_()
+        if self.failed:
+            self._succeed(None, p)
+        else:
+            self._rewind(p)
+            self.errpos = errpos
+            self._fail()
+
+    def _pragma_c7_s1_l_p_g_s2_(self):
+        self._pragma_c7_s1_l_p_g_s2_l_()
+        if not self.failed:
+            self._set('o', self.val)
+
+    def _pragma_c7_s1_l_p_g_s2_l_(self):
+        self._op_()
+
+    def _pragma_c7_s1_l_(self):
+        vs = []
+        self._pragma_c7_s1_l_p_g_()
+        vs.append(self.val)
+        if self.failed:
+            return
+        while True:
+            p = self.pos
+            self._pragma_c7_s1_l_p_g_()
+            if self.failed:
+                self._rewind(p)
+                break
+            vs.append(self.val)
+        self._succeed(vs)
 
     def _op_(self):
         self.scopes.append({})
-        self._seq([self._op_s0_, self._op_s1_])
+        self._op_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(self._join('', self._get('op')))
         self.scopes.pop()
 
-    def _op_s0_l_p_g_(self):
-        self._seq([lambda: self._not(self._ws_), self._any_])
-
     def _op_s0_(self):
-        self._bind(lambda: self._plus(self._op_s0_l_p_g_), 'op')
+        self._op_s0_l_()
+        if not self.failed:
+            self._set('op', self.val)
 
-    def _op_s1_(self):
-        self._succeed(self._join('', self._get('op')))
+    def _op_s0_l_p_g_(self):
+        self._op_s0_l_p_g_s0_()
+        if self.failed:
+            return
+        self._any_()
+
+    def _op_s0_l_p_g_s0_(self):
+        p = self.pos
+        errpos = self.errpos
+        self._ws_()
+        if self.failed:
+            self._succeed(None, p)
+        else:
+            self._rewind(p)
+            self.errpos = errpos
+            self._fail()
+
+    def _op_s0_l_(self):
+        vs = []
+        self._op_s0_l_p_g_()
+        vs.append(self.val)
+        if self.failed:
+            return
+        while True:
+            p = self.pos
+            self._op_s0_l_p_g_()
+            if self.failed:
+                self._rewind(p)
+                break
+            vs.append(self.val)
+        self._succeed(vs)
 
     def _dir_(self):
         self.scopes.append({})
-        self._seq([self._dir_s0_, lambda: self._succeed(self._get('d'))])
+        self._dir_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(self._get('d'))
         self.scopes.pop()
 
-    def _dir_s0_l_g_(self):
-        self._choose([lambda: self._str('left'), lambda: self._str('right')])
-
     def _dir_s0_(self):
-        self._bind(self._dir_s0_l_g_, 'd')
+        self._dir_s0_l_()
+        if not self.failed:
+            self._set('d', self.val)
+
+    def _dir_s0_l_(self):
+        self._dir_s0_l_g_()
+
+    def _dir_s0_l_g_(self):
+        p = self.pos
+        self._str('left')
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._str('right')
 
     def _ident_list_(self):
         self.scopes.append({})
-        self._seq(
-            [self._ident_list_s0_, lambda: self._succeed(self._get('is'))]
-        )
-        self.scopes.pop()
-
-    def _ident_list_s0_l_p_g_(self):
-        self.scopes.append({})
-        self._seq(
-            [
-                self._sp_,
-                lambda: self._bind(self._ident_, 'i'),
-                self._sp_,
-                lambda: self._not(lambda: self._ch('=')),
-                lambda: self._succeed(self._get('i')),
-            ]
-        )
+        self._ident_list_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(self._get('is'))
         self.scopes.pop()
 
     def _ident_list_s0_(self):
-        self._bind(lambda: self._plus(self._ident_list_s0_l_p_g_), 'is')
+        self._ident_list_s0_l_()
+        if not self.failed:
+            self._set('is', self.val)
+
+    def _ident_list_s0_l_p_g_(self):
+        self.scopes.append({})
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ident_list_s0_l_p_g_s1_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ident_list_s0_l_p_g_s3_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(self._get('i'))
+        self.scopes.pop()
+
+    def _ident_list_s0_l_p_g_s1_(self):
+        self._ident_list_s0_l_p_g_s1_l_()
+        if not self.failed:
+            self._set('i', self.val)
+
+    def _ident_list_s0_l_p_g_s1_l_(self):
+        self._ident_()
+
+    def _ident_list_s0_l_p_g_s3_(self):
+        p = self.pos
+        errpos = self.errpos
+        self._ch('=')
+        if self.failed:
+            self._succeed(None, p)
+        else:
+            self._rewind(p)
+            self.errpos = errpos
+            self._fail()
+
+    def _ident_list_s0_l_(self):
+        vs = []
+        self._ident_list_s0_l_p_g_()
+        vs.append(self.val)
+        if self.failed:
+            return
+        while True:
+            p = self.pos
+            self._ident_list_s0_l_p_g_()
+            if self.failed:
+                self._rewind(p)
+                break
+            vs.append(self.val)
+        self._succeed(vs)
 
     def _rule_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._bind(self._ident_, 'i'),
-                self._sp_,
-                lambda: self._ch('='),
-                self._sp_,
-                lambda: self._bind(self._choice_, 'cs'),
-                self._sp_,
-                lambda: self._opt(lambda: self._ch(',')),
-                self._rule_s7_,
-            ]
-        )
+        self._rule_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ch('=')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._rule_s4_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._rule_s6_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['rule', self._get('i'), [self._get('cs')]])
         self.scopes.pop()
 
-    def _rule_s7_(self):
-        self._succeed(['rule', self._get('i'), [self._get('cs')]])
+    def _rule_s0_(self):
+        self._rule_s0_l_()
+        if not self.failed:
+            self._set('i', self.val)
+
+    def _rule_s0_l_(self):
+        self._ident_()
+
+    def _rule_s4_(self):
+        self._rule_s4_l_()
+        if not self.failed:
+            self._set('cs', self.val)
+
+    def _rule_s4_l_(self):
+        self._choice_()
+
+    def _rule_s6_(self):
+        p = self.pos
+        self._ch(',')
+        if self.failed:
+            self._succeed([], p)
+        else:
+            self._succeed([self.val])
 
     def _ident_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._bind(self._id_start_, 'hd'),
-                self._ident_s1_,
-                self._ident_s2_,
-            ]
-        )
+        self._ident_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ident_s1_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(self._cat([self._get('hd')] + self._get('tl')))
         self.scopes.pop()
 
-    def _ident_s1_(self):
-        self._bind(lambda: self._star(self._id_continue_), 'tl')
+    def _ident_s0_(self):
+        self._ident_s0_l_()
+        if not self.failed:
+            self._set('hd', self.val)
 
-    def _ident_s2_(self):
-        self._succeed(self._cat([self._get('hd')] + self._get('tl')))
+    def _ident_s0_l_(self):
+        self._id_start_()
+
+    def _ident_s1_(self):
+        self._ident_s1_l_()
+        if not self.failed:
+            self._set('tl', self.val)
+
+    def _ident_s1_l_(self):
+        vs = []
+        while True:
+            p = self.pos
+            self._id_continue_()
+            if self.failed:
+                self._rewind(p)
+                break
+            vs.append(self.val)
+        self._succeed(vs)
 
     def _id_start_(self):
-        self._choose(
-            [
-                self._id_start_c0_,
-                self._id_start_c1_,
-                lambda: self._ch('_'),
-                lambda: self._ch('$'),
-            ]
-        )
+        p = self.pos
+        self._id_start_c0_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._id_start_c1_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._ch('_')
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._ch('$')
 
     def _id_start_c0_(self):
         self._range('a', 'z')
@@ -379,343 +793,732 @@ class _Parser:
         self._range('A', 'Z')
 
     def _id_continue_(self):
-        self._choose([self._id_start_, self._digit_])
+        p = self.pos
+        self._id_start_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._digit_()
 
     def _choice_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._bind(self._seq_, 's'),
-                self._choice_s1_,
-                self._choice_s2_,
-            ]
-        )
+        self._choice_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._choice_s1_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['choice', None, [self._get('s')] + self._get('ss')])
         self.scopes.pop()
 
-    def _choice_s1_l_p_g_(self):
-        self._seq([self._sp_, lambda: self._ch('|'), self._sp_, self._seq_])
+    def _choice_s0_(self):
+        self._choice_s0_l_()
+        if not self.failed:
+            self._set('s', self.val)
+
+    def _choice_s0_l_(self):
+        self._seq_()
 
     def _choice_s1_(self):
-        self._bind(lambda: self._star(self._choice_s1_l_p_g_), 'ss')
+        self._choice_s1_l_()
+        if not self.failed:
+            self._set('ss', self.val)
 
-    def _choice_s2_(self):
-        self._succeed(['choice', None, [self._get('s')] + self._get('ss')])
+    def _choice_s1_l_p_g_(self):
+        self._sp_()
+        if self.failed:
+            return
+        self._ch('|')
+        if self.failed:
+            return
+        self._sp_()
+        if self.failed:
+            return
+        self._seq_()
+
+    def _choice_s1_l_(self):
+        vs = []
+        while True:
+            p = self.pos
+            self._choice_s1_l_p_g_()
+            if self.failed:
+                self._rewind(p)
+                break
+            vs.append(self.val)
+        self._succeed(vs)
 
     def _seq_(self):
-        self._choose([self._seq_c0_, self._seq_c1_])
+        p = self.pos
+        self._seq_c0_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._succeed(['empty', None, []])
 
     def _seq_c0_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._bind(self._expr_, 'e'),
-                self._seq_c0_s1_,
-                self._seq_c0_s2_,
-            ]
-        )
+        self._seq_c0_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._seq_c0_s1_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['seq', None, [self._get('e')] + self._get('es')])
         self.scopes.pop()
 
-    def _seq_c0_s1_l_p_g_(self):
-        self._seq([self._ws_, self._sp_, self._expr_])
+    def _seq_c0_s0_(self):
+        self._seq_c0_s0_l_()
+        if not self.failed:
+            self._set('e', self.val)
+
+    def _seq_c0_s0_l_(self):
+        self._expr_()
 
     def _seq_c0_s1_(self):
-        self._bind(lambda: self._star(self._seq_c0_s1_l_p_g_), 'es')
+        self._seq_c0_s1_l_()
+        if not self.failed:
+            self._set('es', self.val)
 
-    def _seq_c0_s2_(self):
-        self._succeed(['seq', None, [self._get('e')] + self._get('es')])
+    def _seq_c0_s1_l_p_g_(self):
+        self._ws_()
+        if self.failed:
+            return
+        self._sp_()
+        if self.failed:
+            return
+        self._expr_()
 
-    def _seq_c1_(self):
-        self._succeed(['empty', None, []])
+    def _seq_c0_s1_l_(self):
+        vs = []
+        while True:
+            p = self.pos
+            self._seq_c0_s1_l_p_g_()
+            if self.failed:
+                self._rewind(p)
+                break
+            vs.append(self.val)
+        self._succeed(vs)
 
     def _expr_(self):
-        self._choose([self._expr_c0_, self._post_expr_])
+        p = self.pos
+        self._expr_c0_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._post_expr_()
 
     def _expr_c0_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._bind(self._post_expr_, 'e'),
-                lambda: self._ch(':'),
-                lambda: self._bind(self._ident_, 'l'),
-                self._expr_c0_s3_,
-            ]
-        )
+        self._expr_c0_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ch(':')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._expr_c0_s2_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['label', self._get('l'), [self._get('e')]])
         self.scopes.pop()
 
-    def _expr_c0_s3_(self):
-        self._succeed(['label', self._get('l'), [self._get('e')]])
+    def _expr_c0_s0_(self):
+        self._expr_c0_s0_l_()
+        if not self.failed:
+            self._set('e', self.val)
+
+    def _expr_c0_s0_l_(self):
+        self._post_expr_()
+
+    def _expr_c0_s2_(self):
+        self._expr_c0_s2_l_()
+        if not self.failed:
+            self._set('l', self.val)
+
+    def _expr_c0_s2_l_(self):
+        self._ident_()
 
     def _post_expr_(self):
-        self._choose([self._post_expr_c0_, self._prim_expr_])
+        p = self.pos
+        self._post_expr_c0_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._prim_expr_()
 
     def _post_expr_c0_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._bind(self._prim_expr_, 'e'),
-                lambda: self._bind(self._post_op_, 'op'),
-                self._post_expr_c0_s2_,
-            ]
-        )
+        self._post_expr_c0_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._post_expr_c0_s1_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['post', self._get('op'), [self._get('e')]])
         self.scopes.pop()
 
-    def _post_expr_c0_s2_(self):
-        self._succeed(['post', self._get('op'), [self._get('e')]])
+    def _post_expr_c0_s0_(self):
+        self._post_expr_c0_s0_l_()
+        if not self.failed:
+            self._set('e', self.val)
+
+    def _post_expr_c0_s0_l_(self):
+        self._prim_expr_()
+
+    def _post_expr_c0_s1_(self):
+        self._post_expr_c0_s1_l_()
+        if not self.failed:
+            self._set('op', self.val)
+
+    def _post_expr_c0_s1_l_(self):
+        self._post_op_()
 
     def _post_op_(self):
-        self._choose(
-            [
-                lambda: self._ch('?'),
-                lambda: self._ch('*'),
-                lambda: self._ch('+'),
-            ]
-        )
+        p = self.pos
+        self._ch('?')
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._ch('*')
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._ch('+')
 
     def _prim_expr_(self):
-        self._choose(
-            [
-                self._prim_expr_c0_,
-                self._prim_expr_c1_,
-                self._prim_expr_c2_,
-                self._prim_expr_c3_,
-                self._prim_expr_c4_,
-                self._prim_expr_c5_,
-                self._prim_expr_c6_,
-                self._prim_expr_c7_,
-                self._prim_expr_c8_,
-                self._prim_expr_c9_,
-            ]
-        )
+        p = self.pos
+        self._prim_expr_c0_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._prim_expr_c1_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._prim_expr_c2_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._prim_expr_c3_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._prim_expr_c4_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._prim_expr_c5_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._prim_expr_c6_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._prim_expr_c7_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._prim_expr_c8_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._prim_expr_c9_()
 
     def _prim_expr_c0_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._bind(self._lit_, 'i'),
-                self._sp_,
-                lambda: self._str('..'),
-                self._sp_,
-                lambda: self._bind(self._lit_, 'j'),
-                self._prim_expr_c0_s5_,
-            ]
-        )
+        self._prim_expr_c0_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._str('..')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._prim_expr_c0_s4_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['range', None, [self._get('i'), self._get('j')]])
         self.scopes.pop()
 
-    def _prim_expr_c0_s5_(self):
-        self._succeed(['range', None, [self._get('i'), self._get('j')]])
+    def _prim_expr_c0_s0_(self):
+        self._prim_expr_c0_s0_l_()
+        if not self.failed:
+            self._set('i', self.val)
+
+    def _prim_expr_c0_s0_l_(self):
+        self._lit_()
+
+    def _prim_expr_c0_s4_(self):
+        self._prim_expr_c0_s4_l_()
+        if not self.failed:
+            self._set('j', self.val)
+
+    def _prim_expr_c0_s4_l_(self):
+        self._lit_()
 
     def _prim_expr_c1_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._bind(self._lit_, 'l'),
-                lambda: self._succeed(self._get('l')),
-            ]
-        )
+        self._prim_expr_c1_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(self._get('l'))
         self.scopes.pop()
+
+    def _prim_expr_c1_s0_(self):
+        self._prim_expr_c1_s0_l_()
+        if not self.failed:
+            self._set('l', self.val)
+
+    def _prim_expr_c1_s0_l_(self):
+        self._lit_()
 
     def _prim_expr_c2_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._bind(self._escape_, 'e'),
-                lambda: self._succeed(self._get('e')),
-            ]
-        )
+        self._prim_expr_c2_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(self._get('e'))
         self.scopes.pop()
 
-    def _prim_expr_c3_s1_n_g_(self):
-        self._seq([self._sp_, lambda: self._ch('=')])
+    def _prim_expr_c2_s0_(self):
+        self._prim_expr_c2_s0_l_()
+        if not self.failed:
+            self._set('e', self.val)
+
+    def _prim_expr_c2_s0_l_(self):
+        self._escape_()
 
     def _prim_expr_c3_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._bind(self._ident_, 'i'),
-                lambda: self._not(self._prim_expr_c3_s1_n_g_),
-                self._prim_expr_c3_s2_,
-            ]
-        )
+        self._prim_expr_c3_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._prim_expr_c3_s1_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['apply', self._get('i'), []])
         self.scopes.pop()
 
-    def _prim_expr_c3_s2_(self):
-        self._succeed(['apply', self._get('i'), []])
+    def _prim_expr_c3_s0_(self):
+        self._prim_expr_c3_s0_l_()
+        if not self.failed:
+            self._set('i', self.val)
+
+    def _prim_expr_c3_s0_l_(self):
+        self._ident_()
+
+    def _prim_expr_c3_s1_n_g_(self):
+        self._sp_()
+        if self.failed:
+            return
+        self._ch('=')
+
+    def _prim_expr_c3_s1_(self):
+        p = self.pos
+        errpos = self.errpos
+        self._prim_expr_c3_s1_n_g_()
+        if self.failed:
+            self._succeed(None, p)
+        else:
+            self._rewind(p)
+            self.errpos = errpos
+            self._fail()
 
     def _prim_expr_c4_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._str('->'),
-                self._sp_,
-                lambda: self._bind(self._ll_expr_, 'e'),
-                self._prim_expr_c4_s3_,
-            ]
-        )
+        self._str('->')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._prim_expr_c4_s2_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['action', None, [self._get('e')]])
         self.scopes.pop()
 
-    def _prim_expr_c4_s3_(self):
-        self._succeed(['action', None, [self._get('e')]])
+    def _prim_expr_c4_s2_(self):
+        self._prim_expr_c4_s2_l_()
+        if not self.failed:
+            self._set('e', self.val)
+
+    def _prim_expr_c4_s2_l_(self):
+        self._ll_expr_()
 
     def _prim_expr_c5_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._ch('{'),
-                self._sp_,
-                lambda: self._bind(self._ll_expr_, 'e'),
-                self._sp_,
-                lambda: self._ch('}'),
-                self._prim_expr_c5_s5_,
-            ]
-        )
+        self._ch('{')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._prim_expr_c5_s2_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ch('}')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['action', None, [self._get('e')]])
         self.scopes.pop()
 
-    def _prim_expr_c5_s5_(self):
-        self._succeed(['action', None, [self._get('e')]])
+    def _prim_expr_c5_s2_(self):
+        self._prim_expr_c5_s2_l_()
+        if not self.failed:
+            self._set('e', self.val)
+
+    def _prim_expr_c5_s2_l_(self):
+        self._ll_expr_()
 
     def _prim_expr_c6_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._ch('~'),
-                lambda: self._bind(self._prim_expr_, 'e'),
-                self._prim_expr_c6_s2_,
-            ]
-        )
+        self._ch('~')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._prim_expr_c6_s1_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['not', None, [self._get('e')]])
         self.scopes.pop()
 
-    def _prim_expr_c6_s2_(self):
-        self._succeed(['not', None, [self._get('e')]])
+    def _prim_expr_c6_s1_(self):
+        self._prim_expr_c6_s1_l_()
+        if not self.failed:
+            self._set('e', self.val)
+
+    def _prim_expr_c6_s1_l_(self):
+        self._prim_expr_()
 
     def _prim_expr_c7_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._str('?('),
-                self._sp_,
-                lambda: self._bind(self._ll_expr_, 'e'),
-                self._sp_,
-                lambda: self._ch(')'),
-                self._prim_expr_c7_s5_,
-            ]
-        )
+        self._str('?(')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._prim_expr_c7_s2_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ch(')')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['pred', None, [self._get('e')]])
         self.scopes.pop()
 
-    def _prim_expr_c7_s5_(self):
-        self._succeed(['pred', None, [self._get('e')]])
+    def _prim_expr_c7_s2_(self):
+        self._prim_expr_c7_s2_l_()
+        if not self.failed:
+            self._set('e', self.val)
+
+    def _prim_expr_c7_s2_l_(self):
+        self._ll_expr_()
 
     def _prim_expr_c8_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._str('?{'),
-                self._sp_,
-                lambda: self._bind(self._ll_expr_, 'e'),
-                self._sp_,
-                lambda: self._ch('}'),
-                self._prim_expr_c8_s5_,
-            ]
-        )
+        self._str('?{')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._prim_expr_c8_s2_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ch('}')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['pred', None, [self._get('e')]])
         self.scopes.pop()
 
-    def _prim_expr_c8_s5_(self):
-        self._succeed(['pred', None, [self._get('e')]])
+    def _prim_expr_c8_s2_(self):
+        self._prim_expr_c8_s2_l_()
+        if not self.failed:
+            self._set('e', self.val)
+
+    def _prim_expr_c8_s2_l_(self):
+        self._ll_expr_()
 
     def _prim_expr_c9_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._ch('('),
-                self._sp_,
-                lambda: self._bind(self._choice_, 'e'),
-                self._sp_,
-                lambda: self._ch(')'),
-                self._prim_expr_c9_s5_,
-            ]
-        )
+        self._ch('(')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._prim_expr_c9_s2_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ch(')')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['paren', None, [self._get('e')]])
         self.scopes.pop()
 
-    def _prim_expr_c9_s5_(self):
-        self._succeed(['paren', None, [self._get('e')]])
+    def _prim_expr_c9_s2_(self):
+        self._prim_expr_c9_s2_l_()
+        if not self.failed:
+            self._set('e', self.val)
+
+    def _prim_expr_c9_s2_l_(self):
+        self._choice_()
 
     def _lit_(self):
-        self._choose([self._lit_c0_, self._lit_c1_])
+        p = self.pos
+        self._lit_c0_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._lit_c1_()
 
     def _lit_c0_(self):
         self.scopes.append({})
-        self._seq(
-            [self._squote_, self._lit_c0_s1_, self._squote_, self._lit_c0_s3_]
-        )
+        self._squote_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._lit_c0_s1_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._squote_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['lit', self._cat(self._get('cs')), []])
         self.scopes.pop()
 
     def _lit_c0_s1_(self):
-        self._bind(lambda: self._star(self._sqchar_), 'cs')
+        self._lit_c0_s1_l_()
+        if not self.failed:
+            self._set('cs', self.val)
 
-    def _lit_c0_s3_(self):
-        self._succeed(['lit', self._cat(self._get('cs')), []])
+    def _lit_c0_s1_l_(self):
+        vs = []
+        while True:
+            p = self.pos
+            self._sqchar_()
+            if self.failed:
+                self._rewind(p)
+                break
+            vs.append(self.val)
+        self._succeed(vs)
 
     def _lit_c1_(self):
         self.scopes.append({})
-        self._seq(
-            [self._dquote_, self._lit_c1_s1_, self._dquote_, self._lit_c1_s3_]
-        )
+        self._dquote_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._lit_c1_s1_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._dquote_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['lit', self._cat(self._get('cs')), []])
         self.scopes.pop()
 
     def _lit_c1_s1_(self):
-        self._bind(lambda: self._star(self._dqchar_), 'cs')
+        self._lit_c1_s1_l_()
+        if not self.failed:
+            self._set('cs', self.val)
 
-    def _lit_c1_s3_(self):
-        self._succeed(['lit', self._cat(self._get('cs')), []])
+    def _lit_c1_s1_l_(self):
+        vs = []
+        while True:
+            p = self.pos
+            self._dqchar_()
+            if self.failed:
+                self._rewind(p)
+                break
+            vs.append(self.val)
+        self._succeed(vs)
 
     def _sqchar_(self):
-        self._choose([self._sqchar_c0_, self._sqchar_c1_])
+        p = self.pos
+        self._sqchar_c0_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._sqchar_c1_()
 
     def _sqchar_c0_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                self._bslash_,
-                lambda: self._bind(self._esc_char_, 'c'),
-                lambda: self._succeed(self._get('c')),
-            ]
-        )
+        self._bslash_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sqchar_c0_s1_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(self._get('c'))
         self.scopes.pop()
+
+    def _sqchar_c0_s1_(self):
+        self._sqchar_c0_s1_l_()
+        if not self.failed:
+            self._set('c', self.val)
+
+    def _sqchar_c0_s1_l_(self):
+        self._esc_char_()
 
     def _sqchar_c1_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._not(self._squote_),
-                lambda: self._bind(self._any_, 'c'),
-                lambda: self._succeed(self._get('c')),
-            ]
-        )
+        self._sqchar_c1_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sqchar_c1_s1_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(self._get('c'))
         self.scopes.pop()
 
+    def _sqchar_c1_s0_(self):
+        p = self.pos
+        errpos = self.errpos
+        self._squote_()
+        if self.failed:
+            self._succeed(None, p)
+        else:
+            self._rewind(p)
+            self.errpos = errpos
+            self._fail()
+
+    def _sqchar_c1_s1_(self):
+        self._sqchar_c1_s1_l_()
+        if not self.failed:
+            self._set('c', self.val)
+
+    def _sqchar_c1_s1_l_(self):
+        self._any_()
+
     def _dqchar_(self):
-        self._choose([self._dqchar_c0_, self._dqchar_c1_])
+        p = self.pos
+        self._dqchar_c0_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._dqchar_c1_()
 
     def _dqchar_c0_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                self._bslash_,
-                lambda: self._bind(self._esc_char_, 'c'),
-                lambda: self._succeed(self._get('c')),
-            ]
-        )
+        self._bslash_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._dqchar_c0_s1_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(self._get('c'))
         self.scopes.pop()
+
+    def _dqchar_c0_s1_(self):
+        self._dqchar_c0_s1_l_()
+        if not self.failed:
+            self._set('c', self.val)
+
+    def _dqchar_c0_s1_l_(self):
+        self._esc_char_()
 
     def _dqchar_c1_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._not(self._dquote_),
-                lambda: self._bind(self._any_, 'c'),
-                lambda: self._succeed(self._get('c')),
-            ]
-        )
+        self._dqchar_c1_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._dqchar_c1_s1_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(self._get('c'))
         self.scopes.pop()
+
+    def _dqchar_c1_s0_(self):
+        p = self.pos
+        errpos = self.errpos
+        self._dquote_()
+        if self.failed:
+            self._succeed(None, p)
+        else:
+            self._rewind(p)
+            self.errpos = errpos
+            self._fail()
+
+    def _dqchar_c1_s1_(self):
+        self._dqchar_c1_s1_l_()
+        if not self.failed:
+            self._set('c', self.val)
+
+    def _dqchar_c1_s1_l_(self):
+        self._any_()
 
     def _bslash_(self):
         self._ch('\\')
@@ -727,102 +1530,200 @@ class _Parser:
         self._ch('"')
 
     def _esc_char_(self):
-        self._choose(
-            [
-                self._esc_char_c0_,
-                self._esc_char_c1_,
-                self._esc_char_c2_,
-                self._esc_char_c3_,
-                self._esc_char_c4_,
-                self._esc_char_c5_,
-                self._esc_char_c6_,
-                self._esc_char_c7_,
-                self._esc_char_c8_,
-                self._esc_char_c9_,
-                self._esc_char_c10_,
-            ]
-        )
+        p = self.pos
+        self._esc_char_c0_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._esc_char_c1_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._esc_char_c2_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._esc_char_c3_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._esc_char_c4_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._esc_char_c5_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._esc_char_c6_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._esc_char_c7_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._esc_char_c8_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._esc_char_c9_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._esc_char_c10_()
 
     def _esc_char_c0_(self):
-        self._seq([lambda: self._ch('b'), lambda: self._succeed('\b')])
+        self._ch('b')
+        if self.failed:
+            return
+        self._succeed('\b')
 
     def _esc_char_c1_(self):
-        self._seq([lambda: self._ch('f'), lambda: self._succeed('\f')])
+        self._ch('f')
+        if self.failed:
+            return
+        self._succeed('\f')
 
     def _esc_char_c2_(self):
-        self._seq([lambda: self._ch('n'), lambda: self._succeed('\n')])
+        self._ch('n')
+        if self.failed:
+            return
+        self._succeed('\n')
 
     def _esc_char_c3_(self):
-        self._seq([lambda: self._ch('r'), lambda: self._succeed('\r')])
+        self._ch('r')
+        if self.failed:
+            return
+        self._succeed('\r')
 
     def _esc_char_c4_(self):
-        self._seq([lambda: self._ch('t'), lambda: self._succeed('\t')])
+        self._ch('t')
+        if self.failed:
+            return
+        self._succeed('\t')
 
     def _esc_char_c5_(self):
-        self._seq([lambda: self._ch('v'), lambda: self._succeed('\v')])
+        self._ch('v')
+        if self.failed:
+            return
+        self._succeed('\v')
 
     def _esc_char_c6_(self):
-        self._seq([self._squote_, lambda: self._succeed("'")])
+        self._squote_()
+        if self.failed:
+            return
+        self._succeed("'")
 
     def _esc_char_c7_(self):
-        self._seq([self._dquote_, lambda: self._succeed('"')])
+        self._dquote_()
+        if self.failed:
+            return
+        self._succeed('"')
 
     def _esc_char_c8_(self):
-        self._seq([self._bslash_, lambda: self._succeed('\\')])
+        self._bslash_()
+        if self.failed:
+            return
+        self._succeed('\\')
 
     def _esc_char_c9_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._bind(self._hex_esc_, 'c'),
-                lambda: self._succeed(self._get('c')),
-            ]
-        )
+        self._esc_char_c9_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(self._get('c'))
         self.scopes.pop()
+
+    def _esc_char_c9_s0_(self):
+        self._esc_char_c9_s0_l_()
+        if not self.failed:
+            self._set('c', self.val)
+
+    def _esc_char_c9_s0_l_(self):
+        self._hex_esc_()
 
     def _esc_char_c10_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._bind(self._unicode_esc_, 'c'),
-                lambda: self._succeed(self._get('c')),
-            ]
-        )
+        self._esc_char_c10_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(self._get('c'))
         self.scopes.pop()
+
+    def _esc_char_c10_s0_(self):
+        self._esc_char_c10_s0_l_()
+        if not self.failed:
+            self._set('c', self.val)
+
+    def _esc_char_c10_s0_l_(self):
+        self._unicode_esc_()
 
     def _hex_esc_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._ch('x'),
-                lambda: self._bind(self._hex_, 'h1'),
-                lambda: self._bind(self._hex_, 'h2'),
-                self._hex_esc_s3_,
-            ]
-        )
+        self._ch('x')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._hex_esc_s1_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._hex_esc_s2_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(self._xtou(self._get('h1') + self._get('h2')))
         self.scopes.pop()
 
-    def _hex_esc_s3_(self):
-        self._succeed(self._xtou(self._get('h1') + self._get('h2')))
+    def _hex_esc_s1_(self):
+        self._hex_esc_s1_l_()
+        if not self.failed:
+            self._set('h1', self.val)
+
+    def _hex_esc_s1_l_(self):
+        self._hex_()
+
+    def _hex_esc_s2_(self):
+        self._hex_esc_s2_l_()
+        if not self.failed:
+            self._set('h2', self.val)
+
+    def _hex_esc_s2_l_(self):
+        self._hex_()
 
     def _unicode_esc_(self):
-        self._choose([self._unicode_esc_c0_, self._unicode_esc_c1_])
+        p = self.pos
+        self._unicode_esc_c0_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._unicode_esc_c1_()
 
     def _unicode_esc_c0_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._ch('u'),
-                lambda: self._bind(self._hex_, 'h1'),
-                lambda: self._bind(self._hex_, 'h2'),
-                lambda: self._bind(self._hex_, 'h3'),
-                lambda: self._bind(self._hex_, 'h4'),
-                self._unicode_esc_c0_s5_,
-            ]
-        )
-        self.scopes.pop()
-
-    def _unicode_esc_c0_s5_(self):
+        self._ch('u')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._unicode_esc_c0_s1_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._unicode_esc_c0_s2_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._unicode_esc_c0_s3_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._unicode_esc_c0_s4_()
+        if self.failed:
+            self.scopes.pop()
+            return
         self._succeed(
             self._xtou(
                 self._get('h1')
@@ -831,26 +1732,78 @@ class _Parser:
                 + self._get('h4'),
             )
         )
+        self.scopes.pop()
+
+    def _unicode_esc_c0_s1_(self):
+        self._unicode_esc_c0_s1_l_()
+        if not self.failed:
+            self._set('h1', self.val)
+
+    def _unicode_esc_c0_s1_l_(self):
+        self._hex_()
+
+    def _unicode_esc_c0_s2_(self):
+        self._unicode_esc_c0_s2_l_()
+        if not self.failed:
+            self._set('h2', self.val)
+
+    def _unicode_esc_c0_s2_l_(self):
+        self._hex_()
+
+    def _unicode_esc_c0_s3_(self):
+        self._unicode_esc_c0_s3_l_()
+        if not self.failed:
+            self._set('h3', self.val)
+
+    def _unicode_esc_c0_s3_l_(self):
+        self._hex_()
+
+    def _unicode_esc_c0_s4_(self):
+        self._unicode_esc_c0_s4_l_()
+        if not self.failed:
+            self._set('h4', self.val)
+
+    def _unicode_esc_c0_s4_l_(self):
+        self._hex_()
 
     def _unicode_esc_c1_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._ch('U'),
-                lambda: self._bind(self._hex_, 'h1'),
-                lambda: self._bind(self._hex_, 'h2'),
-                lambda: self._bind(self._hex_, 'h3'),
-                lambda: self._bind(self._hex_, 'h4'),
-                lambda: self._bind(self._hex_, 'h5'),
-                lambda: self._bind(self._hex_, 'h6'),
-                lambda: self._bind(self._hex_, 'h7'),
-                lambda: self._bind(self._hex_, 'h8'),
-                self._unicode_esc_c1_s9_,
-            ]
-        )
-        self.scopes.pop()
-
-    def _unicode_esc_c1_s9_(self):
+        self._ch('U')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._unicode_esc_c1_s1_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._unicode_esc_c1_s2_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._unicode_esc_c1_s3_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._unicode_esc_c1_s4_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._unicode_esc_c1_s5_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._unicode_esc_c1_s6_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._unicode_esc_c1_s7_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._unicode_esc_c1_s8_()
+        if self.failed:
+            self.scopes.pop()
+            return
         self._succeed(
             self._xtou(
                 self._get('h1')
@@ -863,291 +1816,652 @@ class _Parser:
                 + self._get('h8'),
             )
         )
+        self.scopes.pop()
+
+    def _unicode_esc_c1_s1_(self):
+        self._unicode_esc_c1_s1_l_()
+        if not self.failed:
+            self._set('h1', self.val)
+
+    def _unicode_esc_c1_s1_l_(self):
+        self._hex_()
+
+    def _unicode_esc_c1_s2_(self):
+        self._unicode_esc_c1_s2_l_()
+        if not self.failed:
+            self._set('h2', self.val)
+
+    def _unicode_esc_c1_s2_l_(self):
+        self._hex_()
+
+    def _unicode_esc_c1_s3_(self):
+        self._unicode_esc_c1_s3_l_()
+        if not self.failed:
+            self._set('h3', self.val)
+
+    def _unicode_esc_c1_s3_l_(self):
+        self._hex_()
+
+    def _unicode_esc_c1_s4_(self):
+        self._unicode_esc_c1_s4_l_()
+        if not self.failed:
+            self._set('h4', self.val)
+
+    def _unicode_esc_c1_s4_l_(self):
+        self._hex_()
+
+    def _unicode_esc_c1_s5_(self):
+        self._unicode_esc_c1_s5_l_()
+        if not self.failed:
+            self._set('h5', self.val)
+
+    def _unicode_esc_c1_s5_l_(self):
+        self._hex_()
+
+    def _unicode_esc_c1_s6_(self):
+        self._unicode_esc_c1_s6_l_()
+        if not self.failed:
+            self._set('h6', self.val)
+
+    def _unicode_esc_c1_s6_l_(self):
+        self._hex_()
+
+    def _unicode_esc_c1_s7_(self):
+        self._unicode_esc_c1_s7_l_()
+        if not self.failed:
+            self._set('h7', self.val)
+
+    def _unicode_esc_c1_s7_l_(self):
+        self._hex_()
+
+    def _unicode_esc_c1_s8_(self):
+        self._unicode_esc_c1_s8_l_()
+        if not self.failed:
+            self._set('h8', self.val)
+
+    def _unicode_esc_c1_s8_l_(self):
+        self._hex_()
 
     def _escape_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._str('\\p{'),
-                lambda: self._bind(self._ident_, 'i'),
-                lambda: self._ch('}'),
-                self._escape_s3_,
-            ]
-        )
+        self._str('\\p{')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._escape_s1_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ch('}')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['unicat', self._get('i'), []])
         self.scopes.pop()
 
-    def _escape_s3_(self):
-        self._succeed(['unicat', self._get('i'), []])
+    def _escape_s1_(self):
+        self._escape_s1_l_()
+        if not self.failed:
+            self._set('i', self.val)
+
+    def _escape_s1_l_(self):
+        self._ident_()
 
     def _ll_exprs_(self):
-        self._choose([self._ll_exprs_c0_, self._ll_exprs_c1_])
+        p = self.pos
+        self._ll_exprs_c0_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._succeed([])
 
     def _ll_exprs_c0_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._bind(self._ll_expr_, 'e'),
-                self._ll_exprs_c0_s1_,
-                self._ll_exprs_c0_s2_,
-            ]
-        )
+        self._ll_exprs_c0_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ll_exprs_c0_s1_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed([self._get('e')] + self._get('es'))
         self.scopes.pop()
 
-    def _ll_exprs_c0_s1_l_p_g_(self):
-        self._seq(
-            [self._sp_, lambda: self._ch(','), self._sp_, self._ll_expr_]
-        )
+    def _ll_exprs_c0_s0_(self):
+        self._ll_exprs_c0_s0_l_()
+        if not self.failed:
+            self._set('e', self.val)
+
+    def _ll_exprs_c0_s0_l_(self):
+        self._ll_expr_()
 
     def _ll_exprs_c0_s1_(self):
-        self._bind(lambda: self._star(self._ll_exprs_c0_s1_l_p_g_), 'es')
+        self._ll_exprs_c0_s1_l_()
+        if not self.failed:
+            self._set('es', self.val)
 
-    def _ll_exprs_c0_s2_(self):
-        self._succeed([self._get('e')] + self._get('es'))
+    def _ll_exprs_c0_s1_l_p_g_(self):
+        self._sp_()
+        if self.failed:
+            return
+        self._ch(',')
+        if self.failed:
+            return
+        self._sp_()
+        if self.failed:
+            return
+        self._ll_expr_()
 
-    def _ll_exprs_c1_(self):
-        self._succeed([])
+    def _ll_exprs_c0_s1_l_(self):
+        vs = []
+        while True:
+            p = self.pos
+            self._ll_exprs_c0_s1_l_p_g_()
+            if self.failed:
+                self._rewind(p)
+                break
+            vs.append(self.val)
+        self._succeed(vs)
 
     def _ll_expr_(self):
-        self._choose([self._ll_expr_c0_, self._ll_expr_c1_, self._ll_qual_])
+        p = self.pos
+        self._ll_expr_c0_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._ll_expr_c1_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._ll_qual_()
 
     def _ll_expr_c0_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._bind(self._ll_qual_, 'e1'),
-                self._sp_,
-                lambda: self._ch('+'),
-                self._sp_,
-                lambda: self._bind(self._ll_expr_, 'e2'),
-                self._ll_expr_c0_s5_,
-            ]
-        )
+        self._ll_expr_c0_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ch('+')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ll_expr_c0_s4_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['ll_plus', None, [self._get('e1'), self._get('e2')]])
         self.scopes.pop()
 
-    def _ll_expr_c0_s5_(self):
-        self._succeed(['ll_plus', None, [self._get('e1'), self._get('e2')]])
+    def _ll_expr_c0_s0_(self):
+        self._ll_expr_c0_s0_l_()
+        if not self.failed:
+            self._set('e1', self.val)
+
+    def _ll_expr_c0_s0_l_(self):
+        self._ll_qual_()
+
+    def _ll_expr_c0_s4_(self):
+        self._ll_expr_c0_s4_l_()
+        if not self.failed:
+            self._set('e2', self.val)
+
+    def _ll_expr_c0_s4_l_(self):
+        self._ll_expr_()
 
     def _ll_expr_c1_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._bind(self._ll_qual_, 'e1'),
-                self._sp_,
-                lambda: self._ch('-'),
-                self._sp_,
-                lambda: self._bind(self._ll_expr_, 'e2'),
-                self._ll_expr_c1_s5_,
-            ]
-        )
+        self._ll_expr_c1_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ch('-')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ll_expr_c1_s4_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['ll_minus', None, [self._get('e1'), self._get('e2')]])
         self.scopes.pop()
 
-    def _ll_expr_c1_s5_(self):
-        self._succeed(['ll_minus', None, [self._get('e1'), self._get('e2')]])
+    def _ll_expr_c1_s0_(self):
+        self._ll_expr_c1_s0_l_()
+        if not self.failed:
+            self._set('e1', self.val)
+
+    def _ll_expr_c1_s0_l_(self):
+        self._ll_qual_()
+
+    def _ll_expr_c1_s4_(self):
+        self._ll_expr_c1_s4_l_()
+        if not self.failed:
+            self._set('e2', self.val)
+
+    def _ll_expr_c1_s4_l_(self):
+        self._ll_expr_()
 
     def _ll_qual_(self):
-        self._choose([self._ll_qual_c0_, self._ll_prim_])
+        p = self.pos
+        self._ll_qual_c0_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._ll_prim_()
 
     def _ll_qual_c0_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._bind(self._ll_prim_, 'e'),
-                self._ll_qual_c0_s1_,
-                self._ll_qual_c0_s2_,
-            ]
-        )
+        self._ll_qual_c0_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ll_qual_c0_s1_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['ll_qual', None, [self._get('e')] + self._get('ps')])
         self.scopes.pop()
 
-    def _ll_qual_c0_s1_(self):
-        self._bind(lambda: self._plus(self._ll_post_op_), 'ps')
+    def _ll_qual_c0_s0_(self):
+        self._ll_qual_c0_s0_l_()
+        if not self.failed:
+            self._set('e', self.val)
 
-    def _ll_qual_c0_s2_(self):
-        self._succeed(['ll_qual', None, [self._get('e')] + self._get('ps')])
+    def _ll_qual_c0_s0_l_(self):
+        self._ll_prim_()
+
+    def _ll_qual_c0_s1_(self):
+        self._ll_qual_c0_s1_l_()
+        if not self.failed:
+            self._set('ps', self.val)
+
+    def _ll_qual_c0_s1_l_(self):
+        vs = []
+        self._ll_post_op_()
+        vs.append(self.val)
+        if self.failed:
+            return
+        while True:
+            p = self.pos
+            self._ll_post_op_()
+            if self.failed:
+                self._rewind(p)
+                break
+            vs.append(self.val)
+        self._succeed(vs)
 
     def _ll_post_op_(self):
-        self._choose([self._ll_post_op_c0_, self._ll_post_op_c1_])
+        p = self.pos
+        self._ll_post_op_c0_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._ll_post_op_c1_()
 
     def _ll_post_op_c0_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._ch('['),
-                self._sp_,
-                lambda: self._bind(self._ll_expr_, 'e'),
-                self._sp_,
-                lambda: self._ch(']'),
-                self._ll_post_op_c0_s5_,
-            ]
-        )
+        self._ch('[')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ll_post_op_c0_s2_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ch(']')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['ll_getitem', None, [self._get('e')]])
         self.scopes.pop()
 
-    def _ll_post_op_c0_s5_(self):
-        self._succeed(['ll_getitem', None, [self._get('e')]])
+    def _ll_post_op_c0_s2_(self):
+        self._ll_post_op_c0_s2_l_()
+        if not self.failed:
+            self._set('e', self.val)
+
+    def _ll_post_op_c0_s2_l_(self):
+        self._ll_expr_()
 
     def _ll_post_op_c1_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._ch('('),
-                self._sp_,
-                lambda: self._bind(self._ll_exprs_, 'es'),
-                self._sp_,
-                lambda: self._ch(')'),
-                self._ll_post_op_c1_s5_,
-            ]
-        )
+        self._ch('(')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ll_post_op_c1_s2_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ch(')')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['ll_call', None, self._get('es')])
         self.scopes.pop()
 
-    def _ll_post_op_c1_s5_(self):
-        self._succeed(['ll_call', None, self._get('es')])
+    def _ll_post_op_c1_s2_(self):
+        self._ll_post_op_c1_s2_l_()
+        if not self.failed:
+            self._set('es', self.val)
+
+    def _ll_post_op_c1_s2_l_(self):
+        self._ll_exprs_()
 
     def _ll_prim_(self):
-        self._choose(
-            [
-                self._ll_prim_c0_,
-                self._ll_prim_c1_,
-                self._ll_prim_c2_,
-                self._ll_prim_c3_,
-                self._ll_prim_c4_,
-                self._ll_prim_c5_,
-                self._ll_prim_c6_,
-                self._ll_prim_c7_,
-                self._ll_prim_c8_,
-                self._ll_prim_c9_,
-                self._ll_prim_c10_,
-            ]
-        )
+        p = self.pos
+        self._ll_prim_c0_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._ll_prim_c1_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._ll_prim_c2_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._ll_prim_c3_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._ll_prim_c4_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._ll_prim_c5_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._ll_prim_c6_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._ll_prim_c7_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._ll_prim_c8_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._ll_prim_c9_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._ll_prim_c10_()
 
     def _ll_prim_c0_(self):
-        self._seq([lambda: self._str('false'), self._ll_prim_c0_s1_])
-
-    def _ll_prim_c0_s1_(self):
+        self._str('false')
+        if self.failed:
+            return
         self._succeed(['ll_const', 'false', []])
 
     def _ll_prim_c1_(self):
-        self._seq([lambda: self._str('null'), self._ll_prim_c1_s1_])
-
-    def _ll_prim_c1_s1_(self):
+        self._str('null')
+        if self.failed:
+            return
         self._succeed(['ll_const', 'null', []])
 
     def _ll_prim_c2_(self):
-        self._seq([lambda: self._str('true'), self._ll_prim_c2_s1_])
-
-    def _ll_prim_c2_s1_(self):
+        self._str('true')
+        if self.failed:
+            return
         self._succeed(['ll_const', 'true', []])
 
     def _ll_prim_c3_(self):
-        self._seq([lambda: self._str('Infinity'), self._ll_prim_c3_s1_])
-
-    def _ll_prim_c3_s1_(self):
+        self._str('Infinity')
+        if self.failed:
+            return
         self._succeed(['ll_const', 'Infinity', []])
 
     def _ll_prim_c4_(self):
-        self._seq([lambda: self._str('NaN'), self._ll_prim_c4_s1_])
-
-    def _ll_prim_c4_s1_(self):
+        self._str('NaN')
+        if self.failed:
+            return
         self._succeed(['ll_const', 'NaN', []])
 
     def _ll_prim_c5_(self):
         self.scopes.append({})
-        self._seq(
-            [lambda: self._bind(self._ident_, 'i'), self._ll_prim_c5_s1_]
-        )
+        self._ll_prim_c5_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['ll_var', self._get('i'), []])
         self.scopes.pop()
 
-    def _ll_prim_c5_s1_(self):
-        self._succeed(['ll_var', self._get('i'), []])
+    def _ll_prim_c5_s0_(self):
+        self._ll_prim_c5_s0_l_()
+        if not self.failed:
+            self._set('i', self.val)
+
+    def _ll_prim_c5_s0_l_(self):
+        self._ident_()
 
     def _ll_prim_c6_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._str('0x'),
-                lambda: self._bind(self._hexdigits_, 'hs'),
-                self._ll_prim_c6_s2_,
-            ]
-        )
+        self._str('0x')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ll_prim_c6_s1_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['ll_num', '0x' + self._get('hs'), []])
         self.scopes.pop()
 
-    def _ll_prim_c6_s2_(self):
-        self._succeed(['ll_num', '0x' + self._get('hs'), []])
+    def _ll_prim_c6_s1_(self):
+        self._ll_prim_c6_s1_l_()
+        if not self.failed:
+            self._set('hs', self.val)
+
+    def _ll_prim_c6_s1_l_(self):
+        self._hexdigits_()
 
     def _ll_prim_c7_(self):
         self.scopes.append({})
-        self._seq(
-            [lambda: self._bind(self._digits_, 'ds'), self._ll_prim_c7_s1_]
-        )
+        self._ll_prim_c7_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['ll_num', self._get('ds'), []])
         self.scopes.pop()
 
-    def _ll_prim_c7_s1_(self):
-        self._succeed(['ll_num', self._get('ds'), []])
+    def _ll_prim_c7_s0_(self):
+        self._ll_prim_c7_s0_l_()
+        if not self.failed:
+            self._set('ds', self.val)
+
+    def _ll_prim_c7_s0_l_(self):
+        self._digits_()
 
     def _ll_prim_c8_(self):
         self.scopes.append({})
-        self._seq([lambda: self._bind(self._lit_, 'l'), self._ll_prim_c8_s1_])
+        self._ll_prim_c8_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['ll_lit', self._get('l')[1], []])
         self.scopes.pop()
 
-    def _ll_prim_c8_s1_(self):
-        self._succeed(['ll_lit', self._get('l')[1], []])
+    def _ll_prim_c8_s0_(self):
+        self._ll_prim_c8_s0_l_()
+        if not self.failed:
+            self._set('l', self.val)
+
+    def _ll_prim_c8_s0_l_(self):
+        self._lit_()
 
     def _ll_prim_c9_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._ch('('),
-                self._sp_,
-                lambda: self._bind(self._ll_expr_, 'e'),
-                self._sp_,
-                lambda: self._ch(')'),
-                self._ll_prim_c9_s5_,
-            ]
-        )
+        self._ch('(')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ll_prim_c9_s2_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ch(')')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['ll_paren', None, [self._get('e')]])
         self.scopes.pop()
 
-    def _ll_prim_c9_s5_(self):
-        self._succeed(['ll_paren', None, [self._get('e')]])
+    def _ll_prim_c9_s2_(self):
+        self._ll_prim_c9_s2_l_()
+        if not self.failed:
+            self._set('e', self.val)
+
+    def _ll_prim_c9_s2_l_(self):
+        self._ll_expr_()
 
     def _ll_prim_c10_(self):
         self.scopes.append({})
-        self._seq(
-            [
-                lambda: self._ch('['),
-                self._sp_,
-                lambda: self._bind(self._ll_exprs_, 'es'),
-                self._sp_,
-                lambda: self._ch(']'),
-                self._ll_prim_c10_s5_,
-            ]
-        )
+        self._ch('[')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ll_prim_c10_s2_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._sp_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._ch(']')
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(['ll_arr', None, self._get('es')])
         self.scopes.pop()
 
-    def _ll_prim_c10_s5_(self):
-        self._succeed(['ll_arr', None, self._get('es')])
+    def _ll_prim_c10_s2_(self):
+        self._ll_prim_c10_s2_l_()
+        if not self.failed:
+            self._set('es', self.val)
+
+    def _ll_prim_c10_s2_l_(self):
+        self._ll_exprs_()
 
     def _digits_(self):
         self.scopes.append({})
-        self._seq([self._digits_s0_, self._digits_s1_])
+        self._digits_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(self._cat(self._get('ds')))
         self.scopes.pop()
 
     def _digits_s0_(self):
-        self._bind(lambda: self._plus(self._digit_), 'ds')
+        self._digits_s0_l_()
+        if not self.failed:
+            self._set('ds', self.val)
 
-    def _digits_s1_(self):
-        self._succeed(self._cat(self._get('ds')))
+    def _digits_s0_l_(self):
+        vs = []
+        self._digit_()
+        vs.append(self.val)
+        if self.failed:
+            return
+        while True:
+            p = self.pos
+            self._digit_()
+            if self.failed:
+                self._rewind(p)
+                break
+            vs.append(self.val)
+        self._succeed(vs)
 
     def _hexdigits_(self):
         self.scopes.append({})
-        self._seq([self._hexdigits_s0_, self._hexdigits_s1_])
+        self._hexdigits_s0_()
+        if self.failed:
+            self.scopes.pop()
+            return
+        self._succeed(self._cat(self._get('hs')))
         self.scopes.pop()
 
     def _hexdigits_s0_(self):
-        self._bind(lambda: self._plus(self._hex_), 'hs')
+        self._hexdigits_s0_l_()
+        if not self.failed:
+            self._set('hs', self.val)
 
-    def _hexdigits_s1_(self):
-        self._succeed(self._cat(self._get('hs')))
+    def _hexdigits_s0_l_(self):
+        vs = []
+        self._hex_()
+        vs.append(self.val)
+        if self.failed:
+            return
+        while True:
+            p = self.pos
+            self._hex_()
+            if self.failed:
+                self._rewind(p)
+                break
+            vs.append(self.val)
+        self._succeed(vs)
 
     def _hex_(self):
-        self._choose([self._digit_, self._hex_c1_, self._hex_c2_])
+        p = self.pos
+        self._digit_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._hex_c1_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._hex_c2_()
 
     def _hex_c1_(self):
         self._range('a', 'f')
@@ -1164,11 +2478,6 @@ class _Parser:
         else:
             self._fail()
 
-    def _bind(self, rule, var):
-        rule()
-        if not self.failed:
-            self._set(var, self.val)
-
     def _cat(self, strs):
         return ''.join(strs)
 
@@ -1178,15 +2487,6 @@ class _Parser:
             self._succeed(ch, self.pos + 1)
         else:
             self._fail()
-
-    def _choose(self, rules):
-        p = self.pos
-        for rule in rules[:-1]:
-            rule()
-            if not self.failed:
-                return
-            self._rewind(p)
-        rules[-1]()
 
     def _end_(self):
         if self.pos == self.end:
@@ -1229,33 +2529,6 @@ class _Parser:
     def _join(self, s, vs):
         return s.join(vs)
 
-    def _not(self, rule):
-        p = self.pos
-        errpos = self.errpos
-        rule()
-        if self.failed:
-            self._succeed(None, p)
-        else:
-            self._rewind(p)
-            self.errpos = errpos
-            self._fail()
-
-    def _opt(self, rule):
-        p = self.pos
-        rule()
-        if self.failed:
-            self._succeed([], p)
-        else:
-            self._succeed([self.val])
-
-    def _plus(self, rule):
-        vs = []
-        rule()
-        vs.append(self.val)
-        if self.failed:
-            return
-        self._star(rule, vs)
-
     def _range(self, i, j):
         p = self.pos
         if p != self.end and ord(i) <= ord(self.text[p]) <= ord(j):
@@ -1266,25 +2539,8 @@ class _Parser:
     def _rewind(self, newpos):
         self._succeed(None, newpos)
 
-    def _seq(self, rules):
-        for rule in rules:
-            rule()
-            if self.failed:
-                return
-
     def _set(self, var, val):
         self.scopes[-1][var] = val
-
-    def _star(self, rule, vs=None):
-        vs = vs or []
-        while True:
-            p = self.pos
-            rule()
-            if self.failed:
-                self._rewind(p)
-                break
-            vs.append(self.val)
-        self._succeed(vs)
 
     def _str(self, s):
         for ch in s:

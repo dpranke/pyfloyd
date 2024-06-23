@@ -18,6 +18,7 @@ from floyd.formatter import flatten, Comma, Saw, Tree
 from floyd import python_templates as py
 from floyd import string_literal as lit
 
+
 class _CompilerOperatorState:
     def __init__(self):
         self.prec_ops = {}
@@ -242,9 +243,7 @@ class Compiler:
 
     def _choice_(self, rule, node):
         args, sub_rules = self._inline_args(rule, 'c', node[2])
-        lines = [
-            'p = self.pos'
-        ]
+        lines = ['p = self.pos']
         for arg in args[:-1]:
             lines.extend(arg)
             lines.append('if not self.failed:')
@@ -265,7 +264,7 @@ class Compiler:
         self._methods[rule] = [
             f'self._{sub_rule}_()',
             'if not self.failed:',
-            f'    self._set({lit.encode(node[1])}, self.val)'
+            f'    self._set({lit.encode(node[1])}, self.val)',
         ]
         self._compile(node[2][0], sub_rule)
 
@@ -305,17 +304,21 @@ class Compiler:
             inlined_lines = [f'self._{sub_rule}_()']
 
         inlined_lines = self._inline(node[2][0], sub_rule)
-        lines = [
-            'p = self.pos',
-            'errpos = self.errpos',
-        ] + inlined_lines + [
-            'if self.failed:',
-            '    self._succeed(None, p)',
-            'else:',
-            '    self._rewind(p)',
-            '    self.errpos = errpos',
-            '    self._fail()',
-        ]
+        lines = (
+            [
+                'p = self.pos',
+                'errpos = self.errpos',
+            ]
+            + inlined_lines
+            + [
+                'if self.failed:',
+                '    self._succeed(None, p)',
+                'else:',
+                '    self._rewind(p)',
+                '    self.errpos = errpos',
+                '    self._fail()',
+            ]
+        )
         self._methods[rule] = lines
         if not can_inline:
             self._compile(node[2][0], sub_rule)
@@ -348,39 +351,46 @@ class Compiler:
             inlined_lines = self._inline(node[2][0], sub_rule)
             inlined = True
         else:
-            inlined_lines = [ f'self._{sub_rule}_()' ]
+            inlined_lines = [f'self._{sub_rule}_()']
             inlined = False
         if node[1] == '?':
-            lines = [
-                'p = self.pos',
-            ] + inlined_lines + [
-                'if self.failed:',
-                '    self._succeed([], p)',
-                'else:',
-                '    self._succeed([self.val])'
-            ]
+            lines = (
+                [
+                    'p = self.pos',
+                ]
+                + inlined_lines
+                + [
+                    'if self.failed:',
+                    '    self._succeed([], p)',
+                    'else:',
+                    '    self._succeed([self.val])',
+                ]
+            )
         else:
-            lines = [
-                'vs = []'
-            ]
+            lines = ['vs = []']
             if node[1] == '+':
                 lines.extend(inlined_lines)
-                lines.extend([
-                    'vs.append(self.val)',
-                    'if self.failed:',
-                    '    return',
-                ]
+                lines.extend(
+                    [
+                        'vs.append(self.val)',
+                        'if self.failed:',
+                        '    return',
+                    ]
                 )
-            lines.extend([
-                'while True:',
-                '    p = self.pos',
-            ] + ['    ' + line for line in inlined_lines] + [
-                '    if self.failed:',
-                '        self._rewind(p)',
-                '        break',
-                '    vs.append(self.val)',
-                'self._succeed(vs)'
-            ])
+            lines.extend(
+                [
+                    'while True:',
+                    '    p = self.pos',
+                ]
+                + ['    ' + line for line in inlined_lines]
+                + [
+                    '    if self.failed:',
+                    '        self._rewind(p)',
+                    '        break',
+                    '    vs.append(self.val)',
+                    'self._succeed(vs)',
+                ]
+            )
         self._methods[rule] = lines
         if not inlined:
             self._compile(node[2][0], sub_rule)
