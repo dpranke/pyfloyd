@@ -56,18 +56,12 @@ class _Parser:
     def _grammar_(self):
         self.scopes.append({})
         self._grammar_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._end_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['rules', None, self._get('vs')])
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._end_()
+        if not self.failed:
+            self._succeed(['rules', None, self._get('vs')])
         self.scopes.pop()
 
     def _grammar_s0_(self):
@@ -85,9 +79,8 @@ class _Parser:
 
     def _grammar_s0_l_p_g_(self):
         self._sp_()
-        if self.failed:
-            return
-        self._grammar_s0_l_p_g_s1_g_()
+        if not self.failed:
+            self._grammar_s0_l_p_g_s1_g_()
 
     def _grammar_s0_l_(self):
         vs = []
@@ -141,9 +134,8 @@ class _Parser:
 
     def _eol_c0_(self):
         self._ch('\r')
-        if self.failed:
-            return
-        self._ch('\n')
+        if not self.failed:
+            self._ch('\n')
 
     def _comment_(self):
         p = self.pos
@@ -155,15 +147,13 @@ class _Parser:
 
     def _comment_c0_(self):
         self._str('//')
-        if self.failed:
-            return
-        self._comment_c0_s1_()
+        if not self.failed:
+            self._comment_c0_s1_()
 
     def _comment_c0_s1_p_g_(self):
         self._comment_c0_s1_p_g_s0_()
-        if self.failed:
-            return
-        self._any_()
+        if not self.failed:
+            self._any_()
 
     def _comment_c0_s1_p_g_s0_(self):
         p = self.pos
@@ -189,18 +179,15 @@ class _Parser:
 
     def _comment_c1_(self):
         self._str('/*')
-        if self.failed:
-            return
-        self._comment_c1_s1_()
-        if self.failed:
-            return
-        self._str('*/')
+        if not self.failed:
+            self._comment_c1_s1_()
+        if not self.failed:
+            self._str('*/')
 
     def _comment_c1_s1_p_g_(self):
         self._comment_c1_s1_p_g_s0_()
-        if self.failed:
-            return
-        self._any_()
+        if not self.failed:
+            self._any_()
 
     def _comment_c1_s1_p_g_s0_(self):
         p = self.pos
@@ -259,14 +246,10 @@ class _Parser:
     def _pragma_c0_(self):
         self.scopes.append({})
         self._str('%tokens')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._pragma_c0_s1_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['pragma', 'tokens', self._get('is')])
+        if not self.failed:
+            self._pragma_c0_s1_()
+        if not self.failed:
+            self._succeed(['pragma', 'tokens', self._get('is')])
         self.scopes.pop()
 
     def _pragma_c0_s1_(self):
@@ -277,18 +260,12 @@ class _Parser:
     def _pragma_c1_(self):
         self.scopes.append({})
         self._str('%token')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._pragma_c1_s2_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['pragma', 'token', [self._get('i')]])
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._pragma_c1_s2_()
+        if not self.failed:
+            self._succeed(['pragma', 'token', [self._get('i')]])
         self.scopes.pop()
 
     def _pragma_c1_s2_(self):
@@ -299,18 +276,12 @@ class _Parser:
     def _pragma_c2_(self):
         self.scopes.append({})
         self._str('%whitespace_style')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._pragma_c2_s2_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['pragma', 'whitespace_style', self._get('i')])
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._pragma_c2_s2_()
+        if not self.failed:
+            self._succeed(['pragma', 'whitespace_style', self._get('i')])
         self.scopes.pop()
 
     def _pragma_c2_s2_(self):
@@ -321,26 +292,16 @@ class _Parser:
     def _pragma_c3_(self):
         self.scopes.append({})
         self._str('%whitespace')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ch('=')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._pragma_c3_s4_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['pragma', 'whitespace', [self._get('cs')]])
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._ch('=')
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._pragma_c3_s4_()
+        if not self.failed:
+            self._succeed(['pragma', 'whitespace', [self._get('cs')]])
         self.scopes.pop()
 
     def _pragma_c3_s4_(self):
@@ -351,18 +312,12 @@ class _Parser:
     def _pragma_c4_(self):
         self.scopes.append({})
         self._str('%comment_style')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._pragma_c4_s2_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['pragma', 'comment_style', self._get('c')])
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._pragma_c4_s2_()
+        if not self.failed:
+            self._succeed(['pragma', 'comment_style', self._get('c')])
         self.scopes.pop()
 
     def _pragma_c4_s2_l_g_(self):
@@ -381,26 +336,16 @@ class _Parser:
     def _pragma_c5_(self):
         self.scopes.append({})
         self._str('%comment')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ch('=')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._pragma_c5_s4_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['pragma', 'comment', [self._get('cs')]])
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._ch('=')
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._pragma_c5_s4_()
+        if not self.failed:
+            self._succeed(['pragma', 'comment', [self._get('cs')]])
         self.scopes.pop()
 
     def _pragma_c5_s4_(self):
@@ -411,26 +356,16 @@ class _Parser:
     def _pragma_c6_(self):
         self.scopes.append({})
         self._str('%assoc')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._pragma_c6_s2_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._pragma_c6_s4_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['pragma', 'assoc', [self._get('o'), self._get('d')]])
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._pragma_c6_s2_()
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._pragma_c6_s4_()
+        if not self.failed:
+            self._succeed(['pragma', 'assoc', [self._get('o'), self._get('d')]])
         self.scopes.pop()
 
     def _pragma_c6_s2_(self):
@@ -446,14 +381,10 @@ class _Parser:
     def _pragma_c7_(self):
         self.scopes.append({})
         self._str('%prec')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._pragma_c7_s1_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['pragma', 'prec', self._get('os')])
+        if not self.failed:
+            self._pragma_c7_s1_()
+        if not self.failed:
+            self._succeed(['pragma', 'prec', self._get('os')])
         self.scopes.pop()
 
     def _pragma_c7_s1_(self):
@@ -464,18 +395,12 @@ class _Parser:
     def _pragma_c7_s1_l_p_g_(self):
         self.scopes.append({})
         self._pragma_c7_s1_l_p_g_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ws_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._pragma_c7_s1_l_p_g_s2_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(self._get('o'))
+        if not self.failed:
+            self._ws_()
+        if not self.failed:
+            self._pragma_c7_s1_l_p_g_s2_()
+        if not self.failed:
+            self._succeed(self._get('o'))
         self.scopes.pop()
 
     def _pragma_c7_s1_l_p_g_s0_(self):
@@ -512,10 +437,8 @@ class _Parser:
     def _op_(self):
         self.scopes.append({})
         self._op_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(self._join('', self._get('op')))
+        if not self.failed:
+            self._succeed(self._join('', self._get('op')))
         self.scopes.pop()
 
     def _op_s0_(self):
@@ -525,9 +448,8 @@ class _Parser:
 
     def _op_s0_l_p_g_(self):
         self._op_s0_l_p_g_s0_()
-        if self.failed:
-            return
-        self._any_()
+        if not self.failed:
+            self._any_()
 
     def _op_s0_l_p_g_s0_(self):
         p = self.pos
@@ -558,10 +480,8 @@ class _Parser:
     def _dir_(self):
         self.scopes.append({})
         self._dir_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(self._get('d'))
+        if not self.failed:
+            self._succeed(self._get('d'))
         self.scopes.pop()
 
     def _dir_s0_l_g_(self):
@@ -580,10 +500,8 @@ class _Parser:
     def _ident_list_(self):
         self.scopes.append({})
         self._ident_list_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(self._get('is'))
+        if not self.failed:
+            self._succeed(self._get('is'))
         self.scopes.pop()
 
     def _ident_list_s0_(self):
@@ -594,22 +512,14 @@ class _Parser:
     def _ident_list_s0_l_p_g_(self):
         self.scopes.append({})
         self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ident_list_s0_l_p_g_s1_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ident_list_s0_l_p_g_s3_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(self._get('i'))
+        if not self.failed:
+            self._ident_list_s0_l_p_g_s1_()
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._ident_list_s0_l_p_g_s3_()
+        if not self.failed:
+            self._succeed(self._get('i'))
         self.scopes.pop()
 
     def _ident_list_s0_l_p_g_s1_(self):
@@ -646,34 +556,20 @@ class _Parser:
     def _rule_(self):
         self.scopes.append({})
         self._rule_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ch('=')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._rule_s4_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._rule_s6_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['rule', self._get('i'), [self._get('cs')]])
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._ch('=')
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._rule_s4_()
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._rule_s6_()
+        if not self.failed:
+            self._succeed(['rule', self._get('i'), [self._get('cs')]])
         self.scopes.pop()
 
     def _rule_s0_(self):
@@ -697,14 +593,10 @@ class _Parser:
     def _ident_(self):
         self.scopes.append({})
         self._ident_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ident_s1_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(self._cat([self._get('hd')] + self._get('tl')))
+        if not self.failed:
+            self._ident_s1_()
+        if not self.failed:
+            self._succeed(self._cat([self._get('hd')] + self._get('tl')))
         self.scopes.pop()
 
     def _ident_s0_(self):
@@ -761,14 +653,10 @@ class _Parser:
     def _choice_(self):
         self.scopes.append({})
         self._choice_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._choice_s1_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['choice', None, [self._get('s')] + self._get('ss')])
+        if not self.failed:
+            self._choice_s1_()
+        if not self.failed:
+            self._succeed(['choice', None, [self._get('s')] + self._get('ss')])
         self.scopes.pop()
 
     def _choice_s0_(self):
@@ -783,15 +671,12 @@ class _Parser:
 
     def _choice_s1_l_p_g_(self):
         self._sp_()
-        if self.failed:
-            return
-        self._ch('|')
-        if self.failed:
-            return
-        self._sp_()
-        if self.failed:
-            return
-        self._seq_()
+        if not self.failed:
+            self._ch('|')
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._seq_()
 
     def _choice_s1_l_(self):
         vs = []
@@ -815,14 +700,10 @@ class _Parser:
     def _seq_c0_(self):
         self.scopes.append({})
         self._seq_c0_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._seq_c0_s1_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['seq', None, [self._get('e')] + self._get('es')])
+        if not self.failed:
+            self._seq_c0_s1_()
+        if not self.failed:
+            self._succeed(['seq', None, [self._get('e')] + self._get('es')])
         self.scopes.pop()
 
     def _seq_c0_s0_(self):
@@ -837,12 +718,10 @@ class _Parser:
 
     def _seq_c0_s1_l_p_g_(self):
         self._ws_()
-        if self.failed:
-            return
-        self._sp_()
-        if self.failed:
-            return
-        self._expr_()
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._expr_()
 
     def _seq_c0_s1_l_(self):
         vs = []
@@ -866,18 +745,12 @@ class _Parser:
     def _expr_c0_(self):
         self.scopes.append({})
         self._expr_c0_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ch(':')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._expr_c0_s2_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['label', self._get('l'), [self._get('e')]])
+        if not self.failed:
+            self._ch(':')
+        if not self.failed:
+            self._expr_c0_s2_()
+        if not self.failed:
+            self._succeed(['label', self._get('l'), [self._get('e')]])
         self.scopes.pop()
 
     def _expr_c0_s0_(self):
@@ -901,14 +774,10 @@ class _Parser:
     def _post_expr_c0_(self):
         self.scopes.append({})
         self._post_expr_c0_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._post_expr_c0_s1_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['post', self._get('op'), [self._get('e')]])
+        if not self.failed:
+            self._post_expr_c0_s1_()
+        if not self.failed:
+            self._succeed(['post', self._get('op'), [self._get('e')]])
         self.scopes.pop()
 
     def _post_expr_c0_s0_(self):
@@ -976,26 +845,16 @@ class _Parser:
     def _prim_expr_c0_(self):
         self.scopes.append({})
         self._prim_expr_c0_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._str('..')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._prim_expr_c0_s4_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['range', None, [self._get('i'), self._get('j')]])
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._str('..')
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._prim_expr_c0_s4_()
+        if not self.failed:
+            self._succeed(['range', None, [self._get('i'), self._get('j')]])
         self.scopes.pop()
 
     def _prim_expr_c0_s0_(self):
@@ -1011,10 +870,8 @@ class _Parser:
     def _prim_expr_c1_(self):
         self.scopes.append({})
         self._prim_expr_c1_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(self._get('l'))
+        if not self.failed:
+            self._succeed(self._get('l'))
         self.scopes.pop()
 
     def _prim_expr_c1_s0_(self):
@@ -1025,10 +882,8 @@ class _Parser:
     def _prim_expr_c2_(self):
         self.scopes.append({})
         self._prim_expr_c2_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(self._get('e'))
+        if not self.failed:
+            self._succeed(self._get('e'))
         self.scopes.pop()
 
     def _prim_expr_c2_s0_(self):
@@ -1039,14 +894,10 @@ class _Parser:
     def _prim_expr_c3_(self):
         self.scopes.append({})
         self._prim_expr_c3_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._prim_expr_c3_s1_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['apply', self._get('i'), []])
+        if not self.failed:
+            self._prim_expr_c3_s1_()
+        if not self.failed:
+            self._succeed(['apply', self._get('i'), []])
         self.scopes.pop()
 
     def _prim_expr_c3_s0_(self):
@@ -1056,9 +907,8 @@ class _Parser:
 
     def _prim_expr_c3_s1_n_g_(self):
         self._sp_()
-        if self.failed:
-            return
-        self._ch('=')
+        if not self.failed:
+            self._ch('=')
 
     def _prim_expr_c3_s1_(self):
         p = self.pos
@@ -1074,18 +924,12 @@ class _Parser:
     def _prim_expr_c4_(self):
         self.scopes.append({})
         self._str('->')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._prim_expr_c4_s2_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['action', None, [self._get('e')]])
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._prim_expr_c4_s2_()
+        if not self.failed:
+            self._succeed(['action', None, [self._get('e')]])
         self.scopes.pop()
 
     def _prim_expr_c4_s2_(self):
@@ -1096,26 +940,16 @@ class _Parser:
     def _prim_expr_c5_(self):
         self.scopes.append({})
         self._ch('{')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._prim_expr_c5_s2_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ch('}')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['action', None, [self._get('e')]])
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._prim_expr_c5_s2_()
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._ch('}')
+        if not self.failed:
+            self._succeed(['action', None, [self._get('e')]])
         self.scopes.pop()
 
     def _prim_expr_c5_s2_(self):
@@ -1126,14 +960,10 @@ class _Parser:
     def _prim_expr_c6_(self):
         self.scopes.append({})
         self._ch('~')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._prim_expr_c6_s1_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['not', None, [self._get('e')]])
+        if not self.failed:
+            self._prim_expr_c6_s1_()
+        if not self.failed:
+            self._succeed(['not', None, [self._get('e')]])
         self.scopes.pop()
 
     def _prim_expr_c6_s1_(self):
@@ -1144,26 +974,16 @@ class _Parser:
     def _prim_expr_c7_(self):
         self.scopes.append({})
         self._str('?(')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._prim_expr_c7_s2_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ch(')')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['pred', None, [self._get('e')]])
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._prim_expr_c7_s2_()
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._ch(')')
+        if not self.failed:
+            self._succeed(['pred', None, [self._get('e')]])
         self.scopes.pop()
 
     def _prim_expr_c7_s2_(self):
@@ -1174,26 +994,16 @@ class _Parser:
     def _prim_expr_c8_(self):
         self.scopes.append({})
         self._str('?{')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._prim_expr_c8_s2_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ch('}')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['pred', None, [self._get('e')]])
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._prim_expr_c8_s2_()
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._ch('}')
+        if not self.failed:
+            self._succeed(['pred', None, [self._get('e')]])
         self.scopes.pop()
 
     def _prim_expr_c8_s2_(self):
@@ -1204,26 +1014,16 @@ class _Parser:
     def _prim_expr_c9_(self):
         self.scopes.append({})
         self._ch('(')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._prim_expr_c9_s2_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ch(')')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['paren', None, [self._get('e')]])
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._prim_expr_c9_s2_()
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._ch(')')
+        if not self.failed:
+            self._succeed(['paren', None, [self._get('e')]])
         self.scopes.pop()
 
     def _prim_expr_c9_s2_(self):
@@ -1242,18 +1042,12 @@ class _Parser:
     def _lit_c0_(self):
         self.scopes.append({})
         self._squote_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._lit_c0_s1_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._squote_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['lit', self._cat(self._get('cs')), []])
+        if not self.failed:
+            self._lit_c0_s1_()
+        if not self.failed:
+            self._squote_()
+        if not self.failed:
+            self._succeed(['lit', self._cat(self._get('cs')), []])
         self.scopes.pop()
 
     def _lit_c0_s1_(self):
@@ -1275,18 +1069,12 @@ class _Parser:
     def _lit_c1_(self):
         self.scopes.append({})
         self._dquote_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._lit_c1_s1_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._dquote_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['lit', self._cat(self._get('cs')), []])
+        if not self.failed:
+            self._lit_c1_s1_()
+        if not self.failed:
+            self._dquote_()
+        if not self.failed:
+            self._succeed(['lit', self._cat(self._get('cs')), []])
         self.scopes.pop()
 
     def _lit_c1_s1_(self):
@@ -1316,14 +1104,10 @@ class _Parser:
     def _sqchar_c0_(self):
         self.scopes.append({})
         self._bslash_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sqchar_c0_s1_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(self._get('c'))
+        if not self.failed:
+            self._sqchar_c0_s1_()
+        if not self.failed:
+            self._succeed(self._get('c'))
         self.scopes.pop()
 
     def _sqchar_c0_s1_(self):
@@ -1334,14 +1118,10 @@ class _Parser:
     def _sqchar_c1_(self):
         self.scopes.append({})
         self._sqchar_c1_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sqchar_c1_s1_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(self._get('c'))
+        if not self.failed:
+            self._sqchar_c1_s1_()
+        if not self.failed:
+            self._succeed(self._get('c'))
         self.scopes.pop()
 
     def _sqchar_c1_s0_(self):
@@ -1371,14 +1151,10 @@ class _Parser:
     def _dqchar_c0_(self):
         self.scopes.append({})
         self._bslash_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._dqchar_c0_s1_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(self._get('c'))
+        if not self.failed:
+            self._dqchar_c0_s1_()
+        if not self.failed:
+            self._succeed(self._get('c'))
         self.scopes.pop()
 
     def _dqchar_c0_s1_(self):
@@ -1389,14 +1165,10 @@ class _Parser:
     def _dqchar_c1_(self):
         self.scopes.append({})
         self._dqchar_c1_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._dqchar_c1_s1_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(self._get('c'))
+        if not self.failed:
+            self._dqchar_c1_s1_()
+        if not self.failed:
+            self._succeed(self._get('c'))
         self.scopes.pop()
 
     def _dqchar_c1_s0_(self):
@@ -1470,65 +1242,54 @@ class _Parser:
 
     def _esc_char_c0_(self):
         self._ch('b')
-        if self.failed:
-            return
-        self._succeed('\b')
+        if not self.failed:
+            self._succeed('\b')
 
     def _esc_char_c1_(self):
         self._ch('f')
-        if self.failed:
-            return
-        self._succeed('\f')
+        if not self.failed:
+            self._succeed('\f')
 
     def _esc_char_c2_(self):
         self._ch('n')
-        if self.failed:
-            return
-        self._succeed('\n')
+        if not self.failed:
+            self._succeed('\n')
 
     def _esc_char_c3_(self):
         self._ch('r')
-        if self.failed:
-            return
-        self._succeed('\r')
+        if not self.failed:
+            self._succeed('\r')
 
     def _esc_char_c4_(self):
         self._ch('t')
-        if self.failed:
-            return
-        self._succeed('\t')
+        if not self.failed:
+            self._succeed('\t')
 
     def _esc_char_c5_(self):
         self._ch('v')
-        if self.failed:
-            return
-        self._succeed('\v')
+        if not self.failed:
+            self._succeed('\v')
 
     def _esc_char_c6_(self):
         self._squote_()
-        if self.failed:
-            return
-        self._succeed("'")
+        if not self.failed:
+            self._succeed("'")
 
     def _esc_char_c7_(self):
         self._dquote_()
-        if self.failed:
-            return
-        self._succeed('"')
+        if not self.failed:
+            self._succeed('"')
 
     def _esc_char_c8_(self):
         self._bslash_()
-        if self.failed:
-            return
-        self._succeed('\\')
+        if not self.failed:
+            self._succeed('\\')
 
     def _esc_char_c9_(self):
         self.scopes.append({})
         self._esc_char_c9_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(self._get('c'))
+        if not self.failed:
+            self._succeed(self._get('c'))
         self.scopes.pop()
 
     def _esc_char_c9_s0_(self):
@@ -1539,10 +1300,8 @@ class _Parser:
     def _esc_char_c10_(self):
         self.scopes.append({})
         self._esc_char_c10_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(self._get('c'))
+        if not self.failed:
+            self._succeed(self._get('c'))
         self.scopes.pop()
 
     def _esc_char_c10_s0_(self):
@@ -1553,18 +1312,12 @@ class _Parser:
     def _hex_esc_(self):
         self.scopes.append({})
         self._ch('x')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._hex_esc_s1_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._hex_esc_s2_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(self._xtou(self._get('h1') + self._get('h2')))
+        if not self.failed:
+            self._hex_esc_s1_()
+        if not self.failed:
+            self._hex_esc_s2_()
+        if not self.failed:
+            self._succeed(self._xtou(self._get('h1') + self._get('h2')))
         self.scopes.pop()
 
     def _hex_esc_s1_(self):
@@ -1588,33 +1341,23 @@ class _Parser:
     def _unicode_esc_c0_(self):
         self.scopes.append({})
         self._ch('u')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._unicode_esc_c0_s1_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._unicode_esc_c0_s2_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._unicode_esc_c0_s3_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._unicode_esc_c0_s4_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(
-            self._xtou(
-                self._get('h1')
-                + self._get('h2')
-                + self._get('h3')
-                + self._get('h4'),
+        if not self.failed:
+            self._unicode_esc_c0_s1_()
+        if not self.failed:
+            self._unicode_esc_c0_s2_()
+        if not self.failed:
+            self._unicode_esc_c0_s3_()
+        if not self.failed:
+            self._unicode_esc_c0_s4_()
+        if not self.failed:
+            self._succeed(
+                self._xtou(
+                    self._get('h1')
+                    + self._get('h2')
+                    + self._get('h3')
+                    + self._get('h4'),
+                )
             )
-        )
         self.scopes.pop()
 
     def _unicode_esc_c0_s1_(self):
@@ -1640,53 +1383,35 @@ class _Parser:
     def _unicode_esc_c1_(self):
         self.scopes.append({})
         self._ch('U')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._unicode_esc_c1_s1_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._unicode_esc_c1_s2_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._unicode_esc_c1_s3_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._unicode_esc_c1_s4_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._unicode_esc_c1_s5_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._unicode_esc_c1_s6_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._unicode_esc_c1_s7_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._unicode_esc_c1_s8_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(
-            self._xtou(
-                self._get('h1')
-                + self._get('h2')
-                + self._get('h3')
-                + self._get('h4')
-                + self._get('h5')
-                + self._get('h6')
-                + self._get('h7')
-                + self._get('h8'),
+        if not self.failed:
+            self._unicode_esc_c1_s1_()
+        if not self.failed:
+            self._unicode_esc_c1_s2_()
+        if not self.failed:
+            self._unicode_esc_c1_s3_()
+        if not self.failed:
+            self._unicode_esc_c1_s4_()
+        if not self.failed:
+            self._unicode_esc_c1_s5_()
+        if not self.failed:
+            self._unicode_esc_c1_s6_()
+        if not self.failed:
+            self._unicode_esc_c1_s7_()
+        if not self.failed:
+            self._unicode_esc_c1_s8_()
+        if not self.failed:
+            self._succeed(
+                self._xtou(
+                    self._get('h1')
+                    + self._get('h2')
+                    + self._get('h3')
+                    + self._get('h4')
+                    + self._get('h5')
+                    + self._get('h6')
+                    + self._get('h7')
+                    + self._get('h8'),
+                )
             )
-        )
         self.scopes.pop()
 
     def _unicode_esc_c1_s1_(self):
@@ -1732,18 +1457,12 @@ class _Parser:
     def _escape_(self):
         self.scopes.append({})
         self._str('\\p{')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._escape_s1_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ch('}')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['unicat', self._get('i'), []])
+        if not self.failed:
+            self._escape_s1_()
+        if not self.failed:
+            self._ch('}')
+        if not self.failed:
+            self._succeed(['unicat', self._get('i'), []])
         self.scopes.pop()
 
     def _escape_s1_(self):
@@ -1762,14 +1481,10 @@ class _Parser:
     def _ll_exprs_c0_(self):
         self.scopes.append({})
         self._ll_exprs_c0_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ll_exprs_c0_s1_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed([self._get('e')] + self._get('es'))
+        if not self.failed:
+            self._ll_exprs_c0_s1_()
+        if not self.failed:
+            self._succeed([self._get('e')] + self._get('es'))
         self.scopes.pop()
 
     def _ll_exprs_c0_s0_(self):
@@ -1784,15 +1499,12 @@ class _Parser:
 
     def _ll_exprs_c0_s1_l_p_g_(self):
         self._sp_()
-        if self.failed:
-            return
-        self._ch(',')
-        if self.failed:
-            return
-        self._sp_()
-        if self.failed:
-            return
-        self._ll_expr_()
+        if not self.failed:
+            self._ch(',')
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._ll_expr_()
 
     def _ll_exprs_c0_s1_l_(self):
         vs = []
@@ -1820,26 +1532,16 @@ class _Parser:
     def _ll_expr_c0_(self):
         self.scopes.append({})
         self._ll_expr_c0_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ch('+')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ll_expr_c0_s4_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['ll_plus', None, [self._get('e1'), self._get('e2')]])
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._ch('+')
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._ll_expr_c0_s4_()
+        if not self.failed:
+            self._succeed(['ll_plus', None, [self._get('e1'), self._get('e2')]])
         self.scopes.pop()
 
     def _ll_expr_c0_s0_(self):
@@ -1855,26 +1557,16 @@ class _Parser:
     def _ll_expr_c1_(self):
         self.scopes.append({})
         self._ll_expr_c1_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ch('-')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ll_expr_c1_s4_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['ll_minus', None, [self._get('e1'), self._get('e2')]])
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._ch('-')
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._ll_expr_c1_s4_()
+        if not self.failed:
+            self._succeed(['ll_minus', None, [self._get('e1'), self._get('e2')]])
         self.scopes.pop()
 
     def _ll_expr_c1_s0_(self):
@@ -1898,14 +1590,10 @@ class _Parser:
     def _ll_qual_c0_(self):
         self.scopes.append({})
         self._ll_qual_c0_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ll_qual_c0_s1_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['ll_qual', None, [self._get('e')] + self._get('ps')])
+        if not self.failed:
+            self._ll_qual_c0_s1_()
+        if not self.failed:
+            self._succeed(['ll_qual', None, [self._get('e')] + self._get('ps')])
         self.scopes.pop()
 
     def _ll_qual_c0_s0_(self):
@@ -1944,26 +1632,16 @@ class _Parser:
     def _ll_post_op_c0_(self):
         self.scopes.append({})
         self._ch('[')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ll_post_op_c0_s2_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ch(']')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['ll_getitem', None, [self._get('e')]])
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._ll_post_op_c0_s2_()
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._ch(']')
+        if not self.failed:
+            self._succeed(['ll_getitem', None, [self._get('e')]])
         self.scopes.pop()
 
     def _ll_post_op_c0_s2_(self):
@@ -1974,26 +1652,16 @@ class _Parser:
     def _ll_post_op_c1_(self):
         self.scopes.append({})
         self._ch('(')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ll_post_op_c1_s2_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ch(')')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['ll_call', None, self._get('es')])
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._ll_post_op_c1_s2_()
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._ch(')')
+        if not self.failed:
+            self._succeed(['ll_call', None, self._get('es')])
         self.scopes.pop()
 
     def _ll_post_op_c1_s2_(self):
@@ -2047,41 +1715,34 @@ class _Parser:
 
     def _ll_prim_c0_(self):
         self._str('false')
-        if self.failed:
-            return
-        self._succeed(['ll_const', 'false', []])
+        if not self.failed:
+            self._succeed(['ll_const', 'false', []])
 
     def _ll_prim_c1_(self):
         self._str('null')
-        if self.failed:
-            return
-        self._succeed(['ll_const', 'null', []])
+        if not self.failed:
+            self._succeed(['ll_const', 'null', []])
 
     def _ll_prim_c2_(self):
         self._str('true')
-        if self.failed:
-            return
-        self._succeed(['ll_const', 'true', []])
+        if not self.failed:
+            self._succeed(['ll_const', 'true', []])
 
     def _ll_prim_c3_(self):
         self._str('Infinity')
-        if self.failed:
-            return
-        self._succeed(['ll_const', 'Infinity', []])
+        if not self.failed:
+            self._succeed(['ll_const', 'Infinity', []])
 
     def _ll_prim_c4_(self):
         self._str('NaN')
-        if self.failed:
-            return
-        self._succeed(['ll_const', 'NaN', []])
+        if not self.failed:
+            self._succeed(['ll_const', 'NaN', []])
 
     def _ll_prim_c5_(self):
         self.scopes.append({})
         self._ll_prim_c5_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['ll_var', self._get('i'), []])
+        if not self.failed:
+            self._succeed(['ll_var', self._get('i'), []])
         self.scopes.pop()
 
     def _ll_prim_c5_s0_(self):
@@ -2092,14 +1753,10 @@ class _Parser:
     def _ll_prim_c6_(self):
         self.scopes.append({})
         self._str('0x')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ll_prim_c6_s1_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['ll_num', '0x' + self._get('hs'), []])
+        if not self.failed:
+            self._ll_prim_c6_s1_()
+        if not self.failed:
+            self._succeed(['ll_num', '0x' + self._get('hs'), []])
         self.scopes.pop()
 
     def _ll_prim_c6_s1_(self):
@@ -2110,10 +1767,8 @@ class _Parser:
     def _ll_prim_c7_(self):
         self.scopes.append({})
         self._ll_prim_c7_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['ll_num', self._get('ds'), []])
+        if not self.failed:
+            self._succeed(['ll_num', self._get('ds'), []])
         self.scopes.pop()
 
     def _ll_prim_c7_s0_(self):
@@ -2124,10 +1779,8 @@ class _Parser:
     def _ll_prim_c8_(self):
         self.scopes.append({})
         self._ll_prim_c8_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['ll_lit', self._get('l')[1], []])
+        if not self.failed:
+            self._succeed(['ll_lit', self._get('l')[1], []])
         self.scopes.pop()
 
     def _ll_prim_c8_s0_(self):
@@ -2138,26 +1791,16 @@ class _Parser:
     def _ll_prim_c9_(self):
         self.scopes.append({})
         self._ch('(')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ll_prim_c9_s2_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ch(')')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['ll_paren', None, [self._get('e')]])
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._ll_prim_c9_s2_()
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._ch(')')
+        if not self.failed:
+            self._succeed(['ll_paren', None, [self._get('e')]])
         self.scopes.pop()
 
     def _ll_prim_c9_s2_(self):
@@ -2168,26 +1811,16 @@ class _Parser:
     def _ll_prim_c10_(self):
         self.scopes.append({})
         self._ch('[')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ll_prim_c10_s2_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._sp_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._ch(']')
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(['ll_arr', None, self._get('es')])
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._ll_prim_c10_s2_()
+        if not self.failed:
+            self._sp_()
+        if not self.failed:
+            self._ch(']')
+        if not self.failed:
+            self._succeed(['ll_arr', None, self._get('es')])
         self.scopes.pop()
 
     def _ll_prim_c10_s2_(self):
@@ -2198,10 +1831,8 @@ class _Parser:
     def _digits_(self):
         self.scopes.append({})
         self._digits_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(self._cat(self._get('ds')))
+        if not self.failed:
+            self._succeed(self._cat(self._get('ds')))
         self.scopes.pop()
 
     def _digits_s0_(self):
@@ -2227,10 +1858,8 @@ class _Parser:
     def _hexdigits_(self):
         self.scopes.append({})
         self._hexdigits_s0_()
-        if self.failed:
-            self.scopes.pop()
-            return
-        self._succeed(self._cat(self._get('hs')))
+        if not self.failed:
+            self._succeed(self._cat(self._get('hs')))
         self.scopes.pop()
 
     def _hexdigits_s0_(self):

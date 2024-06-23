@@ -424,13 +424,10 @@ class Compiler:
         if needs_scope:
             lines.append('self.scopes.append({})')
         args, sub_rules = self._inline_args(rule, 's', node[2])
-        for arg in args[:-1]:
-            lines.extend(arg)
-            lines.append('if self.failed:')
-            if needs_scope:
-                lines.append('    self.scopes.pop()')
-            lines.append('    return')
-        lines.extend(args[-1])
+        lines.extend(args[0])
+        for arg in args[1:]:
+            lines.append('if not self.failed:')
+            lines.extend('    ' + line for line in arg)
         if needs_scope:
             lines.append('self.scopes.pop()')
         self._methods[rule] = lines
