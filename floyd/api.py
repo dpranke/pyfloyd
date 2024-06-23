@@ -12,74 +12,112 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Optional, Tuple
+from typing import NamedTuple, Optional, Protocol, Tuple
 
 from floyd import analyzer
 from floyd.interpreter import Interpreter
-from floyd.parser import Parser
+from floyd import parser
 from floyd.printer import Printer
 from floyd.python_compiler import Compiler
 
-
-class ParserInterface:
-    def parse(
-        self, text: str, path: str = '<string>'
-    ) -> Tuple[Any, Optional[str], int]:
-        raise NotImplementedError  # pragma: no cover
+Result = parser.Result
 
 
-class _CompiledParser(ParserInterface):
-    def __init__(self):
-        self.grammar = None
-        self.interpreter = None
+class ParserInterface(Protocol):
+    """The interface to a compiled parser.
 
-    def compile(
-        self, grammar: str, path: str = '<string>', memoize: bool = False
-    ) -> Tuple[Optional[str], int]:
-        parser = Parser(grammar, path)
-        ast, err, endpos = parser.parse()
-        if err:
-            return err, endpos
-        try:
-            self.grammar = analyzer.analyze(ast)
-            self.interpreter = Interpreter(self.grammar, memoize=memoize)
-            return None, 0
-        except analyzer.AnalysisError as e:
-            return str(e), endpos
+    This represents the public interface of the object returned from
+    `compile()`.
+    """
 
-    def parse(
-        self, text: str, path: str = '<string>'
-    ) -> Tuple[Any, Optional[str], int]:
-        out, err, endpos = self.interpreter.parse(text, path)
-        return out, err, endpos
+    def parse(self, text: str, path: str = '<string>') -> Result:
+        """Parse a string and return a result.
+
+        `text` is the string to parse.
+        `path` is an optional parameter that can be used in error messages
+               to reflect where the text came from, e.g., a file path.
+        """
 
 
-def compile_parser(
+class CompiledResult(NamedTuple):
+    """The result of `compile_parser()`.
+
+    This represents the tuple of objects returned from `compile_parser()`.
+
+    `parser` If not None, this is the parser object to use to parse strings.
+             It will be something that implements the `ParserInterface`
+             protocol.
+    `err`    A string describing any error(s) in the grammar.
+
+    Only one of `parser` and `err` will have a value, the other will be None.
+    """
+
+    parser: Optional[ParserInterface] = None
+    err: Optional[str] = None
+    pos: Optional[int] = None
+
+
+def compile(  # pylint: disable=redefined-builtin
     grammar: str, path: str = '<string>', memoize: bool = False
-) -> Tuple[Optional[ParserInterface], Optional[str], int]:
-    p = _CompiledParser()
-    err, endpos = p.compile(grammar, path=path, memoize=memoize)
-    if err:
-        return None, err, endpos
-    return p, None, endpos
+) -> CompiledResult:
+    """Compile the grammar into an object that can parse strings.
+
+    This routine parses the provided grammar and returns an object
+    that can parse strings according to the grammar.
+    """
+    result = parser.parse(grammar, path)
+    if result.err:
+        return CompiledResult(err=result.err, pos=result.pos)
+    try:
+        grammar = analyzer.analyze(result.val)
+        interpreter = Interpreter(grammar, memoize=memoize)
+        return CompiledResult(interpreter, None)
+    except analyzer.AnalysisError as e:
+        return CompiledResult(None, str(e))
 
 
-def generate_parser(
+def generate(
     grammar: str,
-    class_name: str = 'Parser',
     main: bool = False,
     memoize: bool = False,
     path: str = '<string>',
-) -> Tuple[Optional[str], Optional[str], int]:
-    ast, err, endpos = Parser(grammar, path).parse()
-    if err:
-        return None, err, endpos
+) -> Result:
+    """Generate the source code of a parser.
+
+    This generates the python text of a parser. The text will be a module
+    with a public `Result` type and a public `parse()` function.
+
+    If `main` is True, then there will also be a `main()` function that
+    is called if the text is invoked directly. (i.e., the module can be
+    run from the command line). The command line interface will take
+    one optional argument that is the path to a file to parse; if the
+    argument is missing or it is `'-'` then the parser will read from
+    stdin instead. Any output will be written to stdout as a JSON string.
+    The actual interface to the `main()` routine contains a bunch of parameters
+    that can all be substituted in for `sys.stdin`, `sys.stdout`, and
+    `sys.argv` for testing purposes.
+
+    If `memoize` is True, the parser will memoize (cache) the results of
+    each combination of rule and position during the parse. For some
+    grammars, this may provide significant speedups.
+
+    `path` represents an optional string that can be included in error
+    messages, e.g., as a path to the file containing the grammar.
+
+    If successful the `.val` member of the result will be the source
+    code for the parser. If the grammar had errors, the `.err` member of
+    the result will describe the errors.
+    """
+
+    result = parser.parse(grammar, path)
+    if result.err:
+        return result
     try:
-        grammar = analyzer.analyze(ast)
-        text = Compiler(grammar, class_name, main, memoize).compile()
-        return text, None, 0
+        grammar = analyzer.analyze(result.val)
+        text = Compiler(grammar, main, memoize).compile()
+        return Result(text)
     except analyzer.AnalysisError as e:
-        return None, str(e), 0
+        return Result(err=str(e))
 
 
 def parse(
@@ -88,25 +126,52 @@ def parse(
     grammar_path: str = '<string>',
     path: str = '<string>',
     memoize: bool = False,
-) -> Tuple[Any, Optional[str], int]:
-    """Match an input text against the specified grammar."""
-    c, err, endpos = compile_parser(grammar, grammar_path, memoize=memoize)
-    if err:
-        return c, 'Error in grammar: ' + err, endpos
-    assert c is not None  # This makes mypy not warn about a union-attr
-    return c.parse(text, path)
+) -> Result:
+    """Match an input text against the specified grammar.
+
+    This will parse the specified `grammar` and create an interpreter for it,
+    and then run the interpreter to parse the provided `text`.
+    `grammar_path` can be provided to indicate the file path for the given
+    grammar, and `path` can be provided to indicate the file path for the
+    text; both will be used in error messages. If `memoize` is True, then
+    the parser will cache intermediate results during the parse; this may
+    provide significant speedups for some grammars, but probably isn't
+    helpful for most of them.
+
+    The returned `Result` object has three members: a `val` member containing
+    the results of a successful parse, a `err` member containing any errors
+    that occur when parsing the grammar or the text, and a `pos` member.
+    If the parse is successful, `pos` will point to the position in the
+    string where the parser stopped. If there is an error, `pos` will
+    indicate where in the string the error occurred.
+    """
+    result = compile(grammar, grammar_path, memoize=memoize)
+    if result.err:
+        return Result(err='Error in grammar: ' + result.err, pos=result.pos)
+    assert result.parser is not None
+    return result.parser.parse(text, path)
 
 
 def pretty_print(
     grammar: str, path: str = '<string>'
 ) -> Tuple[Optional[str], Optional[str]]:
-    parser = Parser(grammar, path)
-    ast, err, _ = parser.parse()
-    if err:
-        return None, err
+    """Pretty-print a grammar.
+
+    `grammar` is the grammar to parse and format. `path` can be used to
+    indicate the path to a file containing the grammar. If there are errors
+    in the grammar, `path` will be included in any error messages.
+
+    Returns a tuple of two results. The first is the formatted string, if
+    the formatting was successful. The second will be a string describing
+    any errors, if it wasn't. If one of the values in the tuple is non-None,
+    the other will be None.
+    """
+    result = parser.parse(grammar, path)
+    if result.err:
+        return None, result.err
 
     try:
-        grammar = analyzer.analyze(ast, rewrite_filler=False)
+        grammar = analyzer.analyze(result.val, rewrite_filler=False)
         return Printer(grammar).dumps(), None
     except analyzer.AnalysisError as e:
         return None, str(e)

@@ -859,14 +859,14 @@ class Interpreter(unittest.TestCase, GrammarTestsMixin):
     max_diff = None
 
     def compile(self, grammar, path='<string>'):
-        return floyd.compile_parser(textwrap.dedent(grammar), path)
+        return floyd.compile(textwrap.dedent(grammar), path)
 
 
 class Compiler(unittest.TestCase, GrammarTestsMixin):
     max_diff = None
 
     def compile(self, grammar, path='<string>'):
-        source_code, err, endpos = floyd.generate_parser(
+        source_code, err, endpos = floyd.generate(
             textwrap.dedent(grammar), main=False, memoize=False, path=path
         )
         if err:
@@ -880,16 +880,15 @@ class Compiler(unittest.TestCase, GrammarTestsMixin):
             d = h.mkdtemp()
             h.write_text_file(d + '/parser.py', source_code)
         exec(source_code, scope)
-        parser_cls = scope['Parser']
+        parse_fn = scope['parse']
         if debug:  # pragma: no cover
             h.rmtree(d)
-        return _ParserWrapper(parser_cls), None, 0
+        return _ParserWrapper(parse_fn), None, 0
 
 
 class _ParserWrapper:
-    def __init__(self, parser_cls):
-        self.parser_cls = parser_cls
+    def __init__(self, parse_fn):
+        self.parse_fn = parse_fn
 
     def parse(self, text, path='<string>'):
-        parser = self.parser_cls(text, path)
-        return parser.parse()
+        return self.parse_fn(text, path)

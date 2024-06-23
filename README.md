@@ -31,6 +31,13 @@ format the code. `./run --help` is your friend to find out more.
 
 ## Version History / Release Notes
 
+* v0.11 (2024-06-22)
+    * Rework the API significantly. Now the generated parser API is a single
+      `parse()` function and a data type for the return value (`Result`),
+      and the public API functions are called `compile()` instead of
+      `compile_parser()` and `generate()` instead of `generate_parser()`.
+    * Add typing hints to everything.
+    * Add lots more documentation of the API.
 * v0.10.2 (2024-06-22)
     * Update test to use 79 cols instead of 80.
 * v0.10.1 (2024-06-22)

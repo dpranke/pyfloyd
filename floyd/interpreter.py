@@ -14,6 +14,8 @@
 
 import unicodedata
 
+from floyd import parser
+
 
 class _OperatorState:
     def __init__(self):
@@ -30,8 +32,8 @@ class Interpreter:
         self.memoize = memoize
         self.grammar = grammar
 
-        self.msg = None
-        self.fname = None
+        self.text = None
+        self.path = None
         self.failed = False
         self.val = None
         self.pos = 0
@@ -43,13 +45,13 @@ class Interpreter:
         self.blocked = set()
         self.operators = {}
 
-    def parse(self, msg, fname):
-        self.msg = msg
-        self.fname = fname
+    def parse(self, text: str, path: str = '<string>') -> parser.Result:
+        self.text = text
+        self.path = path
         self.failed = False
         self.val = None
         self.pos = 0
-        self.end = len(self.msg)
+        self.end = len(self.text)
         self.errstr = None
         self.errpos = 0
         self.scopes = []
@@ -57,7 +59,7 @@ class Interpreter:
         self._interpret(self.grammar.rules[self.grammar.starting_rule])
         if self.failed:
             return self._format_error()
-        return self.val, None, self.pos
+        return parser.Result(self.val, None, self.pos)
 
     def _interpret(self, node):
         node_handler = getattr(self, '_handle_' + node[0], None)
@@ -84,21 +86,21 @@ class Interpreter:
     def _format_error(self):
         lineno = 1
         colno = 1
-        for ch in self.msg[: self.errpos]:
+        for ch in self.text[: self.errpos]:
             if ch == '\n':
                 lineno += 1
                 colno = 1
             else:
                 colno += 1
         if not self.errstr:
-            if self.errpos == len(self.msg):
+            if self.errpos == len(self.text):
                 thing = 'end of input'
             else:
-                thing = repr(self.msg[self.errpos]).replace("'", '"')
+                thing = repr(self.text[self.errpos]).replace("'", '"')
             self.errstr = 'Unexpected %s at column %d' % (thing, colno)
 
-        msg = '%s:%d %s' % (self.fname, lineno, self.errstr)
-        return None, msg, self.errpos
+        msg = '%s:%d %s' % (self.path, lineno, self.errstr)
+        return parser.Result(None, msg, self.errpos)
 
     def _handle_action(self, node):
         self._interpret(node[2][0])
@@ -111,7 +113,7 @@ class Interpreter:
 
         if rule_name == 'any':
             if self.pos != self.end:
-                self._succeed(self.msg[self.pos], self.pos + 1)
+                self._succeed(self.text[self.pos], self.pos + 1)
                 return
             self._fail()
             return
@@ -189,19 +191,19 @@ class Interpreter:
         while (
             i < lit_len
             and self.pos < self.end
-            and self.msg[self.pos] == lit[i]
+            and self.text[self.pos] == lit[i]
         ):
             self.pos += 1
             i += 1
         if i == lit_len:
-            self._succeed(self.msg[pos : self.pos])
+            self._succeed(self.text[pos : self.pos])
         else:
             self._fail()
 
     def _handle_unicat(self, node):
         p = self.pos
-        if p < self.end and unicodedata.category(self.msg[p]) == node[1]:
-            self._succeed(self.msg[p], newpos=p + 1)
+        if p < self.end and unicodedata.category(self.text[p]) == node[1]:
+            self._succeed(self.text[p], newpos=p + 1)
         else:
             self._fail()
 
@@ -403,9 +405,9 @@ class Interpreter:
         assert node[2][1][0] == 'lit'
         if (
             self.pos != self.end
-            and node[2][0][1] <= self.msg[self.pos] <= node[2][1][1]
+            and node[2][0][1] <= self.text[self.pos] <= node[2][1][1]
         ):
-            self._succeed(self.msg[self.pos], self.pos + 1)
+            self._succeed(self.text[self.pos], self.pos + 1)
             return
         self._fail()
 

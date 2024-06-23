@@ -30,9 +30,8 @@ class _CompilerOperatorState:
 
 
 class Compiler:
-    def __init__(self, grammar, classname, main_wanted=True, memoize=True):
+    def __init__(self, grammar, main_wanted=True, memoize=True):
         self._grammar = grammar
-        self._classname = classname
         self._builtins = self._load_builtins()
         self._exception_needed = False
         self._main_wanted = main_wanted
@@ -66,7 +65,6 @@ class Compiler:
 
         if self._main_wanted:
             text = py.MAIN_HEADER.format(
-                classname=self._classname,
                 unicodedata_import=unicodedata_import,
             )
         else:
@@ -80,7 +78,7 @@ class Compiler:
         if self._operators:
             text += py.OPERATOR_CLASS
 
-        text += py.CLASS.format(classname=self._classname)
+        text += py.CLASS
 
         text += self._state()
         text += '\n'

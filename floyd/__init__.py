@@ -12,22 +12,64 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""A parsing framework and parser generator for Python."""
+"""A parsing framework and parser generator for Python.
 
+This package can be used to parse texts according to a given grammar
+and to generate modules that can be used to parse texts.
+
+The grammars in question are a form of Parsing Expression Grammar.
+The grammars support left recursion and can be used to specify operator
+precedence in expressions as well. The parse results are in the form
+of JSON objects (or their Python equivalents, anyway).
+
+Given a grammar:
+
+    >>> grammar = \"\"\"
+    grammar = hello ' '* world { $1 + ', ' $3] }
+    hello   = 'Hello'
+    world   = 'world'
+    \"\"\"
+
+And the input text 'Hello world', the parser will return the string
+'Hello, world'.
+
+You can call the `parse` function to do this most easily:
+
+    >>> result = floyd.parse(grammar, 'Hello world')
+    >>> result.val
+    'Hello, world'
+    >>>
+
+Following the `re` module, you can also call a `compile` function to
+compile the parser ahead of time:
+
+    >>> parser, _, _ = floyd.compile(grammar)
+    >>> result = parse.parse('Hello world')
+    Result(val='Hello, world', err=None, pos=11)
+    >>>
+"""
+
+# pylint: disable=redefined-builtin
 from floyd.api import (
     parse,
-    compile_parser,
-    generate_parser,
+    compile,
+    generate,
     pretty_print,
+    CompiledResult,
     ParserInterface,
+    Result,
 )
 from floyd.version import __version__
 
+# pylint: enable=redefined-builtin
+
 __all__ = [
     '__version__',
-    'compile_parser',
-    'generate_parser',
+    'compile',
+    'generate',
     'parse',
     'pretty_print',
+    'CompiledResult',
     'ParserInterface',
+    'Result',
 ]

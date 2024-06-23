@@ -48,9 +48,8 @@ def main(argv=None, host=None):
         if args.pretty_print:
             contents, err = floyd.pretty_print(grammar, args.grammar)
         elif args.compile:
-            contents, err, _ = floyd.generate_parser(
+            contents, err, _ = floyd.generate(
                 grammar,
-                class_name=args.class_name,
                 main=args.main,
                 memoize=args.memoize,
                 path=args.grammar,
@@ -91,12 +90,6 @@ def _parse_args(host, argv):
         '--version',
         action='store_true',
         help='print current version (%s)' % floyd.__version__,
-    )
-    ap.add_argument(
-        '--class-name',
-        default='Parser',
-        help='class name for the generated class when '
-        'compiling it (defaults to "Parser")',
     )
     ap.add_argument(
         '--memoize',

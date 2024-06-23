@@ -35,11 +35,11 @@ class ToolTest(unittest.TestCase):
         parser = host.files['grammar.py']
         scope = {}
         exec(parser, scope)
-        parser_cls = scope['Parser']
-        obj, err, endpos = parser_cls('Hello', 'grammar.g').parse()
-        self.assertEqual(obj, True)
-        self.assertIsNone(err)
-        self.assertEqual(endpos, 5)
+        parse_fn = scope['parse']
+        result = parse_fn('Hello', 'grammar.g')
+        self.assertEqual(result.val, True)
+        self.assertIsNone(result.err)
+        self.assertEqual(result.pos, 5)
 
     def test_compile_error(self):
         host = FakeHost()
@@ -75,12 +75,12 @@ class ToolTest(unittest.TestCase):
             f = host.read_text_file(d + '/grammar.py')
             scope = {}
             exec(f, scope)
-            parser_cls = scope['Parser']
-            obj, err, endpos = parser_cls('foofoo', '<string>').parse()
+            parse_fn = scope['parse']
+            result = parse_fn('foofoo', '<string>')
             self.assertEqual(ret, 0)
-            self.assertEqual(obj, True)
-            self.assertIsNone(err)
-            self.assertEqual(endpos, 6)
+            self.assertEqual(result.val, True)
+            self.assertIsNone(result.err)
+            self.assertEqual(result.pos, 6)
         finally:
             host.rmtree(d)
 
@@ -187,11 +187,11 @@ class ToolTest(unittest.TestCase):
         parser = host.files['grammar.py']
         scope = {}
         exec(parser, scope)
-        parser_cls = scope['Parser']
-        obj, err, endpos = parser_cls('Hello', 'grammar.g').parse()
-        self.assertEqual(obj, True)
-        self.assertIsNone(err)
-        self.assertEqual(endpos, 5)
+        parse_fn = scope['parse']
+        result = parse_fn('Hello', 'grammar.g')
+        self.assertEqual(result.val, True)
+        self.assertIsNone(result.err)
+        self.assertEqual(result.pos, 5)
 
     def test_missing_grammar(self):
         host = FakeHost()

@@ -14,7 +14,9 @@
 
 
 DEFAULT_HEADER = """\
-{unicodedata_import}# pylint: disable=too-many-lines
+from typing import Any, NamedTuple, Optional
+{unicodedata_import}
+# pylint: disable=too-many-lines
 
 
 """
@@ -30,6 +32,7 @@ import argparse
 import json
 import os
 import sys
+from typing import Any, NamedTuple, Optional
 {unicodedata_import}
 
 # pylint: disable=too-many-lines
@@ -48,21 +51,21 @@ def main(
     args = arg_parser.parse_args(argv)
 
     if not args.file or args.file[1] == '-':
-        fname = '<stdin>'
+        path = '<stdin>'
         fp = stdin
     elif not exists(args.file):
         print('Error: file "%s" not found.' % args.file, file=stderr)
         return 1
     else:
-        fname = args.file
-        fp = opener(fname)
+        path = args.file
+        fp = opener(path)
 
     msg = fp.read()
-    obj, err, _ = {classname}(msg, fname).parse()
-    if err:
-        print(err, file=stderr)
+    result = parse(msg, path)
+    if result.err:
+        print(result.err, file=stderr)
         return 1
-    print(json.dumps(obj, indent=2), file=stdout)
+    print(json.dumps(result.val, indent=2), file=stdout)
     return 0
 
 
@@ -98,13 +101,46 @@ class _OperatorState:
 """
 
 CLASS = """\
-class {classname}:
-    def __init__(self, msg, fname):
-        self.msg = msg
-        self.end = len(self.msg)
+class Result(NamedTuple):
+    \"\"\"The result returned from a `parse()` call.
+
+    If the parse is successful, `val` will contain the returned value, if any
+    and `pos` will indicate the point in the text where the parser stopped.
+    If the parse is unsuccessful, `err` will contain a string describing
+    any errors that occurred during the parse and `pos` will indicate
+    the location of the farthest error in the text.
+    \"\"\"
+
+    val: Any = None
+    err: Optional[str] = None
+    pos: Optional[int] = None
+
+
+def parse(text: str, path: str = '<string>') -> Result:
+    \"\"\"Parse a given text and return the result.
+
+    If the parse was successful, `result.val` will be the returned value
+    from the parse, and `result.pos` will indicate where the parser
+    stopped when it was done parsing.
+
+    If the parse is unsuccessful, `result.err` will be a string describing
+    any errors found in the text, and `result.pos` will indicate the
+    furthest point reached during the parse.
+
+    If the optional `path` is provided it will be used in any error
+    messages to indicate the path to the filename containing the given
+    text.
+    \"\"\"
+    return _Parser(text, path).parse()
+
+
+class _Parser:
+    def __init__(self, text, path):
+        self.text = text
+        self.end = len(self.text)
         self.errpos = 0
         self.failed = False
-        self.fname = fname
+        self.path = path
         self.pos = 0
         self.val = None
 """
@@ -114,8 +150,8 @@ PARSE = """\
     def parse(self):
         self._{starting_rule}_()
         if self.failed:
-            return None, self._err_str(), self.errpos
-        return self.val, None, self.pos
+            return Result(None, self._err_str(), self.errpos)
+        return Result(self.val, None, self.pos)
 """
 
 
@@ -130,7 +166,7 @@ PARSE_WITH_EXCEPTION = """\
             lineno, _ = self._err_offsets()
             return (
                 None,
-                self.fname + ':' + str(lineno) + ' ' + str(e),
+                self.path + ':' + str(lineno) + ' ' + str(e),
                 self.errpos,
             )
 """
@@ -139,7 +175,7 @@ PARSE_WITH_EXCEPTION = """\
 BUILTINS = """\
     def _any_(self):
         if self.pos < self.end:
-            self._succeed(self.msg[self.pos], self.pos + 1)
+            self._succeed(self.text[self.pos], self.pos + 1)
         else:
             self._fail()
 
@@ -153,7 +189,7 @@ BUILTINS = """\
 
     def _ch(self, ch):
         p = self.pos
-        if p < self.end and self.msg[p] == ch:
+        if p < self.end and self.text[p] == ch:
             self._succeed(ch, self.pos + 1)
         else:
             self._fail()
@@ -180,7 +216,7 @@ BUILTINS = """\
         lineno = 1
         colno = 1
         for i in range(self.errpos):
-            if self.msg[i] == '\\n':
+            if self.text[i] == '\\n':
                 lineno += 1
                 colno = 1
             else:
@@ -189,12 +225,12 @@ BUILTINS = """\
 
     def _err_str(self):
         lineno, colno = self._err_offsets()
-        if self.errpos == len(self.msg):
+        if self.errpos == len(self.text):
             thing = 'end of input'
         else:
-            thing = '"%s"' % self.msg[self.errpos]
+            thing = '"%s"' % self.text[self.errpos]
         return '%s:%d Unexpected %s at column %d' % (
-            self.fname,
+            self.path,
             lineno,
             thing,
             colno,
@@ -323,8 +359,8 @@ BUILTINS = """\
 
     def _range(self, i, j):
         p = self.pos
-        if p != self.end and ord(i) <= ord(self.msg[p]) <= ord(j):
-            self._succeed(self.msg[p], self.pos + 1)
+        if p != self.end and ord(i) <= ord(self.text[p]) <= ord(j):
+            self._succeed(self.text[p], self.pos + 1)
         else:
             self._fail()
 
@@ -366,8 +402,8 @@ BUILTINS = """\
 
     def _unicat(self, cat):
         p = self.pos
-        if p < self.end and unicodedata.category(self.msg[p]) == cat:
-            self._succeed(self.msg[p], self.pos + 1)
+        if p < self.end and unicodedata.category(self.text[p]) == cat:
+            self._succeed(self.text[p], self.pos + 1)
         else:
             self._fail()
 
