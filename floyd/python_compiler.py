@@ -18,10 +18,6 @@ from floyd.formatter import flatten, Comma, Saw, Tree
 from floyd import python_templates as py
 from floyd import string_literal as lit
 
-# This is used to optimize inlined methods, see _inline().
-METHOD_RE = re.compile(r'(self\._[_a-z0-9]*_)\(\)')
-
-
 class _CompilerOperatorState:
     def __init__(self):
         self.prec_ops = {}
@@ -34,6 +30,7 @@ class Compiler:
         self._grammar = grammar
         self._builtins = self._load_builtins()
         self._exception_needed = False
+        self._has_scopes = False
         self._main_wanted = main_wanted
         self._memoize = memoize
         self._methods = {}
@@ -101,7 +98,7 @@ class Compiler:
         text = ''
         if self._memoize:
             text += '        self.cache = {}\n'
-        if 'bind' in self._needed:
+        if self._has_scopes:
             text += '        self.scopes = []\n'
             self._needed.update({'get', 'set'})
         if 'leftrec' in self._needed or 'operator' in self._needed:
@@ -207,7 +204,7 @@ class Compiler:
             if self._can_inline(child):
                 args.append(self._inline(child, sub_rule))
             else:
-                args.append(f'self._{sub_rule}_')
+                args.append([f'self._{sub_rule}_()'])
                 sub_rules.append((sub_rule, child))
             # Even if the sub_rule is being inlined, the name might be
             # used as a prefix for inner expressions that aren't inlined.
@@ -218,32 +215,15 @@ class Compiler:
         return args, sub_rules
 
     def _can_inline(self, node):
-        if node[0] in ('apply', 'lit', 'paren'):
-            return True
-        if node[0] == 'label' and node[2][0][0] == 'apply':
-            return True
-        if node[0] in ('not', 'post') and self._can_inline(node[2][0]):
-            return True
-        if (
-            node[0] == 'action'
-            and len(node[2]) == 1
-            and node[2][0][0] in ('ll_lit', 'll_var')
-        ):
+        if node[0] in ('action', 'apply', 'lit', 'paren'):
             return True
         return False
 
     def _inline(self, node, rule):
         self._compile(node, rule)
-        txt = self._methods[rule][0]
+        lines = self._methods[rule]
         del self._methods[rule]
-
-        # If a node compiled down to just invoking a rule, we can
-        # return the name of the method instead of a lambda function
-        # that invokes the method.
-        m = METHOD_RE.match(txt)
-        if m:
-            return m.group(1)
-        return 'lambda: ' + txt
+        return lines
 
     #
     # Handlers for each non-host node in the glop AST follow.
@@ -261,9 +241,17 @@ class Compiler:
         self._methods[rule] = [f'self._{node[1]}_()']
 
     def _choice_(self, rule, node):
-        self._needed.add('choose')
         args, sub_rules = self._inline_args(rule, 'c', node[2])
-        self._methods[rule] = self._gen_method_call('choose', args)
+        lines = [
+            'p = self.pos'
+        ]
+        for arg in args[:-1]:
+            lines.extend(arg)
+            lines.append('if not self.failed:')
+            lines.append('    return')
+            lines.append('self._rewind(p)')
+        lines.extend(args[-1])
+        self._methods[rule] = lines
         for sub_rule, sub_node in sub_rules:
             self._compile(sub_node, sub_rule)
 
@@ -272,16 +260,14 @@ class Compiler:
         self._methods[rule] = ['self._succeed(None)']
 
     def _label_(self, rule, node):
-        self._needed.add('bind')
+        self._has_scopes = True
         sub_rule = rule + '_l'
-        if self._can_inline(node[2][0]):
-            txt = self._inline(node[2][0], sub_rule)
-            self._methods[rule] = [f'self._bind({txt}, {lit.encode(node[1])})']
-        else:
-            self._methods[rule] = [
-                'self._bind(self._%s_, %s)' % (sub_rule, lit.encode(node[1]))
-            ]
-            self._compile(node[2][0], sub_rule)
+        self._methods[rule] = [
+            f'self._{sub_rule}_()',
+            'if not self.failed:',
+            f'    self._set({lit.encode(node[1])}, self.val)'
+        ]
+        self._compile(node[2][0], sub_rule)
 
     def _leftrec_(self, rule, node):
         sub_rule = 'rule' + '_l'
@@ -311,13 +297,28 @@ class Compiler:
         self._methods[rule] = [f'self._{method}({expr})']
 
     def _not_(self, rule, node):
-        self._needed.add('not')
         sub_rule = rule + '_n'
-        # A not will compile down to either a lambda expression
-        # or a method invocation, and both of those are inlineable.
-        assert self._can_inline(node[2][0])
-        txt = self._inline(node[2][0], sub_rule)
-        self._methods[rule] = [f'self._not({txt})']
+        can_inline = self._can_inline(node[2][0])
+        if can_inline:
+            inlined_lines = self._inline(node[2][0], sub_rule)
+        else:
+            inlined_lines = [f'self._{sub_rule}_()']
+
+        inlined_lines = self._inline(node[2][0], sub_rule)
+        lines = [
+            'p = self.pos',
+            'errpos = self.errpos',
+        ] + inlined_lines + [
+            'if self.failed:',
+            '    self._succeed(None, p)',
+            'else:',
+            '    self._rewind(p)',
+            '    self.errpos = errpos',
+            '    self._fail()',
+        ]
+        self._methods[rule] = lines
+        if not can_inline:
+            self._compile(node[2][0], sub_rule)
 
     def _operator_(self, rule, node):
         self._needed.add('operator')
@@ -343,20 +344,45 @@ class Compiler:
 
     def _post_(self, rule, node):
         sub_rule = rule + '_p'
-        if node[1] == '?':
-            method = 'opt'
-        elif node[1] == '+':
-            method = 'plus'
-            self._needed.add('star')
-        else:
-            assert node[1] == '*'
-            method = 'star'
-        self._needed.add(method)
         if self._can_inline(node[2][0]):
-            txt = self._inline(node[2][0], sub_rule)
-            self._methods[rule] = [f'self._{method}({txt})']
+            inlined_lines = self._inline(node[2][0], sub_rule)
+            inlined = True
         else:
-            self._methods[rule] = [f'self._{method}(self._{sub_rule}_)']
+            inlined_lines = [ f'self._{sub_rule}_()' ]
+            inlined = False
+        if node[1] == '?':
+            lines = [
+                'p = self.pos',
+            ] + inlined_lines + [
+                'if self.failed:',
+                '    self._succeed([], p)',
+                'else:',
+                '    self._succeed([self.val])'
+            ]
+        else:
+            lines = [
+                'vs = []'
+            ]
+            if node[1] == '+':
+                lines.extend(inlined_lines)
+                lines.extend([
+                    'vs.append(self.val)',
+                    'if self.failed:',
+                    '    return',
+                ]
+                )
+            lines.extend([
+                'while True:',
+                '    p = self.pos',
+            ] + ['    ' + line for line in inlined_lines] + [
+                '    if self.failed:',
+                '        self._rewind(p)',
+                '        break',
+                '    vs.append(self.val)',
+                'self._succeed(vs)'
+            ])
+        self._methods[rule] = lines
+        if not inlined:
             self._compile(node[2][0], sub_rule)
 
     def _pred_(self, rule, node):
@@ -383,13 +409,18 @@ class Compiler:
         ]
 
     def _seq_(self, rule, node):
-        self._needed.add('seq')
         needs_scope = self._has_labels(node)
         lines = []
         if needs_scope:
             lines.append('self.scopes.append({})')
         args, sub_rules = self._inline_args(rule, 's', node[2])
-        lines += self._gen_method_call('seq', args)
+        for arg in args[:-1]:
+            lines.extend(arg)
+            lines.append('if self.failed:')
+            if needs_scope:
+                lines.append('    self.scopes.pop()')
+            lines.append('    return')
+        lines.extend(args[-1])
         if needs_scope:
             lines.append('self.scopes.pop()')
         self._methods[rule] = lines

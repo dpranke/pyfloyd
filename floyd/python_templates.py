@@ -179,11 +179,6 @@ BUILTINS = """\
         else:
             self._fail()
 
-    def _bind(self, rule, var):
-        rule()
-        if not self.failed:
-            self._set(var, self.val)
-
     def _cat(self, strs):
         return ''.join(strs)
 
@@ -193,15 +188,6 @@ BUILTINS = """\
             self._succeed(ch, self.pos + 1)
         else:
             self._fail()
-
-    def _choose(self, rules):
-        p = self.pos
-        for rule in rules[:-1]:
-            rule()
-            if not self.failed:
-                return
-            self._rewind(p)
-        rules[-1]()
 
     def _dict(self, pairs):
          return dict(pairs)
@@ -290,17 +276,6 @@ BUILTINS = """\
                     self.blocked.remove(rule_name)
                 return
 
-    def _not(self, rule):
-        p = self.pos
-        errpos = self.errpos
-        rule()
-        if self.failed:
-            self._succeed(None, p)
-        else:
-            self._rewind(p)
-            self.errpos = errpos
-            self._fail()
-
     def _operator(self, rule_name):
         o = self.operators[rule_name]
         pos = self.pos
@@ -341,22 +316,6 @@ BUILTINS = """\
             o.current_prec = 0
         self.val, self.failed, self.pos = current
 
-    def _opt(self, rule):
-        p = self.pos
-        rule()
-        if self.failed:
-            self._succeed([], p)
-        else:
-            self._succeed([self.val])
-
-    def _plus(self, rule):
-        vs = []
-        rule()
-        vs.append(self.val)
-        if self.failed:
-            return
-        self._star(rule, vs)
-
     def _range(self, i, j):
         p = self.pos
         if p != self.end and ord(i) <= ord(self.text[p]) <= ord(j):
@@ -367,25 +326,8 @@ BUILTINS = """\
     def _rewind(self, newpos):
         self._succeed(None, newpos)
 
-    def _seq(self, rules):
-        for rule in rules:
-            rule()
-            if self.failed:
-                return
-
     def _set(self, var, val):
         self.scopes[-1][var] = val
-
-    def _star(self, rule, vs=None):
-        vs = vs or []
-        while True:
-            p = self.pos
-            rule()
-            if self.failed:
-                self._rewind(p)
-                break
-            vs.append(self.val)
-        self._succeed(vs)
 
     def _str(self, s):
         for ch in s:
