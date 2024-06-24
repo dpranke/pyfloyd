@@ -139,7 +139,7 @@ class _Parser:
         self.text = text
         self.end = len(self.text)
         self.errpos = 0
-        self.ok = True
+        self.failed = False
         self.path = path
         self.pos = 0
         self.val = None
@@ -149,7 +149,7 @@ class _Parser:
 PARSE = """\
     def parse(self):
         self._{starting_rule}_()
-        if not self.ok:
+        if self.failed:
             return Result(None, self._err_str(), self.errpos)
         return Result(self.val, None, self.pos)
 """
@@ -159,7 +159,7 @@ PARSE_WITH_EXCEPTION = """\
     def parse(self):
         try:
             self._{starting_rule}_()
-            if not self.ok:
+            if self.failed:
                 return None, self._err_str(), self.errpos
             return self.val, None, self.pos
         except _ParsingRuntimeError as e:  # pragma: no cover
@@ -224,7 +224,7 @@ BUILTINS = """\
 
     def _fail(self):
         self.val = None
-        self.ok = False
+        self.failed = True
         self.errpos = max(self.errpos, self.pos)
 
     def _float(self, str):
@@ -253,25 +253,25 @@ BUILTINS = """\
         key = (rule_name, pos)
         seed = self.seeds.get(key)
         if seed:
-            self.val, self.ok, self.pos = seed
+            self.val, self.failed, self.pos = seed
             return
         if rule_name in self.blocked:
             self.val = None
-            self.ok = False
+            self.failed = True
             return
-        current = (None, False, self.pos)
+        current = (None, True, self.pos)
         self.seeds[key] = current
         if left_assoc:
             self.blocked.add(rule_name)
         while True:
             rule()
             if self.pos > current[2]:
-                current = (self.val, self.ok, self.pos)
+                current = (self.val, self.failed, self.pos)
                 self.seeds[key] = current
                 self.pos = pos
             else:
                 del self.seeds[key]
-                self.val, self.ok, self.pos = current
+                self.val, self.failed, self.pos = current
                 if left_assoc:
                     self.blocked.remove(rule_name)
                 return
@@ -282,10 +282,10 @@ BUILTINS = """\
         key = (rule_name, self.pos)
         seed = self.seeds.get(key)
         if seed:
-            self.val, self.ok, self.pos = seed
+            self.val, self.failed, self.pos = seed
             return
         o.current_depth += 1
-        current = (None, False, self.pos)
+        current = (None, True, self.pos)
         self.seeds[key] = current
         min_prec = o.current_prec
         i = 0
@@ -301,8 +301,8 @@ BUILTINS = """\
             for j, _ in enumerate(prec_ops):
                 op = prec_ops[j]
                 o.choices[op]()
-                if self.ok and self.pos > pos:
-                    current = (self.val, self.ok, self.pos)
+                if not self.failed and self.pos > pos:
+                    current = (self.val, self.failed, self.pos)
                     self.seeds[key] = current
                     repeat = True
                     break
@@ -314,7 +314,7 @@ BUILTINS = """\
         o.current_depth -= 1
         if o.current_depth == 0:
             o.current_prec = 0
-        self.val, self.ok, self.pos = current
+        self.val, self.failed, self.pos = current
 
     def _range(self, i, j):
         p = self.pos
@@ -332,13 +332,13 @@ BUILTINS = """\
     def _str(self, s):
         for ch in s:
             self._ch(ch)
-            if not self.ok:
+            if self.failed:
                 return
         self.val = s
 
     def _succeed(self, v, newpos=None):
         self.val = v
-        self.ok = True
+        self.failed = False
         if newpos is not None:
             self.pos = newpos
 
