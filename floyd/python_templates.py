@@ -190,7 +190,7 @@ BUILTINS = """\
             self._fail()
 
     def _dict(self, pairs):
-         return dict(pairs)
+        return dict(pairs)
 
     def _end_(self):
         if self.pos == self.end:
@@ -227,17 +227,16 @@ BUILTINS = """\
         self.failed = True
         self.errpos = max(self.errpos, self.pos)
 
-    def _float(self, str):
-          if '.' in str or 'e' in str or 'E' in str:
-              return float(str)
-          else:
-              return int(str)
+    def _float(self, s):
+        if '.' in s or 'e' in s or 'E' in s:
+            return float(s)
+        return int(s)
 
     def _get(self, var):
         return self.scopes[-1][var]
 
-    def _hex(self, str):
-        return int(str, base=16)
+    def _hex(self, s):
+        return int(s, base=16)
 
     def _is_unicat(self, var, cat):
         return unicodedata.category(var) == cat
