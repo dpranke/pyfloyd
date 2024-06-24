@@ -97,9 +97,6 @@ class Compiler:
         text = ''
         if self._memoize:
             text += '        self.cache = {}\n'
-        if self._has_scopes:
-            text += '        self.scopes = []\n'
-            self._needed.update({'get', 'set'})
         if 'leftrec' in self._needed or 'operator' in self._needed:
             text += '        self.seeds = {}\n'
         if 'leftrec' in self._needed:
@@ -183,14 +180,6 @@ class Compiler:
         fn = getattr(self, f'_{node[0]}_')
         return fn(node)
 
-    def _has_labels(self, node):
-        if node and node[0] in ('label', 'll_var'):
-            return True
-        for n in node:
-            if isinstance(n, list) and self._has_labels(n):
-                return True
-        return False
-
     def _inline_args(self, rule, sub_rule_type, children):
         args = []
         sub_rules = []
@@ -211,7 +200,7 @@ class Compiler:
         return args, sub_rules
 
     def _can_inline(self, node):
-        if node[0] in ('action', 'apply', 'lit', 'paren'):
+        if node[0] in ('action', 'apply', 'label', 'lit', 'paren', 'pred'):
             return True
         return False
 
@@ -254,7 +243,6 @@ class Compiler:
         self._methods[rule] = ['self._succeed(None)']
 
     def _label_(self, rule, node):
-        self._has_scopes = True
         sub_rule = rule + '_l'
         can_inline = self._can_inline(node[2][0])
         if can_inline:
@@ -264,7 +252,7 @@ class Compiler:
         lines.extend(
             [
                 'if not self.failed:',
-                f'    self._set({lit.encode(node[1])}, self.val)',
+                f'    v_{node[1].replace("$", "_")} = self.val',
             ]
         )
         self._methods[rule] = lines
@@ -275,16 +263,11 @@ class Compiler:
         sub_rule = 'rule' + '_l'
         left_assoc = self._grammar.assoc.get(node[1], 'left') == 'left'
         self._needed.add('leftrec')
-        needs_scope = self._has_labels(node)
         lines = []
-        if needs_scope:
-            lines.append('self.scopes.append({})')
         lines.append(
             f'self._leftrec(self._{sub_rule}_, '
             + f"'{node[1]}', {str(left_assoc)})"
         )
-        if needs_scope:
-            lines.append('self.scopes.pop()')
         self._methods[rule] = lines
         self._compile(node[2][0], sub_rule)
 
@@ -419,17 +402,12 @@ class Compiler:
         ]
 
     def _seq_(self, rule, node):
-        needs_scope = self._has_labels(node)
         lines = []
-        if needs_scope:
-            lines.append('self.scopes.append({})')
         args, sub_rules = self._inline_args(rule, 's', node[2])
         lines.extend(args[0])
         for arg in args[1:]:
             lines.append('if not self.failed:')
             lines.extend('    ' + line for line in arg)
-        if needs_scope:
-            lines.append('self.scopes.pop()')
         self._methods[rule] = lines
         for sub_rule, sub_node in sub_rules:
             self._compile(sub_node, sub_rule)
@@ -500,7 +478,7 @@ class Compiler:
         return saw
 
     def _ll_var_(self, node):
-        return "self._get('%s')" % node[1]
+        return 'v_' + node[1].replace('$', '_')
 
     def _ll_const_(self, node):
         if node[1] == 'false':

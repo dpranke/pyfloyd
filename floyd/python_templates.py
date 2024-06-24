@@ -232,9 +232,6 @@ BUILTINS = """\
             return float(s)
         return int(s)
 
-    def _get(self, var):
-        return self.scopes[-1][var]
-
     def _hex(self, s):
         return int(s, base=16)
 
@@ -324,9 +321,6 @@ BUILTINS = """\
 
     def _rewind(self, newpos):
         self._succeed(None, newpos)
-
-    def _set(self, var, val):
-        self.scopes[-1][var] = val
 
     def _str(self, s):
         for ch in s:
