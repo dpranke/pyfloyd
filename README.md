@@ -31,6 +31,11 @@ format the code. `./run --help` is your friend to find out more.
 
 ## Version History / Release Notes
 
+* v0.13 (2024-06-29)
+    * Rework the way subrules are generated and named to be much less
+      cryptic. Now rules result in methods named `_r_{rule}_` and
+      subrules methods named `_s_{rule}_{i}` where i is a series of
+      consecutive integers named in a depth first manner.
 * v0.12 (2024-06-29)
     * Significantly rework the generated parser so that it is less like
       a set of parser combinators (self._star() and so on) and more like
