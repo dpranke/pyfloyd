@@ -31,6 +31,11 @@ format the code. `./run --help` is your friend to find out more.
 
 ## Version History / Release Notes
 
+* v0.12 (2024-06-29)
+    * Significantly rework the generated parser so that it is less like
+      a set of parser combinators (self._star() and so on) and more like
+      code that you'd write inline by hand. This appears to produce a
+      parser close to 2x faster for 1.33x more code.
 * v0.11 (2024-06-22)
     * Rework the API significantly. Now the generated parser API is a single
       `parse()` function and a data type for the return value (`Result`),
