@@ -338,9 +338,6 @@ class Runner:
                 'grammars/floyd.g',
             ]
         )
-        # TODO: Fix the compiler so that we don't need to reformat the file.
-        # Right now expressions may be up to 4 chars too long for a line.
-        self.call([sys.executable, '-m', 'ruff', 'format', 'parser.py'])
 
 
 if __name__ == '__main__':
