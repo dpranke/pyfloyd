@@ -148,7 +148,7 @@ class _Parser:
 
 PARSE = """\
     def parse(self):
-        self._{starting_rule}_()
+        self._r_{starting_rule}_()
         if self.failed:
             return Result(None, self._err_str(), self.errpos)
         return Result(self.val, None, self.pos)
@@ -158,7 +158,7 @@ PARSE = """\
 PARSE_WITH_EXCEPTION = """\
     def parse(self):
         try:
-            self._{starting_rule}_()
+            self._r_{starting_rule}_()
             if self.failed:
                 return None, self._err_str(), self.errpos
             return self.val, None, self.pos

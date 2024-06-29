@@ -7,6 +7,8 @@
 * analyzer.py: Figure out how to do type analysis of predicates to
   statically catch ones that don't return booleans.
 
+* analyzer.py: Add general typechecking of host expressions.
+
 * compiler.py: Figure out if we can omit generated code when it isn't
   actually possible to execute it (E.g., catching a ParsingRuntimeError
   when one will never be thrown). See where I had to add `# pragma: no cover`
@@ -44,3 +46,9 @@
 * analyzer.py: Figure out if it is possible to mix operator expressions and
   left-recursive expressions so that we trip the unexpected AST node
   assertion in _check_lr
+
+* compiler.py: Figure out if we need more typechecking beyond whatever we
+  can do in analyzer.py. 
+
+* compiler.py: Figure out a better mechanism for reporting runtime errors
+  that aren't syntax errors.
