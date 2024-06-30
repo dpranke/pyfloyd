@@ -107,7 +107,7 @@ class FormatterTests(unittest.TestCase):
         t = Saw('foo(', "'bar'", Saw(')(', "'baz'", ')'))
         self.assertEqual(["foo('bar')('baz')"], flatten(t))
 
-        # Test that the right length of args can fit on a line of 79
+        # Test that the right length of args can fit on a line of 75
         # chars by itself.
         t = Saw(
             'foo(',
@@ -115,8 +115,8 @@ class FormatterTests(unittest.TestCase):
                 [
                     'self._long_rule_1',
                     'self._long_rule_2',
-                    'self._long_rule_3',
-                    'self._long',
+                    'self._long_3',
+                    'self._long4',
                 ]
             ),
             ')',
@@ -124,8 +124,8 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             [
                 'foo(',
-                '    self._long_rule_1, self._long_rule_2, self._long_rule_3, '
-                'self._long',
+                '    self._long_rule_1, self._long_rule_2, self._long_3, '
+                'self._long4',
                 ')',
             ],
             flatten(t),

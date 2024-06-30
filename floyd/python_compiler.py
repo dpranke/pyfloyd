@@ -32,7 +32,8 @@ class _CompilerOperatorState:
 class Compiler:
     def __init__(self, grammar, main_wanted=True, memoize=True):
         self._grammar = grammar
-        self._builtins = self._load_builtins()
+        self._builtin_methods = self._load_builtin_methods()
+        self._builtin_functions = self._load_builtin_functions()
         self._exception_needed = False
         self._has_scopes = False
         self._main_wanted = main_wanted
@@ -46,7 +47,7 @@ class Compiler:
         self._counter = 1
 
         # These methods are always needed.
-        self._needed = set(
+        self._needed_methods = set(
             {
                 'err_offsets',
                 'err_str',
@@ -55,6 +56,7 @@ class Compiler:
                 'succeed',
             }
         )
+        self._needed_functions = set()
 
     def compile(self) -> str:
         self._compile_rules()
@@ -107,6 +109,9 @@ class Compiler:
             text += py.PARSE.format(starting_rule=self._grammar.starting_rule)
 
         text += self._gen_methods()
+        if self._needed_functions:
+            text += '\n\n'
+            text += self._gen_functions()
         if self._main_wanted:
             text += py.MAIN_FOOTER
         else:
@@ -117,9 +122,12 @@ class Compiler:
         text = ''
         if self._memoize:
             text += '        self.cache = {}\n'
-        if 'leftrec' in self._needed or 'operator' in self._needed:
+        if (
+            'leftrec' in self._needed_methods
+            or 'operator' in self._needed_methods
+        ):
             text += '        self.seeds = {}\n'
-        if 'leftrec' in self._needed:
+        if 'leftrec' in self._needed_methods:
             text += '        self.blocked = set()\n'
         if self._operators:
             text += self._operator_state()
@@ -148,8 +156,8 @@ class Compiler:
             text += "        self.operators['%s'] = o\n" % rule
         return text
 
-    def _load_builtins(self) -> Dict[str, str]:
-        blocks = py.BUILTINS.split('\n    def ')
+    def _load_builtin_methods(self) -> Dict[str, str]:
+        blocks = py.BUILTIN_METHODS.split('\n    def ')
         blocks[0] = blocks[0][8:]
         builtins = {}
         for block in blocks:
@@ -162,6 +170,14 @@ class Compiler:
             builtins[name] = text
         return builtins
 
+    def _load_builtin_functions(self) -> Dict[str, str]:
+        blocks = py.BUILTIN_FUNCTIONS[:-1].split('\n\n')
+        builtins = {}
+        for block in blocks:
+            name = block[5 : block.find('(')]
+            builtins[name] = block + '\n'
+        return builtins
+
     def _gen_methods(self) -> str:
         text = ''
         for rule, method_body in self._methods.items():
@@ -171,7 +187,8 @@ class Compiler:
         text += '\n'
 
         text += '\n'.join(
-            self._builtins[name] for name in sorted(self._needed)
+            self._builtin_methods[name]
+            for name in sorted(self._needed_methods)
         )
         return text
 
@@ -191,6 +208,12 @@ class Compiler:
             text += f'        self.cache[("{method_name}", pos)] = ('
             text += 'self.val, self.failed, self.pos)\n'
         return text
+
+    def _gen_functions(self) -> str:
+        return '\n\n'.join(
+            self._builtin_functions[name]
+            for name in sorted(self._needed_functions)
+        )
 
     def _compile(self, node) -> List[str]:
         # All of the rule methods return a list of lines.
@@ -234,7 +257,7 @@ class Compiler:
         # Unknown rules were caught in analysis so if the rule isn't
         # one of the ones in the grammar it must be a built-in one.
         if node[1] not in self._grammar.rules:
-            self._needed.add(node[1])
+            self._needed_methods.add(node[1])
             return [f'self._{node[1]}_()']
         return [f'self._r_{node[1]}_()']
 
@@ -273,7 +296,7 @@ class Compiler:
     def _leftrec_(self, node) -> List[str]:
         sub_rule = self._sub_rule()
         left_assoc = self._grammar.assoc.get(node[1], 'left') == 'left'
-        self._needed.add('leftrec')
+        self._needed_methods.add('leftrec')
         lines = []
         lines.append(
             f'self._leftrec(self._{sub_rule}_, '
@@ -288,8 +311,8 @@ class Compiler:
             method = 'ch'
         else:
             method = 'str'
-            self._needed.add('ch')
-        self._needed.add(method)
+            self._needed_methods.add('ch')
+        self._needed_methods.add(method)
         return [f'self._{method}({expr})']
 
     def _not_(self, node) -> List[str]:
@@ -319,7 +342,7 @@ class Compiler:
         return lines
 
     def _operator_(self, node) -> List[str]:
-        self._needed.add('operator')
+        self._needed_methods.add('operator')
         o = _CompilerOperatorState()
         for operator in node[2]:
             op, prec = operator[1]
@@ -404,7 +427,7 @@ class Compiler:
         ]
 
     def _range_(self, node) -> List[str]:
-        self._needed.add('range')
+        self._needed_methods.add('range')
         return [
             'self._range(%s, %s)'
             % (lit.encode(node[2][0][1]), lit.encode(node[2][1][1]))
@@ -421,7 +444,7 @@ class Compiler:
 
     def _unicat_(self, node) -> List[str]:
         self._unicodedata_needed = True
-        self._needed.add('unicat')
+        self._needed_methods.add('unicat')
         return ['self._unicat(%s)' % lit.encode(node[1])]
 
     #
@@ -468,10 +491,10 @@ class Compiler:
                 # first is an identifier, but it must refer to a
                 # built-in function if second is a call.
                 fn = first[1]
-                self._needed.add(fn)
+                self._needed_functions.add(fn)
                 # Note that unknown functions were caught during analysis
                 # so we don't have to worry about that here.
-                start = f'self._{fn}'
+                start = f'_{fn}'
             else:
                 # If second isn't a call, then first refers to a variable.
                 start = self._ll_var_(first)

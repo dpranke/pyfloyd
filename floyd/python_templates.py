@@ -172,29 +172,23 @@ PARSE_WITH_EXCEPTION = """\
 """
 
 
-BUILTINS = """\
+BUILTIN_METHODS = """\
     def _any_(self):
         if self.pos < self.end:
             self._succeed(self.text[self.pos], self.pos + 1)
         else:
             self._fail()
 
-    def _cat(self, strs):
-        return ''.join(strs)
+    def _end_(self):
+        if self.pos == self.end:
+            self._succeed(None)
+        else:
+            self._fail()
 
     def _ch(self, ch):
         p = self.pos
         if p < self.end and self.text[p] == ch:
             self._succeed(ch, self.pos + 1)
-        else:
-            self._fail()
-
-    def _dict(self, pairs):
-        return dict(pairs)
-
-    def _end_(self):
-        if self.pos == self.end:
-            self._succeed(None)
         else:
             self._fail()
 
@@ -226,23 +220,6 @@ BUILTINS = """\
         self.val = None
         self.failed = True
         self.errpos = max(self.errpos, self.pos)
-
-    def _float(self, s):
-        if '.' in s or 'e' in s or 'E' in s:
-            return float(s)
-        return int(s)
-
-    def _hex(self, s):
-        return int(s, base=16)
-
-    def _is_unicat(self, var, cat):
-        return unicodedata.category(var) == cat
-
-    def _itou(self, n):
-        return chr(n)
-
-    def _join(self, s, vs):
-        return s.join(vs)
 
     def _leftrec(self, rule, rule_name, left_assoc):
         pos = self.pos
@@ -341,13 +318,38 @@ BUILTINS = """\
             self._succeed(self.text[p], self.pos + 1)
         else:
             self._fail()
+"""
 
-    def _utoi(self, s):
-        return ord(s)
+BUILTIN_FUNCTIONS = """\
+def _cat(strs):
+    return ''.join(strs)
 
-    def _xtoi(self, s):
-        return int(s, base=16)
+def _dict(pairs):
+    return dict(pairs)
 
-    def _xtou(self, s):
-        return chr(int(s, base=16))
+def _float(s):
+    if '.' in s or 'e' in s or 'E' in s:
+        return float(s)
+    return int(s)
+
+def _hex(s):
+    return int(s, base=16)
+
+def _is_unicat(var, cat):
+    return unicodedata.category(var) == cat
+
+def _itou(n):
+    return chr(n)
+
+def _join(s, vs):
+    return s.join(vs)
+
+def _utoi(s):
+    return ord(s)
+
+def _xtoi(s):
+    return int(s, base=16)
+
+def _xtou(s):
+    return chr(int(s, base=16))
 """

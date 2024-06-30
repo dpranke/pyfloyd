@@ -393,7 +393,7 @@ class _Parser:
         if not self.failed:
             v_op = self.val
         if not self.failed:
-            self._succeed(self._join('', v_op))
+            self._succeed(_join('', v_op))
 
     def _s_op_1_(self):
         vs = []
@@ -445,7 +445,7 @@ class _Parser:
             if not self.failed:
                 v_ds = self.val
         if not self.failed:
-            self._succeed(v_i + '#' + self._join('', v_ds))
+            self._succeed(v_i + '#' + _join('', v_ds))
 
     def _r_dir_(self):
         self._s_dir_1_()
@@ -546,7 +546,7 @@ class _Parser:
             if not self.failed:
                 v_tl = self.val
         if not self.failed:
-            self._succeed(self._cat([v_hd] + v_tl))
+            self._succeed(_cat([v_hd] + v_tl))
 
     def _s_ident_1_(self):
         vs = []
@@ -902,7 +902,7 @@ class _Parser:
         if not self.failed:
             self._r_squote_()
         if not self.failed:
-            self._succeed(['lit', self._cat(v_cs), []])
+            self._succeed(['lit', _cat(v_cs), []])
 
     def _s_lit_2_(self):
         vs = []
@@ -924,7 +924,7 @@ class _Parser:
         if not self.failed:
             self._r_dquote_()
         if not self.failed:
-            self._succeed(['lit', self._cat(v_cs), []])
+            self._succeed(['lit', _cat(v_cs), []])
 
     def _s_lit_4_(self):
         vs = []
@@ -1134,7 +1134,7 @@ class _Parser:
             if not self.failed:
                 v_h2 = self.val
         if not self.failed:
-            self._succeed(self._xtou(v_h1 + v_h2))
+            self._succeed(_xtou(v_h1 + v_h2))
 
     def _r_unicode_esc_(self):
         p = self.pos
@@ -1163,7 +1163,7 @@ class _Parser:
             if not self.failed:
                 v_h4 = self.val
         if not self.failed:
-            self._succeed(self._xtou(v_h1 + v_h2 + v_h3 + v_h4))
+            self._succeed(_xtou(v_h1 + v_h2 + v_h3 + v_h4))
 
     def _s_unicode_esc_2_(self):
         self._ch('U')
@@ -1201,9 +1201,7 @@ class _Parser:
                 v_h8 = self.val
         if not self.failed:
             self._succeed(
-                self._xtou(
-                    v_h1 + v_h2 + v_h3 + v_h4 + v_h5 + v_h6 + v_h7 + v_h8
-                )
+                _xtou(v_h1 + v_h2 + v_h3 + v_h4 + v_h5 + v_h6 + v_h7 + v_h8)
             )
 
     def _r_escape_(self):
@@ -1508,7 +1506,7 @@ class _Parser:
         if not self.failed:
             v_ds = self.val
         if not self.failed:
-            self._succeed(self._cat(v_ds))
+            self._succeed(_cat(v_ds))
 
     def _s_digits_1_(self):
         vs = []
@@ -1530,7 +1528,7 @@ class _Parser:
         if not self.failed:
             v_hs = self.val
         if not self.failed:
-            self._succeed(self._cat(v_hs))
+            self._succeed(_cat(v_hs))
 
     def _s_hexdigits_1_(self):
         vs = []
@@ -1574,9 +1572,6 @@ class _Parser:
         else:
             self._fail()
 
-    def _cat(self, strs):
-        return ''.join(strs)
-
     def _ch(self, ch):
         p = self.pos
         if p < self.end and self.text[p] == ch:
@@ -1619,9 +1614,6 @@ class _Parser:
         self.failed = True
         self.errpos = max(self.errpos, self.pos)
 
-    def _join(self, s, vs):
-        return s.join(vs)
-
     def _range(self, i, j):
         p = self.pos
         if p != self.end and ord(i) <= ord(self.text[p]) <= ord(j):
@@ -1645,5 +1637,14 @@ class _Parser:
         if newpos is not None:
             self.pos = newpos
 
-    def _xtou(self, s):
-        return chr(int(s, base=16))
+
+def _cat(strs):
+    return ''.join(strs)
+
+
+def _join(s, vs):
+    return s.join(vs)
+
+
+def _xtou(s):
+    return chr(int(s, base=16))
