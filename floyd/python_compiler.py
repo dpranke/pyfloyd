@@ -19,7 +19,7 @@ from floyd import python_templates as py
 from floyd import string_literal as lit
 
 
-_FormatObj = Union[Comma | Tree | Saw | str]
+_FormatObj = Union[Comma, Tree, Saw, str]
 
 
 class _CompilerOperatorState:
