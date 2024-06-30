@@ -30,6 +30,7 @@ class _CompilerOperatorState:
 
 class Compiler:
     def __init__(self, grammar, main_wanted=True, memoize=True):
+
         self._grammar = grammar
         self._builtin_methods = self._load_builtin_methods()
         self._builtin_functions = self._load_builtin_functions()
@@ -38,12 +39,8 @@ class Compiler:
         self._main_wanted = main_wanted
         self._memoize = memoize
         self._methods = {}
-        self._method_lines = []
         self._operators = {}
         self._unicodedata_needed = False
-        self._rule = None
-        self._sub_rules = {}
-        self._counter = 1
 
         # These methods are always needed.
         self._needed_methods = set(
@@ -63,17 +60,7 @@ class Compiler:
 
     def _compile_rules(self) -> None:
         for rule, node in self._grammar.rules.items():
-            self._rule = rule
-            self._sub_rules = {}
-            self._counter = 0
-            lines = self._compile(node)
-            self._methods[f'r_{rule}'] = lines
-            sub_rules = sorted(self._sub_rules.keys(), key=self._sub_rule_key)
-            for sub_rule in sub_rules:
-                self._methods[sub_rule] = self._sub_rules[sub_rule]
-
-    def _sub_rule_key(self, s: str) -> int:
-        return int(s.replace(f's_{self._rule}_', ''))
+            self._methods[rule] = self._compile(node)
 
     def _gen_text(self) -> str:
         unicodedata_import = ''
@@ -182,8 +169,14 @@ class Compiler:
         for rule, method_body in self._methods.items():
             memoize = self._memoize and rule[2:] in self._grammar.rules
             text += self._gen_method_text(rule, method_body, memoize)
-
         text += '\n'
+
+        if self._grammar.needed_builtin_rules:
+            text += '\n'.join(
+                self._builtin_methods[f'r_{name}_']
+                for name in sorted(self._grammar.needed_builtin_rules)
+            )
+            text += '\n'
 
         text += '\n'.join(
             self._builtin_methods[name]
@@ -193,7 +186,7 @@ class Compiler:
 
     def _gen_method_text(self, method_name, method_body, memoize) -> str:
         text = '\n'
-        text += '    def _%s_(self):\n' % method_name
+        text += '    def %s(self):\n' % method_name
         if memoize:
             text += '        r = self.cache.get(("%s", ' % method_name
             text += 'self.pos))\n'
@@ -211,7 +204,7 @@ class Compiler:
     def _gen_functions(self) -> str:
         return '\n\n'.join(
             self._builtin_functions[name]
-            for name in sorted(self._needed_functions)
+            for name in sorted(self._grammar.needed_builtin_functions)
         )
 
     def _compile(self, node) -> List[str]:
@@ -253,22 +246,16 @@ class Compiler:
         return flatten(Saw('self._succeed(', obj, ')'))
 
     def _apply_(self, node) -> List[str]:
-        # Unknown rules were caught in analysis so if the rule isn't
-        # one of the ones in the grammar it must be a built-in one.
-        if node[1] not in self._grammar.rules:
-            self._needed_methods.add(node[1])
-            return [f'self._{node[1]}_()']
-        return [f'self._r_{node[1]}_()']
+        return [f'self.{node[1]}()']
 
     def _choice_(self, node) -> List[str]:
-        sub_lines = self._inline_args(node[2])
         lines = ['p = self.pos']
-        for sub_line in sub_lines[:-1]:
-            lines.extend(sub_line)
+        for subnode in node[2][:-1]:
+            lines.extend(self._compile(subnode))
             lines.append('if not self.failed:')
             lines.append('    return')
             lines.append('self._rewind(p)')
-        lines.extend(sub_lines[-1])
+        lines.extend(self._compile(node[2][-1]))
         return lines
 
     def _empty_(self, node) -> List[str]:
@@ -276,14 +263,7 @@ class Compiler:
         return ['self._succeed(None)']
 
     def _label_(self, node) -> List[str]:
-        sub_node = node[2][0]
-        can_inline = self._can_inline(sub_node)
-        if can_inline:
-            lines = self._compile(sub_node)
-        else:
-            sub_rule = self._sub_rule()
-            self._sub_rules[sub_rule] = self._compile(sub_node)
-            lines = [f'self._{sub_rule}_()']
+        lines = self._compile(node[2][0])
         lines.extend(
             [
                 'if not self.failed:',
@@ -293,15 +273,11 @@ class Compiler:
         return lines
 
     def _leftrec_(self, node) -> List[str]:
-        sub_rule = self._sub_rule()
         left_assoc = self._grammar.assoc.get(node[1], 'left') == 'left'
-        self._needed_methods.add('leftrec')
-        lines = []
-        lines.append(
-            f'self._leftrec(self._{sub_rule}_, '
+        lines = [
+            f'self._leftrec(self._r_{node[1]}_, '
             + f"'{node[1]}', {str(left_assoc)})"
-        )
-        self._sub_rules[sub_rule] = self._compile(node[2][0])
+        ]
         return lines
 
     def _lit_(self, node) -> List[str]:
@@ -315,20 +291,13 @@ class Compiler:
         return [f'self._{method}({expr})']
 
     def _not_(self, node) -> List[str]:
-        sub_node = node[2][0]
-        can_inline = self._can_inline(sub_node)
-        if can_inline:
-            inlined_lines = self._compile(sub_node)
-        else:
-            sub_rule = self._sub_rule()
-            self._sub_rules[sub_rule] = self._compile(sub_node)
-            inlined_lines = [f'self._{sub_rule}_()']
+        sublines = self._compile(node[2][0])
         lines = (
             [
                 'p = self.pos',
                 'errpos = self.errpos',
             ]
-            + inlined_lines
+            + sublines
             + [
                 'if self.failed:',
                 '    self._succeed(None, p)',
@@ -345,36 +314,27 @@ class Compiler:
         o = _CompilerOperatorState()
         for operator in node[2]:
             op, prec = operator[1]
-            sub_node = operator[2][0]
+            subnode = operator[2][0]
             o.prec_ops.setdefault(prec, []).append(op)
             if self._grammar.assoc.get(op) == 'right':
                 o.rassoc.add(op)
-            sub_rule = self._sub_rule()
-            o.choices[op] = sub_rule
-            self._sub_rules[sub_rule] = self._compile(sub_node)
+            subrule = self._subrule()
+            o.choices[op] = subrule
+            self._subrules[subrule] = self._compile(subnode)
         self._operators[self._rule] = o
         return [f"self._operator(f'{self._rule}')"]
 
     def _paren_(self, node) -> List[str]:
-        sub_rule = self._sub_rule()
-        self._sub_rules[sub_rule] = self._compile(node[2][0])
-        return [f'self._{sub_rule}_()']
+        return self._compile(node[2][0])
 
     def _post_(self, node) -> List[str]:
-        sub_node = node[2][0]
-        can_inline = self._can_inline(sub_node)
-        if can_inline:
-            inlined_lines = self._compile(sub_node)
-        else:
-            sub_rule = self._sub_rule()
-            self._sub_rules[sub_rule] = self._compile(sub_node)
-            inlined_lines = [f'self._{sub_rule}_()']
+        sublines = self._compile(node[2][0])
         if node[1] == '?':
             lines = (
                 [
                     'p = self.pos',
                 ]
-                + inlined_lines
+                + sublines
                 + [
                     'if self.failed:',
                     '    self._succeed([], p)',
@@ -385,7 +345,7 @@ class Compiler:
         else:
             lines = ['vs = []']
             if node[1] == '+':
-                lines.extend(inlined_lines)
+                lines.extend(sublines)
                 lines.extend(
                     [
                         'vs.append(self.val)',
@@ -398,7 +358,7 @@ class Compiler:
                     'while True:',
                     '    p = self.pos',
                 ]
-                + ['    ' + line for line in inlined_lines]
+                + ['    ' + line for line in sublines]
                 + [
                     '    if self.failed:',
                     '        self._rewind(p)',
@@ -434,11 +394,11 @@ class Compiler:
 
     def _seq_(self, node) -> List[str]:
         lines = []
-        sub_rules = self._inline_args(node[2])
-        lines.extend(sub_rules[0])
-        for sub_rule_lines in sub_rules[1:]:
-            lines.append('if not self.failed:')
-            lines.extend('    ' + line for line in sub_rule_lines)
+        lines.extend(self._compile(node[2][0]))
+        for subnode in node[2][1:]:
+            lines.append('if self.failed:')
+            lines.append('    return')
+            lines.extend(self._compile(subnode))
         return lines
 
     def _unicat_(self, node) -> List[str]:
@@ -695,13 +655,13 @@ _PARSE_WITH_EXCEPTION = """\
 
 
 _BUILTIN_METHODS = """\
-    def _any_(self):
+    def _r_any_(self):
         if self.pos < self.end:
             self._succeed(self.text[self.pos], self.pos + 1)
         else:
             self._fail()
 
-    def _end_(self):
+    def _r_end_(self):
         if self.pos == self.end:
             self._succeed(None)
         else:

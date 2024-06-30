@@ -114,6 +114,7 @@ def generate(
         return result
     try:
         grammar = analyzer.analyze(result.val)
+        analyzer.rewrite_subrules(grammar)
         text = Compiler(grammar, main, memoize).compile()
         return Result(text)
     except analyzer.AnalysisError as e:

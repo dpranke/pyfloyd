@@ -46,6 +46,10 @@ class Grammar:
         self.whitespace_style = None
         self.assoc = {}
         self.prec = {}
+        self.operator_needed = False
+        self.leftrec_needed = False
+        self.needed_builtin_functions = set()
+        self.needed_builtin_rules = set()
 
         has_starting_rule = False
         for n in self.ast[2]:
@@ -621,3 +625,96 @@ def _add_filler_rules(grammar):
                 ['apply', '_whitespace', []],
             ],
         ]
+
+
+def rewrite_subrules(
+    grammar, rule_fmt='_r_{rule}_', subrule_fmt='_s_{rule}_{counter}_'
+):
+    sr = _SubRuleRewriter(grammar, rule_fmt, subrule_fmt)
+    sr.rewrite()
+
+
+class _SubRuleRewriter:
+    def __init__(self, grammar, rule_fmt, subrule_fmt):
+        self._grammar = grammar
+        self._rule_fmt = rule_fmt
+        self._subrule_fmt = subrule_fmt
+        self._rule = None
+        self._counter = 0
+        self._methods = {}
+        self._subrules = {}
+
+    def rewrite(self):
+        for rule, node in self._grammar.rules.items():
+            self._rule = rule
+            self._subrules = {}
+            self._counter = 0
+            new_node = self._walk(node)
+            self._methods[self._rule_fmt.format(rule=rule)] = new_node
+            subrules = sorted(self._subrules.keys(), key=self._subrule_key)
+            for subrule in subrules:
+                self._methods[subrule] = self._subrules[subrule]
+        self._grammar.rules = self._methods
+        # TODO: rewrite grammar.ast
+
+    def _subrule(self) -> str:
+        self._counter += 1
+        return self._subrule_fmt.format(rule=self._rule, counter=self._counter)
+        
+
+    def _subrule_key(self, s: str) -> int:
+        return int(s.replace('_s_{rule}_'.format(rule=self._rule), '').
+                   replace('_', ''))
+
+    def _sub_rule(self) -> str:
+        self._counter += 1
+        return self._subrule_fmt.format(rule=self._rule, counter=self._counter)
+
+    def _walk(self, node):
+        fn = getattr(self, f'_{node[0]}_', None)
+        if fn:
+            return fn(node)
+        return self._walkn(node)
+
+    def _walkn(self, node):
+        subnodes = []
+        for child in node[2]:
+            if self._can_inline(child):
+                subnodes.append(self._walk(child))
+            else:
+                subnodes.append(self._make_subrule(child))
+        return [node[0], node[1], subnodes]
+
+    def _split1(self, node):
+        return [node[0], node[1], [self._make_subrule(node[2][0])]]
+
+    def _can_inline(self, node) -> bool:
+        if node[0] in ('choice', 'seq'):
+            return False
+        return True
+
+    def _make_subrule(self, child):
+        subnode_rule = self._subrule()
+        self._subrules[subnode_rule] = self._walk(child)
+        return ['apply', subnode_rule, []]
+
+    def _apply_(self, node):
+        if node[1] in ('any', 'end'):
+            self._grammar.needed_builtin_rules.add(node[1])
+        return [node[0], self._rule_fmt.format(rule=node[1]), node[2]]
+
+    def _leftrec_(self, node):
+        self._grammar.leftrec_needed = True
+        return self._split1(node)
+
+    def _ll_qual_(self, node):
+        if node[2][0][0] == 'll_var' and node[2][1][0] == 'll_call':
+            self._grammar.needed_builtin_functions.add(node[2][0][1])
+        return self._walkn(node)
+
+    def _operator_(self, node):
+        self._grammar.operator_needed = True
+        return self._split1(node)
+
+    def _paren_(self, node):
+        return self._split1(node)
