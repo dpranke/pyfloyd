@@ -273,9 +273,10 @@ class Compiler:
         return lines
 
     def _leftrec_(self, node) -> List[str]:
+        self._needed_methods.add('leftrec')
         left_assoc = self._grammar.assoc.get(node[1], 'left') == 'left'
         lines = [
-            f'self._leftrec(self._r_{node[1]}_, '
+            f'self._leftrec(self.{node[2][0][1]}, '
             + f"'{node[1]}', {str(left_assoc)})"
         ]
         return lines

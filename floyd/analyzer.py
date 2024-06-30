@@ -46,8 +46,6 @@ class Grammar:
         self.whitespace_style = None
         self.assoc = {}
         self.prec = {}
-        self.operator_needed = False
-        self.leftrec_needed = False
         self.needed_builtin_functions = set()
         self.needed_builtin_rules = set()
 
@@ -704,7 +702,6 @@ class _SubRuleRewriter:
         return [node[0], self._rule_fmt.format(rule=node[1]), node[2]]
 
     def _leftrec_(self, node):
-        self._grammar.leftrec_needed = True
         return self._split1(node)
 
     def _ll_qual_(self, node):
@@ -713,8 +710,7 @@ class _SubRuleRewriter:
         return self._walkn(node)
 
     def _operator_(self, node):
-        self._grammar.operator_needed = True
-        return self._split1(node)
+        return node
 
     def _paren_(self, node):
         return self._split1(node)
