@@ -217,26 +217,6 @@ class Compiler:
         fn = getattr(self, f'_{node[0]}_')
         return fn(node)
 
-    def _inline_args(self, children) -> List[List[str]]:
-        lines = []
-        for child in children:
-            if self._can_inline(child):
-                lines.append(self._compile(child))
-            else:
-                sub_rule = self._sub_rule()
-                lines.append([f'self._{sub_rule}_()'])
-                self._sub_rules[sub_rule] = self._compile(child)
-        return lines
-
-    def _can_inline(self, node) -> bool:
-        if node[0] in ('action', 'apply', 'label', 'lit', 'paren', 'pred'):
-            return True
-        return False
-
-    def _sub_rule(self) -> str:
-        self._counter += 1
-        return f's_{self._rule}_{self._counter}'
-
     #
     # Handlers for each non-host node in the glop AST follow.
     #
