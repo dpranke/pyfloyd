@@ -710,7 +710,10 @@ class _SubRuleRewriter:
         return self._walkn(node)
 
     def _operator_(self, node):
-        return node
+        subnodes = []
+        for child in node[2]:
+            subnodes.append(self._split1(child))
+        return [node[0], node[1], subnodes]
 
     def _paren_(self, node):
         return self._split1(node)

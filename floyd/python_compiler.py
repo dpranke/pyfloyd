@@ -137,7 +137,7 @@ class Compiler:
             text += '])\n'
             text += '        o.choices = {\n'
             for op in o.choices:
-                text += "            '%s': self._%s_,\n" % (op, o.choices[op])
+                text += "            '%s': self.%s,\n" % (op, o.choices[op])
             text += '        }\n'
             text += "        self.operators['%s'] = o\n" % rule
         return text
@@ -319,11 +319,10 @@ class Compiler:
             o.prec_ops.setdefault(prec, []).append(op)
             if self._grammar.assoc.get(op) == 'right':
                 o.rassoc.add(op)
-            subrule = self._subrule()
-            o.choices[op] = subrule
-            self._subrules[subrule] = self._compile(subnode)
-        self._operators[self._rule] = o
-        return [f"self._operator(f'{self._rule}')"]
+            o.choices[op] = subnode[1]
+            self._compile(subnode)
+        self._operators[node[1]] = o
+        return [f"self._operator(f'{node[1]}')"]
 
     def _paren_(self, node) -> List[str]:
         return self._compile(node[2][0])
