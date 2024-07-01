@@ -672,11 +672,13 @@ class _SubRuleRewriter:
     def _subrule(self) -> str:
         self._counter += 1
         return self._subrule_fmt.format(rule=self._rule, counter=self._counter)
-        
 
     def _subrule_key(self, s: str) -> int:
-        return int(s.replace('_s_{rule}_'.format(rule=self._rule), '').
-                   replace('_', ''))
+        return int(
+            s.replace('_s_{rule}_'.format(rule=self._rule), '').replace(
+                '_', ''
+            )
+        )
 
     def _sub_rule(self) -> str:
         self._counter += 1
@@ -761,4 +763,3 @@ class _SubRuleRewriter:
     def _unicat_(self, node):
         self._grammar.unicat_needed = True
         return node
-

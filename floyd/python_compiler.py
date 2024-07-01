@@ -23,7 +23,6 @@ _FormatObj = Union[Comma, Tree, Saw, str]
 
 class Compiler:
     def __init__(self, grammar, main_wanted=True, memoize=True):
-
         self._grammar = grammar
         self._builtin_methods = self._load_builtin_methods()
         self._builtin_functions = self._load_builtin_functions()
@@ -217,7 +216,9 @@ class Compiler:
             fn = getattr(self, f'_{node[0]}_')
             return fn(node)
         except Exception as e:
-            import pdb; pdb.set_trace()
+            import pdb
+
+            pdb.set_trace()
             pass
 
     def _eval(self, node) -> _FormatObj:
