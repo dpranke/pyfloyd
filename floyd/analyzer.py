@@ -680,10 +680,6 @@ class _SubRuleRewriter:
             )
         )
 
-    def _sub_rule(self) -> str:
-        self._counter += 1
-        return self._subrule_fmt.format(rule=self._rule, counter=self._counter)
-
     def _walk(self, node):
         fn = getattr(self, f'_{node[0]}_', None)
         if fn:
@@ -703,7 +699,7 @@ class _SubRuleRewriter:
         return [node[0], node[1], [self._make_subrule(node[2][0])]]
 
     def _can_inline(self, node) -> bool:
-        if node[0] in ('choice', 'seq'):
+        if node[0] in ('choice', 'seq', 'post'):
             return False
         return True
 
@@ -734,7 +730,6 @@ class _SubRuleRewriter:
 
     def _operator_(self, node):
         self._grammar.operator_needed = True
-        subnodes = []
         o = OperatorState()
         for operator in node[2]:
             op, prec = operator[1]
@@ -747,11 +742,6 @@ class _SubRuleRewriter:
             self._subrules[subnode_rule] = self._walk(subnode)
         self._grammar.operators[node[1]] = o
         return [node[0], node[1], []]
-
-        subnodes = []
-        for child in node[2]:
-            subnodes.append(self._split1(child))
-        return [node[0], node[1], subnodes]
 
     def _paren_(self, node):
         return self._split1(node)

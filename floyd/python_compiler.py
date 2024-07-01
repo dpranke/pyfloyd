@@ -151,10 +151,6 @@ class Compiler:
         builtins = {}
         for block in blocks:
             name = block[1 : block.find('(')]
-            if name == 'end_':
-                name = 'end'
-            if name == 'any_':
-                name = 'any'
             text = '    def ' + block
             builtins[name] = text
         return builtins
@@ -170,7 +166,7 @@ class Compiler:
     def _gen_methods(self) -> str:
         text = ''
         for rule, method_body in self._methods.items():
-            memoize = self._memoize and rule[2:] in self._grammar.rules
+            memoize = self._memoize and rule.startswith('_r_')
             text += self._gen_method_text(rule, method_body, memoize)
         text += '\n'
 
@@ -212,14 +208,8 @@ class Compiler:
 
     def _compile(self, node) -> List[str]:
         # All of the rule methods return a list of lines.
-        try:
-            fn = getattr(self, f'_{node[0]}_')
-            return fn(node)
-        except Exception as e:
-            import pdb
-
-            pdb.set_trace()
-            pass
+        fn = getattr(self, f'_{node[0]}_')
+        return fn(node)
 
     def _eval(self, node) -> _FormatObj:
         # All of the host methods return a formatter object.
@@ -372,12 +362,10 @@ class Compiler:
         ]
 
     def _seq_(self, node) -> List[str]:
-        lines = []
-        lines.extend(self._compile(node[2][0]))
+        lines = self._compile(node[2][0])
         for subnode in node[2][1:]:
-            lines.append('if self.failed:')
-            lines.append('    return')
-            lines.extend(self._compile(subnode))
+            lines.append('if not self.failed:')
+            lines.extend('    ' + line for line in self._compile(subnode))
         return lines
 
     def _unicat_(self, node) -> List[str]:
