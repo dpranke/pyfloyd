@@ -21,13 +21,6 @@ from floyd import string_literal as lit
 _FormatObj = Union[Comma, Tree, Saw, str]
 
 
-class _CompilerOperatorState:
-    def __init__(self):
-        self.prec_ops = {}
-        self.rassoc = set()
-        self.choices = {}
-
-
 class Compiler:
     def __init__(self, grammar, main_wanted=True, memoize=True):
 
@@ -40,9 +33,12 @@ class Compiler:
         self._memoize = memoize
         self._methods = {}
         self._operators = {}
-        self._unicodedata_needed = False
+        self._unicodedata_needed = (
+            grammar.unicat_needed
+            or 'unicat' in grammar.needed_builtin_functions
+        )
 
-        # These methods are always needed.
+        # These methods are pretty much always needed.
         self._needed_methods = set(
             {
                 'err_offsets',
@@ -52,7 +48,18 @@ class Compiler:
                 'succeed',
             }
         )
-        self._needed_functions = set()
+        if grammar.ch_needed:
+            self._needed_methods.add('ch')
+        if grammar.leftrec_needed:
+            self._needed_methods.add('leftrec')
+        if grammar.operator_needed:
+            self._needed_methods.add('operator')
+        if grammar.range_needed:
+            self._needed_methods.add('range')
+        if grammar.str_needed:
+            self._needed_methods.add('str')
+        if grammar.unicat_needed:
+            self._needed_methods.add('unicat')
 
     def compile(self) -> str:
         self._compile_rules()
@@ -79,7 +86,7 @@ class Compiler:
         if self._exception_needed:
             text += _PARSING_RUNTIME_EXCEPTION
 
-        if self._operators:
+        if self._grammar.operators:
             text += _OPERATOR_CLASS
 
         text += _CLASS
@@ -95,7 +102,7 @@ class Compiler:
             text += _PARSE.format(starting_rule=self._grammar.starting_rule)
 
         text += self._gen_methods()
-        if self._needed_functions:
+        if self._grammar.needed_builtin_functions:
             text += '\n\n'
             text += self._gen_functions()
         if self._main_wanted:
@@ -108,14 +115,11 @@ class Compiler:
         text = ''
         if self._memoize:
             text += '        self.cache = {}\n'
-        if (
-            'leftrec' in self._needed_methods
-            or 'operator' in self._needed_methods
-        ):
+        if self._grammar.leftrec_needed or self._grammar.operator_needed:
             text += '        self.seeds = {}\n'
-        if 'leftrec' in self._needed_methods:
+        if self._grammar.leftrec_needed:
             text += '        self.blocked = set()\n'
-        if self._operators:
+        if self._grammar.operator_needed:
             text += self._operator_state()
             text += '\n'
 
@@ -123,7 +127,7 @@ class Compiler:
 
     def _operator_state(self) -> str:
         text = '        self.operators = {}\n'
-        for rule, o in self._operators.items():
+        for rule, o in self._grammar.operators.items():
             text += '        o = _OperatorState()\n'
             text += '        o.prec_ops = {\n'
             for prec in sorted(o.prec_ops):
@@ -209,8 +213,12 @@ class Compiler:
 
     def _compile(self, node) -> List[str]:
         # All of the rule methods return a list of lines.
-        fn = getattr(self, f'_{node[0]}_')
-        return fn(node)
+        try:
+            fn = getattr(self, f'_{node[0]}_')
+            return fn(node)
+        except Exception as e:
+            import pdb; pdb.set_trace()
+            pass
 
     def _eval(self, node) -> _FormatObj:
         # All of the host methods return a formatter object.
@@ -253,7 +261,6 @@ class Compiler:
         return lines
 
     def _leftrec_(self, node) -> List[str]:
-        self._needed_methods.add('leftrec')
         left_assoc = self._grammar.assoc.get(node[1], 'left') == 'left'
         lines = [
             f'self._leftrec(self.{node[2][0][1]}, '
@@ -267,8 +274,6 @@ class Compiler:
             method = 'ch'
         else:
             method = 'str'
-            self._needed_methods.add('ch')
-        self._needed_methods.add(method)
         return [f'self._{method}({expr})']
 
     def _not_(self, node) -> List[str]:
@@ -292,16 +297,10 @@ class Compiler:
 
     def _operator_(self, node) -> List[str]:
         self._needed_methods.add('operator')
-        o = _CompilerOperatorState()
-        for operator in node[2]:
-            op, prec = operator[1]
-            subnode = operator[2][0]
-            o.prec_ops.setdefault(prec, []).append(op)
-            if self._grammar.assoc.get(op) == 'right':
-                o.rassoc.add(op)
-            o.choices[op] = subnode[1]
-            self._compile(subnode)
-        self._operators[node[1]] = o
+        # Operator nodes have no children, but subrules for each arm
+        # of the expression cluster have been defined and are referenced
+        # from self._grammar.operators[node[1]].choices.
+        assert node[2] == []
         return [f"self._operator(f'{node[1]}')"]
 
     def _paren_(self, node) -> List[str]:
@@ -366,7 +365,6 @@ class Compiler:
         ]
 
     def _range_(self, node) -> List[str]:
-        self._needed_methods.add('range')
         return [
             'self._range(%s, %s)'
             % (lit.encode(node[2][0][1]), lit.encode(node[2][1][1]))
@@ -382,8 +380,6 @@ class Compiler:
         return lines
 
     def _unicat_(self, node) -> List[str]:
-        self._unicodedata_needed = True
-        self._needed_methods.add('unicat')
         return ['self._unicat(%s)' % lit.encode(node[1])]
 
     #
@@ -430,7 +426,6 @@ class Compiler:
                 # first is an identifier, but it must refer to a
                 # built-in function if second is a call.
                 fn = first[1]
-                self._needed_functions.add(fn)
                 # Note that unknown functions were caught during analysis
                 # so we don't have to worry about that here.
                 start = f'_{fn}'

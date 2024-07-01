@@ -46,8 +46,15 @@ class Grammar:
         self.whitespace_style = None
         self.assoc = {}
         self.prec = {}
+        self.leftrec_needed = False
+        self.operator_needed = False
+        self.unicat_needed = False
+        self.ch_needed = False
+        self.str_needed = False
+        self.range_needed = False
         self.needed_builtin_functions = set()
         self.needed_builtin_rules = set()
+        self.operators = {}
 
         has_starting_rule = False
         for n in self.ast[2]:
@@ -59,6 +66,13 @@ class Grammar:
             elif n[0] == 'pragma' and n[1] in ('token', 'tokens'):
                 for t in n[2]:
                     self.tokens.add(t)
+
+
+class OperatorState:
+    def __init__(self):
+        self.prec_ops = {}
+        self.rassoc = set()
+        self.choices = {}
 
 
 def analyze(ast, rewrite_filler=True):
@@ -702,7 +716,14 @@ class _SubRuleRewriter:
         return [node[0], self._rule_fmt.format(rule=node[1]), node[2]]
 
     def _leftrec_(self, node):
+        self._grammar.leftrec_needed = True
         return self._split1(node)
+
+    def _lit_(self, node):
+        self._grammar.ch_needed = True
+        if len(node[1]) > 1:
+            self._grammar.str_needed = True
+        return node
 
     def _ll_qual_(self, node):
         if node[2][0][0] == 'll_var' and node[2][1][0] == 'll_call':
@@ -710,6 +731,21 @@ class _SubRuleRewriter:
         return self._walkn(node)
 
     def _operator_(self, node):
+        self._grammar.operator_needed = True
+        subnodes = []
+        o = OperatorState()
+        for operator in node[2]:
+            op, prec = operator[1]
+            subnode = operator[2][0]
+            o.prec_ops.setdefault(prec, []).append(op)
+            if self._grammar.assoc.get(op) == 'right':
+                o.rassoc.add(op)
+            subnode_rule = self._subrule()
+            o.choices[op] = subnode_rule
+            self._subrules[subnode_rule] = self._walk(subnode)
+        self._grammar.operators[node[1]] = o
+        return [node[0], node[1], []]
+
         subnodes = []
         for child in node[2]:
             subnodes.append(self._split1(child))
@@ -717,3 +753,12 @@ class _SubRuleRewriter:
 
     def _paren_(self, node):
         return self._split1(node)
+
+    def _range_(self, node):
+        self._grammar.range_needed = True
+        return node
+
+    def _unicat_(self, node):
+        self._grammar.unicat_needed = True
+        return node
+
