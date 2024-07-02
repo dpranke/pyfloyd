@@ -56,6 +56,7 @@ from floyd.api import (
     generate,
     pretty_print,
     CompiledResult,
+    GeneratorOptions,
     ParserInterface,
     Result,
 )
@@ -70,6 +71,7 @@ __all__ = [
     'parse',
     'pretty_print',
     'CompiledResult',
+    'GeneratorOptions',
     'ParserInterface',
     'Result',
 ]

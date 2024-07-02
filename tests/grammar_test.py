@@ -925,7 +925,9 @@ class Generator(unittest.TestCase, GrammarTestsMixin):
 
     def compile(self, grammar, path='<string>'):
         source_code, err, endpos = floyd.generate(
-            textwrap.dedent(grammar), main=False, memoize=False, path=path
+            textwrap.dedent(grammar),
+            path=path,
+            options=floyd.GeneratorOptions(main=False, memoize=False),
         )
         if err:
             assert source_code is None

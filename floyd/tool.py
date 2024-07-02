@@ -48,11 +48,13 @@ def main(argv=None, host=None):
         if args.pretty_print:
             contents, err = floyd.pretty_print(grammar, args.grammar)
         elif args.compile:
+            options = floyd.GeneratorOptions(
+                main=args.main, memoize=args.memoize
+            )
             contents, err, _ = floyd.generate(
                 grammar,
-                main=args.main,
-                memoize=args.memoize,
                 path=args.grammar,
+                options=options,
             )
         else:
             contents, err, _ = _interpret_grammar(host, args, grammar)

@@ -14,24 +14,23 @@
 
 from typing import Dict, List, Union
 
+from floyd.analyzer import Grammar
 from floyd.formatter import flatten, Comma, Saw, Tree
+from floyd.generator import Generator, GeneratorOptions
 from floyd import string_literal as lit
 
 
 _FormatObj = Union[Comma, Tree, Saw, str]
 
 
-class Generator:
-    def __init__(self, grammar, main_wanted=True, memoize=True):
-        self._grammar = grammar
+class PythonGenerator(Generator):
+    def __init__(self, grammar: Grammar, options: GeneratorOptions):
+        super().__init__(grammar, options)
         self._builtin_methods = self._load_builtin_methods()
         self._builtin_functions = self._load_builtin_functions()
         self._exception_needed = False
-        self._has_scopes = False
-        self._main_wanted = main_wanted
-        self._memoize = memoize
-        self._methods = {}
-        self._operators = {}
+        self._methods: Dict[str, List[str]] = {}
+        self._operators: Dict[str, str] = {}
         self._unicodedata_needed = (
             grammar.unicat_needed
             or 'unicat' in grammar.needed_builtin_functions
@@ -65,7 +64,7 @@ class Generator:
         return self._gen_text()
 
     def _gen_rules(self) -> None:
-        for rule, node in self._grammar.rules.items():
+        for rule, node in self.grammar.rules.items():
             self._methods[rule] = self._gen(node)
 
     def _gen_text(self) -> str:
@@ -73,7 +72,7 @@ class Generator:
         if self._unicodedata_needed:
             unicodedata_import = 'import unicodedata\n\n'
 
-        if self._main_wanted:
+        if self.options.main:
             text = _MAIN_HEADER.format(
                 unicodedata_import=unicodedata_import,
             )
@@ -85,7 +84,7 @@ class Generator:
         if self._exception_needed:
             text += _PARSING_RUNTIME_EXCEPTION
 
-        if self._grammar.operators:
+        if self.grammar.operators:
             text += _OPERATOR_CLASS
 
         text += _CLASS
@@ -95,16 +94,16 @@ class Generator:
 
         if self._exception_needed:
             text += _PARSE_WITH_EXCEPTION.format(
-                starting_rule=self._grammar.starting_rule
+                starting_rule=self.grammar.starting_rule
             )
         else:
-            text += _PARSE.format(starting_rule=self._grammar.starting_rule)
+            text += _PARSE.format(starting_rule=self.grammar.starting_rule)
 
         text += self._gen_methods()
-        if self._grammar.needed_builtin_functions:
+        if self.grammar.needed_builtin_functions:
             text += '\n\n'
             text += self._gen_functions()
-        if self._main_wanted:
+        if self.options.main:
             text += _MAIN_FOOTER
         else:
             text += _DEFAULT_FOOTER
@@ -112,13 +111,13 @@ class Generator:
 
     def _state(self) -> str:
         text = ''
-        if self._memoize:
+        if self.options.memoize:
             text += '        self.cache = {}\n'
-        if self._grammar.leftrec_needed or self._grammar.operator_needed:
+        if self.grammar.leftrec_needed or self.grammar.operator_needed:
             text += '        self.seeds = {}\n'
-        if self._grammar.leftrec_needed:
+        if self.grammar.leftrec_needed:
             text += '        self.blocked = set()\n'
-        if self._grammar.operator_needed:
+        if self.grammar.operator_needed:
             text += self._operator_state()
             text += '\n'
 
@@ -126,7 +125,7 @@ class Generator:
 
     def _operator_state(self) -> str:
         text = '        self.operators = {}\n'
-        for rule, o in self._grammar.operators.items():
+        for rule, o in self.grammar.operators.items():
             text += '        o = _OperatorState()\n'
             text += '        o.prec_ops = {\n'
             for prec in sorted(o.prec_ops):
@@ -166,14 +165,14 @@ class Generator:
     def _gen_methods(self) -> str:
         text = ''
         for rule, method_body in self._methods.items():
-            memoize = self._memoize and rule.startswith('_r_')
+            memoize = self.options.memoize and rule.startswith('_r_')
             text += self._gen_method_text(rule, method_body, memoize)
         text += '\n'
 
-        if self._grammar.needed_builtin_rules:
+        if self.grammar.needed_builtin_rules:
             text += '\n'.join(
                 self._builtin_methods[f'r_{name}_']
-                for name in sorted(self._grammar.needed_builtin_rules)
+                for name in sorted(self.grammar.needed_builtin_rules)
             )
             text += '\n'
 
@@ -203,7 +202,7 @@ class Generator:
     def _gen_functions(self) -> str:
         return '\n\n'.join(
             self._builtin_functions[name]
-            for name in sorted(self._grammar.needed_builtin_functions)
+            for name in sorted(self.grammar.needed_builtin_functions)
         )
 
     def _gen(self, node) -> List[str]:
@@ -252,7 +251,7 @@ class Generator:
         return lines
 
     def _leftrec_(self, node) -> List[str]:
-        left_assoc = self._grammar.assoc.get(node[1], 'left') == 'left'
+        left_assoc = self.grammar.assoc.get(node[1], 'left') == 'left'
         lines = [
             f'self._leftrec(self.{node[2][0][1]}, '
             + f"'{node[1]}', {str(left_assoc)})"
@@ -290,7 +289,7 @@ class Generator:
         self._needed_methods.add('operator')
         # Operator nodes have no children, but subrules for each arm
         # of the expression cluster have been defined and are referenced
-        # from self._grammar.operators[node[1]].choices.
+        # from self.grammar.operators[node[1]].choices.
         assert node[2] == []
         return [f"self._operator(f'{node[1]}')"]
 
@@ -396,7 +395,9 @@ class Generator:
         return lit.encode(node[1])
 
     def _ll_minus_(self, node) -> Tree:
-        return Tree(self._gen_expr(node[2][0]), '-', self._gen_expr(node[2][1]))
+        return Tree(
+            self._gen_expr(node[2][0]), '-', self._gen_expr(node[2][1])
+        )
 
     def _ll_num_(self, node) -> str:
         return node[1]
@@ -405,7 +406,9 @@ class Generator:
         return self._gen_expr(node[2][0])
 
     def _ll_plus_(self, node) -> Tree:
-        return Tree(self._gen_expr(node[2][0]), '+', self._gen_expr(node[2][1]))
+        return Tree(
+            self._gen_expr(node[2][0]), '+', self._gen_expr(node[2][1])
+        )
 
     def _ll_qual_(self, node) -> Saw:
         first = node[2][0]

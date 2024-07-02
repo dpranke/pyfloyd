@@ -18,7 +18,8 @@ from floyd import analyzer
 from floyd.interpreter import Interpreter
 from floyd import parser
 from floyd.printer import Printer
-from floyd.python_generator import Generator
+from floyd.generator import GeneratorOptions
+from floyd.python_generator import PythonGenerator
 
 Result = parser.Result
 
@@ -78,27 +79,29 @@ def compile(  # pylint: disable=redefined-builtin
 
 def generate(
     grammar: str,
-    main: bool = False,
-    memoize: bool = False,
     path: str = '<string>',
+    options: Optional[GeneratorOptions] = None,
 ) -> Result:
     """Generate the source code of a parser.
 
     This generates the python text of a parser. The text will be a module
     with a public `Result` type and a public `parse()` function.
 
-    If `main` is True, then there will also be a `main()` function that
-    is called if the text is invoked directly. (i.e., the module can be
-    run from the command line). The command line interface will take
-    one optional argument that is the path to a file to parse; if the
-    argument is missing or it is `'-'` then the parser will read from
-    stdin instead. Any output will be written to stdout as a JSON string.
-    The actual interface to the `main()` routine contains a bunch of parameters
-    that can all be substituted in for `sys.stdin`, `sys.stdout`, and
-    `sys.argv` for testing purposes.
+    `options.language` specifies the language to use for the generated
+    parser.
 
-    If `memoize` is True, the parser will memoize (cache) the results of
-    each combination of rule and position during the parse. For some
+    If `options.main` is True, then the generated parser file will also have a
+    `main()` function that is called if the text is invoked directly. (i.e.,
+    the module can be run from the command line). The command line interface
+    will take one optional argument that is the path to a file to parse; if the
+    argument is missing or it is `'-'` then the parser will read from stdin
+    instead. Any output will be written to stdout as a JSON string.  The actual
+    interface to the `main()` routine contains a bunch of parameters that can
+    all be substituted in for `sys.stdin`, `sys.stdout`, and `sys.argv` for
+    testing purposes.
+
+    If `options.memoize` is True, the parser will memoize (cache) the results
+    of each combination of rule and position during the parse. For some
     grammars, this may provide significant speedups.
 
     `path` represents an optional string that can be included in error
@@ -113,9 +116,11 @@ def generate(
     if result.err:
         return result
     try:
-        grammar = analyzer.analyze(result.val)
-        analyzer.rewrite_subrules(grammar)
-        text = Generator(grammar, main, memoize).generate()
+        grammar_obj = analyzer.analyze(result.val)
+        analyzer.rewrite_subrules(grammar_obj)
+        options = options or GeneratorOptions()
+        assert options.language == 'python'
+        text = PythonGenerator(grammar_obj, options).generate()
         return Result(text)
     except analyzer.AnalysisError as e:
         return Result(err=str(e))
