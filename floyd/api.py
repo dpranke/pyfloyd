@@ -18,7 +18,7 @@ from floyd import analyzer
 from floyd.interpreter import Interpreter
 from floyd import parser
 from floyd.printer import Printer
-from floyd.python_compiler import Compiler
+from floyd.python_generator import Generator
 
 Result = parser.Result
 
@@ -115,7 +115,7 @@ def generate(
     try:
         grammar = analyzer.analyze(result.val)
         analyzer.rewrite_subrules(grammar)
-        text = Compiler(grammar, main, memoize).compile()
+        text = Generator(grammar, main, memoize).generate()
         return Result(text)
     except analyzer.AnalysisError as e:
         return Result(err=str(e))

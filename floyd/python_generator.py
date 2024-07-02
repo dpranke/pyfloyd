@@ -21,7 +21,7 @@ from floyd import string_literal as lit
 _FormatObj = Union[Comma, Tree, Saw, str]
 
 
-class Compiler:
+class Generator:
     def __init__(self, grammar, main_wanted=True, memoize=True):
         self._grammar = grammar
         self._builtin_methods = self._load_builtin_methods()
@@ -60,13 +60,13 @@ class Compiler:
         if grammar.unicat_needed:
             self._needed_methods.add('unicat')
 
-    def compile(self) -> str:
-        self._compile_rules()
+    def generate(self) -> str:
+        self._gen_rules()
         return self._gen_text()
 
-    def _compile_rules(self) -> None:
+    def _gen_rules(self) -> None:
         for rule, node in self._grammar.rules.items():
-            self._methods[rule] = self._compile(node)
+            self._methods[rule] = self._gen(node)
 
     def _gen_text(self) -> str:
         unicodedata_import = ''
@@ -206,12 +206,12 @@ class Compiler:
             for name in sorted(self._grammar.needed_builtin_functions)
         )
 
-    def _compile(self, node) -> List[str]:
+    def _gen(self, node) -> List[str]:
         # All of the rule methods return a list of lines.
         fn = getattr(self, f'_{node[0]}_')
         return fn(node)
 
-    def _eval(self, node) -> _FormatObj:
+    def _gen_expr(self, node) -> _FormatObj:
         # All of the host methods return a formatter object.
         fn = getattr(self, f'_{node[0]}_')
         return fn(node)
@@ -221,7 +221,7 @@ class Compiler:
     #
 
     def _action_(self, node) -> List[str]:
-        obj = self._eval(node[2][0])
+        obj = self._gen_expr(node[2][0])
         return flatten(Saw('self._succeed(', obj, ')'))
 
     def _apply_(self, node) -> List[str]:
@@ -230,11 +230,11 @@ class Compiler:
     def _choice_(self, node) -> List[str]:
         lines = ['p = self.pos']
         for subnode in node[2][:-1]:
-            lines.extend(self._compile(subnode))
+            lines.extend(self._gen(subnode))
             lines.append('if not self.failed:')
             lines.append('    return')
             lines.append('self._rewind(p)')
-        lines.extend(self._compile(node[2][-1]))
+        lines.extend(self._gen(node[2][-1]))
         return lines
 
     def _empty_(self, node) -> List[str]:
@@ -242,7 +242,7 @@ class Compiler:
         return ['self._succeed(None)']
 
     def _label_(self, node) -> List[str]:
-        lines = self._compile(node[2][0])
+        lines = self._gen(node[2][0])
         lines.extend(
             [
                 'if not self.failed:',
@@ -268,7 +268,7 @@ class Compiler:
         return [f'self._{method}({expr})']
 
     def _not_(self, node) -> List[str]:
-        sublines = self._compile(node[2][0])
+        sublines = self._gen(node[2][0])
         lines = (
             [
                 'p = self.pos',
@@ -295,10 +295,10 @@ class Compiler:
         return [f"self._operator(f'{node[1]}')"]
 
     def _paren_(self, node) -> List[str]:
-        return self._compile(node[2][0])
+        return self._gen(node[2][0])
 
     def _post_(self, node) -> List[str]:
-        sublines = self._compile(node[2][0])
+        sublines = self._gen(node[2][0])
         if node[1] == '?':
             lines = (
                 [
@@ -340,7 +340,7 @@ class Compiler:
         return lines
 
     def _pred_(self, node) -> List[str]:
-        arg = self._eval(node[2][0])
+        arg = self._gen_expr(node[2][0])
         # TODO: Figure out how to statically analyze predicates to
         # catch ones that don't return booleans, so that we don't need
         # the _ParsingRuntimeError exception
@@ -362,10 +362,10 @@ class Compiler:
         ]
 
     def _seq_(self, node) -> List[str]:
-        lines = self._compile(node[2][0])
+        lines = self._gen(node[2][0])
         for subnode in node[2][1:]:
             lines.append('if not self.failed:')
-            lines.extend('    ' + line for line in self._compile(subnode))
+            lines.extend('    ' + line for line in self._gen(subnode))
         return lines
 
     def _unicat_(self, node) -> List[str]:
@@ -377,7 +377,7 @@ class Compiler:
     def _ll_arr_(self, node) -> _FormatObj:
         if len(node[2]) == 0:
             return '[]'
-        args = [self._compile(n) for n in node[2]]
+        args = [self._gen(n) for n in node[2]]
         return Saw('[', Comma(args), ']')
 
     def _ll_call_(self, node) -> Saw:
@@ -386,26 +386,26 @@ class Compiler:
         # TODO: Figure out if we need this routine or not when we also
         # fix the quals.
         assert len(node[2]) != 0
-        args = [self._compile(n) for n in node[2]]
+        args = [self._gen(n) for n in node[2]]
         return Saw('(', Comma(args), ')')
 
     def _ll_getitem_(self, node) -> Saw:
-        return Saw('[', self._compile(node[2][0]), ']')
+        return Saw('[', self._gen(node[2][0]), ']')
 
     def _ll_lit_(self, node) -> str:
         return lit.encode(node[1])
 
     def _ll_minus_(self, node) -> Tree:
-        return Tree(self._eval(node[2][0]), '-', self._eval(node[2][1]))
+        return Tree(self._gen_expr(node[2][0]), '-', self._gen_expr(node[2][1]))
 
     def _ll_num_(self, node) -> str:
         return node[1]
 
     def _ll_paren_(self, node) -> _FormatObj:
-        return self._eval(node[2][0])
+        return self._gen_expr(node[2][0])
 
     def _ll_plus_(self, node) -> Tree:
-        return Tree(self._eval(node[2][0]), '+', self._eval(node[2][1]))
+        return Tree(self._gen_expr(node[2][0]), '+', self._gen_expr(node[2][1]))
 
     def _ll_qual_(self, node) -> Saw:
         first = node[2][0]
@@ -421,7 +421,7 @@ class Compiler:
             else:
                 # If second isn't a call, then first refers to a variable.
                 start = self._ll_var_(first)
-            saw = self._eval(second)
+            saw = self._gen_expr(second)
             if not isinstance(saw, Saw):  # pragma: no cover
                 raise TypeError(second)
             saw.start = start + saw.start
@@ -429,13 +429,13 @@ class Compiler:
         else:
             # TODO: We need to do typechecking, and figure out a better
             # strategy for propagating errors/exceptions.
-            saw = self._eval(first)
+            saw = self._gen_expr(first)
             if not isinstance(saw, Saw):  # pragma: no cover
                 raise TypeError(first)
             i = 1
         next_saw = saw
         for n in node[2][i:]:
-            new_saw = self._eval(n)
+            new_saw = self._gen_expr(n)
             if not isinstance(new_saw, Saw):  # pragma: no cover
                 raise TypeError(n)
             new_saw.start = next_saw.end + new_saw.start

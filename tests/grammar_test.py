@@ -341,7 +341,7 @@ class GrammarTestsMixin:
 
     def test_inline_parens(self):
         # This is a regression test for a subtle bug found when working
-        # on the inlining code in the compiler; the method for the second
+        # on the inlining code in the generator; the method for the second
         # choice was overwriting the method for the first choice.
         self.check(
             """
@@ -920,7 +920,7 @@ class Interpreter(unittest.TestCase, GrammarTestsMixin):
         return floyd.compile(textwrap.dedent(grammar), path)
 
 
-class Compiler(unittest.TestCase, GrammarTestsMixin):
+class Generator(unittest.TestCase, GrammarTestsMixin):
     max_diff = None
 
     def compile(self, grammar, path='<string>'):
