@@ -31,6 +31,12 @@ format the code. `./run --help` is your friend to find out more.
 
 ## Version History / Release Notes
 
+* v0.14.0 (2024-06-30)
+    * Move a lot of the logic from python_compiler.py to a new pass in
+      analyzer.py. Now python_compiler is very simple and you can start
+      to see how it can be converted to something in a DSL like
+      StringTemplate. This also will make it much easier to share logic
+      between different compilers.
 * v0.13 (2024-06-29)
     * Rework the way subrules are generated and named to be much less
       cryptic. Now rules result in methods named `_r_{rule}_` and
