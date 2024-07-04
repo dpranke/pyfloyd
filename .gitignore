@@ -6,3 +6,4 @@ dist
 *.pyc.d
 *.py,cover
 floyd_python.egg-info
+node_modules

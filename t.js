@@ -32,9 +32,9 @@ class Parser {
     return new Result(this.val, null, this.pos);
   }
 
-  _err_offsets(str) {
-    lineno = 1;
-    colno = 1;
+  _err_offsets() {
+    let lineno = 1;
+    let colno = 1;
     for (let i = 0; i < this.errpos; i++) {
       if (this.text[i] == "\n") {
         lineno += 1;
@@ -47,8 +47,9 @@ class Parser {
   }
 
   _err_str() {
-    [lineno, colno] = _err_offsets();
-    if (this.errpos == len(this.text)) {
+    let [lineno, colno] = this._err_offsets();
+    let thing;
+    if (this.errpos == this.text.length) {
       thing = "end of input";
     } else {
       thing = `"${this.text[this.errpos]}"`;
@@ -63,7 +64,7 @@ class Parser {
   fail() {
     this.val = null;
     this.failed = true;
-    this.errpos = max(this.errpos, this.pos);
+    this.errpos = Math.max(this.errpos, this.pos);
   }
 
   succeed(val, newpos = undefined) {
