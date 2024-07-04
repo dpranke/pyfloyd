@@ -25,14 +25,14 @@ class Parser {
   }
 
   parse() {
-    this.grammar();
+    this.#_grammar_();
     if (this.failed) {
-      return new Result(null, this._err_str(), this.errpos);
+      return new Result(null, this.#_error(), this.errpos);
     }
     return new Result(this.val, null, this.pos);
   }
 
-  _err_offsets() {
+  #_error() {
     let lineno = 1;
     let colno = 1;
     for (let i = 0; i < this.errpos; i++) {
@@ -43,11 +43,7 @@ class Parser {
         colno += 1;
       }
     }
-    return [lineno, colno];
-  }
 
-  _err_str() {
-    let [lineno, colno] = this._err_offsets();
     let thing;
     if (this.errpos == this.text.length) {
       thing = "end of input";
@@ -57,17 +53,19 @@ class Parser {
     return `${this.path}:${lineno} Unexpected ${thing} at column ${colno}`;
   }
 
-  grammar() {
-    this.succeed(true);
+  #_grammar_() {
+    this.#succeed(true);
   }
 
-  fail() {
+  /*
+  #fail() {
     this.val = null;
     this.failed = true;
     this.errpos = Math.max(this.errpos, this.pos);
   }
+  */
 
-  succeed(val, newpos = undefined) {
+  #succeed(val, newpos = undefined) {
     this.val = val;
     this.failed = false;
     if (newpos != undefined) {
@@ -98,9 +96,11 @@ async function main() {
 
   let result = parse(s);
   if (result.err != undefined) {
-    console.log(`err = ${result.err}`);
+    console.log(result.err);
+    process.exit(1);
   } else {
-    console.log(result.val);
+    console.log(JSON.stringify(result.val, null, 2));
+    process.exit(0);
   }
 }
 
