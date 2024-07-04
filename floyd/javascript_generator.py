@@ -106,7 +106,7 @@ class JavaScriptGenerator(Generator):
         if self.grammar.leftrec_needed or self.grammar.operator_needed:
             text += '        this.seeds = {}\n'
         if self.grammar.leftrec_needed:
-            text += '        this.blocked = Set()\n'
+            text += '        this.blocked = new Set()\n'
         if self.grammar.operator_needed:
             text += self._operator_state()
             text += '\n'
@@ -117,14 +117,14 @@ class JavaScriptGenerator(Generator):
         text = '        this.operators = {}\n'
         for rule, o in self.grammar.operators.items():
             text += '        o = OperatorState()\n'
-            text += '        o.precOps = {\n'
+            text += '        o.precOps = new Map()\n'
             for prec in sorted(o.prec_ops):
-                text += '            %d: [' % prec
+                text += '    o.precOps.set(prec, [' % prec
                 text += ', '.join("'%s'" % op for op in o.prec_ops[prec])
                 text += '],\n'
-            text += '        }\n'
-            text += '        o.precs = sorted(o.precOps, reverse=True)\n'
-            text += '        o.rassoc = Set(['
+            text += '        )\n'
+            text += '        o.precs = sorted(o.precOps.keys(), reverse=True)\n'
+            text += '        o.rassoc = new Set(['
             text += ', '.join("'%s'" % op for op in o.rassoc)
             text += '])\n'
             text += '        o.choices = {\n'
@@ -518,10 +518,10 @@ class OperatorState {
   constructor():
     this.currentDepth = 0
     this.currentPrec = 0
-    this.precOps = {}
-    this.precs = []
-    this.rassoc = set()
-    this.choices = {}
+    this.precOps = {}  // Map[int, [str]]
+    this.precs = []    // List[int]
+    this.rassoc = Set()
+    this.choices = {}  // Map[str, rule]
 
 """
 
@@ -645,7 +645,7 @@ _BUILTIN_METHODS = """\
       [this.val, this.failed, this.pos] = seed;
       return
     }
-    if (rule_name in this.blocked) {
+    if (this.blocked.has(rule_name)) {
       this.val = undefined;
       this.failed = true;
       return;
@@ -681,23 +681,23 @@ _BUILTIN_METHODS = """\
         [this.val, this.failed, this.pos] = seed;
         return;
     }
-    o.current_depth += 1;
+    o.currentDepth += 1;
     let current = [null, true, pos];
     this.seeds[key] = current;
     let minPrec = o.currentPrec;
     let i = 0;
-    while (i < o.precs.length) {
+    while (i < o.precs.size) {
       let repeat = false;
       let prec = o.precs[i];
-      let precOps = o.precOps[prec];
+      let precOps = o.precOps.get(prec);
       if (prec < minPrec) {
         break;
       }
       o.current_prec = prec;
-      if (precOps[0] not in o.rassoc) {
+      if (!o.rassoc.has(precOps[0])) {
         o.currentPrec += 1;
       }
-      for (let j = 0; j+= 1; j < precOps.length) {
+      for (let j = 0; j += 1; j < precOps.size) {
         let op = precOps[j];
         o.choices[op]();
         if (!this.failed && this.pos > pos) {
