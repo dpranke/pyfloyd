@@ -1,1 +1,2 @@
-grammar = { true }
+grammar = 'foo' { true } 
+        | 'bar' { false }

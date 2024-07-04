@@ -20,6 +20,7 @@ from floyd import parser
 from floyd.printer import Printer
 from floyd.generator import GeneratorOptions
 from floyd.python_generator import PythonGenerator
+from floyd.javascript_generator import JavaScriptGenerator
 
 Result = parser.Result
 
@@ -119,8 +120,12 @@ def generate(
         grammar_obj = analyzer.analyze(result.val)
         analyzer.rewrite_subrules(grammar_obj)
         options = options or GeneratorOptions()
-        assert options.language == 'python'
-        text = PythonGenerator(grammar_obj, options).generate()
+        if options.language == 'python':
+            cls = PythonGenerator
+        else:
+            assert options.language == 'javascript'
+            cls = JavaScriptGenerator
+        text = cls(grammar_obj, options).generate()
         return Result(text)
     except analyzer.AnalysisError as e:
         return Result(err=str(e))

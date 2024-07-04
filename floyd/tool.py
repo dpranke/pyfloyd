@@ -49,7 +49,7 @@ def main(argv=None, host=None):
             contents, err = floyd.pretty_print(grammar, args.grammar)
         elif args.compile:
             options = floyd.GeneratorOptions(
-                main=args.main, memoize=args.memoize
+                language=args.language, main=args.main, memoize=args.memoize
             )
             contents, err, _ = floyd.generate(
                 grammar,
@@ -94,14 +94,21 @@ def _parse_args(host, argv):
         help='print current version (%s)' % floyd.__version__,
     )
     ap.add_argument(
-        '--memoize',
+        '-l',
+        '--language',
+        action='store',
+        default='python',
+        help='Language to generate( %default by default)'
+    )
+    ap.add_argument(
+        '-M', '--memoize',
         action='store_true',
         default=False,
         help='memoize intermediate results (off by default)',
     )
     ap.add_argument('--no-memoize', dest='memoize', action='store_false')
     ap.add_argument(
-        '--main',
+        '-m', '--main',
         action='store_true',
         default=False,
         help='generate a main() wrapper (off by default)',
@@ -129,7 +136,10 @@ def _parse_args(host, argv):
 
     if not args.output:
         if args.compile:
-            args.output = host.splitext(args.grammar)[0] + '.py'
+            if args.language == 'python':
+                args.output = host.splitext(args.grammar)[0] + '.py'
+            else:
+                args.output = host.splitext(args.grammar)[0] + '.js'
         else:
             args.output = '-'
 

@@ -1,10 +1,4 @@
 #!/usr/bin/env node
-
-function parse(s, path = "<string>") {
-  const p = new Parser(s, path);
-  return p.parse();
-}
-
 class Result {
   constructor(val, err, pos) {
     this.val = val;
@@ -13,62 +7,119 @@ class Result {
   }
 }
 
+function parse(text, path = '<string>') {
+  const p = new Parser(text, path);
+  return p.parse();
+}
+
 class Parser {
   constructor(text, path) {
     this.text = text;
-    this.path = path;
-    this.end = this.text.length;
+    this.end = text.length;
     this.errpos = 0;
     this.failed = false;
+    this.path = path;
     this.pos = 0;
-    this.val = null;
+    this.val = undefined;
   }
 
   parse() {
-    this.#_grammar_();
+    this.#_r_grammar_();
     if (this.failed) {
-      return new Result(null, this.#_error(), this.errpos);
+      return new Result(null, this.#error(), this.errpos);
+    } else {
+      return new Result(this.val, null, this.pos);
     }
-    return new Result(this.val, null, this.pos);
   }
 
-  #_error() {
-    let lineno = 1;
-    let colno = 1;
-    for (let i = 0; i < this.errpos; i++) {
-      if (this.text[i] == "\n") {
-        lineno += 1;
-        colno = 1;
-      } else {
-        colno += 1;
-      }
+  #_r_grammar_() {
+    let p = this.pos
+    this.#_s_grammar_1_()
+    if (!this.failed) {
+      return;
     }
+    this.#rewind(p)
+    this.#_s_grammar_2_()
+  }
 
+  #_s_grammar_1_() {
+    this.#str('foo')
+    if (!this.failed) {
+      this.#succeed(true)
+    }
+  }
+
+  #_s_grammar_2_() {
+    this.#str('bar')
+    if (!this.failed) {
+      this.#succeed(false)
+    }
+  }
+
+  #ch(ch) {
+     let p = this.pos;
+     if (p < this.end && this.text[p] === ch) {
+       this.#succeed(ch, this.pos + 1);
+     } else {
+       this.#fail();
+    }
+  }
+
+
+  #error() {
+    let [lineno, colno] = this.#errorOffsets();
     let thing;
-    if (this.errpos == this.text.length) {
-      thing = "end of input";
+    if (this.errpos === this.end) {
+      thing = 'end of input';
     } else {
       thing = `"${this.text[this.errpos]}"`;
     }
     return `${this.path}:${lineno} Unexpected ${thing} at column ${colno}`;
   }
 
-  #_grammar_() {
-    this.#succeed(true);
+
+  #errorOffsets() {
+    let lineno = 1;
+    let colno = 1;
+    for (let i = 0; i < this.errpos ; i++) {
+      if (this.text[i] === '\n') {
+        lineno += 1;
+        colno = 1;
+      } else {
+        colno += 1;
+      }
+    }
+    return [lineno, colno];
   }
 
-  /*
+
   #fail() {
-    this.val = null;
+    this.val = undefined;
     this.failed = true;
     this.errpos = Math.max(this.errpos, this.pos);
   }
-  */
 
-  #succeed(val, newpos = undefined) {
-    this.val = val;
+
+  #rewind(newpos) {
+     this.#succeed(null, newpos);
+  }
+
+
+  #str(s) {
+    for (let ch of s) {
+      this.#ch(ch);
+      if (this.failed) {
+        return;
+      } 
+      this.val = s
+    }
+  }
+
+
+  #succeed(v, newpos=null) {
+    this.val = v;
     this.failed = false;
-    if (newpos != undefined) {
+    if (newpos !== null) {
       this.pos = newpos;
     }
   }
@@ -94,7 +145,7 @@ async function main() {
     s = await fs.promises.readFile(process.argv[2]);
   }
 
-  let result = parse(s);
+  let result = parse(s.toString());
   if (result.err != undefined) {
     console.log(result.err);
     process.exit(1);
