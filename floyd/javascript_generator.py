@@ -204,9 +204,9 @@ class JavaScriptGenerator(Generator):
 
     def _gen(self, node) -> List[str]:
         # All of the rule methods return a list of lines.
-        lines = []
+        lines: list[str] = []
         if node[0] == 'seq':
-            vs = set()
+            vs: set[str] = set()
             self._find_vars(node, vs)
             lines = []
             for v in vs:

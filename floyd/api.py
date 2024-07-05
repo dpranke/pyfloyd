@@ -18,7 +18,7 @@ from floyd import analyzer
 from floyd.interpreter import Interpreter
 from floyd import parser
 from floyd.printer import Printer
-from floyd.generator import GeneratorOptions
+from floyd.generator import Generator, GeneratorOptions
 from floyd.python_generator import PythonGenerator
 from floyd.javascript_generator import JavaScriptGenerator
 
@@ -121,11 +121,12 @@ def generate(
         analyzer.rewrite_subrules(grammar_obj)
         options = options or GeneratorOptions()
         if options.language == 'python':
-            cls = PythonGenerator
-        else:
+            gen: Generator = PythonGenerator(grammar_obj, options)
+        else:  # type: ignore
+            # TODO: Figure out why mypy is choking here.
             assert options.language == 'javascript'
-            cls = JavaScriptGenerator
-        text = cls(grammar_obj, options).generate()
+            gen = JavaScriptGenerator(grammar_obj, options)
+        text = gen.generate()
         return Result(text)
     except analyzer.AnalysisError as e:
         return Result(err=str(e))

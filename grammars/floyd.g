@@ -32,7 +32,7 @@ ident_list  = (sp ident:i sp ~'=' -> i)+:is       -> is
 
 rule        = ident:i sp '=' sp choice:cs sp ','? -> ['rule', i, [cs]]
 
-ident       = id_start:hd id_continue*:tl         -> arrcat([hd], tl)
+ident       = id_start:hd id_continue*:tl         -> strcat(hd, join('', tl))
 
 id_start    = 'a'..'z' | 'A'..'Z' | '_' | '$'
 

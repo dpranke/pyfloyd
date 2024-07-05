@@ -50,5 +50,5 @@ class Generator:
         self.grammar = grammar
         self.options = options
 
-    def generate(self) -> str:
+    def generate(self) -> str:  # pragma: no cover
         return ''
