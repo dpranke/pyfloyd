@@ -129,6 +129,12 @@ class PrinterTest(unittest.TestCase):
         self.assertEqual(grammar, out)
         self.assertIsNone(err)
 
+    def test_pred(self):
+        grammar = "grammar = ?(true) -> true\n"
+        out, err = floyd.pretty_print(grammar)
+        self.assertEqual(grammar, out)
+        self.assertIsNone(err)
+
     def test_token(self):
         grammar = textwrap.dedent("""\
             %token foo

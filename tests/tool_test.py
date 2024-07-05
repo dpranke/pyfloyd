@@ -110,6 +110,47 @@ class ToolTest(unittest.TestCase):
         finally:
             host.rmtree(d)
 
+    def test_integration_memoizing_javascript(self):
+        # This does a full end-to-end test with floyd writing the
+        # compiled parser to the filesystem, loading the file from
+        # filesystem, and using it to parse something.
+        host = floyd.host.Host()
+        d = host.mkdtemp()
+        try:
+            path = d + '/grammar.g'
+            host.write_text_file(path, "grammar = 'foo'* -> true\n")
+
+            # This intentionally generates a JS file w/o a `main()` to
+            # get coverage of the code path where the generated file
+            # doesn't have a main. It also omits the `-o` flag
+            # to get coverage of the code path where we use the default
+            # output path and extension.
+            floyd.tool.main(
+                [
+                    '-c', 
+                    '--memoize', 
+                    '--language=javascript', 
+                    path
+                ]
+            )
+
+            host.write_text_file(d + '/foo.inp', 'foofoo')
+
+            # This runs the file but doesn't do much of anything, because
+            # the JS file doesn't have a `main()`. It at least ensures that
+            # the file can be parsed, though.
+            proc = subprocess.run(
+                ['node', d + '/grammar.js', d + '/foo.inp'],
+                capture_output=True,
+                check=False,
+                text=True,
+            )
+            self.assertEqual(proc.returncode, 0)
+            self.assertEqual(proc.stdout, '')
+            self.assertEqual(proc.stderr, '')
+        finally:
+            host.rmtree(d)
+
     def test_interpret_file(self):
         host = FakeHost()
         host.files['grammar.g'] = 'grammar = "Hello" end -> true'

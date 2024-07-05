@@ -1042,7 +1042,8 @@ class JavaScriptGenerator(unittest.TestCase, GrammarTestsMixin):
         return _JavaScriptParserWrapper(h, d), None, 0
 
     def test_fn_is_unicat(self):
-        self.skipTest("Can't implement this in JavaScript.")
+        # Can't implement this in JavaScript.
+        pass
 
     @skip('integration')
     def test_json5_special_floats(self):
