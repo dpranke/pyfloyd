@@ -125,14 +125,7 @@ class ToolTest(unittest.TestCase):
             # doesn't have a main. It also omits the `-o` flag
             # to get coverage of the code path where we use the default
             # output path and extension.
-            floyd.tool.main(
-                [
-                    '-c', 
-                    '--memoize', 
-                    '--language=javascript', 
-                    path
-                ]
-            )
+            floyd.tool.main(['-c', '--memoize', '--language=javascript', path])
 
             host.write_text_file(d + '/foo.inp', 'foofoo')
 
