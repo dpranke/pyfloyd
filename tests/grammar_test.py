@@ -877,6 +877,11 @@ class GrammarTestsMixin:
         self.check("grammar = 'a'* -> true", text='a', out=True)
         self.check("grammar = 'a'* -> true", text='aa', out=True)
 
+    def test_star_nested(self):
+        # This checks to make sure we don't get stuck in an infinite
+        # loop.
+        self.check("grammar = ('a'*)* 'b' -> true", text='b', out=True)
+
     def test_tabs_are_whitespace(self):
         self.check("grammar\t=\t'a'\t->\ttrue", text='a', out=True)
 

@@ -425,7 +425,11 @@ class Interpreter:
             p = self.pos
             self._interpret(node[2][0])
             if self.failed:
-                self.pos = p
+                self._rewind(p)
+                break
+            if self.pos == p:
+                # We didn't actually consume anything, so break out so
+                # that we don't get stuck in an infinite loop.
                 break
             vs.append(self.val)
         self._succeed(vs)

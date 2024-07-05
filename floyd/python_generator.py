@@ -332,6 +332,8 @@ class PythonGenerator(Generator):
                     '    if self.failed:',
                     '        self._rewind(p)',
                     '        break',
+                    '    if self.pos == p:',
+                    '        break',
                     '    vs.append(self.val)',
                     'self._succeed(vs)',
                 ]
