@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pylint: disable=too-many-lines
+
 import json
 import math
 import os
@@ -43,7 +45,6 @@ def skip(kind):
 
 
 class GrammarTestsMixin:
-
     def check(self, grammar, text, out=None, err=None, grammar_err=None):
         p, p_err, _ = self.compile(grammar)
         self.assertMultiLineEqual(grammar_err or '', p_err or '')
@@ -333,12 +334,13 @@ class GrammarTestsMixin:
         self.check("g = -> strcat('foo', 'bar')", text='', out='foobar')
 
     def test_fn_dict(self):
-        self.check("g = -> dict([['a', 1], ['b', 2]])", text='',
-                   out={'a': 1, 'b': 2})
+        self.check(
+            "g = -> dict([['a', 1], ['b', 2]])", text='', out={'a': 1, 'b': 2}
+        )
 
     def test_fn_float(self):
         self.check("g = -> float('4.3')", text='', out=4.3)
-        
+
     def test_fn_is_unicat(self):
         self.check("g = -> is_unicat('1', 'Nd')", text='', out=True)
 
@@ -980,7 +982,7 @@ class Interpreter(unittest.TestCase, GrammarTestsMixin):
 
     def compile(self, grammar, path='<string>'):
         return floyd.compile(textwrap.dedent(grammar), path)
-    
+
 
 class PythonGenerator(unittest.TestCase, GrammarTestsMixin):
     max_diff = None
@@ -1035,7 +1037,7 @@ class JavaScriptGenerator(unittest.TestCase, GrammarTestsMixin):
             return None, err, endpos
 
         h = floyd.host.Host()
-        d = '/tmp' # h.mkdtemp()
+        d = '/tmp'  # h.mkdtemp()
         h.write_text_file(d + '/parser.js', source_code)
         return _JavaScriptParserWrapper(h, d), None, 0
 
@@ -1066,7 +1068,6 @@ class JavaScriptGenerator(unittest.TestCase, GrammarTestsMixin):
         self.skipTest('TODO: Get this to work.')
 
 
-
 class _JavaScriptParserWrapper:
     def __init__(self, h, d):
         self.h = h
@@ -1074,14 +1075,16 @@ class _JavaScriptParserWrapper:
         self.source = d + '/parser.js'
 
     def parse(self, text, path='<string>'):
+        del path
         inp = self.d + '/input.txt'
         self.h.write_text_file(inp, text)
-        proc = subprocess.run(['node', self.source, inp], capture_output=True)
+        proc = subprocess.run(
+            ['node', self.source, inp], check=False, capture_output=True
+        )
         if proc.returncode == 0:
             val = json.loads(proc.stdout)
             return val, None, 0
-        else:
-            return None, proc.stderr.decode('utf8'), 0
+        return None, proc.stderr.decode('utf8'), 0
 
     def cleanup(self):
-        pass # self.h.rmtree(self.d)
+        pass  # self.h.rmtree(self.d)

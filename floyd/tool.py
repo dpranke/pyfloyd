@@ -98,17 +98,19 @@ def _parse_args(host, argv):
         '--language',
         action='store',
         default='python',
-        help='Language to generate( %default by default)'
+        help='Language to generate( %default by default)',
     )
     ap.add_argument(
-        '-M', '--memoize',
+        '-M',
+        '--memoize',
         action='store_true',
         default=False,
         help='memoize intermediate results (off by default)',
     )
     ap.add_argument('--no-memoize', dest='memoize', action='store_false')
     ap.add_argument(
-        '-m', '--main',
+        '-m',
+        '--main',
         action='store_true',
         default=False,
         help='generate a main() wrapper (off by default)',

@@ -85,7 +85,9 @@ class JavaScriptGenerator(Generator):
                 '{starting_rule}', self.grammar.starting_rule
             )
         else:
-            text += _PARSE.replace('{starting_rule}', self.grammar.starting_rule)
+            text += _PARSE.replace(
+                '{starting_rule}', self.grammar.starting_rule
+            )
 
         text += self._gen_methods()
         text += '}\n'
@@ -109,7 +111,7 @@ class JavaScriptGenerator(Generator):
             text += '    this.blocked = new Set()\n'
         if self.grammar.operator_needed:
             text += self._operator_state()
-        text += '  }\n' 
+        text += '  }\n'
 
         return text
 
@@ -140,7 +142,7 @@ class JavaScriptGenerator(Generator):
         blocks[0] = blocks[0][3:]
         builtins = {}
         for block in blocks:
-            name = block[ :block.find('(')]
+            name = block[: block.find('(')]
             text = block
             builtins[name] = text
         return builtins
@@ -149,7 +151,7 @@ class JavaScriptGenerator(Generator):
         blocks = _BUILTIN_FUNCTIONS[:-1].split('\n\n')
         builtins = {}
         for block in blocks:
-            name = block[:block.find('(')]
+            name = block[: block.find('(')]
             builtins[name] = block + '\n'
         return builtins
 
@@ -205,10 +207,10 @@ class JavaScriptGenerator(Generator):
         lines = []
         if node[0] == 'seq':
             vs = set()
-            self._find_vars(node, vs);
+            self._find_vars(node, vs)
             lines = []
             for v in vs:
-                lines.append(f'let {v};');
+                lines.append(f'let {v};')
 
         fn = getattr(self, f'_{node[0]}_')
         return lines + fn(node)
@@ -226,6 +228,7 @@ class JavaScriptGenerator(Generator):
 
     def _varname(self, v):
         return f'v_{v.replace("$", "_")}'
+
     #
     # Handlers for each non-host node in the glop AST follow.
     #
@@ -254,14 +257,8 @@ class JavaScriptGenerator(Generator):
 
     def _label_(self, node) -> List[str]:
         lines = self._gen(node[2][0])
-        varname = self._varname(node[1]);
-        lines.extend(
-            [
-                'if (!this.failed) {',
-                f'  {varname} = this.val;',
-                '}'
-            ]
-        )
+        varname = self._varname(node[1])
+        lines.extend(['if (!this.failed) {', f'  {varname} = this.val;', '}'])
         return lines
 
     def _leftrec_(self, node) -> List[str]:
