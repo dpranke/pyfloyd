@@ -88,10 +88,10 @@ class JavaScriptGenerator(Generator):
             text += _PARSE.replace('{starting_rule}', self.grammar.starting_rule)
 
         text += self._gen_methods()
+        text += '}\n'
         if self.grammar.needed_builtin_functions:
             text += '\n\n'
             text += self._gen_functions()
-        text += '}\n'
 
         if self.options.main:
             text += _MAIN_FOOTER
@@ -102,36 +102,37 @@ class JavaScriptGenerator(Generator):
     def _state(self) -> str:
         text = ''
         if self.options.memoize:
-            text += '        this.cache = {}\n'
+            text += '    this.cache = {}\n'
         if self.grammar.leftrec_needed or self.grammar.operator_needed:
-            text += '        this.seeds = {}\n'
+            text += '    this.seeds = {}\n'
         if self.grammar.leftrec_needed:
-            text += '        this.blocked = new Set()\n'
+            text += '    this.blocked = new Set()\n'
         if self.grammar.operator_needed:
             text += self._operator_state()
-            text += '\n'
+        text += '  }\n' 
 
         return text
 
     def _operator_state(self) -> str:
-        text = '        this.operators = {}\n'
+        text = '    this.operators = {}\n'
+        text += '    let o;\n'
         for rule, o in self.grammar.operators.items():
-            text += '        o = OperatorState()\n'
-            text += '        o.precOps = new Map()\n'
+            text += '    o = new OperatorState()\n'
+            text += '    o.precOps = new Map()\n'
             for prec in sorted(o.prec_ops):
-                text += '    o.precOps.set(prec, [' % prec
+                text += '    o.precOps.set(%d, [' % prec
                 text += ', '.join("'%s'" % op for op in o.prec_ops[prec])
-                text += '],\n'
-            text += '        )\n'
-            text += '        o.precs = sorted(o.precOps.keys(), reverse=True)\n'
-            text += '        o.rassoc = new Set(['
+                text += ']);\n'
+            text += '    o.precs = [...o.precOps.keys()].toSorted('
+            text += '(a, b) => b - a);\n'
+            text += '    o.rassoc = new Set(['
             text += ', '.join("'%s'" % op for op in o.rassoc)
-            text += '])\n'
-            text += '        o.choices = {\n'
+            text += ']);\n'
+            text += '    o.choices = {\n'
             for op in o.choices:
-                text += "            '%s': this.%s,\n" % (op, o.choices[op])
-            text += '        }\n'
-            text += "        this.operators['%s'] = o\n" % rule
+                text += "      '%s': this.%s,\n" % (op, o.choices[op])
+            text += '    };\n'
+            text += "    this.operators['%s'] = o;\n" % rule
         return text
 
     def _load_builtin_methods(self) -> Dict[str, str]:
@@ -162,13 +163,13 @@ class JavaScriptGenerator(Generator):
             text += '\n'
 
         if self.grammar.needed_builtin_rules:
-            text += '  #' + '\n\n  #'.join(
-                self._builtin_methods[f'r_{name}_']
-                for name in sorted(self.grammar.needed_builtin_rules)
-            )
+            for name in sorted(self.grammar.needed_builtin_rules):
+                method_txt = self._builtin_methods[f'_r_{name}_']
+                text += '  #' + method_txt
+                text += '\n\n'
             text += '\n'
 
-        text += '  #' + '\n\n  #'.join(
+        text += '  #' + '\n  #'.join(
             self._builtin_methods[name]
             for name in sorted(self._needed_methods)
         )
@@ -194,21 +195,37 @@ class JavaScriptGenerator(Generator):
         return text
 
     def _gen_functions(self) -> str:
-        return '\n\n'.join(
+        return 'function ' + '\nfunction '.join(
             self._builtin_functions[name]
             for name in sorted(self.grammar.needed_builtin_functions)
         )
 
     def _gen(self, node) -> List[str]:
         # All of the rule methods return a list of lines.
+        lines = []
+        if node[0] == 'seq':
+            vs = set()
+            self._find_vars(node, vs);
+            lines = []
+            for v in vs:
+                lines.append(f'let {v};');
+
         fn = getattr(self, f'_{node[0]}_')
-        return fn(node)
+        return lines + fn(node)
 
     def _gen_expr(self, node) -> _FormatObj:
         # All of the host methods return a formatter object.
         fn = getattr(self, f'_{node[0]}_')
         return fn(node)
 
+    def _find_vars(self, node, vs):
+        if node[0] == 'label':
+            vs.add(self._varname(node[1]))
+        for c in node[2]:
+            self._find_vars(c, vs)
+
+    def _varname(self, v):
+        return f'v_{v.replace("$", "_")}'
     #
     # Handlers for each non-host node in the glop AST follow.
     #
@@ -218,39 +235,43 @@ class JavaScriptGenerator(Generator):
         return flatten(Saw('this.#succeed(', obj, ')'))
 
     def _apply_(self, node) -> List[str]:
-        return [f'this.#{node[1]}()']
+        return [f'this.#{node[1]}();']
 
     def _choice_(self, node) -> List[str]:
-        lines = ['let p = this.pos']
+        lines = ['let p = this.pos;']
         for subnode in node[2][:-1]:
             lines.extend(self._gen(subnode))
             lines.append('if (!this.failed) {')
             lines.append('  return;')
             lines.append('}')
-            lines.append('this.#rewind(p)')
+            lines.append('this.#rewind(p);')
         lines.extend(self._gen(node[2][-1]))
         return lines
 
     def _empty_(self, node) -> List[str]:
         del node
-        return ['this.#succeed(null)']
+        return ['this.#succeed(null);']
 
     def _label_(self, node) -> List[str]:
         lines = self._gen(node[2][0])
+        varname = self._varname(node[1]);
         lines.extend(
             [
                 'if (!this.failed) {',
-                f'  v_{node[1].replace("$", "_")} = this.val',
+                f'  {varname} = this.val;',
                 '}'
             ]
         )
         return lines
 
     def _leftrec_(self, node) -> List[str]:
-        left_assoc = self.grammar.assoc.get(node[1], 'left') == 'left'
+        if self.grammar.assoc.get(node[1], 'true') == 'true':
+            left_assoc = 'true'
+        else:
+            left_assoc = 'false'
         lines = [
-            f'this._leftrec(this.{node[2][0][1]}, '
-            + f"'{node[1]}', {left_assoc})"
+            f'this.#leftrec(this.#{node[2][0][1]}, '
+            + f"'{node[1]}', {left_assoc});"
         ]
         return lines
 
@@ -260,19 +281,19 @@ class JavaScriptGenerator(Generator):
             method = 'ch'
         else:
             method = 'str'
-        return [f'this.#{method}({expr})']
+        return [f'this.#{method}({expr});']
 
     def _not_(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
         lines = (
             [
-                'p = this.pos;',
-                'errpos = this.errpos;',
+                'let p = this.pos;',
+                'let errpos = this.errpos;',
             ]
             + sublines
             + [
                 'if (this.failed) {',
-                '  this.#succeed(None, p);',
+                '  this.#succeed(null, p);',
                 '} else {',
                 '  this.#rewind(p);',
                 '  this.errpos = errpos;',
@@ -288,7 +309,7 @@ class JavaScriptGenerator(Generator):
         # of the expression cluster have been defined and are referenced
         # from self.grammar.operators[node[1]].choices.
         assert node[2] == []
-        return [f"this._operator(f'{node[1]}')"]
+        return [f"this.#operator('{node[1]}')"]
 
     def _paren_(self, node) -> List[str]:
         return self._gen(node[2][0])
@@ -298,24 +319,24 @@ class JavaScriptGenerator(Generator):
         if node[1] == '?':
             lines = (
                 [
-                    'p = this.pos;',
+                    'let p = this.pos;',
                 ]
                 + sublines
                 + [
                     'if (this.failed) {',
-                    '  this._succeed([], p);',
+                    '  this.#succeed([], p);',
                     '} else {',
-                    '  this._succeed([this.val]);',
+                    '  this.#succeed([this.val]);',
                     '}',
                 ]
             )
         else:
-            lines = ['vs = [];']
+            lines = ['let vs = [];']
             if node[1] == '+':
                 lines.extend(sublines)
                 lines.extend(
                     [
-                        'vs.append(this.val);',
+                        'vs.push(this.val);',
                         'if (this.failed) {',
                         '  return;',
                         '}',
@@ -324,16 +345,17 @@ class JavaScriptGenerator(Generator):
             lines.extend(
                 [
                     'while (true) {',
-                    '  p = this.pos;',
+                    '  let p = this.pos;',
                 ]
                 + ['  ' + line for line in sublines]
                 + [
                     '  if (this.failed) {',
-                    '    this._rewind(p);',
+                    '    this.#rewind(p);',
                     '    break',
                     '  }',
-                    '  vs.append(this.val);',
-                    'this._succeed(vs);',
+                    '  vs.push(this.val);',
+                    '}',
+                    'this.#succeed(vs);',
                 ]
             )
         return lines
@@ -345,11 +367,11 @@ class JavaScriptGenerator(Generator):
         # the _ParsingRuntimeError exception
         self._exception_needed = True
         return [
-            'v = ' + flatten(arg)[0],
+            'let v = ' + flatten(arg)[0],
             'if (v === true) {',
-            '  this._succeed(v);',
+            '  this.#succeed(v);',
             '} else if (v === false) {',
-            '  this._fail();',
+            '  this.#fail();',
             '} else {',
             "  throw new ParsingRuntimeError('Bad predicate value');",
             '}',
@@ -357,7 +379,7 @@ class JavaScriptGenerator(Generator):
 
     def _range_(self, node) -> List[str]:
         return [
-            'this.#range(%s, %s)'
+            'this.#range(%s, %s);'
             % (lit.encode(node[2][0][1]), lit.encode(node[2][1][1]))
         ]
 
@@ -370,7 +392,7 @@ class JavaScriptGenerator(Generator):
         return lines
 
     def _unicat_(self, node) -> List[str]:
-        return ['this.#unicat(%s)' % lit.encode(node[1])]
+        return ['this.#unicat(%s);' % lit.encode(node[1])]
 
     #
     # Handlers for the host nodes in the AST
@@ -378,7 +400,7 @@ class JavaScriptGenerator(Generator):
     def _ll_arr_(self, node) -> _FormatObj:
         if len(node[2]) == 0:
             return '[]'
-        args = [self._gen(n) for n in node[2]]
+        args = [self._gen_expr(n) for n in node[2]]
         return Saw('[', Comma(args), ']')
 
     def _ll_call_(self, node) -> Saw:
@@ -387,11 +409,11 @@ class JavaScriptGenerator(Generator):
         # TODO: Figure out if we need this routine or not when we also
         # fix the quals.
         assert len(node[2]) != 0
-        args = [self._gen(n) for n in node[2]]
+        args = [self._gen_expr(n) for n in node[2]]
         return Saw('(', Comma(args), ')')
 
     def _ll_getitem_(self, node) -> Saw:
-        return Saw('[', self._gen(node[2][0]), ']')
+        return Saw('[', self._gen_expr(node[2][0]), ']')
 
     def _ll_lit_(self, node) -> str:
         return lit.encode(node[1])
@@ -422,7 +444,7 @@ class JavaScriptGenerator(Generator):
                 fn = first[1]
                 # Note that unknown functions were caught during analysis
                 # so we don't have to worry about that here.
-                start = f'_{fn}'
+                start = f'{fn}'
             else:
                 # If second isn't a call, then first refers to a variable.
                 start = self._ll_var_(first)
@@ -491,10 +513,10 @@ async function main() {
 
   let result = parse(s.toString());
   if (result.err != undefined) {
-    console.log(result.err);
+    process.stderr.write(result.err);
     process.exit(1);
   } else {
-    console.log(JSON.stringify(result.val, null, 2));
+    process.stdout.write(JSON.stringify(result.val, null, 2));
     process.exit(0);
   }
 }
@@ -508,20 +530,26 @@ if (typeof process !== "undefined" && process.release.name === "node") {
 
 
 _PARSING_RUNTIME_EXCEPTION = """\
-class ParsingRuntimeError extends Exception;
+class ParsingRuntimeError extends Error {
+  toString() {
+    return this.message.toString();
+  }
+}
 
 
 """
 
 _OPERATOR_CLASS = """\
 class OperatorState {
-  constructor():
+  constructor() {
     this.currentDepth = 0
     this.currentPrec = 0
     this.precOps = {}  // Map[int, [str]]
     this.precs = []    // List[int]
-    this.rassoc = Set()
+    this.rassoc = new Set()
     this.choices = {}  // Map[str, rule]
+  }
+}
 
 """
 
@@ -548,7 +576,6 @@ class Parser {
     this.path = path;
     this.pos = 0;
     this.val = undefined;
-  }
 """
 
 _PARSE = """\
@@ -572,8 +599,8 @@ _PARSE_WITH_EXCEPTION = """\
         return new Result(this.val, null, this.pos);
       }
     } catch (e) {
-      if (instanceof(e, ParsingRuntimeError)) {
-        let lineno, _ = this.#errorOffsets();
+      if (e instanceof ParsingRuntimeError) {
+        let [lineno, _] = this.#errorOffsets();
         return new Result(null, this.path + ':' + lineno + ' ' + e.toString());
       } else {
         throw e;
@@ -589,6 +616,7 @@ _BUILTIN_METHODS = """\
     } else {
       this.#fail();
     }
+  }
 
   #_r_end_() {
     if (this.pos === this.end) {
@@ -596,6 +624,7 @@ _BUILTIN_METHODS = """\
     } else {
       this.#fail();
     }
+  }
 
   #ch(ch) {
      let p = this.pos;
@@ -656,7 +685,7 @@ _BUILTIN_METHODS = """\
       this.blocked.add(rule_name);
     }
     while (true) {
-      rule();
+      rule.call(this);
       if (this.pos > current[2]) {
         current = [this.val, this.failed, this.pos];
         this.seeds[key] = current;
@@ -665,7 +694,7 @@ _BUILTIN_METHODS = """\
         delete this.seeds[key];
         [this.val, this.failed, this.pos] = current;
         if (left_assoc) {
-          this.blocked.remove(rule_name);
+          this.blocked.delete(rule_name);
           return;
         }
       }
@@ -676,7 +705,7 @@ _BUILTIN_METHODS = """\
     let o = this.operators[rule_name];
     let pos = this.pos;
     let key = [rule_name, pos];
-    let seed = this.seeds.get(key);
+    let seed = this.seeds[key];
     if (seed) {
         [this.val, this.failed, this.pos] = seed;
         return;
@@ -699,7 +728,7 @@ _BUILTIN_METHODS = """\
       }
       for (let j = 0; j += 1; j < precOps.size) {
         let op = precOps[j];
-        o.choices[op]();
+        o.choices[op].call(this);
         if (!this.failed && this.pos > pos) {
           current = [this.val, this.failed, this.pos];
           this.seeds[key] = current;
@@ -723,12 +752,18 @@ _BUILTIN_METHODS = """\
   }
 
   #range(i, j) {
-    p = this.pos;
-    if (p != this.end && ord(i) <= ord(this.text[p]) <= ord(j)) {
+    let p = this.pos;
+    if (p == this.end) {
+      this.#fail();
+      return;
+    }
+    let c = this.text[p]
+    if (i <= c && c <= j) {
       this.#succeed(this.text[p], this.pos + 1);
     } else {
       this.#fail();
     }
+  }
 
   #rewind(newpos) {
      this.#succeed(null, newpos);
@@ -752,51 +787,67 @@ _BUILTIN_METHODS = """\
     }
   }
 
-  #unicat(this, cat):
-    this.#fail();
+  #unicat(cat) {
+    if (this.pos == this.end) {
+      this.#fail();
+      return
+    }
+    let c = this.text[this.pos];
+    let re = new RegExp(`\\\\p{${cat}}`, 'u');
+    if (c.match(re)) {
+      this.#succeed(c, this.pos + 1);
+    } else {
+      this.#fail();
+    }
   }
 """
 
 _BUILTIN_FUNCTIONS = """\
-cat(strs) {
-  return ''.join(strs);
+arrcat(a, b) {
+  return a.concat(b)
 }
 
 dict(pairs) {
-  return dict(pairs);
+  m = new Map();
+  for ([k, v] of pairs) {
+    m[k] = v;
+  }
+  return m;
 }
 
 float(s) {
-  if ('.' in s or 'e' in s or 'E' in s) {
-    return float(s);
-  }
-  return int(s);
+  return Number.parseFloat(s)
+}
 
 hex(s) {
-  return int(s, base=16);
+  return Number.parseInt(s, 16);
 }
 
 is_unicat(var, cat) {
-  return unicodedata.category(var) == cat;
+  throw Exception('is_unicat is not implemented');
 }
 
 itou(n) {
-  return chr(n);
+  return String.fromCharCode(n);
 }
 
 join(s, vs) {
-  return s.join(vs);
+  return vs.join(s);
+}
+
+strcat(a, b) {
+  return a.concat(b)
 }
 
 utoi(s) {
-  return ord(s);
+  return s.charCodeAt(0);
 }
 
 xtoi(s) {
-  return int(s, base=16);
+  return Number.parseInt(s, 16);
 }
 
 xtou(s) {
-  return chr(int(s, base=16));
+  return String.fromCharCode(Number.parseInt(s, 16));
 }
 """

@@ -33,7 +33,7 @@ class PythonGenerator(Generator):
         self._operators: Dict[str, str] = {}
         self._unicodedata_needed = (
             grammar.unicat_needed
-            or 'unicat' in grammar.needed_builtin_functions
+            or 'is_unicat' in grammar.needed_builtin_functions
         )
 
         # These methods are pretty much always needed.
@@ -770,8 +770,8 @@ _BUILTIN_METHODS = """\
 """
 
 _BUILTIN_FUNCTIONS = """\
-def _cat(strs):
-    return ''.join(strs)
+def _arrcat(a, b):
+    return a + b
 
 def _dict(pairs):
     return dict(pairs)
@@ -792,6 +792,9 @@ def _itou(n):
 
 def _join(s, vs):
     return s.join(vs)
+
+def _strcat(a, b):
+    return a + b
 
 def _utoi(s):
     return ord(s)

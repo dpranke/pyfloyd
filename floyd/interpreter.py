@@ -430,8 +430,8 @@ class Interpreter:
             vs.append(self.val)
         self._succeed(vs)
 
-    def _builtin_fn_cat(self, val):
-        return ''.join(val)
+    def _builtin_fn_arrcat(self, a, b):
+        return a + b
 
     def _builtin_fn_dict(self, val):
         return dict(val)
@@ -453,8 +453,14 @@ class Interpreter:
     def _builtin_fn_join(self, val, vs):
         return val.join(vs)
 
+    def _builtin_fn_strcat(self, a, b):
+        return a + b
+
     def _builtin_fn_utoi(self, val):
         return ord(val)
+
+    def _builtin_fn_xtoi(self, val):
+        return int(val, base=16)
 
     def _builtin_fn_xtou(self, val):
         return chr(int(val, base=16))

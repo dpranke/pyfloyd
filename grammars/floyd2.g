@@ -26,7 +26,7 @@ ident_list  = (ident:i ~'=' -> i)+:is          -> is
 
 rule        = ident:i '=' choice:cs ','?       -> ['rule', i, [cs]]
 
-ident       = id_start:hd id_continue*:tl      -> cat([hd] + tl)
+ident       = id_start:hd id_continue*:tl      -> arrcat([hd], tl)
 
 id_start    = 'a'..'z' | 'A'..'Z' | '_' | '$'
 
@@ -56,8 +56,8 @@ prim_expr   = lit:i '..' lit:j                 -> ['range', null, [i, j]]
             | '?{' ll_expr:e '}'               -> ['pred', null, [e]]
             | '(' choice:e ')'                 -> ['paren', null, [e]]
 
-lit         = squote sqchar*:cs squote         -> ['lit', cat(cs), []]
-            | dquote dqchar*:cs dquote         -> ['lit', cat(cs), []]
+lit         = squote sqchar*:cs squote         -> ['lit', join('', cs), []]
+            | dquote dqchar*:cs dquote         -> ['lit', join('', cs), []]
 
 sqchar      = bslash esc_char:c                -> c
             | ~squote any:c                    -> c
@@ -117,9 +117,9 @@ ll_prim     = 'false'                          -> ['ll_const', 'false', []]
             | '(' sp ll_expr:e sp ')'          -> ['ll_paren', null, [e]]
             | '[' sp ll_exprs:es sp ']'        -> ['ll_arr', null, es]
 
-digits      = digit+:ds                        -> cat(ds)
+digits      = digit+:ds                        -> join('', ds)
 
-hexdigits   = hex+:hs                          -> cat(hs)
+hexdigits   = hex+:hs                          -> join('', hs)
 
 hex         = digit | 'a'..'f' | 'A'..'F'
 

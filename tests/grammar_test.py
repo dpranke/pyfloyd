@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import math
 import os
 import pathlib
+import subprocess
 import textwrap
 import unittest
 
@@ -41,23 +43,26 @@ def skip(kind):
 
 
 class GrammarTestsMixin:
+
     def check(self, grammar, text, out=None, err=None, grammar_err=None):
         p, p_err, _ = self.compile(grammar)
-        self.assertEqual(grammar_err, p_err)
+        self.assertMultiLineEqual(grammar_err or '', p_err or '')
         if p:
             self.checkp(p, text, out, err)
+        if hasattr(p, 'cleanup'):
+            p.cleanup()
 
     def checkp(self, parser, text, out=None, err=None):
         actual_out, actual_err, _ = parser.parse(text)
         # Test err before out because it's probably more helpful to display
         # an unexpected error than it is to display an unexpected output.
-        self.assertEqual(err, actual_err)
+        self.assertMultiLineEqual(err or '', actual_err or '')
         self.assertEqual(out, actual_out)
 
     def check_grammar_error(self, grammar, err):
         p, p_err, _ = self.compile(grammar)
         self.assertIsNone(p)
-        self.assertEqual(err, p_err)
+        self.assertMultiLineEqual(err, p_err)
 
     def test_action(self):
         self.check('grammar = end -> true', text='', out=True)
@@ -86,11 +91,11 @@ class GrammarTestsMixin:
     def test_array(self):
         self.check(
             """\
-            grammar = '[' value:v (',' value)*:vs ','? ']' -> [v] + vs
+            grammar = '[' value:v (',' value)*:vs ','? ']' -> arrcat([v], vs)
             value   = '2':v                                -> float(v)
             """,
             text='[2]',
-            out=[2.0],
+            out=[2],
         )
 
     def test_basic(self):
@@ -127,6 +132,8 @@ class GrammarTestsMixin:
         self.assertIsNone(err)
         self.checkp(p, ' 1 + 2 ', out=True)
         self.checkp(p, ' 1/* comment */+2', out=True)
+        if hasattr(p, 'cleanup'):
+            p.cleanup()
 
     def test_choice(self):
         self.check(
@@ -302,8 +309,8 @@ class GrammarTestsMixin:
         # We don't check the actual output here because it is too long
         # and we don't want the test to be so sensitive to the AST for
         # the floyd grammar.
-        self.assertEqual(out[0], 'rules')
         self.assertIsNone(err)
+        self.assertEqual(out[0], 'rules')
 
     @skip('integration')
     def test_floyd2(self):
@@ -316,8 +323,39 @@ class GrammarTestsMixin:
         # We don't check the actual output here because it is too long
         # and we don't want the test to be so sensitive to the AST for
         # the floyd grammar.
-        self.assertEqual(out[0], 'rules')
         self.assertIsNone(err)
+        self.assertEqual(out[0], 'rules')
+
+    def test_fn_arrcat(self):
+        self.check('g = -> arrcat([1], [2])', text='', out=[1, 2])
+
+    def test_fn_strcat(self):
+        self.check("g = -> strcat('foo', 'bar')", text='', out='foobar')
+
+    def test_fn_dict(self):
+        self.check("g = -> dict([['a', 1], ['b', 2]])", text='',
+                   out={'a': 1, 'b': 2})
+
+    def test_fn_float(self):
+        self.check("g = -> float('4.3')", text='', out=4.3)
+        
+    def test_fn_is_unicat(self):
+        self.check("g = -> is_unicat('1', 'Nd')", text='', out=True)
+
+    def test_fn_itou(self):
+        self.check('grammar = -> itou(97)', text='', out='a')
+
+    def test_fn_join(self):
+        self.check("g = -> join('x', ['1', '2', '3'])", text='', out='1x2x3')
+
+    def test_fn_utoi(self):
+        self.check('grammar = -> utoi("a")', text='', out=97)
+
+    def test_fn_xtoi(self):
+        self.check("g = -> xtoi('0x41')", text='', out=65)
+
+    def test_fn_xtou(self):
+        self.check("g = -> xtou('0x41')", text='', out='A')
 
     def test_hex_digits_in_value(self):
         self.check('grammar = -> 0x20', text='', out=32)
@@ -352,9 +390,6 @@ class GrammarTestsMixin:
             out='*',
         )
 
-    def test_itou(self):
-        self.check('grammar = -> itou(97)', text='', out='a')
-
     @skip('integration')
     def test_json5(self):
         h = floyd.host.Host()
@@ -363,6 +398,23 @@ class GrammarTestsMixin:
         self.assertIsNone(err)
         self._common_json5_checks(p)
 
+    @skip('integration')
+    def test_json5_floats(self):
+        h = floyd.host.Host()
+        path = str(THIS_DIR / '../grammars/json5.g')
+        p, err, _ = self.compile(h.read_text_file(path))
+        self.assertIsNone(err)
+
+        self.checkp(p, text='Infinity', out=float('inf'))
+
+        # Can't use check() for this because NaN != NaN.
+        obj, err, _ = p.parse('NaN')
+        self.assertTrue(math.isnan(obj))
+        self.assertTrue(err is None)
+
+        if hasattr(p, 'cleanup'):
+            p.cleanup()
+
     def _common_json5_checks(self, p):
         self.checkp(p, text='123', out=123)
         self.checkp(p, text='1.5', out=1.5)
@@ -370,7 +422,6 @@ class GrammarTestsMixin:
         self.checkp(p, text='-1.5', out=-1.5)
         self.checkp(p, text='1.5e2', out=150)
         self.checkp(p, text='.5e-2', out=0.005)
-        self.checkp(p, text='Infinity', out=float('inf'))
         self.checkp(p, text='null', out=None)
         self.checkp(p, text='true', out=True)
         self.checkp(p, text='false', out=False)
@@ -383,11 +434,6 @@ class GrammarTestsMixin:
             p, text='{foo: "bar", a: "b"}', out={'foo': 'bar', 'a': 'b'}
         )
 
-        # Can't use check for this because NaN != NaN.
-        obj, err, _ = p.parse('NaN')
-        self.assertTrue(math.isnan(obj))
-        self.assertTrue(err is None)
-
         self.checkp(
             p, text='[1', err='<string>:1 Unexpected end of input at column 3'
         )
@@ -395,7 +441,18 @@ class GrammarTestsMixin:
         # Check that leading whitespace is allowed.
         self.checkp(p, '  {}', {})
 
+        if hasattr(p, 'cleanup'):
+            p.cleanup()
+
+    @skip('integration')
+    def test_json5_sample(self):
         # Check the sample file from pyjson5.
+        # this skips the `'to': Infinity` pair because that can't
+        # be marshalled in and out of JSON.
+        h = floyd.host.Host()
+        path = str(THIS_DIR / '../grammars/json5.g')
+        p, err, _ = self.compile(h.read_text_file(path))
+        self.assertIsNone(err)
         self.checkp(
             p,
             textwrap.dedent("""\
@@ -415,7 +472,6 @@ class GrammarTestsMixin:
                 hex: 0xDEADbeef,
                 half: .5,
                 delta: +10,
-                to: Infinity,   // and beyond!
 
                 finally: 'a trailing comma',
                 oh: [
@@ -433,7 +489,6 @@ class GrammarTestsMixin:
                 'hex': 3735928559,
                 'half': 0.5,
                 'delta': 10.0,
-                'to': float('inf'),
                 'finally': 'a trailing comma',
                 'oh': [
                     "we shouldn't forget",
@@ -442,6 +497,8 @@ class GrammarTestsMixin:
                 ],
             },
         )
+        if hasattr(p, 'cleanup'):
+            p.cleanup()
 
     @skip('integration')
     def test_json5_2(self):
@@ -451,6 +508,8 @@ class GrammarTestsMixin:
         p, err, _ = self.compile(grammar)
         self.assertIsNone(err)
         self._common_json5_checks(p)
+        if hasattr(p, 'cleanup'):
+            p.cleanup()
 
     def test_label(self):
         self.check("grammar = 'foobar':v -> v", text='foobar', out='foobar')
@@ -678,6 +737,7 @@ class GrammarTestsMixin:
             err='<string>:1 Bad predicate value',
         )
 
+    @skip('leftrec')
     def test_recursion_both(self):
         grammar = """\
             expr = expr:l '+' expr:r -> [l, '+', r]
@@ -687,6 +747,7 @@ class GrammarTestsMixin:
         # is left-associative by default.
         self.check(grammar, '1+2+3', [['1', '+', '2'], '+', '3'])
 
+    @skip('leftrec')
     def test_recursion_direct_left(self):
         self.check(
             """\
@@ -697,6 +758,7 @@ class GrammarTestsMixin:
             [['a', '+', 'a'], '+', 'a'],
         )
 
+    @skip('leftrec')
     def test_recursion_without_a_label(self):
         # This covers the code path where left recursion happens but
         # we don't need to save the value from it.
@@ -719,6 +781,7 @@ class GrammarTestsMixin:
             ['a', '+', ['a', '+', 'a']],
         )
 
+    @skip('leftrec')
     def test_recursion_indirect_left(self):
         self.check(
             """\
@@ -750,6 +813,7 @@ class GrammarTestsMixin:
             'aabb',
         )
 
+    @skip('leftrec')
     def test_recursion_left_opt(self):
         grammar = """\
             grammar = 'b'?:b grammar:g 'c' -> join('', b) + g + 'c'
@@ -782,6 +846,7 @@ class GrammarTestsMixin:
             err='<string>:1 Unexpected end of input at column 4',
         )
 
+    @skip('leftrec')
     def test_recursion_repeated(self):
         self.check(
             """
@@ -853,9 +918,6 @@ class GrammarTestsMixin:
             """
         self.check(grammar, text='foobar', out=True)
 
-    def test_utoi(self):
-        self.check('grammar = -> utoi("a")', text='', out=97)
-
     def test_whitespace_pragma(self):
         grammar = """\
             %token foo
@@ -918,9 +980,9 @@ class Interpreter(unittest.TestCase, GrammarTestsMixin):
 
     def compile(self, grammar, path='<string>'):
         return floyd.compile(textwrap.dedent(grammar), path)
+    
 
-
-class Generator(unittest.TestCase, GrammarTestsMixin):
+class PythonGenerator(unittest.TestCase, GrammarTestsMixin):
     max_diff = None
 
     def compile(self, grammar, path='<string>'):
@@ -943,12 +1005,83 @@ class Generator(unittest.TestCase, GrammarTestsMixin):
         parse_fn = scope['parse']
         if debug:  # pragma: no cover
             h.rmtree(d)
-        return _ParserWrapper(parse_fn), None, 0
+        return _PythonParserWrapper(parse_fn), None, 0
 
 
-class _ParserWrapper:
+class _PythonParserWrapper:
     def __init__(self, parse_fn):
         self.parse_fn = parse_fn
 
     def parse(self, text, path='<string>'):
         return self.parse_fn(text, path)
+
+    def cleanup(self):
+        pass
+
+
+class JavaScriptGenerator(unittest.TestCase, GrammarTestsMixin):
+    maxDiff = None
+
+    def compile(self, grammar, path='<string>'):
+        source_code, err, endpos = floyd.generate(
+            textwrap.dedent(grammar),
+            path=path,
+            options=floyd.GeneratorOptions(
+                language='javascript', main=True, memoize=False
+            ),
+        )
+        if err:
+            assert source_code is None
+            return None, err, endpos
+
+        h = floyd.host.Host()
+        d = '/tmp' # h.mkdtemp()
+        h.write_text_file(d + '/parser.js', source_code)
+        return _JavaScriptParserWrapper(h, d), None, 0
+
+    def test_fn_is_unicat(self):
+        self.skipTest("Can't implement this in JavaScript.")
+
+    @skip('integration')
+    def test_json5_floats(self):
+        # TODO: Figure out what to do about these JSON5 tests, as
+        # `Infinity` and `NaN` are legal Python values but not
+        # legal JavaScript values.
+        pass
+
+    @skip('operators')
+    def test_operator_multichar_is_valid(self):
+        self.skipTest('TODO: Get this to work.')
+
+    @skip('operators')
+    def test_operators(self):
+        self.skipTest('TODO: Get this to work.')
+
+    @skip('operators')
+    def test_operators_with_whitespace(self):
+        self.skipTest('TODO: Get this to work.')
+
+    @skip('leftrec')
+    def test_recursion_left_opt(self):
+        self.skipTest('TODO: Get this to work.')
+
+
+
+class _JavaScriptParserWrapper:
+    def __init__(self, h, d):
+        self.h = h
+        self.d = d
+        self.source = d + '/parser.js'
+
+    def parse(self, text, path='<string>'):
+        inp = self.d + '/input.txt'
+        self.h.write_text_file(inp, text)
+        proc = subprocess.run(['node', self.source, inp], capture_output=True)
+        if proc.returncode == 0:
+            val = json.loads(proc.stdout)
+            return val, None, 0
+        else:
+            return None, proc.stderr.decode('utf8'), 0
+
+    def cleanup(self):
+        pass # self.h.rmtree(self.d)

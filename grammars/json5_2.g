@@ -71,14 +71,14 @@ hex_esc        = 'x' hex hex                     { xtou($2 + $3) }
 
 unicode_esc    = 'u' hex hex hex hex             { xtou($2 + $3 + $4 + $5) }
 
-element_list   = value (',' value)* ','?         { [$1] + $2 }
+element_list   = value (',' value)* ','?         { arrcat([$1], $2) }
 
-member_list    = member (',' member)* ','?       { [$1] + $2 }
+member_list    = member (',' member)* ','?       { arrcat([$1], $2) }
 
 member         = string ':' value                { [$1, $3] }
                | ident ':' value                 { [$1, $3] }
 
-ident          = id_start id_continue*           { join('', [$1] + $2) }
+ident          = id_start id_continue*           { join('', arrcat([$1], $2)) }
 
 id_start       = ascii_id_start
                | other_id_start
@@ -111,8 +111,9 @@ num_literal    = '-' num_literal                 { 0 - $2 }
                | 'Infinity'                      { Infinity }
                | 'NaN'                           { NaN }
 
-dec_literal    = dec_int_lit frac? exp?          { join('', [$1] + $2 + $3) }
-               | frac exp?                       { join('', [$1] + $2) }
+dec_literal    = dec_int_lit frac? exp?          
+                   { join('', arrcat(arrcat([$1], $2), $3)) }
+               | frac exp?                       { join('', arrcat([$1], $2)) }
 
 dec_int_lit    = '0' ~digit                      { '0' }
                | nonzerodigit digit*             { $1 + join('', $2) }

@@ -96,13 +96,14 @@ def analyze(ast, rewrite_filler=True):
 
 
 BUILTIN_FUNCTIONS = (
-    'cat',
+    'arrcat',
     'dict',
     'float',
     'hex',
     'is_unicat',
     'itou',
     'join',
+    'strcat',
     'utoi',
     'xtoi',
     'xtou',
@@ -699,7 +700,7 @@ class _SubRuleRewriter:
         return [node[0], node[1], [self._make_subrule(node[2][0])]]
 
     def _can_inline(self, node) -> bool:
-        if node[0] in ('choice', 'seq', 'post'):
+        if node[0] in ('choice', 'not', 'post', 'seq'):
             return False
         return True
 

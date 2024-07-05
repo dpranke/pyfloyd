@@ -10,7 +10,7 @@ ws             = ' '
                | '\f'
                | '\xa0'
                | '\ufeff'
-               | ~~(any:x ?(is_unicat(x, 'Zs'))) any:x   -> x
+               | \p{Zs}:x                                -> x
 
 eol            = '\r' '\n'
                | '\r'
@@ -70,14 +70,14 @@ hex_esc        = 'x' hex:h1 hex:h2                       -> xtou(h1 + h2)
 
 unicode_esc    = 'u' hex:a hex:b hex:c hex:d             -> xtou(a + b + c + d)
 
-element_list   = value:v (sp ',' sp value)*:vs sp ','?   -> [v] + vs
+element_list   = value:v (sp ',' sp value)*:vs sp ','?   -> arrcat([v], vs)
 
-member_list    = member:m (sp ',' sp member)*:ms sp ','? -> [m] + ms
+member_list    = member:m (sp ',' sp member)*:ms sp ','? -> arrcat([m], ms)
 
 member         = string:k sp ':' sp value:v              -> [k, v]
                | ident:k sp ':' sp value:v               -> [k, v]
 
-ident          = id_start:hd id_continue*:tl             -> join('', [hd] + tl)
+ident          = id_start:hd id_continue*:tl             -> join('', arrcat([hd], tl))
 
 id_start       = ascii_id_start
                | other_id_start
