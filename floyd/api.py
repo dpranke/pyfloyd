@@ -120,10 +120,10 @@ def generate(
         grammar_obj = analyzer.analyze(result.val)
         analyzer.rewrite_subrules(grammar_obj)
         options = options or GeneratorOptions()
+        gen: Generator
         if options.language == 'python':
-            gen: Generator = PythonGenerator(grammar_obj, options)
-        else:  # type: ignore
-            # TODO: Figure out why mypy is choking here.
+            gen = PythonGenerator(grammar_obj, options)
+        else:
             assert options.language == 'javascript'
             gen = JavaScriptGenerator(grammar_obj, options)
         text = gen.generate()
