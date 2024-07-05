@@ -130,10 +130,12 @@ class JavaScriptGenerator(Generator):
             text += '    o.rassoc = new Set(['
             text += ', '.join("'%s'" % op for op in o.rassoc)
             text += ']);\n'
-            text += '    o.choices = {\n'
+            text += '    o.choices = new Map()\n'
             for op in o.choices:
-                text += "      '%s': this.%s,\n" % (op, o.choices[op])
-            text += '    };\n'
+                text += "    o.choices.set('%s', this.#%s)\n" % (
+                    op,
+                    o.choices[op],
+                )
             text += "    this.operators['%s'] = o;\n" % rule
         return text
 
@@ -692,8 +694,8 @@ _BUILTIN_METHODS = """\
         [this.val, this.failed, this.pos] = current;
         if (left_assoc) {
           this.blocked.delete(rule_name);
-          return;
         }
+        return;
       }
     }
   }
@@ -712,28 +714,27 @@ _BUILTIN_METHODS = """\
     this.seeds[key] = current;
     let minPrec = o.currentPrec;
     let i = 0;
-    while (i < o.precs.size) {
+    while (i < o.precs.length) {
       let repeat = false;
       let prec = o.precs[i];
       let precOps = o.precOps.get(prec);
       if (prec < minPrec) {
         break;
       }
-      o.current_prec = prec;
+      o.currentPrec = prec;
       if (!o.rassoc.has(precOps[0])) {
         o.currentPrec += 1;
       }
-      for (let j = 0; j += 1; j < precOps.size) {
+      for (let j = 0; j < precOps.length; j += 1) {
         let op = precOps[j];
-        o.choices[op].call(this);
+        o.choices.get(op).call(this);
         if (!this.failed && this.pos > pos) {
           current = [this.val, this.failed, this.pos];
           this.seeds[key] = current;
           repeat = true;
           break;
-        } else {
-          this.#rewind(pos);
         }
+        this.#rewind(pos);
       }
       if (!repeat) {
         i += 1;
@@ -742,7 +743,7 @@ _BUILTIN_METHODS = """\
 
     delete this.seeds[key];
     o.currentDepth -= 1;
-    if (o.currentDepth == 0) {
+    if (o.currentDepth === 0) {
       o.currentPrec = 0;
     }
     [this.val, this.failed, this.pos] = current;
