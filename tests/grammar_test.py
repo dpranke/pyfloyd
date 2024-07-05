@@ -618,26 +618,6 @@ class GrammarTestsMixin:
             out=None,
         )
 
-    def test_opt(self):
-        self.check("grammar = 'a' 'b'? -> true", text='a', out=True)
-
-    def test_optional_comma(self):
-        self.check('grammar = end -> true,', text='', out=True)
-
-    def test_paren_in_value(self):
-        self.check('grammar = -> (true)', text='', out=True)
-
-    def test_plus(self):
-        g = "grammar = 'a'+ -> true"
-        self.check(
-            g,
-            text='',
-            err='<string>:1 Unexpected end of input at column 1',
-        )
-
-        self.check(g, text='a', out=True)
-        self.check(g, text='aa', out=True)
-
     def test_operator_invalid(self):
         # 'a' is not a valid operator; operators cannot contain valid
         # parts of an identifier.
@@ -720,6 +700,26 @@ class GrammarTestsMixin:
                 [['4', '*', '5'], '/', '6'],
             ],
         )
+
+    def test_opt(self):
+        self.check("grammar = 'a' 'b'? -> true", text='a', out=True)
+
+    def test_optional_comma(self):
+        self.check('grammar = end -> true,', text='', out=True)
+
+    def test_paren_in_value(self):
+        self.check('grammar = -> (true)', text='', out=True)
+
+    def test_plus(self):
+        g = "grammar = 'a'+ -> true"
+        self.check(
+            g,
+            text='',
+            err='<string>:1 Unexpected end of input at column 1',
+        )
+
+        self.check(g, text='a', out=True)
+        self.check(g, text='aa', out=True)
 
     def test_pred(self):
         self.check('grammar = ?(true) end -> true', text='', out=True)
@@ -879,7 +879,9 @@ class GrammarTestsMixin:
 
     def test_star_nested(self):
         # This checks to make sure we don't get stuck in an infinite
-        # loop.
+        # loop where the inner star always succeeds so the outer star
+        # keeps looping. The implementation should break out if it
+        # doesn't actually consume anything.
         self.check("grammar = ('a'*)* 'b' -> true", text='b', out=True)
 
     def test_tabs_are_whitespace(self):
