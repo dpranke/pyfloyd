@@ -31,6 +31,10 @@ format the code. `./run --help` is your friend to find out more.
 
 ## Version History / Release Notes
 
+* v0.15.0 (2024-07-05)
+    * Add a JavaScript back end. As a part of this I've changed the GitHub
+      CI config to install a specific version of Node so that the new
+      JS codepaths are tested properly.
 * v0.14.0 (2024-06-30)
     * Move a lot of the logic from python_compiler.py to a new pass in
       analyzer.py. Now python_compiler is very simple and you can start
