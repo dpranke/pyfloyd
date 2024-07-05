@@ -1,5 +1,7 @@
 # Things TODO (semi-prioritized)
 
+* Change generators to indicate how the output files were generated.
+
 * Figure out how to do proper typechecking and decide how to handle
   union/json types in a static language like Go or C++. Do we need
   to add functions like an `add()` that takes two JSON values and
@@ -35,7 +37,9 @@
   and format, and figure out a more generic test harness that can be
   easily ported to different implementations of Floyd.
 
-* Add a C++ backend.
+* Add a C++ backend. This may require a revamp of the API and CLI in orderi
+  to be able to generate both an interface/header file and a source file
+  in one go.
 
 * Add a Go backend.
 
