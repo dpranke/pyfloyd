@@ -38,9 +38,11 @@ id_start    = 'a'..'z' | 'A'..'Z' | '_' | '$'
 
 id_continue = id_start | digit
 
-choice      = seq:s (sp '|' sp seq)*:ss           -> ['choice', null, [s] + ss]
+choice      = seq:s (sp '|' sp seq)*:ss
+                -> ['choice', null, arrcat([s], ss)]
 
-seq         = expr:e (ws sp expr)*:es             -> ['seq', null, [e] + es]
+seq         = expr:e (ws sp expr)*:es
+                -> ['seq', null, arrcat([e], es)]
             |                                     -> ['empty', null, []]
 
 expr        = post_expr:e ':' ident:l             -> ['label', l, [e]]
@@ -106,7 +108,8 @@ ll_expr     = ll_qual:e1 sp '+' sp ll_expr:e2     -> ['ll_plus', null, [e1, e2]]
                                                       null, [e1, e2]]
             | ll_qual
 
-ll_qual     = ll_prim:e ll_post_op+:ps            -> ['ll_qual', null, [e] + ps]
+ll_qual     = ll_prim:e ll_post_op+:ps
+                -> ['ll_qual', null, arrcat([e], ps)]
             | ll_prim
 
 ll_post_op  = '[' sp ll_expr:e sp ']'             -> ['ll_getitem', null, [e]]
