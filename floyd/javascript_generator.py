@@ -125,7 +125,7 @@ class JavaScriptGenerator(Generator):
                 text += '    o.precOps.set(%d, [' % prec
                 text += ', '.join("'%s'" % op for op in o.prec_ops[prec])
                 text += ']);\n'
-            text += '    o.precs = [...o.precOps.keys()].toSorted('
+            text += '    o.precs = [...o.precOps.keys()].sort('
             text += '(a, b) => b - a);\n'
             text += '    o.rassoc = new Set(['
             text += ', '.join("'%s'" % op for op in o.rassoc)
