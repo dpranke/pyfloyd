@@ -92,7 +92,7 @@ class JavaScriptGenerator(Generator):
         text += self._gen_methods()
         text += '}\n'
         if self.grammar.needed_builtin_functions:
-            text += '\n\n'
+            text += '\n'
             text += self._gen_functions()
 
         if self.options.main:
@@ -170,8 +170,7 @@ class JavaScriptGenerator(Generator):
             for name in sorted(self.grammar.needed_builtin_rules):
                 method_txt = self._builtin_methods[f'_r_{name}_']
                 text += '  #' + method_txt
-                text += '\n\n'
-            text += '\n'
+                text += '\n'
 
         text += '  #' + '\n  #'.join(
             self._builtin_methods[name]
@@ -211,7 +210,7 @@ class JavaScriptGenerator(Generator):
             vs: set[str] = set()
             self._find_vars(node, vs)
             lines = []
-            for v in vs:
+            for v in sorted(vs):
                 lines.append(f'let {v};')
 
         fn = getattr(self, f'_{node[0]}_')
@@ -237,7 +236,7 @@ class JavaScriptGenerator(Generator):
 
     def _action_(self, node) -> List[str]:
         obj = self._gen_expr(node[2][0])
-        return flatten(Saw('this.#succeed(', obj, ')'))
+        return flatten(Saw('this.#succeed(', obj, ');'), indent='  ')
 
     def _apply_(self, node) -> List[str]:
         return [f'this.#{node[1]}();']
@@ -350,7 +349,7 @@ class JavaScriptGenerator(Generator):
                 + [
                     '  if (this.failed) {',
                     '    this.#rewind(p);',
-                    '    break',
+                    '    break;',
                     '  }',
                     '  if (this.pos === p) {',
                     '    break;',
@@ -369,7 +368,7 @@ class JavaScriptGenerator(Generator):
         # the _ParsingRuntimeError exception
         self._exception_needed = True
         return [
-            'let v = ' + flatten(arg)[0],
+            'let v = ' + flatten(arg, indent='  ')[0],
             'if (v === true) {',
             '  this.#succeed(v);',
             '} else if (v === false) {',
@@ -514,13 +513,27 @@ async function main() {
   }
 
   let result = parse(s.toString());
+
+  let txt, stream, ret;
   if (result.err != undefined) {
-    process.stderr.write(result.err);
-    process.exit(1);
+    txt = result.err;
+    stream = process.stderr;
+    ret = 1;
   } else {
-    process.stdout.write(JSON.stringify(result.val, null, 2));
-    process.exit(0);
+    txt = JSON.stringify(result.val, null, 2);
+    stream = process.stdout;
+    ret = 0;
   }
+  await new Promise(function(resolve, reject) {
+    stream.write(txt, 'utf8', function(err, data) {
+      if (err != null) {
+        reject(err);
+      } else {
+        resolve(data);
+      }
+    });
+  });
+  process.exit(ret);
 }
 
 if (typeof process !== "undefined" && process.release.name === "node") {
@@ -629,18 +642,18 @@ _BUILTIN_METHODS = """\
   }
 
   #ch(ch) {
-     let p = this.pos;
-     if (p < this.end && this.text[p] === ch) {
-       this.#succeed(ch, this.pos + 1);
-     } else {
-       this.#fail();
+    let p = this.pos;
+    if (p < this.end && this.text[p] === ch) {
+      this.#succeed(ch, this.pos + 1);
+    } else {
+      this.#fail();
     }
   }
 
   #errorOffsets() {
     let lineno = 1;
     let colno = 1;
-    for (let i = 0; i < this.errpos ; i++) {
+    for (let i = 0; i < this.errpos; i++) {
       if (this.text[i] === '\\n') {
         lineno += 1;
         colno = 1;
@@ -758,7 +771,7 @@ _BUILTIN_METHODS = """\
       this.#fail();
       return;
     }
-    let c = this.text[p]
+    let c = this.text[p];
     if (i <= c && c <= j) {
       this.#succeed(this.text[p], this.pos + 1);
     } else {
@@ -767,7 +780,7 @@ _BUILTIN_METHODS = """\
   }
 
   #rewind(newpos) {
-     this.#succeed(null, newpos);
+    this.#succeed(null, newpos);
   }
 
   #str(s) {
@@ -775,12 +788,12 @@ _BUILTIN_METHODS = """\
       this.#ch(ch);
       if (this.failed) {
         return;
-      } 
-      this.val = s
+      }
+      this.val = s;
     }
   }
 
-  #succeed(v, newpos=null) {
+  #succeed(v, newpos = null) {
     this.val = v;
     this.failed = false;
     if (newpos !== null) {
@@ -805,7 +818,7 @@ _BUILTIN_METHODS = """\
 
 _BUILTIN_FUNCTIONS = """\
 arrcat(a, b) {
-  return a.concat(b)
+  return a.concat(b);
 }
 
 dict(pairs) {
@@ -837,7 +850,7 @@ join(s, vs) {
 }
 
 strcat(a, b) {
-  return a.concat(b)
+  return a.concat(b);
 }
 
 utoi(s) {

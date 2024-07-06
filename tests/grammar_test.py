@@ -1074,8 +1074,7 @@ class _JavaScriptParserWrapper:
             ['node', self.source, inp], check=False, capture_output=True
         )
         if proc.returncode == 0:
-            val = json.loads(proc.stdout)
-            return val, None, 0
+            return json.loads(proc.stdout), None, 0
         return None, proc.stderr.decode('utf8'), 0
 
     def cleanup(self):

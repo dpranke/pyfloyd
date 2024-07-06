@@ -71,6 +71,8 @@ class _Parser:
             if self.failed:
                 self._rewind(p)
                 break
+            if self.pos == p:
+                break
             vs.append(self.val)
         self._succeed(vs)
 
@@ -94,6 +96,8 @@ class _Parser:
             self._r_ws_()
             if self.failed:
                 self._rewind(p)
+                break
+            if self.pos == p:
                 break
             vs.append(self.val)
         self._succeed(vs)
@@ -152,6 +156,8 @@ class _Parser:
             if self.failed:
                 self._rewind(p)
                 break
+            if self.pos == p:
+                break
             vs.append(self.val)
         self._succeed(vs)
 
@@ -185,6 +191,8 @@ class _Parser:
             self._s_comment_7_()
             if self.failed:
                 self._rewind(p)
+                break
+            if self.pos == p:
                 break
             vs.append(self.val)
         self._succeed(vs)
@@ -363,6 +371,8 @@ class _Parser:
             if self.failed:
                 self._rewind(p)
                 break
+            if self.pos == p:
+                break
             vs.append(self.val)
         self._succeed(vs)
 
@@ -406,6 +416,8 @@ class _Parser:
             self._s_op_2_()
             if self.failed:
                 self._rewind(p)
+                break
+            if self.pos == p:
                 break
             vs.append(self.val)
         self._succeed(vs)
@@ -480,6 +492,8 @@ class _Parser:
             self._s_ident_list_2_()
             if self.failed:
                 self._rewind(p)
+                break
+            if self.pos == p:
                 break
             vs.append(self.val)
         self._succeed(vs)
@@ -556,6 +570,8 @@ class _Parser:
             if self.failed:
                 self._rewind(p)
                 break
+            if self.pos == p:
+                break
             vs.append(self.val)
         self._succeed(vs)
 
@@ -592,7 +608,7 @@ class _Parser:
             if not self.failed:
                 v_ss = self.val
         if not self.failed:
-            self._succeed(['choice', None, [v_s] + v_ss])
+            self._succeed(['choice', None, _arrcat([v_s], v_ss)])
 
     def _s_choice_1_(self):
         vs = []
@@ -601,6 +617,8 @@ class _Parser:
             self._s_choice_2_()
             if self.failed:
                 self._rewind(p)
+                break
+            if self.pos == p:
                 break
             vs.append(self.val)
         self._succeed(vs)
@@ -631,7 +649,7 @@ class _Parser:
             if not self.failed:
                 v_es = self.val
         if not self.failed:
-            self._succeed(['seq', None, [v_e] + v_es])
+            self._succeed(['seq', None, _arrcat([v_e], v_es)])
 
     def _s_seq_2_(self):
         vs = []
@@ -640,6 +658,8 @@ class _Parser:
             self._s_seq_3_()
             if self.failed:
                 self._rewind(p)
+                break
+            if self.pos == p:
                 break
             vs.append(self.val)
         self._succeed(vs)
@@ -906,6 +926,8 @@ class _Parser:
             if self.failed:
                 self._rewind(p)
                 break
+            if self.pos == p:
+                break
             vs.append(self.val)
         self._succeed(vs)
 
@@ -927,6 +949,8 @@ class _Parser:
             self._r_dqchar_()
             if self.failed:
                 self._rewind(p)
+                break
+            if self.pos == p:
                 break
             vs.append(self.val)
         self._succeed(vs)
@@ -1236,6 +1260,8 @@ class _Parser:
             if self.failed:
                 self._rewind(p)
                 break
+            if self.pos == p:
+                break
             vs.append(self.val)
         self._succeed(vs)
 
@@ -1311,7 +1337,7 @@ class _Parser:
             if not self.failed:
                 v_ps = self.val
         if not self.failed:
-            self._succeed(['ll_qual', None, [v_e] + v_ps])
+            self._succeed(['ll_qual', None, _arrcat([v_e], v_ps)])
 
     def _s_ll_qual_2_(self):
         vs = []
@@ -1324,6 +1350,8 @@ class _Parser:
             self._r_ll_post_op_()
             if self.failed:
                 self._rewind(p)
+                break
+            if self.pos == p:
                 break
             vs.append(self.val)
         self._succeed(vs)
@@ -1514,6 +1542,8 @@ class _Parser:
             if self.failed:
                 self._rewind(p)
                 break
+            if self.pos == p:
+                break
             vs.append(self.val)
         self._succeed(vs)
 
@@ -1535,6 +1565,8 @@ class _Parser:
             self._r_hex_()
             if self.failed:
                 self._rewind(p)
+                break
+            if self.pos == p:
                 break
             vs.append(self.val)
         self._succeed(vs)
@@ -1624,6 +1656,10 @@ class _Parser:
         self.failed = False
         if newpos is not None:
             self.pos = newpos
+
+
+def _arrcat(a, b):
+    return a + b
 
 
 def _join(s, vs):
