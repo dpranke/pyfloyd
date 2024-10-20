@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # Copyright 2024 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -46,7 +47,9 @@ def main(argv=None, host=None):
             return 1
 
         if args.pretty_print:
-            contents, err = floyd.pretty_print(grammar, args.grammar)
+            contents, err = floyd.pretty_print(
+                grammar, args.grammar, args.rewrite_filler
+            )
         elif args.compile:
             options = floyd.GeneratorOptions(
                 language=args.language, main=args.main, memoize=args.memoize
@@ -88,6 +91,11 @@ def _parse_args(host, argv):
         help='pretty-print the input grammar',
     )
     ap.add_argument(
+        '--rewrite-filler',
+        action='store_true',
+        help='include the filler rules in the grammar',
+    )
+    ap.add_argument(
         '-V',
         '--version',
         action='store_true',
@@ -98,7 +106,7 @@ def _parse_args(host, argv):
         '--language',
         action='store',
         default='python',
-        help='Language to generate( %default by default)',
+        help='Language to generate( %(default)s by default)',
     )
     ap.add_argument(
         '-M',

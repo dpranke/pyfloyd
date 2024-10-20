@@ -256,6 +256,17 @@ class JavaScriptGenerator(Generator):
         del node
         return ['this.#succeed(null);']
 
+    def _exclude_(self, node) -> List[str]:
+        s = lit.escape(node[1], ']')
+        return [
+            f'let m = /^[{s}]/;',
+            'if (this.pos === this.end || this.text[this.pos].match(m)) {',
+            '  this.#fail();',
+            '  return;',
+            '}',
+            'this.#succeed(this.text[this.pos], this.pos + 1);',
+        ]
+
     def _label_(self, node) -> List[str]:
         lines = self._gen(node[2][0])
         varname = self._varname(node[1])
@@ -347,11 +358,8 @@ class JavaScriptGenerator(Generator):
                 ]
                 + ['  ' + line for line in sublines]
                 + [
-                    '  if (this.failed) {',
+                    '  if (this.failed || this.pos === p) {',
                     '    this.#rewind(p);',
-                    '    break;',
-                    '  }',
-                    '  if (this.pos === p) {',
                     '    break;',
                     '  }',
                     '  vs.push(this.val);',
@@ -382,6 +390,19 @@ class JavaScriptGenerator(Generator):
         return [
             'this.#range(%s, %s);'
             % (lit.encode(node[2][0][1]), lit.encode(node[2][1][1]))
+        ]
+
+    def _regexp_(self, node) -> List[str]:
+        s = lit.escape(node[1], '/')
+        return [
+            f'let regexp = /{s}/g;',
+            'regexp.lastIndex = this.pos;',
+            'let found = regexp.exec(this.text);',
+            'if (found) {',
+            '    this.#succeed(found[0], regexp.lastIndex)',
+            '    return;',
+            '}',
+            'this.#fail();',
         ]
 
     def _seq_(self, node) -> List[str]:

@@ -68,18 +68,24 @@ class PythonGenerator(Generator):
             self._methods[rule] = self._gen(node)
 
     def _gen_text(self) -> str:
-        unicodedata_import = ''
+        imports = ''
+        if self.options.main:
+            imports += 'import argparse\n'
+        if self.options.main:
+            imports += 'import json\n'
+            imports += 'import os\n'
+        if self.grammar.re_needed:
+            imports += 'import re\n'
+        if self.options.main:
+            imports += 'import sys\n'
+        imports += 'from typing import Any, NamedTuple, Optional\n'
         if self._unicodedata_needed:
-            unicodedata_import = 'import unicodedata\n\n'
+            imports += 'import unicodedata\n'
 
         if self.options.main:
-            text = _MAIN_HEADER.format(
-                unicodedata_import=unicodedata_import,
-            )
+            text = _MAIN_HEADER.format(imports=imports)
         else:
-            text = _DEFAULT_HEADER.format(
-                unicodedata_import=unicodedata_import
-            )
+            text = _DEFAULT_HEADER.format(imports=imports)
 
         if self._exception_needed:
             text += _PARSING_RUNTIME_EXCEPTION
@@ -117,6 +123,8 @@ class PythonGenerator(Generator):
             text += '        self.seeds = {}\n'
         if self.grammar.leftrec_needed:
             text += '        self.blocked = set()\n'
+        if self.grammar.re_needed:
+            text += '        self.regexps = {}\n'
         if self.grammar.operator_needed:
             text += self._operator_state()
             text += '\n'
@@ -240,6 +248,18 @@ class PythonGenerator(Generator):
         del node
         return ['self._succeed(None)']
 
+    def _exclude_(self, node) -> List[str]:
+        return [
+            (
+                'if self.pos == self.end or self.text[self.pos] in '
+                + lit.encode(node[1])
+            )
+            + ':',
+            '    self._fail()',
+            '    return',
+            'self._succeed(self.text[self.pos], self.pos + 1)',
+        ]
+
     def _label_(self, node) -> List[str]:
         lines = self._gen(node[2][0])
         lines.extend(
@@ -329,10 +349,8 @@ class PythonGenerator(Generator):
                 ]
                 + ['    ' + line for line in sublines]
                 + [
-                    '    if self.failed:',
+                    '    if self.failed or self.pos == p:',
                     '        self._rewind(p)',
-                    '        break',
-                    '    if self.pos == p:',
                     '        break',
                     '    vs.append(self.val)',
                     'self._succeed(vs)',
@@ -360,6 +378,18 @@ class PythonGenerator(Generator):
         return [
             'self._range(%s, %s)'
             % (lit.encode(node[2][0][1]), lit.encode(node[2][1][1]))
+        ]
+
+    def _regexp_(self, node) -> List[str]:
+        return [
+            f'p = {lit.encode(node[1])}',
+            f'if p not in self.regexps:',
+            '    self.regexps[p] = re.compile(p)',
+            'm = self.regexps[p].match(self.text, self.pos)',
+            'if m:',
+            '    self._succeed(m.group(0), m.end())',
+            '    return',
+            'self._fail()',
         ]
 
     def _seq_(self, node) -> List[str]:
@@ -465,8 +495,8 @@ class PythonGenerator(Generator):
 
 
 _DEFAULT_HEADER = """\
-from typing import Any, NamedTuple, Optional
-{unicodedata_import}
+{imports}
+
 # pylint: disable=too-many-lines
 
 
@@ -479,12 +509,7 @@ _DEFAULT_FOOTER = ''
 _MAIN_HEADER = """\
 #!/usr/bin/env python
 
-import argparse
-import json
-import os
-import sys
-from typing import Any, NamedTuple, Optional
-{unicodedata_import}
+{imports}
 
 # pylint: disable=too-many-lines
 
@@ -496,7 +521,7 @@ def main(
     stderr=sys.stderr,
     exists=os.path.exists,
     opener=open,
-):
+) -> int:
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument('file', nargs='?')
     args = arg_parser.parse_args(argv)
@@ -659,7 +684,7 @@ _BUILTIN_METHODS = """\
         if self.errpos == len(self.text):
             thing = 'end of input'
         else:
-            thing = '"%s"' % self.text[self.errpos]
+            thing = repr(self.text[self.errpos]).replace("'", '"')
         return '%s:%d Unexpected %s at column %d' % (
             self.path,
             lineno,

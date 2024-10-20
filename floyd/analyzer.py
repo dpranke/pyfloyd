@@ -29,9 +29,14 @@ class AnalysisError(Exception):
 
 
 def _update_rules(grammar):
+    rules = set()
     for rule in grammar.ast[2]:
         if rule[0] == 'rule':
             grammar.rules[rule[1]] = rule[2][0]
+            rules.add(rule[1])
+    for rule in grammar.rules:
+        if rule not in rules:
+            grammar.ast[2].append(['rule', rule, [grammar.rules[rule]]])
 
 
 class Grammar:
@@ -52,6 +57,7 @@ class Grammar:
         self.ch_needed = False
         self.str_needed = False
         self.range_needed = False
+        self.re_needed = False
         self.needed_builtin_functions = set()
         self.needed_builtin_rules = set()
         self.operators = {}
@@ -208,12 +214,12 @@ class _Analyzer:
             elif node[1] == 'comment':
                 self.comment = node[2][0]
             elif node[1] == 'prec':
-                for op in node[2]:
-                    self.prec[op] = self.current_prec
+                for n in node[2]:
+                    self.prec[n[1]] = self.current_prec
                 self.current_prec += 2
             else:
                 assert node[1] == 'assoc'
-                self.assoc[node[2][0]] = node[2][1]
+                self.assoc[node[2][0][1]] = node[2][1]
         elif ty == 'rule':
             self.walk(node[2][0])
         elif ty in (
@@ -410,6 +416,8 @@ def _check_lr(name, node, rules, seen):
         return any(_check_lr(name, n, rules, seen) for n in node[2])
     if ty == 'empty':
         return False
+    if ty == 'exclude':
+        return False
     if ty == 'label':
         return _check_lr(name, node[2][0], rules, seen)
     if ty == 'leftrec':
@@ -425,6 +433,8 @@ def _check_lr(name, node, rules, seen):
     if ty == 'pred':
         return False
     if ty == 'range':
+        return False
+    if ty == 'regexp':
         return False
     if ty == 'seq':
         for subnode in node[2]:
@@ -459,6 +469,21 @@ def _rewrite_filler(grammar):
     _FillerVisitor(grammar).process()
 
     _update_rules(grammar)
+    new_rules = []
+    for rule in grammar.ast[2]:
+        if rule[0] == 'pragma' and rule[1] in (
+            'whitespace',
+            'whitespace_style',
+            'comment',
+            'comment_style',
+        ):
+            continue
+        new_rules.append(rule)
+    grammar.ast[2] = new_rules
+    grammar.comment = None
+    grammar.content_style = None
+    grammar.whitespace = None
+    grammar.whitespace_style = None
 
 
 class _TokenVisitor(Visitor):
@@ -510,7 +535,7 @@ class _FillerVisitor(Visitor):
         self.grammar.ast = walk(self.grammar.ast, self)
 
     def should_fill(self, node):
-        if node[0] in ('escape', 'lit', 'range'):
+        if node[0] in ('escape', 'exclude', 'lit', 'range', 'regexp'):
             return True
         if node[0] == 'apply' and (
             node[1] == 'end' or node[1] in self.grammar.tokens
@@ -523,72 +548,21 @@ class _FillerVisitor(Visitor):
 
 
 # (' '|'\n'|'\r'|'\t')*
-STANDARD_WHITESPACE = [
-    'choice',
-    None,
-    [
-        ['lit', ' ', []],
-        ['lit', '\r', []],
-        ['lit', '\n', []],
-        ['lit', '\t', []],
-    ],
-]
+STANDARD_WHITESPACE = ['regexp', '[ \n\r\t]', []]
 
 
 def _eol_comment(lit):
-    # $lit (~'\n' any)*
-    return [
-        'seq',
-        None,
-        [
-            ['lit', lit, []],
-            [
-                'post',
-                '*',
-                [
-                    [
-                        'seq',
-                        None,
-                        [
-                            ['not', None, [['lit', '\n', []]]],
-                            ['apply', 'any', []],
-                        ],
-                    ]
-                ],
-            ],
-        ],
-    ]
+    return ['regexp', f'{lit}[^\n]*', []]
 
 
 BASH_COMMENT = _eol_comment('#')
 
 
 # '/*' (~'*/' any)* '*/'
-C_COMMENT = [
-    'seq',
-    None,
-    [
-        ['lit', '/*', []],
-        [
-            'post',
-            '*',
-            [
-                [
-                    'seq',
-                    None,
-                    [
-                        ['not', None, [['lit', '*/', []]]],
-                        ['apply', 'any', []],
-                    ],
-                ],
-            ],
-        ],
-        ['lit', '*/', []],
-    ],
-]
+C_COMMENT = ['regexp', r'/\*([^*]|\*[^\\])*\*/', []]
 
 
-CPP_COMMENT = ['choice', None, [_eol_comment('//'), C_COMMENT]]
+CPP_COMMENT = ['regexp', f"(({_eol_comment('//')[1]})|({C_COMMENT[1]}))", []]
 
 
 def _add_filler_rules(grammar):
@@ -607,37 +581,57 @@ def _add_filler_rules(grammar):
     if grammar.comment:
         grammar.rules['_comment'] = grammar.comment
     if grammar.whitespace and grammar.comment:
-        grammar.rules['_filler'] = [
-            'post',
-            '*',
-            [
+        if (
+            grammar.whitespace[0] == 'regexp'
+            and grammar.comment[0] == 'regexp'
+        ):
+            grammar.rules['_filler'] = [
+                'regexp',
+                f'(({grammar.whitespace[1]})|({grammar.comment[1]}))*',
+                [],
+            ]
+        else:
+            grammar.rules['_filler'] = [
+                'post',
+                '*',
                 [
-                    'choice',
-                    None,
                     [
-                        ['apply', '_whitespace', []],
-                        ['apply', '_comment', []],
+                        'choice',
+                        None,
+                        [
+                            ['apply', '_whitespace', []],
+                            ['apply', '_comment', []],
+                        ],
                     ],
-                ]
-            ],
-        ]
+                ],
+            ]
     elif grammar.comment:
-        grammar.rules['_filler'] = [
-            'post',
-            '*',
-            [
-                ['apply', '_comment', []],
-            ],
-        ]
+        if grammar.comment[0] == 'regexp':
+            grammar.rules['_filler'] = [
+                'regexp',
+                f'({grammar.comment[1]})*',
+                [],
+            ]
+        else:
+            grammar.rules['_filler'] = [
+                'post',
+                '*',
+                [['apply', '_comment', []]],
+            ]
     else:
         assert grammar.whitespace
-        grammar.rules['_filler'] = [
-            'post',
-            '*',
-            [
-                ['apply', '_whitespace', []],
-            ],
-        ]
+        if grammar.whitespace[0] == 'regexp':
+            grammar.rules['_filler'] = [
+                'regexp',
+                f'({grammar.whitespace[1]})*',
+                [],
+            ]
+        else:
+            grammar.rules['_filler'] = [
+                'post',
+                '*',
+                [['apply', '_whitespace', []]],
+            ]
 
 
 def rewrite_subrules(
@@ -700,7 +694,7 @@ class _SubRuleRewriter:
         return [node[0], node[1], [self._make_subrule(node[2][0])]]
 
     def _can_inline(self, node) -> bool:
-        if node[0] in ('choice', 'not', 'post', 'seq'):
+        if node[0] in ('choice', 'exclude', 'not', 'post', 'regexp', 'seq'):
             return False
         return True
 
@@ -749,6 +743,10 @@ class _SubRuleRewriter:
 
     def _range_(self, node):
         self._grammar.range_needed = True
+        return node
+
+    def _regexp_(self, node):
+        self._grammar.re_needed = True
         return node
 
     def _unicat_(self, node):

@@ -1,5 +1,6 @@
 from typing import Any, NamedTuple, Optional
 
+
 # pylint: disable=too-many-lines
 
 
@@ -68,10 +69,8 @@ class _Parser:
         while True:
             p = self.pos
             self._s_grammar_2_()
-            if self.failed:
+            if self.failed or self.pos == p:
                 self._rewind(p)
-                break
-            if self.pos == p:
                 break
             vs.append(self.val)
         self._succeed(vs)
@@ -94,10 +93,8 @@ class _Parser:
         while True:
             p = self.pos
             self._r_ws_()
-            if self.failed:
+            if self.failed or self.pos == p:
                 self._rewind(p)
-                break
-            if self.pos == p:
                 break
             vs.append(self.val)
         self._succeed(vs)
@@ -112,6 +109,10 @@ class _Parser:
         if not self.failed:
             return
         self._rewind(p)
+        self._ch('\r')
+        if not self.failed:
+            return
+        self._rewind(p)
         self._r_eol_()
         if not self.failed:
             return
@@ -119,21 +120,7 @@ class _Parser:
         self._r_comment_()
 
     def _r_eol_(self):
-        p = self.pos
-        self._s_eol_1_()
-        if not self.failed:
-            return
-        self._rewind(p)
-        self._ch('\r')
-        if not self.failed:
-            return
-        self._rewind(p)
         self._ch('\n')
-
-    def _s_eol_1_(self):
-        self._ch('\r')
-        if not self.failed:
-            self._ch('\n')
 
     def _r_comment_(self):
         p = self.pos
@@ -153,10 +140,8 @@ class _Parser:
         while True:
             p = self.pos
             self._s_comment_3_()
-            if self.failed:
+            if self.failed or self.pos == p:
                 self._rewind(p)
-                break
-            if self.pos == p:
                 break
             vs.append(self.val)
         self._succeed(vs)
@@ -189,10 +174,8 @@ class _Parser:
         while True:
             p = self.pos
             self._s_comment_7_()
-            if self.failed:
+            if self.failed or self.pos == p:
                 self._rewind(p)
-                break
-            if self.pos == p:
                 break
             vs.append(self.val)
         self._succeed(vs)
@@ -243,7 +226,7 @@ class _Parser:
         if not self.failed:
             return
         self._rewind(p)
-        self._s_pragma_10_()
+        self._s_pragma_9_()
 
     def _s_pragma_1_(self):
         self._str('%tokens')
@@ -330,9 +313,9 @@ class _Parser:
         if not self.failed:
             self._r_sp_()
         if not self.failed:
-            self._s_pragma_9_()
+            self._r_lit_()
             if not self.failed:
-                v_a = self.val
+                v_l = self.val
         if not self.failed:
             self._r_sp_()
         if not self.failed:
@@ -340,124 +323,36 @@ class _Parser:
             if not self.failed:
                 v_d = self.val
         if not self.failed:
-            self._succeed(['pragma', 'assoc', [v_a, v_d]])
+            self._succeed(['pragma', 'assoc', [v_l, v_d]])
 
     def _s_pragma_9_(self):
-        p = self.pos
-        self._r_op_()
-        if not self.failed:
-            return
-        self._rewind(p)
-        self._r_arm_()
-
-    def _s_pragma_10_(self):
         self._str('%prec')
         if not self.failed:
-            self._s_pragma_11_()
+            self._s_pragma_10_()
             if not self.failed:
-                v_os = self.val
+                v_ls = self.val
         if not self.failed:
-            self._succeed(['pragma', 'prec', v_os])
+            self._succeed(['pragma', 'prec', v_ls])
+
+    def _s_pragma_10_(self):
+        vs = []
+        self._s_pragma_11_()
+        vs.append(self.val)
+        if self.failed:
+            return
+        while True:
+            p = self.pos
+            self._s_pragma_11_()
+            if self.failed or self.pos == p:
+                self._rewind(p)
+                break
+            vs.append(self.val)
+        self._succeed(vs)
 
     def _s_pragma_11_(self):
-        vs = []
-        self._s_pragma_12_()
-        vs.append(self.val)
-        if self.failed:
-            return
-        while True:
-            p = self.pos
-            self._s_pragma_12_()
-            if self.failed:
-                self._rewind(p)
-                break
-            if self.pos == p:
-                break
-            vs.append(self.val)
-        self._succeed(vs)
-
-    def _s_pragma_12_(self):
-        self._s_pragma_13_()
+        self._r_sp_()
         if not self.failed:
-            self._r_ws_()
-        if not self.failed:
-            self._r_op_()
-            if not self.failed:
-                v_o = self.val
-        if not self.failed:
-            self._succeed(v_o)
-
-    def _s_pragma_13_(self):
-        p = self.pos
-        errpos = self.errpos
-        self._r_eol_()
-        if self.failed:
-            self._succeed(None, p)
-        else:
-            self._rewind(p)
-            self.errpos = errpos
-            self._fail()
-
-    def _r_op_(self):
-        self._s_op_1_()
-        if not self.failed:
-            v_op = self.val
-        if not self.failed:
-            self._succeed(_join('', v_op))
-
-    def _s_op_1_(self):
-        vs = []
-        self._s_op_2_()
-        vs.append(self.val)
-        if self.failed:
-            return
-        while True:
-            p = self.pos
-            self._s_op_2_()
-            if self.failed:
-                self._rewind(p)
-                break
-            if self.pos == p:
-                break
-            vs.append(self.val)
-        self._succeed(vs)
-
-    def _s_op_2_(self):
-        self._s_op_3_()
-        if not self.failed:
-            self._r_any_()
-
-    def _s_op_3_(self):
-        p = self.pos
-        errpos = self.errpos
-        self._s_op_4_()
-        if self.failed:
-            self._succeed(None, p)
-        else:
-            self._rewind(p)
-            self.errpos = errpos
-            self._fail()
-
-    def _s_op_4_(self):
-        p = self.pos
-        self._r_ws_()
-        if not self.failed:
-            return
-        self._rewind(p)
-        self._r_id_continue_()
-
-    def _r_arm_(self):
-        self._r_ident_()
-        if not self.failed:
-            v_i = self.val
-        if not self.failed:
-            self._ch('#')
-        if not self.failed:
-            self._r_digits_()
-            if not self.failed:
-                v_ds = self.val
-        if not self.failed:
-            self._succeed(v_i + '#' + _join('', v_ds))
+            self._r_lit_()
 
     def _r_dir_(self):
         self._s_dir_1_()
@@ -490,10 +385,8 @@ class _Parser:
         while True:
             p = self.pos
             self._s_ident_list_2_()
-            if self.failed:
+            if self.failed or self.pos == p:
                 self._rewind(p)
-                break
-            if self.pos == p:
                 break
             vs.append(self.val)
         self._succeed(vs)
@@ -567,10 +460,8 @@ class _Parser:
         while True:
             p = self.pos
             self._r_id_continue_()
-            if self.failed:
+            if self.failed or self.pos == p:
                 self._rewind(p)
-                break
-            if self.pos == p:
                 break
             vs.append(self.val)
         self._succeed(vs)
@@ -615,10 +506,8 @@ class _Parser:
         while True:
             p = self.pos
             self._s_choice_2_()
-            if self.failed:
+            if self.failed or self.pos == p:
                 self._rewind(p)
-                break
-            if self.pos == p:
                 break
             vs.append(self.val)
         self._succeed(vs)
@@ -656,10 +545,8 @@ class _Parser:
         while True:
             p = self.pos
             self._s_seq_3_()
-            if self.failed:
+            if self.failed or self.pos == p:
                 self._rewind(p)
-                break
-            if self.pos == p:
                 break
             vs.append(self.val)
         self._succeed(vs)
@@ -762,6 +649,14 @@ class _Parser:
             return
         self._rewind(p)
         self._s_prim_expr_12_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._s_prim_expr_13_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._s_prim_expr_15_()
 
     def _s_prim_expr_1_(self):
         self._r_lit_()
@@ -846,7 +741,7 @@ class _Parser:
             self._succeed(['action', None, [v_e]])
 
     def _s_prim_expr_9_(self):
-        self._ch('~')
+        self._ch('\x7e')
         if not self.failed:
             self._r_prim_expr_()
             if not self.failed:
@@ -899,6 +794,58 @@ class _Parser:
         if not self.failed:
             self._succeed(['paren', None, [v_e]])
 
+    def _s_prim_expr_13_(self):
+        self._str('[^')
+        if not self.failed:
+            self._s_prim_expr_14_()
+            if not self.failed:
+                v_es = self.val
+        if not self.failed:
+            self._ch(']')
+        if not self.failed:
+            self._succeed(['exclude', _join('', v_es), []])
+
+    def _s_prim_expr_14_(self):
+        vs = []
+        self._r_exchar_()
+        vs.append(self.val)
+        if self.failed:
+            return
+        while True:
+            p = self.pos
+            self._r_exchar_()
+            if self.failed or self.pos == p:
+                self._rewind(p)
+                break
+            vs.append(self.val)
+        self._succeed(vs)
+
+    def _s_prim_expr_15_(self):
+        self._ch('/')
+        if not self.failed:
+            self._s_prim_expr_16_()
+            if not self.failed:
+                v_rs = self.val
+        if not self.failed:
+            self._ch('/')
+        if not self.failed:
+            self._succeed(['regexp', _join('', v_rs), []])
+
+    def _s_prim_expr_16_(self):
+        vs = []
+        self._r_rechar_()
+        vs.append(self.val)
+        if self.failed:
+            return
+        while True:
+            p = self.pos
+            self._r_rechar_()
+            if self.failed or self.pos == p:
+                self._rewind(p)
+                break
+            vs.append(self.val)
+        self._succeed(vs)
+
     def _r_lit_(self):
         p = self.pos
         self._s_lit_1_()
@@ -923,10 +870,8 @@ class _Parser:
         while True:
             p = self.pos
             self._r_sqchar_()
-            if self.failed:
+            if self.failed or self.pos == p:
                 self._rewind(p)
-                break
-            if self.pos == p:
                 break
             vs.append(self.val)
         self._succeed(vs)
@@ -947,10 +892,8 @@ class _Parser:
         while True:
             p = self.pos
             self._r_dqchar_()
-            if self.failed:
+            if self.failed or self.pos == p:
                 self._rewind(p)
-                break
-            if self.pos == p:
                 break
             vs.append(self.val)
         self._succeed(vs)
@@ -961,19 +904,27 @@ class _Parser:
         if not self.failed:
             return
         self._rewind(p)
-        self._s_sqchar_2_()
+        self._s_sqchar_3_()
 
     def _s_sqchar_1_(self):
         self._r_bslash_()
         if not self.failed:
-            self._r_esc_char_()
+            self._s_sqchar_2_()
             if not self.failed:
                 v_c = self.val
         if not self.failed:
             self._succeed(v_c)
 
     def _s_sqchar_2_(self):
-        self._s_sqchar_3_()
+        p = self.pos
+        self._r_squote_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._r_esc_char_()
+
+    def _s_sqchar_3_(self):
+        self._s_sqchar_4_()
         if not self.failed:
             self._r_any_()
             if not self.failed:
@@ -981,7 +932,7 @@ class _Parser:
         if not self.failed:
             self._succeed(v_c)
 
-    def _s_sqchar_3_(self):
+    def _s_sqchar_4_(self):
         p = self.pos
         errpos = self.errpos
         self._r_squote_()
@@ -998,19 +949,27 @@ class _Parser:
         if not self.failed:
             return
         self._rewind(p)
-        self._s_dqchar_2_()
+        self._s_dqchar_3_()
 
     def _s_dqchar_1_(self):
         self._r_bslash_()
         if not self.failed:
-            self._r_esc_char_()
+            self._s_dqchar_2_()
             if not self.failed:
                 v_c = self.val
         if not self.failed:
             self._succeed(v_c)
 
     def _s_dqchar_2_(self):
-        self._s_dqchar_3_()
+        p = self.pos
+        self._r_dquote_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._r_esc_char_()
+
+    def _s_dqchar_3_(self):
+        self._s_dqchar_4_()
         if not self.failed:
             self._r_any_()
             if not self.failed:
@@ -1018,7 +977,7 @@ class _Parser:
         if not self.failed:
             self._succeed(v_c)
 
-    def _s_dqchar_3_(self):
+    def _s_dqchar_4_(self):
         p = self.pos
         errpos = self.errpos
         self._r_dquote_()
@@ -1073,14 +1032,6 @@ class _Parser:
             return
         self._rewind(p)
         self._s_esc_char_9_()
-        if not self.failed:
-            return
-        self._rewind(p)
-        self._s_esc_char_10_()
-        if not self.failed:
-            return
-        self._rewind(p)
-        self._s_esc_char_11_()
 
     def _s_esc_char_1_(self):
         self._ch('b')
@@ -1113,28 +1064,18 @@ class _Parser:
             self._succeed('\v')
 
     def _s_esc_char_7_(self):
-        self._r_squote_()
-        if not self.failed:
-            self._succeed("'")
-
-    def _s_esc_char_8_(self):
-        self._r_dquote_()
-        if not self.failed:
-            self._succeed('"')
-
-    def _s_esc_char_9_(self):
         self._r_bslash_()
         if not self.failed:
             self._succeed('\\')
 
-    def _s_esc_char_10_(self):
+    def _s_esc_char_8_(self):
         self._r_hex_esc_()
         if not self.failed:
             v_c = self.val
         if not self.failed:
             self._succeed(v_c)
 
-    def _s_esc_char_11_(self):
+    def _s_esc_char_9_(self):
         self._r_unicode_esc_()
         if not self.failed:
             v_c = self.val
@@ -1233,6 +1174,135 @@ class _Parser:
         if not self.failed:
             self._succeed(['unicat', v_i, []])
 
+    def _r_exchar_(self):
+        p = self.pos
+        self._s_exchar_1_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._s_exchar_3_()
+
+    def _s_exchar_1_(self):
+        self._r_bslash_()
+        if not self.failed:
+            self._s_exchar_2_()
+            if not self.failed:
+                v_c = self.val
+        if not self.failed:
+            self._succeed(v_c)
+
+    def _s_exchar_2_(self):
+        p = self.pos
+        self._ch(']')
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._r_esc_char_()
+
+    def _s_exchar_3_(self):
+        self._s_exchar_4_()
+        if not self.failed:
+            v_cs = self.val
+        if not self.failed:
+            self._succeed(_join('', v_cs))
+
+    def _s_exchar_4_(self):
+        vs = []
+        self._s_exchar_5_()
+        vs.append(self.val)
+        if self.failed:
+            return
+        while True:
+            p = self.pos
+            self._s_exchar_5_()
+            if self.failed or self.pos == p:
+                self._rewind(p)
+                break
+            vs.append(self.val)
+        self._succeed(vs)
+
+    def _s_exchar_5_(self):
+        self._s_exchar_6_()
+        if not self.failed:
+            self._s_exchar_7_()
+        if not self.failed:
+            self._r_any_()
+
+    def _s_exchar_6_(self):
+        p = self.pos
+        errpos = self.errpos
+        self._ch(']')
+        if self.failed:
+            self._succeed(None, p)
+        else:
+            self._rewind(p)
+            self.errpos = errpos
+            self._fail()
+
+    def _s_exchar_7_(self):
+        p = self.pos
+        errpos = self.errpos
+        self._r_bslash_()
+        if self.failed:
+            self._succeed(None, p)
+        else:
+            self._rewind(p)
+            self.errpos = errpos
+            self._fail()
+
+    def _r_rechar_(self):
+        p = self.pos
+        self._s_rechar_1_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._s_rechar_3_()
+
+    def _s_rechar_1_(self):
+        self._r_bslash_()
+        if not self.failed:
+            self._s_rechar_2_()
+            if not self.failed:
+                v_c = self.val
+        if not self.failed:
+            self._succeed(v_c)
+
+    def _s_rechar_2_(self):
+        p = self.pos
+        self._ch('/')
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._r_esc_char_()
+
+    def _s_rechar_3_(self):
+        self._s_rechar_4_()
+        if not self.failed:
+            v_cs = self.val
+        if not self.failed:
+            self._succeed(_join('', v_cs))
+
+    def _s_rechar_4_(self):
+        vs = []
+        self._s_rechar_5_()
+        vs.append(self.val)
+        if self.failed:
+            return
+        while True:
+            p = self.pos
+            self._s_rechar_5_()
+            if self.failed or self.pos == p:
+                self._rewind(p)
+                break
+            vs.append(self.val)
+        self._succeed(vs)
+
+    def _s_rechar_5_(self):
+        if self.pos == self.end or self.text[self.pos] in '/':
+            self._fail()
+            return
+        self._succeed(self.text[self.pos], self.pos + 1)
+
     def _r_ll_exprs_(self):
         p = self.pos
         self._s_ll_exprs_1_()
@@ -1250,17 +1320,15 @@ class _Parser:
             if not self.failed:
                 v_es = self.val
         if not self.failed:
-            self._succeed([v_e] + v_es)
+            self._succeed(_arrcat([v_e], v_es))
 
     def _s_ll_exprs_2_(self):
         vs = []
         while True:
             p = self.pos
             self._s_ll_exprs_3_()
-            if self.failed:
+            if self.failed or self.pos == p:
                 self._rewind(p)
-                break
-            if self.pos == p:
                 break
             vs.append(self.val)
         self._succeed(vs)
@@ -1348,10 +1416,8 @@ class _Parser:
         while True:
             p = self.pos
             self._r_ll_post_op_()
-            if self.failed:
+            if self.failed or self.pos == p:
                 self._rewind(p)
-                break
-            if self.pos == p:
                 break
             vs.append(self.val)
         self._succeed(vs)
@@ -1539,10 +1605,8 @@ class _Parser:
         while True:
             p = self.pos
             self._r_digit_()
-            if self.failed:
+            if self.failed or self.pos == p:
                 self._rewind(p)
-                break
-            if self.pos == p:
                 break
             vs.append(self.val)
         self._succeed(vs)
@@ -1563,10 +1627,8 @@ class _Parser:
         while True:
             p = self.pos
             self._r_hex_()
-            if self.failed:
+            if self.failed or self.pos == p:
                 self._rewind(p)
-                break
-            if self.pos == p:
                 break
             vs.append(self.val)
         self._succeed(vs)
@@ -1621,7 +1683,7 @@ class _Parser:
         if self.errpos == len(self.text):
             thing = 'end of input'
         else:
-            thing = '"%s"' % self.text[self.errpos]
+            thing = repr(self.text[self.errpos]).replace("'", '"')
         return '%s:%d Unexpected %s at column %d' % (
             self.path,
             lineno,

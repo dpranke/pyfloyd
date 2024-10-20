@@ -1,40 +1,37 @@
 %whitespace_style standard
-%tokens           comment digits hexdigits ident lit
+%comment_style    C++
+%tokens           digits hexdigits ident lit
 
 grammar     = (pragma|rule)*:vs end             -> ['rules', null, vs]
 
-sp          = ws*
-
-ws          = '\x20' | '\x09' | eol | comment
-
-eol         = '\x0D' '\x0A' | '\x0D' | '\x0A'
-
-comment     = '//' (~eol any)*
-            | '/*' (~'*/' any)* '*/'
-
 pragma      = '%tokens' ident_list:is          -> ['pragma', 'tokens', is]
-            | '%token' ident:t                 -> ['pragma', 'token', [t]]
+            | '%token' ident:i                 -> ['pragma', 'token', [i]]
             | '%whitespace_style' ident:i      -> ['pragma',
                                                    'whitespace_style', i]
             | '%whitespace' '=' choice:cs
                                                -> ['pragma', 'whitespace', [cs]]
             | '%comment_style'
-              ('C++' | 'C#' | ident):c         -> ['pragma', 'comment_style', c]
+              ('C++' | ident):c                -> ['pragma', 'comment_style', c]
             | '%comment' '=' choice:cs         -> ['pragma', 'comment', [cs]]
+            | '%assoc' lit:l dir:d             -> ['pragma', 'assoc', [l, d]]
+            | '%prec' lit+:ls                  -> ['pragma', 'prec', ls]
+
+dir         = ('left'|'right'):d               -> d
 
 ident_list  = (ident:i ~'=' -> i)+:is          -> is
 
 rule        = ident:i '=' choice:cs ','?       -> ['rule', i, [cs]]
 
-ident       = id_start:hd id_continue*:tl      -> arrcat([hd], tl)
+ident       = id_start:hd id_continue*:tl      -> strcat(hd, join('', tl))
 
 id_start    = 'a'..'z' | 'A'..'Z' | '_' | '$'
 
 id_continue = id_start | digit
 
-choice      = seq:s ('|' seq)*:ss              -> ['choice', null, [s] + ss]
+choice      = seq:s ('|' seq)*:ss              
+                -> ['choice', null, arrcat([s], ss)]
 
-seq         = expr:e (expr)*:es                -> ['seq', null, [e] + es]
+seq         = expr:e (expr)*:es                -> ['seq', null, arrcat([e], es)]
             |                                  -> ['empty', null, []]
 
 expr        = post_expr:e ':' ident:l          -> ['label', l, [e]]
@@ -55,6 +52,8 @@ prim_expr   = lit:i '..' lit:j                 -> ['range', null, [i, j]]
             | '?(' ll_expr:e ')'               -> ['pred', null, [e]]
             | '?{' ll_expr:e '}'               -> ['pred', null, [e]]
             | '(' choice:e ')'                 -> ['paren', null, [e]]
+            | '[^' exchar+:es ']'
+                -> ['exclude', join('', es), []]
 
 lit         = squote sqchar*:cs squote         -> ['lit', join('', cs), []]
             | dquote dqchar*:cs dquote         -> ['lit', join('', cs), []]
@@ -86,20 +85,23 @@ esc_char    = 'b'                              -> '\x08'
 hex_esc     = 'x' hex:h1 hex:h2                -> xtou(h1 + h2)
 
 unicode_esc = 'u' hex:h1 hex:h2 hex:h3 hex:h4  -> xtou(h1 + h2 + h3 + h4)
-            | 'U' hex:h1 hex:h2 hex:h3 hex:h4
-                  hex:h5 hex:h6 hex:h7 hex:h8  -> xtou(h1 + h2 + h3 + h4 +
-                                                       h5 + h6 + h7 + h8)
+            | 'U' hex:h1 hex:h2 hex:h3 hex:h4 hex:h5 hex:h6 hex:h7 hex:h8
+                -> xtou(h1 + h2 + h3 + h4 + h5 + h6 + h7 + h8)
 
 escape      = '\\p{' ident:i '}'               -> ['unicat', i, []]
 
-ll_exprs    = ll_expr:e (',' ll_expr)*:es      -> [e] + es
+exchar      = bslash (']' | esc_char):c        -> c
+            | (~']' ~bslash any)+:cs           -> join('', cs)
+
+ll_exprs    = ll_expr:e (',' ll_expr)*:es      -> arrcat([e], es)
             |                                  -> []
 
 ll_expr     = ll_qual:e1 '+' ll_expr:e2        -> ['ll_plus', null, [e1, e2]]
             | ll_qual:e1 '-' ll_expr:e2        -> ['ll_minus', null, [e1, e2]]
             | ll_qual
 
-ll_qual     = ll_prim:e ll_post_op+:ps         -> ['ll_qual', null, [e] + ps]
+ll_qual     = ll_prim:e ll_post_op+:ps
+                -> ['ll_qual', null, arrcat([e], ps)]
             | ll_prim
 
 ll_post_op  = '[' ll_expr:e ']'                -> ['ll_getitem', null, [e]]
@@ -111,15 +113,15 @@ ll_prim     = 'false'                          -> ['ll_const', 'false', []]
             | 'Infinity'                       -> ['ll_const', 'Infinity', []]
             | 'NaN'                            -> ['ll_const', 'NaN', []]
             | ident:i                          -> ['ll_var', i, []]
-            | '0x' hexdigits:hs                -> ['ll_num', '0x' + hs, []]
+            | hexdigits:hs                     -> ['ll_num', hs, []]
             | digits:ds                        -> ['ll_num', ds, []]
             | lit:l                            -> ['ll_lit', l[1], []]
-            | '(' sp ll_expr:e sp ')'          -> ['ll_paren', null, [e]]
-            | '[' sp ll_exprs:es sp ']'        -> ['ll_arr', null, es]
+            | '(' ll_expr:e ')'                -> ['ll_paren', null, [e]]
+            | '[' ll_exprs:es ']'              -> ['ll_arr', null, es]
 
 digits      = digit+:ds                        -> join('', ds)
 
-hexdigits   = hex+:hs                          -> join('', hs)
+hexdigits   = '0x' hex+:hs                     -> '0x' + join('', hs)
 
 hex         = digit | 'a'..'f' | 'A'..'F'
 

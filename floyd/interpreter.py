@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
 import unicodedata
 
 from floyd import parser
@@ -44,6 +45,7 @@ class Interpreter:
         self.seeds = {}
         self.blocked = set()
         self.operators = {}
+        self.regexps = {}
 
     def parse(self, text: str, path: str = '<string>') -> parser.Result:
         self.text = text
@@ -143,6 +145,12 @@ class Interpreter:
             self._fail()
             return
         self._succeed()
+
+    def _handle_exclude(self, node):
+        if self.pos == self.end or self.text[self.pos] in node[1]:
+            self._fail()
+            return
+        self._succeed(self.text[self.pos], self.pos + 1)
 
     def _handle_label(self, node):
         self._interpret(node[2][0])
@@ -408,6 +416,15 @@ class Interpreter:
             and node[2][0][1] <= self.text[self.pos] <= node[2][1][1]
         ):
             self._succeed(self.text[self.pos], self.pos + 1)
+            return
+        self._fail()
+
+    def _handle_regexp(self, node):
+        if node[1] not in self.regexps:
+            self.regexps[node[1]] = re.compile(node[1])
+        m = self.regexps[node[1]].match(self.text, self.pos)
+        if m:
+            self._succeed(m.group(0), m.end())
             return
         self._fail()
 

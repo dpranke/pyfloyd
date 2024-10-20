@@ -263,8 +263,7 @@ class Runner:
 
     def run_presubmit(self):
         self.args.check = True
-        # TODO: Reenable when the formatting can handle indented statements.
-        # self.run_regen()
+        self.run_regen()
         self.run_format()
         self.run_check()
         self.run_lint()

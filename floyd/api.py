@@ -165,7 +165,7 @@ def parse(
 
 
 def pretty_print(
-    grammar: str, path: str = '<string>'
+    grammar: str, path: str = '<string>', rewrite_filler=False
 ) -> Tuple[Optional[str], Optional[str]]:
     """Pretty-print a grammar.
 
@@ -183,7 +183,7 @@ def pretty_print(
         return None, result.err
 
     try:
-        grammar = analyzer.analyze(result.val, rewrite_filler=False)
+        grammar = analyzer.analyze(result.val, rewrite_filler=rewrite_filler)
         return Printer(grammar).dumps(), None
     except analyzer.AnalysisError as e:
         return None, str(e)

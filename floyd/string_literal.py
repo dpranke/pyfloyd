@@ -13,15 +13,12 @@
 # limitations under the License.
 
 
-def _enc(ch, esc_dquote):
+def _enc(ch, esc_ch):
     bslash = '\\'
-    dquote = '"'
-    if dquote < ch < bslash or bslash < ch < chr(128) or ch in ' !':
-        return ch
+    if ch == esc_ch:
+        return bslash + esc_ch
     if ch == bslash:
         return bslash + bslash
-    if ch == dquote:
-        return (bslash + dquote) if esc_dquote else dquote
     if ch == '\b':
         return bslash + 'b'
     if ch == '\f':
@@ -34,15 +31,22 @@ def _enc(ch, esc_dquote):
         return bslash + 't'
     if ch == '\v':
         return bslash + 'v'
+    if 32 <= ord(ch) < 126:
+        return ch
     if ord(ch) < 256:
         return '\\x%02x' % ord(ch)
     return '\\u%04x' % ord(ch)
 
 
+def escape(s, ch):
+    """Returns a safely-escaped string of characters."""
+    return ''.join(_enc(c, ch) for c in s)
+
+
 def encode(s):
+    """Return a string literal containing a safely-escaped string of chars."""
     squote = "'"
     dquote = '"'
-    has_squote = any(ch == "'" for ch in s)
-    if has_squote:
-        return dquote + ''.join(_enc(ch, esc_dquote=True) for ch in s) + dquote
-    return squote + ''.join(_enc(ch, esc_dquote=False) for ch in s) + squote
+    if squote in s:
+        return dquote + escape(s, dquote) + dquote
+    return squote + escape(s, squote) + squote

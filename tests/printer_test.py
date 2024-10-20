@@ -99,15 +99,11 @@ class PrinterTest(unittest.TestCase):
         self.assertIsNone(err)
 
     def test_floyd(self):  # pragma: no cover
-        return
         # TODO: Improve printer algorithm enough for this to work
         # without requiring all the rules to be more than 80 chars wide.
-        # pylint: disable=unreachable
         host = floyd.host.Host()
         grammar = host.read_text_file(THIS_DIR / '../grammars/floyd.g')
-        out, err = floyd.pretty_print(grammar)
-        self.assertMultiLineEqual(grammar, out)
-        self.assertIsNone(err)
+        _ = floyd.pretty_print(grammar)
 
     @skip('integration')
     def test_json5(self):
@@ -133,6 +129,33 @@ class PrinterTest(unittest.TestCase):
         grammar = 'grammar = ?(true) -> true\n'
         out, err = floyd.pretty_print(grammar)
         self.assertEqual(grammar, out)
+        self.assertIsNone(err)
+
+    def test_rewrite_filler(self):
+        grammar = textwrap.dedent("""\
+            %comment = '//' (~'\\n' any)*
+
+            %token foo
+
+            grammar  = foo end
+
+            foo      = 'foo'
+            """)
+        out, err = floyd.pretty_print(grammar, rewrite_filler=True)
+        self.assertEqual(
+            textwrap.dedent("""\
+            %token foo
+
+            grammar  = _filler foo _filler end
+
+            foo      = 'foo'
+
+            _comment = '//' (~'\\n' any)*
+
+            _filler  = _comment*
+            """),
+            out,
+        )
         self.assertIsNone(err)
 
     def test_token(self):

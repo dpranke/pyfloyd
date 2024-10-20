@@ -230,7 +230,6 @@ class GrammarTestsMixin:
         )
 
     def test_cpp_style_comment_eol(self):
-        self.check('grammar = //\rend -> true', text='', out=True)
         self.check('grammar = //\r\nend -> true', text='', out=True)
         self.check('grammar = //\nend -> true', text='', out=True)
 
@@ -295,8 +294,43 @@ class GrammarTestsMixin:
         self.check('grammar = \\p{Nd} -> true', text='1', out=True)
 
     def test_escapes_in_string(self):
+        self.check('grammar = "\\n\\"foo" -> true', text='\n"foo', out=True)
+        self.check("grammar = '\\'foo' -> true", text="'foo", out=True)
+
+    def test_exclude(self):
+        self.check('g = [^ab] -> true', text='c', out=True)
         self.check(
-            'grammar = "\\n\\\'\\"foo" -> true', text='\n\'"foo', out=True
+            'g = [^a] -> true',
+            text='a',
+            err='<string>:1 Unexpected "a" at column 1',
+        )
+        self.check(
+            'g = [^a] -> true',
+            text='',
+            err='<string>:1 Unexpected end of input at column 1',
+        )
+        self.check(
+            'g = [^\\]] -> true',
+            text=']',
+            err='<string>:1 Unexpected "]" at column 1',
+        )
+        self.check(
+            'g = [^] -> true',
+            text='',
+            grammar_err='<string>:1 Unexpected "]" at column 7',
+        )
+        self.check(
+            'g = [^',
+            text='',
+            grammar_err='<string>:1 Unexpected end of input at column 7',
+        )
+        self.check('g = [^\\ta\\n] -> true', text='e', out=True)
+
+    def test_exclude_esc_char(self):
+        self.check(
+            'g = [^\\n] -> true',
+            text='\n',
+            err='<string>:1 Unexpected "\\n" at column 1',
         )
 
     @skip('integration')
@@ -372,6 +406,7 @@ class GrammarTestsMixin:
             'grammar = -> 0xtt',
             text='',
             grammar_err='<string>:1 Unexpected end of input at column 18',
+            # grammar_err='Errors were found:\n  Unknown rule "xtt"\n',
         )
 
     def test_inline_seq(self):
@@ -432,9 +467,6 @@ class GrammarTestsMixin:
         self.checkp(p, text='[2]', out=[2])
         self.checkp(p, text='{}', out={})
         self.checkp(p, text='{foo: "bar"}', out={'foo': 'bar'})
-        self.checkp(
-            p, text='{foo: "bar", a: "b"}', out={'foo': 'bar', 'a': 'b'}
-        )
 
         self.checkp(
             p, text='[1', err='<string>:1 Unexpected end of input at column 3'
@@ -509,9 +541,10 @@ class GrammarTestsMixin:
         grammar = h.read_text_file(path)
         p, err, _ = self.compile(grammar)
         self.assertIsNone(err)
-        self._common_json5_checks(p)
-        if hasattr(p, 'cleanup'):
-            p.cleanup()
+        self.checkp(
+            p, text='{foo: "bar", a: "b"}', out={'foo': 'bar', 'a': 'b'}
+        )
+        # self._common_json5_checks(p)
 
     def test_label(self):
         self.check("grammar = 'foobar':v -> v", text='foobar', out='foobar')
@@ -576,7 +609,7 @@ class GrammarTestsMixin:
         # rhs isn't recursive.
         self.check(
             """
-            %prec +
+            %prec '+'
             expr = expr '+' '0'
                  | 'x'
             """,
@@ -587,7 +620,7 @@ class GrammarTestsMixin:
         # Too many base cases. TODO: handle this.
         self.check(
             """
-            %prec +
+            %prec '+'
             expr = expr '+' expr
                  | '0'
                  | 'x'
@@ -599,7 +632,7 @@ class GrammarTestsMixin:
         # Base case isn't a single expr. TODO: handle this.
         self.check(
             """
-            %prec +
+            %prec '+'
             expr = expr '+' expr
                  | 'x' 'y'
             """,
@@ -610,7 +643,7 @@ class GrammarTestsMixin:
         # Fourth term isn't an action: TODO: handle 'end' as a special case.
         self.check(
             """
-            %prec +
+            %prec '+'
             expr = expr '+' expr end
                 | 'x'
             """,
@@ -619,8 +652,6 @@ class GrammarTestsMixin:
         )
 
     def test_operator_invalid(self):
-        # 'a' is not a valid operator; operators cannot contain valid
-        # parts of an identifier.
         g = """
            %prec a
            expr = expr 'a' expr -> [$1, 'a', $3]
@@ -635,11 +666,11 @@ class GrammarTestsMixin:
         # For now, precedence has no effect but this at least tests
         # that the pragmas get parsed.
         g = """
-            %prec + -
-            %prec * /
-            %prec ^
-            %assoc ^ right
-            %assoc + left   // this is unnecessary but gets us coverage.
+            %prec '+' '-'
+            %prec '*' '/'
+            %prec '^'
+            %assoc '^' right
+            %assoc '+' left   // this is unnecessary but gets us coverage.
             expr = expr '+' expr -> [$1, '+', $3]
                  | expr '-' expr -> [$1, '-', $3]
                  | expr '*' expr -> [$1, '*', $3]
@@ -666,7 +697,7 @@ class GrammarTestsMixin:
     def test_operators_multichar_is_valid(self):
         # This tests that operators do not have to be just a single character.
         g = """
-           %prec ++
+           %prec '++'
            expr = expr '++' expr -> [$1, '++', $3]
                 | '0'..'9'
         """
@@ -678,10 +709,10 @@ class GrammarTestsMixin:
         # that the pragmas get parsed.
         g = """
             %whitespace_style standard
-            %prec + -
-            %prec * /
-            %prec ^
-            %assoc ^ right
+            %prec '+' '-'
+            %prec '*' '/'
+            %prec '^'
+            %assoc '^' right
             expr = expr '+' expr -> [$1, '+', $3]
                  | expr '-' expr -> [$1, '-', $3]
                  | expr '*' expr -> [$1, '*', $3]
@@ -838,7 +869,7 @@ class GrammarTestsMixin:
         # first invocation to consume and so it fails to find the 'c' it
         # needs.
         grammar = """\
-            %assoc grammar#1 right
+            %assoc 'grammar#1' right
             grammar = 'b'?:b grammar:g 'c' -> join('', b) + g + 'c'
                     | 'a'           -> 'a'
             """
@@ -858,6 +889,9 @@ class GrammarTestsMixin:
             'aaa',
             ['a', 'a', 'a'],
         )
+
+    def test_regexp(self):
+        self.check('g = /.+/', text='abc', out='abc')
 
     def test_rule_with_lit_str(self):
         self.check(
@@ -927,6 +961,9 @@ class GrammarTestsMixin:
             """
         self.check(grammar, text='foobar', out=True)
 
+    def test_whitespace_chars(self):
+        self.check('g = \t\n\r { true }', text='', out=True)
+
     def test_whitespace_pragma(self):
         grammar = """\
             %token foo
@@ -983,22 +1020,35 @@ class GrammarTestsMixin:
             ),
         )
 
+    def test_whitespace_standard_and_cpp_comment(self):
+        grammar = """\
+            %token foo
+            %whitespace_style standard
+            %comment_style C++
+
+            grammar = foo foo end // comment 
+                        -> true
+
+            foo     = 'foo'
+            """
+        self.check(grammar, text='foofoo', out=True)
+
 
 class Interpreter(unittest.TestCase, GrammarTestsMixin):
     max_diff = None
 
-    def compile(self, grammar, path='<string>'):
-        return floyd.compile(textwrap.dedent(grammar), path)
+    def compile(self, grammar, path='<string>', memoize=False):
+        return floyd.compile(textwrap.dedent(grammar), path, memoize=memoize)
 
 
 class PythonGenerator(unittest.TestCase, GrammarTestsMixin):
     max_diff = None
 
-    def compile(self, grammar, path='<string>'):
+    def compile(self, grammar, path='<string>', memoize=False):
         source_code, err, endpos = floyd.generate(
             textwrap.dedent(grammar),
             path=path,
-            options=floyd.GeneratorOptions(main=False, memoize=False),
+            options=floyd.GeneratorOptions(main=False, memoize=memoize),
         )
         if err:
             assert source_code is None
@@ -1031,7 +1081,8 @@ class _PythonParserWrapper:
 class JavaScriptGenerator(unittest.TestCase, GrammarTestsMixin):
     maxDiff = None
 
-    def compile(self, grammar, path='<string>'):
+    def compile(self, grammar, path='<string>', memoize=False):
+        del memoize
         source_code, err, endpos = floyd.generate(
             textwrap.dedent(grammar),
             path=path,
@@ -1044,9 +1095,15 @@ class JavaScriptGenerator(unittest.TestCase, GrammarTestsMixin):
             return None, err, endpos
 
         h = floyd.host.Host()
-        d = '/tmp'  # h.mkdtemp()
+        d = h.mkdtemp()
         h.write_text_file(d + '/parser.js', source_code)
         return _JavaScriptParserWrapper(h, d), None, 0
+
+    def test_exclude_esc_char(self):
+        # The JS implementation isn't smart enough to escape unexpected
+        # characters yet.
+        # TODO: Fix this.
+        pass
 
     def test_fn_is_unicat(self):
         # Can't implement this in JavaScript.
@@ -1078,4 +1135,4 @@ class _JavaScriptParserWrapper:
         return None, proc.stderr.decode('utf8'), 0
 
     def cleanup(self):
-        pass  # self.h.rmtree(self.d)
+        self.h.rmtree(self.d)

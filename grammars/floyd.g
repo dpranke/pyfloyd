@@ -2,29 +2,24 @@ grammar     = (sp (pragma|rule))*:vs sp end       -> ['rules', null, vs]
 
 sp          = ws*
 
-ws          = '\x20' | '\x09' | eol | comment
+ws          = ' ' | '\t' | '\r' | eol | comment
 
-eol         = '\x0D' '\x0A' | '\x0D' | '\x0A'
+eol         = '\n'
 
 comment     = '//' (~eol any)*
             | '/*' (~'*/' any)* '*/'
 
 pragma      = '%tokens' ident_list:is             -> ['pragma', 'tokens', is]
             | '%token' sp ident:i                 -> ['pragma', 'token', [i]]
-            | '%whitespace_style' sp ident:i      -> ['pragma',
-                                                      'whitespace_style', i]
-            | '%whitespace' sp '=' sp choice:cs   -> ['pragma', 'whitespace',
-                                                      [cs]]
+            | '%whitespace_style' sp ident:i
+                -> ['pragma', 'whitespace_style', i]
+            | '%whitespace' sp '=' sp choice:cs
+                -> ['pragma', 'whitespace', [cs]]
             | '%comment_style' sp ('C++' | ident):c
-                                                  -> ['pragma',
-                                                      'comment_style', c]
+                -> ['pragma', 'comment_style', c]
             | '%comment' sp '=' sp choice:cs      -> ['pragma', 'comment', [cs]]
-            | '%assoc' sp (op|arm):a sp dir:d     -> ['pragma', 'assoc', [a, d]]
-            | '%prec' (~eol ws op:o -> o)+:os     -> ['pragma', 'prec', os]
-
-op          = (~(ws|id_continue) any)+:op         -> join('', op)
-
-arm         = ident:i '#' digits:ds               -> i + '#' + join('', ds)
+            | '%assoc' sp lit:l sp dir:d          -> ['pragma', 'assoc', [l, d]]
+            | '%prec' (sp lit)+:ls                -> ['pragma', 'prec', ls]
 
 dir         = ('left'|'right'):d                  -> d
 
@@ -63,14 +58,18 @@ prim_expr   = lit:i sp '..' sp lit:j              -> ['range', null, [i, j]]
             | '?(' sp ll_expr:e sp ')'            -> ['pred', null, [e]]
             | '?{' sp ll_expr:e sp '}'            -> ['pred', null, [e]]
             | '(' sp choice:e sp ')'              -> ['paren', null, [e]]
+            | '[^' exchar+:es ']'
+                -> ['exclude', join('', es), []]
+            | '/' rechar+:rs '/'
+                -> ['regexp', join('', rs), []]
 
 lit         = squote sqchar*:cs squote            -> ['lit', join('', cs), []]
             | dquote dqchar*:cs dquote            -> ['lit', join('', cs), []]
 
-sqchar      = bslash esc_char:c                   -> c
+sqchar      = bslash (squote | esc_char):c        -> c
             | ~squote any:c                       -> c
 
-dqchar      = bslash esc_char:c                   -> c
+dqchar      = bslash (dquote | esc_char):c        -> c
             | ~dquote any:c                       -> c
 
 bslash      = '\x5C'
@@ -85,8 +84,6 @@ esc_char    = 'b'                                 -> '\x08'
             | 'r'                                 -> '\x0D'
             | 't'                                 -> '\x09'
             | 'v'                                 -> '\x0B'
-            | squote                              -> '\x27'
-            | dquote                              -> '\x22'
             | bslash                              -> '\x5C'
             | hex_esc:c                           -> c
             | unicode_esc:c                       -> c
@@ -94,18 +91,23 @@ esc_char    = 'b'                                 -> '\x08'
 hex_esc     = 'x' hex:h1 hex:h2                   -> xtou(h1 + h2)
 
 unicode_esc = 'u' hex:h1 hex:h2 hex:h3 hex:h4     -> xtou(h1 + h2 + h3 + h4)
-            | 'U' hex:h1 hex:h2 hex:h3 hex:h4
-                  hex:h5 hex:h6 hex:h7 hex:h8     -> xtou(h1 + h2 + h3 + h4 +
-                                                          h5 + h6 + h7 + h8)
+            | 'U' hex:h1 hex:h2 hex:h3 hex:h4 hex:h5 hex:h6 hex:h7 hex:h8
+                -> xtou(h1 + h2 + h3 + h4 + h5 + h6 + h7 + h8)
 
 escape      = '\\p{' ident:i '}'                  -> ['unicat', i, []]
 
-ll_exprs    = ll_expr:e (sp ',' sp ll_expr)*:es   -> [e] + es
+exchar      = bslash (']' | esc_char):c           -> c
+            | (~']' ~bslash any)+:cs              -> join('', cs)
+
+rechar      = bslash ('/' | esc_char):c           -> c
+            | [^/]+:cs                            -> join('', cs)
+
+ll_exprs    = ll_expr:e (sp ',' sp ll_expr)*:es   -> arrcat([e], es)
             |                                     -> []
 
 ll_expr     = ll_qual:e1 sp '+' sp ll_expr:e2     -> ['ll_plus', null, [e1, e2]]
-            | ll_qual:e1 sp '-' sp ll_expr:e2     -> ['ll_minus',
-                                                      null, [e1, e2]]
+            | ll_qual:e1 sp '-' sp ll_expr:e2
+               -> ['ll_minus', null, [e1, e2]]
             | ll_qual
 
 ll_qual     = ll_prim:e ll_post_op+:ps
@@ -118,7 +120,8 @@ ll_post_op  = '[' sp ll_expr:e sp ']'             -> ['ll_getitem', null, [e]]
 ll_prim     = 'false'                             -> ['ll_const', 'false', []]
             | 'null'                              -> ['ll_const', 'null', []]
             | 'true'                              -> ['ll_const', 'true', []]
-            | 'Infinity'                          -> ['ll_const', 'Infinity', []]
+            | 'Infinity'
+                -> ['ll_const', 'Infinity', []]
             | 'NaN'                               -> ['ll_const', 'NaN', []]
             | ident:i                             -> ['ll_var', i, []]
             | '0x' hexdigits:hs                   -> ['ll_num', '0x' + hs, []]
