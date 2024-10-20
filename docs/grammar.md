@@ -126,10 +126,11 @@ Here are the basic rules:
       `(^expr)* expr`. This can be called a *non-greedy* match.
 
     * Counted: `expr '{' number '}'`<br>
-      Matches <number> exprs in a row.
+      Matches &lt;number&gt; exprs in a row.
 
     * Counted-Range: `expr '{' number1 ',' number2 '}'`<br>
-      Matches between <number1> and <number2> exprs in a row (inclusive).
+      Matches between &lt;number1&gt; and &lt;number2&gt; exprs in a row
+      (inclusive).
 
 ## Filler (whitespace and comments)
 
@@ -325,7 +326,7 @@ type = null
      | [type*]
      | {str:type*}
 
-Result = <a union of all of the other types>
+Result = &lt;a union of all of the other types&gt;
 ```
 
 Because a `Result` is an encompassing all-purpose type (or an `any` type),
