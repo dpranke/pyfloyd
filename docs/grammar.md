@@ -21,21 +21,23 @@ then ends in 'bar'.
 
 Here are the basic rules:
 
-1. Grammars area list of one or more rules. A rule follows the format
-   `rulename '=' expr`.
+1.  Grammars are a list of one or more rules. A rule follows the format
+    `rulename '=' expr`. Unless otherwise specified, parsing will begin
 
-2. Rule names are identifiers, where identifiers are defined as they
-   are in JavaScript: roughly they start with a letter, an underscore ('_'),
-   a percent sign ('%'), or a dollar sign ('$'), followed by more of
-   those or digits. Identifiers starting with an underscore, a percent
-   sign, or a dollar sign are reserved for the parser, so a user's
-   identifier has to start with a letter.
+2.  Rule names are identifiers, where identifiers are defined as they
+    are in JavaScript: roughly, they start with a letter, an underscore ('_'),
+    a percent sign ('%'), or a dollar sign ('$'), followed by more of
+    those or digits. Identifiers starting with an underscore, a percent
+    sign, or a dollar sign are reserved for the parser, so a user's
+    identifier has to start with a letter.
 
-3. Rules are combinations of *terms* and *operators*. A term can be thought
-   of as identifier or a literal preceded and followed by zero or more
-   operators; terms usually have no whitespace in them unless they are
-   surrounded by parens. The names for the rules have no particular meaning
-   other than to give you something to refer to):
+3.  Rules are combinations of *terms* and *operators*. A term can be thought
+    of as identifier or a literal preceded and followed by zero or more
+    operators; terms usually have no whitespace in them unless they are
+    surrounded by parens. The names for the rules have no particular meaning
+    other than to give us something to refer to.
+
+    The basic rules work as follows:
 
     * Any:        `any`<br>
       Matches any single character.
@@ -48,11 +50,11 @@ Here are the basic rules:
 
     * Sequence:  `expr1 expr2 expr3...`<br>
       Matches `expr1` followed immediately by `expr2` and then immediately
-      expr3 and so on.
+      `expr3` and so on.
 
     * Choice:    `expr1 "|" expr2 "|" ...`<br>
       Choices are called *ordered*. This means that the parser first tries
-      to match i`expr1`. If that succeeds, the parser stops further processing
+      to match `expr1`. If that succeeds, the parser stops further processing
       of the rule. If `expr1` doesn't match, then the parser will try to
       match `expr2`, and so on.
 
@@ -60,23 +62,24 @@ Here are the basic rules:
       AKA repetition. Matches zero or more occurrences of `expr`.
 
     * Not:       `"~" expr`<br>
-      Matches if the next thing in the grammar does *not* match expr.
+      Matches if the next thing in the grammar does *not* match `expr`.
       This does not consume any input.
 
     * Empty:<br>
       Matches an empty string. This always succeeds.
 
     * Result:    `'->' `result_expr` | '{' result_expr '}'`<br>
-      Always succeeds and the expression returns the value of `host_expr`.
-      Results are described below.
+      Always succeeds and the expression returns the value of `result_expr`.
+      Results (or result expressions) are described below.
 
     * Pred:      `'?(' result_expr ')' | '?{' result_expr '}'`<br>
       Succeeds when the `result_expr` evaluates to true. No input is consumed
-      unless the host_expr explicitly consumes it.
+      unless the `result_expr` explicitly consumes it.
 
     * Binding:   `expr ':' ident`<br>
       Assigns the string matching `expr` to the variable `ident`, which
-      can then be used in subsequent preds and results in the sequence.
+      can then be used in subsequent preds and results terms in the 
+      same sequence that the binding happens in.
 
     * Parens:    `'(' expr ')'`<br>
       Matches the expression inside the parentheses as if it was a
@@ -130,24 +133,22 @@ Here are the basic rules:
 
 ## Filler (whitespace and comments)
 
-PEGs originally (and conventionally) don't distinguish between lexing
-and parsing the way the combination of LEX and YACC do. Instead, they
-are known as *scannerless* parsers, and handle both kinds of syntax
-consistently at once. By default this means that if you want to have
-whitespace or comments in your rules, you have to be explicit about
-them:
+PEGs originally (and conventionally) don't distinguish between lexing and
+parsing the way compilers like the combination of LEX and YACC do.  Instead,
+they are known as *scannerless* parsers, and handle both kinds of syntax
+consistently at once. By default this means that if you want to have whitespace
+or comments in your rules, you have to be explicit about them:
 
 ```
 grammar = ws 'foo'* ws 'bar' ws end
 ```
 
-In Floyd, whitespace and comments are known as *filler*, and you can
-use the `%whitespace` and `%comment` rules to define how
-whitespace and comments are recognized. If either or both of those
-rules are specified, then whitespace and comment rules will be
-be inserted in front of every string literal and at the end of the
-grammar (but before `end`, if the grammar ends in `end`), allowing
-any combination of whitespace and comments in between the literals.
+In Floyd, whitespace and comments are known as *filler*, and you can use the
+`%whitespace` and `%comment` rules to define how theye are recognized. If
+either or both of those rules are specified, then whitespace and comment rules
+will be be inserted in front of every string literal and at the end of the
+grammar (but before `end`, if the grammar ends in `end`), allowing any
+combination of whitespace and comments in between the literals.
 
 So, the above grammar could be equivalently specified as:
 
@@ -195,57 +196,55 @@ an object).
 
 Results are computed as follows:
 
-* The result of `any` is the character it matched.
+*   The result of `any` is the character it matched.
 
-* The result of a string literal is that string.
+*   The result of a string literal is that string.
 
-* The result of a sequence is the result of the last term in
-  the sequence.
+*   The result of a sequence is the result of the last term in the sequence.
 
-* The result of a choice is the result of whichever term
-  that was matched.
+*   The result of a choice is the result of whichever term that was matched.
 
-* The result of a star expression is an array of the values of
-  each expression. If the expression didn't match anything,
-  the result is an empty array.
+*   The result of a star expression is an array of the values of
+    each expression. If the expression didn't match anything,
+    the result is an empty array.
 
-* The result of a not-term is null.
+*   The result of a not-term is null.
 
-* The result of a result term (something that looks like `-> ...`
-  or `{ ... }` is the value of the computed expression.
+*   The result of a result term (something that looks like `-> ...`
+    or `{ ... }` is the value of the computed expression.
 
-* The result of a predicate term is null.
+*   The result of a predicate term is null.
 
-* The result of a binding term is the result of the expr it is
-  bound to; there is also the side effect that the value of the
-  result may be referred to in predicate terms or result terms
-  in the same sequence.
+*   The result of a binding term is the result of the expr it is
+    bound to; there is also the side effect that the value of the
+    result may be referred to in predicate terms or result terms
+    in the same sequence.
 
-* The result of a parenthesized expression is the result of the
-  enclosed expression.
+*   The result of a parenthesized expression is the result of the
+    enclosed expression.
 
-* The result of a run is the string matched by the run, as described
-  above.
+*   The result of a run is the string matched by the run, as described
+    above.
 
-* The result of `end` is `null`.
+*   The result of `end` is `null`.
 
-* The result of a plus term is the array of matched expressions.
+*   The result of a plus term is the array of matched expressions.
 
-* The result of an optional term is an array with either zero
-  or one values depending on whether the term didn't match or it did.
+*   The result of an optional term is an array with either zero
+    or one values depending on whether the term didn't match or it did.
 
-* The result of a range is the character it matched.
+*   The result of a range is the character it matched.
 
-* The result of a not-one is the character it matched.
+*   The result of a not-one is the character it matched.
 
-* The result of a charset is the character it matched.
+*   The result of a charset is the character it matched.
 
-* The result of an ends-in term is the result of the ending expression.
+*   The result of an ends-in term is the result of the ending expression.
 
-* The result of a counted term or a counted-range term is an array of
-  the N expressions it matched.
+*   The result of a counted term or a counted-range term is an array of
+    the N expressions it matched.
 
-* The result of a unicode category match is the character it matched.
+*   The result of a unicode category match is the character it matched.
 
 The parser will automatically assign the value of each term in a sequence
 to a variable starting with '$' and numbered according to the position in
@@ -316,28 +315,28 @@ between Results and primitive or container types as needed.
 The host language is statically typed, with the following kinds of types:
 
 ```
-type  = null
-      | bool
-      | int
-      | number
-      | char
-      | str
-      | Result
-      | [type*]
-      | {str:type*}
+type = null
+     | bool
+     | int
+     | number
+     | char
+     | str
+     | Result
+     | [type*]
+     | {str:type*}
 
-Result = <a union of all of the types>
+Result = <a union of all of the other types>
 ```
 
-Because a Result is an encompassing all-purpose type (or an `any` type),
+Because a `Result` is an encompassing all-purpose type (or an `any` type),
 the language will often feel more like it is dynamically-typed.
 
-A *char* is a string of length 1; A *str* contains any number of chars.
+A `char` is a string of length 1; A `str` contains any number of chars.
 
-An *int* is a number with an integral value (i.e., no fractional or
+An `int` is a number with an integral value (i.e., no fractional or
 exponent parts).
 
-A *number* can have either an integral value or a floating-point value;
+A `number` can have either an integral value or a floating-point value;
 it could also be called a float.
 
 Any type will be automatically promoted to a Result where needed.
@@ -354,7 +353,7 @@ declared).
 
 ## Variables
 
-The result of a term in a grammar may be "bound" or assigned to an identifier,
+The result of a term in a grammar may be *bound* or assigned to an identifier,
 which then acts as a variable and may then be referenced in expressions in any
 following terms of the enclosing term sequence (i.e., the scope is the
 remaining terms in the sequence).
@@ -370,7 +369,7 @@ For example:
 grammar = 'a' ('b' 'c' -> $1) -> $1
 ```
 
-Has a result of 'a', from the first term in the outer sequence expression.
+Has a result of `'a'`, from the first term in the outer sequence expression.
 
 ## Functions
 
