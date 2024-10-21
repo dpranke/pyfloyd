@@ -34,13 +34,22 @@ choice      = seq:s ('|' seq)*:ss
 seq         = expr:e (expr)*:es                -> ['seq', null, arrcat([e], es)]
             |                                  -> ['empty', null, []]
 
-expr        = post_expr:e ':' ident:l          -> ['label', l, [e]]
+expr        = '<' expr:e '>'                   -> ['run', e, []]
+            | post_expr:e ':' ident:l          -> ['label', l, [e]]
             | post_expr
 
 post_expr   = prim_expr:e post_op:op           -> ['post', op, [e]]
+            | prim_expr:e count:c              -> ['count', c, [e]]
             | prim_expr
 
 post_op     = '?' | '*' | '+'
+
+count       = '{' zpos:x ',' zpos:y '}'        -> [x, y]
+            | '{' zpos:x '}'                   -> [x, x]
+
+zpos        = '0'                              -> 0
+            | ('1' .. '9'):hd ('0'..'9')*:tl 
+                 -> atoi(join('', arrcat([hd], tl)))
 
 prim_expr   = lit:i '..' lit:j                 -> ['range', null, [i, j]]
             | lit:l                            -> l
@@ -49,11 +58,15 @@ prim_expr   = lit:i '..' lit:j                 -> ['range', null, [i, j]]
             | '->' ll_expr:e                   -> ['action', null, [e]]
             | '{' ll_expr:e '}'                -> ['action', null, [e]]
             | '~' prim_expr:e                  -> ['not', null, [e]]
+            | '^' prim_expr:e                  -> ['not-one', null, [e]]
+            | '^.' prim_expr:e                 -> ['ends-in', null, [e]]
             | '?(' ll_expr:e ')'               -> ['pred', null, [e]]
             | '?{' ll_expr:e '}'               -> ['pred', null, [e]]
             | '(' choice:e ')'                 -> ['paren', null, [e]]
             | '[^' exchar+:es ']'
                 -> ['exclude', join('', es), []]
+            | '[' exchar+:es ']'
+                -> ['set', join('', es), []]
 
 lit         = squote sqchar*:cs squote         -> ['lit', join('', cs), []]
             | dquote dqchar*:cs dquote         -> ['lit', join('', cs), []]
@@ -83,8 +96,10 @@ esc_char    = 'b'                              -> '\x08'
             | unicode_esc:c                    -> c
 
 hex_esc     = 'x' hex:h1 hex:h2                -> xtou(h1 + h2)
+            | 'x{' hex+:hs '}'                 -> xtou(join('', hs))
 
 unicode_esc = 'u' hex:h1 hex:h2 hex:h3 hex:h4  -> xtou(h1 + h2 + h3 + h4)
+            | 'u{' hex+:hs '}'                 -> xtou(join('', hs))
             | 'U' hex:h1 hex:h2 hex:h3 hex:h4 hex:h5 hex:h6 hex:h7 hex:h8
                 -> xtou(h1 + h2 + h3 + h4 + h5 + h6 + h7 + h8)
 
