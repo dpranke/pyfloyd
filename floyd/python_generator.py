@@ -244,6 +244,26 @@ class PythonGenerator(Generator):
         lines.extend(self._gen(node[2][-1]))
         return lines
 
+    def _count_(self, node) -> List[str]:
+        lines = [
+            'vs = []',
+            'i = 0',
+            f'cmin, cmax = {node[1]}',
+            f'while i < cmax:',
+        ]
+        lines.extend(['    ' + l for l in self._gen(node[2][0])])
+        lines.extend([
+            '    if self.failed:',
+            '        if i >= cmin:',
+            '            self._succeed(vs)',
+            '            return',
+            '        return',
+            '    vs.append(self.val)',
+            '    i += 1',
+            'self._succeed(vs)',
+        ])
+        return lines
+
     def _empty_(self, node) -> List[str]:
         del node
         return ['self._succeed(None)']
@@ -395,9 +415,27 @@ class PythonGenerator(Generator):
     def _seq_(self, node) -> List[str]:
         lines = self._gen(node[2][0])
         for subnode in node[2][1:]:
-            lines.append('if not self.failed:')
+            try:
+                lines.append('if not self.failed:')
+            except Exception as e:
+                import pdb; pdb.set_trace()
+                raise e
+
             lines.extend('    ' + line for line in self._gen(subnode))
         return lines
+
+    def _set_(self, node) -> List[str]:
+        return [
+            'if self.pos == self.end:',
+            '    self._fail()',
+            f"m = re.match('[' + {lit.encode(node[1])} + ']', ",
+                'self.text, self.pos)',
+            'if m:',
+            '    self._succeed(m.group(0), m.end())',
+            '    return',
+            'self._fail()',
+        ]
+
 
     def _unicat_(self, node) -> List[str]:
         return ['self._unicat(%s)' % lit.encode(node[1])]
@@ -507,9 +545,10 @@ _DEFAULT_FOOTER = ''
 
 
 _MAIN_HEADER = """\
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 {imports}
+import re
 
 # pylint: disable=too-many-lines
 
@@ -797,6 +836,9 @@ _BUILTIN_METHODS = """\
 """
 
 _BUILTIN_FUNCTIONS = """\
+def _atoi(a):
+    return int(a)
+
 def _arrcat(a, b):
     return a + b
 

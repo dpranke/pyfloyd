@@ -65,8 +65,10 @@ prim_expr   = lit:i '..' lit:j                 -> ['range', null, [i, j]]
             | '(' choice:e ')'                 -> ['paren', null, [e]]
             | '[^' exchar+:es ']'
                 -> ['exclude', join('', es), []]
-            | '[' exchar+:es ']'
+            | '[' ~'^' exchar+:es ']'
                 -> ['set', join('', es), []]
+            // | '/' rechar+:rs '/' 
+            //    -> ['regexp', join('', rs), []]
 
 lit         = squote sqchar*:cs squote         -> ['lit', join('', cs), []]
             | dquote dqchar*:cs dquote         -> ['lit', join('', cs), []]
@@ -94,6 +96,9 @@ esc_char    = 'b'                              -> '\x08'
             | bslash                           -> '\x5C'
             | hex_esc:c                        -> c
             | unicode_esc:c                    -> c
+
+rechar      = bslash ('/' | esc_char):c           -> c
+            | [^/]+:cs                            -> join('', cs)
 
 hex_esc     = 'x' hex:h1 hex:h2                -> xtou(h1 + h2)
             | 'x{' hex+:hs '}'                 -> xtou(join('', hs))

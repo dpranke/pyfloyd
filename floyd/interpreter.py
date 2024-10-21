@@ -136,6 +136,21 @@ class Interpreter:
         self._interpret(node[2][-1])
         return
 
+    def _handle_count(self, node):
+        vs = []
+        i = 0
+        cmin, cmax = node[1]
+        while i < cmax:
+            self._interpret(node[2][0])
+            if self.failed:
+                if i >= cmin:
+                    self._succeed(vs)
+                    return
+                return
+            vs.append(self.val)
+            i += 1
+        self._succeed(vs)
+
     def _handle_empty(self, node):
         del node
         self._succeed()
@@ -436,6 +451,16 @@ class Interpreter:
                 break
         self.scopes.pop()
 
+    def _handle_set(self, node):
+        if self.text == self.end:
+            self._fail()
+            return
+        m = re.match(node[1], self.text, self.pos)
+        if m:
+            self._succeed(m.group(0), m.end())
+            return
+        self._fail()
+
     def _handle_star(self, node):
         vs = []
         while not self.failed and self.pos < self.end:
@@ -450,6 +475,9 @@ class Interpreter:
                 break
             vs.append(self.val)
         self._succeed(vs)
+
+    def _builtin_fn_atoi(self, val):
+        return int(val)
 
     def _builtin_fn_arrcat(self, a, b):
         return a + b

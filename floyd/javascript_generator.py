@@ -252,6 +252,30 @@ class JavaScriptGenerator(Generator):
         lines.extend(self._gen(node[2][-1]))
         return lines
 
+    def _count_(self, node) -> List[str]:
+        lines = [
+            'let vs = [];',
+            'let i = 0;',
+            f'let cmin = {node[1][0]};',
+            f'let cmax = {node[1][1]};',
+            'while (i < cmax) {',
+        ]
+        lines.extend(['    ' + l for l in self._gen(node[2][0])])
+        lines.extend([
+            '    if (this.failed) {',
+            '        if (i >= cmin) {',
+            '            this.#succeed(vs);',
+            '            return;',
+            '        }',
+            '        return;',
+            '    }',
+            '    vs.push(this.val);',
+            '    i += 1;',
+            '}',
+            'this.#succeed(vs);',
+        ])
+        return lines
+
     def _empty_(self, node) -> List[str]:
         del node
         return ['this.#succeed(null);']
@@ -840,6 +864,10 @@ _BUILTIN_METHODS = """\
 _BUILTIN_FUNCTIONS = """\
 arrcat(a, b) {
   return a.concat(b);
+}
+
+atoi(a) {
+  return parseInt(a);
 }
 
 dict(pairs) {

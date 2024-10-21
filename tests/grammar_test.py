@@ -216,8 +216,19 @@ class GrammarTestsMixin:
         self.check(
             grammar,
             text='foo\nfoo\n',
-            grammar_err="Errors were found:\n  Can't set both comment and comment_style pragmas\n",
+            grammar_err=("Errors were found:\n  Can't set both comment "
+                         "and comment_style pragmas\n"),
         )
+
+    def test_count(self):
+        grammar = "grammar = 'a'{3} 'b'{1,4} end"
+        self.check(grammar, text='a',
+                   err='<string>:1 Unexpected end of input at column 2')
+        self.check(grammar, text='aaa',
+                   err='<string>:1 Unexpected end of input at column 4')
+        self.check(grammar, text='aaab', out=None)
+        self.check(grammar, text='aaabbbbb',
+                   err='<string>:1 Unexpected "b" at column 8')
 
     def test_cpp_style_comment_in_grammar(self):
         self.check(
@@ -405,8 +416,8 @@ class GrammarTestsMixin:
         self.check(
             'grammar = -> 0xtt',
             text='',
-            grammar_err='<string>:1 Unexpected end of input at column 18',
-            # grammar_err='Errors were found:\n  Unknown rule "xtt"\n',
+            # grammar_err='<string>:1 Unexpected end of input at column 18',
+            grammar_err='Errors were found:\n  Unknown rule "xtt"\n',
         )
 
     def test_inline_seq(self):

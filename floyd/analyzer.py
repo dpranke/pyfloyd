@@ -103,6 +103,7 @@ def analyze(ast, rewrite_filler=True):
 
 BUILTIN_FUNCTIONS = (
     'arrcat',
+    'atoi',
     'dict',
     'float',
     'hex',
@@ -224,10 +225,13 @@ class _Analyzer:
             self.walk(node[2][0])
         elif ty in (
             'action',
+            'count',
+            'ends-in',
             'label',
             'll_getitem',
             'll_paren',
             'not',
+            'not-one',
             'paren',
             'post',
             'pred',
@@ -414,8 +418,12 @@ def _check_lr(name, node, rules, seen):
         return _check_lr(name, rules[node[1]], rules, seen)
     if ty == 'choice':
         return any(_check_lr(name, n, rules, seen) for n in node[2])
+    if ty == 'count':
+        return _check_lr(name, node[2][0], rules, seen)
     if ty == 'empty':
         return False
+    if ty == 'ends-in':
+        return _check_lr(name, node[2][0], rules, seen)
     if ty == 'exclude':
         return False
     if ty == 'label':
@@ -426,6 +434,8 @@ def _check_lr(name, node, rules, seen):
         return False
     if ty == 'not':
         return _check_lr(name, node[2][0], rules, seen)
+    if ty == 'not-one':
+        return _check_lr(name, node[2][0], rules, seen)
     if ty == 'paren':
         return _check_lr(name, node[2][0], rules, seen)
     if ty == 'post':
@@ -435,6 +445,8 @@ def _check_lr(name, node, rules, seen):
     if ty == 'range':
         return False
     if ty == 'regexp':
+        return False
+    if ty == 'set':
         return False
     if ty == 'seq':
         for subnode in node[2]:
@@ -694,7 +706,8 @@ class _SubRuleRewriter:
         return [node[0], node[1], [self._make_subrule(node[2][0])]]
 
     def _can_inline(self, node) -> bool:
-        if node[0] in ('choice', 'exclude', 'not', 'post', 'regexp', 'seq'):
+        if node[0] in ('choice', 'count', 'exclude', 'not', 'post', 'regexp',
+                       'seq'):
             return False
         return True
 

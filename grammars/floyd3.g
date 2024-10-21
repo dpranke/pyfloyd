@@ -21,7 +21,7 @@ seq         = expr (expr)*                 { ['seq', cons($1, $2)] }
             |                              { ['empty'] }
 
 expr        = lit '..' lit                 { ['range', $1, $3] }
-            | '<' result '>'               { ['run', $2] }
+            | '<' expr '>'                 { ['run', $2] }
             | '{' result '}'               { ['result', $2] }
             | '?{' result '}'              { ['pred', $2] }
             | post_expr ':' ident          { ['label', $1, $3] }
@@ -30,7 +30,7 @@ expr        = lit '..' lit                 { ['range', $1, $3] }
 post_expr   = prim_expr '?'                { ['opt', $1] }
             | prim_expr '*'                { ['star', $1] }
             | prim_expr '+'                { ['plus', $1] }
-            | prim_expr count              { cons('count', $2) } 
+            | prim_expr count              { ['count', $1, $2] }
             | prim_expr
 
 count       = '{' zpos ',' zpos '}'        { [$2, $3] }
