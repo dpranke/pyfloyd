@@ -33,7 +33,7 @@ choice      = seq:s ('|' seq)*:ss
 seq         = expr:e (expr)*:es                -> ['seq', null, arrcat([e], es)]
             |                                  -> ['empty', null, []]
 
-expr        = '<' expr:e '>'                   -> ['run', e, []]
+expr        = '<' choice:c '>'                 -> ['run', null, [c]]
             | post_expr:e ':' ident:l          -> ['label', l, [e]]
             | post_expr
 

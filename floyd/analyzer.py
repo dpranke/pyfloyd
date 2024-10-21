@@ -223,6 +223,7 @@ class _Analyzer:
             'paren',
             'post',
             'pred',
+            'run',
         ):
             self.walk(node[2][0])
         elif ty in ('ll_plus', 'll_minus'):
@@ -408,6 +409,8 @@ def _check_lr(name, node, rules, seen):
         return False
     if ty == 'regexp':
         return False
+    if ty == 'run':
+        return _check_lr(name, node[2][0], rules, seen)
     if ty == 'set':
         return False
     if ty == 'seq':

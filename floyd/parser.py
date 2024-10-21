@@ -452,15 +452,15 @@ class _Parser:
         if not self.failed:
             self._ch('<')
         if not self.failed:
-            self._r_expr_()
+            self._r_choice_()
             if not self.failed:
-                v_e = self.val
+                v_c = self.val
         if not self.failed:
             self._r__filler_()
         if not self.failed:
             self._ch('>')
         if not self.failed:
-            self._succeed(['run', v_e, []])
+            self._succeed(['run', None, [v_c]])
 
     def _s_expr_2_(self):
         self._r_post_expr_()

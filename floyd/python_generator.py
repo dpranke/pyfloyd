@@ -412,15 +412,21 @@ class PythonGenerator(Generator):
             'self._fail()',
         ]
 
+    def _run_(self, node) -> List[str]:
+        lines = self._gen(node[2][0])
+        return [
+            'start = self.pos'
+        ] + lines + [
+            'if self.failed:',
+            '    return',
+            'end = self.pos',
+            'self.val = self.text[start:end]'
+        ]
+
     def _seq_(self, node) -> List[str]:
         lines = self._gen(node[2][0])
         for subnode in node[2][1:]:
-            try:
-                lines.append('if not self.failed:')
-            except Exception as e:
-                import pdb; pdb.set_trace()
-                raise e
-
+            lines.append('if not self.failed:')
             lines.extend('    ' + line for line in self._gen(subnode))
         return lines
 

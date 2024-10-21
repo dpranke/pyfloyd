@@ -223,6 +223,14 @@ class Interpreter:
         else:
             self._fail()
 
+    def _handle_run(self, node):
+        start = self.pos
+        self._interpret(node[2][0])
+        if self.failed:
+            return
+        end = self.pos
+        self.val = self.text[start:end]
+
     def _handle_unicat(self, node):
         p = self.pos
         if p < self.end and unicodedata.category(self.text[p]) == node[1]:

@@ -429,6 +429,17 @@ class JavaScriptGenerator(Generator):
             'this.#fail();',
         ]
 
+    def _run_(self, node) -> List[str]:
+        lines = self._gen(node[2][0])
+        return [
+            'let start = this.pos;'
+        ] + lines + [
+            'if (this.failed) {',
+            '    return;',
+            '}',
+            'let end = this.pos;',
+            'this.val = this.text.substr(start, end);'
+        ]
     def _seq_(self, node) -> List[str]:
         lines = self._gen(node[2][0])
         for subnode in node[2][1:]:

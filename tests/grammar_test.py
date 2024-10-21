@@ -851,6 +851,11 @@ class GrammarTestsMixin:
             out=True,
         )
 
+    def test_run(self):
+        self.check("g = <'a' 'b' 'c'> -> true", text='abc', out=True)
+        self.check("g = <'a' 'b' 'c'> -> true", text='d',
+                   err= '<string>:1 Unexpected "d" at column 1')
+
     def test_seq(self):
         self.check("grammar = 'foo' 'bar' -> true", text='foobar', out=True)
 
