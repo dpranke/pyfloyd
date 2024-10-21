@@ -1,4 +1,4 @@
-%whitespace_style standard
+%whitespace = ' ' | '\n' | '\r' | '\t'
 %prec + -
 %prec * /
 %prec ^

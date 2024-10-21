@@ -11,12 +11,8 @@ comment     = '//' (~eol any)*
 
 pragma      = '%tokens' ident_list:is             -> ['pragma', 'tokens', is]
             | '%token' sp ident:i                 -> ['pragma', 'token', [i]]
-            | '%whitespace_style' sp ident:i
-                -> ['pragma', 'whitespace_style', i]
             | '%whitespace' sp '=' sp choice:cs
                 -> ['pragma', 'whitespace', [cs]]
-            | '%comment_style' sp ('C++' | ident):c
-                -> ['pragma', 'comment_style', c]
             | '%comment' sp '=' sp choice:cs      -> ['pragma', 'comment', [cs]]
             | '%assoc' sp lit:l sp dir:d          -> ['pragma', 'assoc', [l, d]]
             | '%prec' (sp lit)+:ls                -> ['pragma', 'prec', ls]
