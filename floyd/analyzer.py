@@ -43,12 +43,10 @@ class Grammar:
     def __init__(self, ast):
         self.ast = ast
         self.comment = None
-        self.comment_style = None
         self.rules = collections.OrderedDict()
         self.starting_rule = None
         self.tokens = set()
         self.whitespace = None
-        self.whitespace_style = None
         self.assoc = {}
         self.prec = {}
         self.leftrec_needed = False
@@ -128,13 +126,11 @@ class _Analyzer:
         self.grammar = grammar
 
         self.comment = None
-        self.comment_style = None
         self.errors = []
         self.rules = set()
         self.scopes = []
         self.tokens = set()
         self.whitespace = None
-        self.whitespace_style = None
         self.assoc = {}
         self.prec = {}
         self.current_prec = 0
@@ -143,13 +139,9 @@ class _Analyzer:
         self.rules = set(n[1] for n in self.grammar.ast[2] if n[0] == 'rule')
         self.walk(self.grammar.ast)
         self.grammar.comment = self.comment
-        self.grammar.comment_style = self.comment_style
         self.grammar.whitespace = self.whitespace
-        self.grammar.whitespace_style = self.whitespace_style
         self.grammar.assoc = self.assoc
         self.grammar.prec = self.prec
-
-        self._check_pragmas()
 
         if self.errors:
             raise AnalysisError(self.errors)
@@ -206,12 +198,8 @@ class _Analyzer:
                         self.tokens.add(n)
                     else:
                         self.errors.append(f'Unknown token rule "{n}"')
-            elif node[1] == 'whitespace_style':
-                self.whitespace_style = node[2]
             elif node[1] == 'whitespace':
                 self.whitespace = node[2][0]
-            elif node[1] == 'comment_style':
-                self.comment_style = node[2]
             elif node[1] == 'comment':
                 self.comment = node[2][0]
             elif node[1] == 'prec':
@@ -273,32 +261,6 @@ class _Analyzer:
             pass
         else:  # pragma: no cover
             assert False, f'Unexpected AST node type: {ty}'
-
-    def _check_pragmas(self):
-        if self.whitespace_style and self.whitespace_style != 'standard':
-            self.errors.append(
-                'Unknown %%whitespace_style "%s"' % self.whitespace_style
-            )
-        if self.comment_style and self.comment_style not in (
-            'C',
-            'C++',
-            'Java',
-            'JavaScript',
-            'Python',
-            'shell',
-        ):
-            self.errors.append(
-                'Unknown %%comment_style "%s"' % self.comment_style
-            )
-
-        if self.comment and self.comment_style:
-            self.errors.append(
-                "Can't set both comment and comment_style pragmas"
-            )
-        if self.whitespace and self.whitespace_style:
-            self.errors.append(
-                "Can't set both whitespace and whitespace_style pragmas"
-            )
 
 
 class Visitor:
@@ -468,9 +430,7 @@ def _check_lr(name, node, rules, seen):
 def _rewrite_filler(grammar):
     if (
         not grammar.comment
-        and not grammar.comment_style
         and not grammar.whitespace
-        and not grammar.whitespace_style
     ):
         return
 
@@ -485,17 +445,13 @@ def _rewrite_filler(grammar):
     for rule in grammar.ast[2]:
         if rule[0] == 'pragma' and rule[1] in (
             'whitespace',
-            'whitespace_style',
             'comment',
-            'comment_style',
         ):
             continue
         new_rules.append(rule)
     grammar.ast[2] = new_rules
     grammar.comment = None
-    grammar.content_style = None
     grammar.whitespace = None
-    grammar.whitespace_style = None
 
 
 class _TokenVisitor(Visitor):
@@ -559,35 +515,7 @@ class _FillerVisitor(Visitor):
         return ['seq', None, [['apply', '_filler', []], node]]
 
 
-# (' '|'\n'|'\r'|'\t')*
-STANDARD_WHITESPACE = ['regexp', '[ \n\r\t]', []]
-
-
-def _eol_comment(lit):
-    return ['regexp', f'{lit}[^\n]*', []]
-
-
-BASH_COMMENT = _eol_comment('#')
-
-
-# '/*' (~'*/' any)* '*/'
-C_COMMENT = ['regexp', r'/\*([^*]|\*[^\\])*\*/', []]
-
-
-CPP_COMMENT = ['regexp', f"(({_eol_comment('//')[1]})|({C_COMMENT[1]}))", []]
-
-
 def _add_filler_rules(grammar):
-    if grammar.whitespace_style == 'standard':
-        grammar.whitespace = STANDARD_WHITESPACE
-    if grammar.comment_style:
-        if grammar.comment_style in ('Python', 'shell'):
-            grammar.comment = BASH_COMMENT
-        elif grammar.comment_style == 'C':
-            grammar.comment = C_COMMENT
-        else:
-            assert grammar.comment_style in ('C++', 'Java', 'JavaScript')
-            grammar.comment = CPP_COMMENT
     if grammar.whitespace:
         grammar.rules['_whitespace'] = grammar.whitespace
     if grammar.comment:

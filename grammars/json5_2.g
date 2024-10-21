@@ -1,5 +1,3 @@
-%comment_style C++
-
 %whitespace    = ' '
                | '\t'
                | '\n'
@@ -11,6 +9,9 @@
                | '\u2029'
                | '\ufeff'
                | \p{Zs}
+
+%comment       = '//' (~'\n' any)*
+               | '/*' (~'*/' any)* '*/'
 
 %tokens        ident num_literal string
 

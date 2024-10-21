@@ -1,46 +1,7 @@
-#!/usr/bin/env python3
-
-import argparse
-import json
-import os
-import re
-import sys
 from typing import Any, NamedTuple, Optional
 
-import re
 
 # pylint: disable=too-many-lines
-
-
-def main(
-    argv=sys.argv[1:],
-    stdin=sys.stdin,
-    stdout=sys.stdout,
-    stderr=sys.stderr,
-    exists=os.path.exists,
-    opener=open,
-) -> int:
-    arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument('file', nargs='?')
-    args = arg_parser.parse_args(argv)
-
-    if not args.file or args.file[1] == '-':
-        path = '<stdin>'
-        fp = stdin
-    elif not exists(args.file):
-        print('Error: file "%s" not found.' % args.file, file=stderr)
-        return 1
-    else:
-        path = args.file
-        fp = opener(path)
-
-    msg = fp.read()
-    result = parse(msg, path)
-    if result.err:
-        print(result.err, file=stderr)
-        return 1
-    print(json.dumps(result.val, indent=2), file=stdout)
-    return 0
 
 
 class Result(NamedTuple):
@@ -85,7 +46,6 @@ class _Parser:
         self.path = path
         self.pos = 0
         self.val = None
-        self.regexps = {}
 
     def parse(self):
         self._r_grammar_()
@@ -137,23 +97,15 @@ class _Parser:
         if not self.failed:
             return
         self._rewind(p)
+        self._s_pragma_5_()
+        if not self.failed:
+            return
+        self._rewind(p)
         self._s_pragma_6_()
         if not self.failed:
             return
         self._rewind(p)
-        self._s_pragma_7_()
-        if not self.failed:
-            return
-        self._rewind(p)
-        self._s_pragma_11_()
-        if not self.failed:
-            return
-        self._rewind(p)
-        self._s_pragma_12_()
-        if not self.failed:
-            return
-        self._rewind(p)
-        self._s_pragma_14_()
+        self._s_pragma_8_()
 
     def _s_pragma_1_(self):
         self._r__filler_()
@@ -185,22 +137,6 @@ class _Parser:
     def _s_pragma_4_(self):
         self._r__filler_()
         if not self.failed:
-            self._str('%whitespace_style')
-        if not self.failed:
-            self._s_pragma_5_()
-            if not self.failed:
-                v_i = self.val
-        if not self.failed:
-            self._succeed(['pragma', 'whitespace_style', v_i])
-
-    def _s_pragma_5_(self):
-        self._r__filler_()
-        if not self.failed:
-            self._r_ident_()
-
-    def _s_pragma_6_(self):
-        self._r__filler_()
-        if not self.failed:
             self._str('%whitespace')
         if not self.failed:
             self._r__filler_()
@@ -213,36 +149,7 @@ class _Parser:
         if not self.failed:
             self._succeed(['pragma', 'whitespace', [v_cs]])
 
-    def _s_pragma_7_(self):
-        self._r__filler_()
-        if not self.failed:
-            self._str('%comment_style')
-        if not self.failed:
-            self._s_pragma_8_()
-            if not self.failed:
-                v_c = self.val
-        if not self.failed:
-            self._succeed(['pragma', 'comment_style', v_c])
-
-    def _s_pragma_8_(self):
-        p = self.pos
-        self._s_pragma_9_()
-        if not self.failed:
-            return
-        self._rewind(p)
-        self._s_pragma_10_()
-
-    def _s_pragma_9_(self):
-        self._r__filler_()
-        if not self.failed:
-            self._str('C++')
-
-    def _s_pragma_10_(self):
-        self._r__filler_()
-        if not self.failed:
-            self._r_ident_()
-
-    def _s_pragma_11_(self):
+    def _s_pragma_5_(self):
         self._r__filler_()
         if not self.failed:
             self._str('%comment')
@@ -257,12 +164,12 @@ class _Parser:
         if not self.failed:
             self._succeed(['pragma', 'comment', [v_cs]])
 
-    def _s_pragma_12_(self):
+    def _s_pragma_6_(self):
         self._r__filler_()
         if not self.failed:
             self._str('%assoc')
         if not self.failed:
-            self._s_pragma_13_()
+            self._s_pragma_7_()
             if not self.failed:
                 v_l = self.val
         if not self.failed:
@@ -272,38 +179,38 @@ class _Parser:
         if not self.failed:
             self._succeed(['pragma', 'assoc', [v_l, v_d]])
 
-    def _s_pragma_13_(self):
+    def _s_pragma_7_(self):
         self._r__filler_()
         if not self.failed:
             self._r_lit_()
 
-    def _s_pragma_14_(self):
+    def _s_pragma_8_(self):
         self._r__filler_()
         if not self.failed:
             self._str('%prec')
         if not self.failed:
-            self._s_pragma_15_()
+            self._s_pragma_9_()
             if not self.failed:
                 v_ls = self.val
         if not self.failed:
             self._succeed(['pragma', 'prec', v_ls])
 
-    def _s_pragma_15_(self):
+    def _s_pragma_9_(self):
         vs = []
-        self._s_pragma_16_()
+        self._s_pragma_10_()
         vs.append(self.val)
         if self.failed:
             return
         while True:
             p = self.pos
-            self._s_pragma_16_()
+            self._s_pragma_10_()
             if self.failed or self.pos == p:
                 self._rewind(p)
                 break
             vs.append(self.val)
         self._succeed(vs)
 
-    def _s_pragma_16_(self):
+    def _s_pragma_10_(self):
         self._r__filler_()
         if not self.failed:
             self._r_lit_()
@@ -2016,34 +1923,128 @@ class _Parser:
         self._range('0', '9')
 
     def _r__whitespace_(self):
-        p = '[ \n\r\t]'
-        if p not in self.regexps:
-            self.regexps[p] = re.compile(p)
-        m = self.regexps[p].match(self.text, self.pos)
-        if m:
-            self._succeed(m.group(0), m.end())
+        vs = []
+        self._s__whitespace_1_()
+        vs.append(self.val)
+        if self.failed:
             return
-        self._fail()
+        while True:
+            p = self.pos
+            self._s__whitespace_1_()
+            if self.failed or self.pos == p:
+                self._rewind(p)
+                break
+            vs.append(self.val)
+        self._succeed(vs)
+
+    def _s__whitespace_1_(self):
+        p = self.pos
+        self._ch(' ')
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._ch('\t')
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._ch('\r')
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._ch('\n')
 
     def _r__comment_(self):
-        p = '((//[^\n]*)|(/\\*([^*]|\\*[^\\\\])*\\*/))'
-        if p not in self.regexps:
-            self.regexps[p] = re.compile(p)
-        m = self.regexps[p].match(self.text, self.pos)
-        if m:
-            self._succeed(m.group(0), m.end())
+        p = self.pos
+        self._s__comment_1_()
+        if not self.failed:
             return
-        self._fail()
+        self._rewind(p)
+        self._s__comment_5_()
+
+    def _s__comment_1_(self):
+        self._str('//')
+        if not self.failed:
+            self._s__comment_2_()
+
+    def _s__comment_2_(self):
+        vs = []
+        while True:
+            p = self.pos
+            self._s__comment_3_()
+            if self.failed or self.pos == p:
+                self._rewind(p)
+                break
+            vs.append(self.val)
+        self._succeed(vs)
+
+    def _s__comment_3_(self):
+        self._s__comment_4_()
+        if not self.failed:
+            self._r_any_()
+
+    def _s__comment_4_(self):
+        p = self.pos
+        errpos = self.errpos
+        self._ch('\n')
+        if self.failed:
+            self._succeed(None, p)
+        else:
+            self._rewind(p)
+            self.errpos = errpos
+            self._fail()
+
+    def _s__comment_5_(self):
+        self._str('/*')
+        if not self.failed:
+            self._s__comment_6_()
+        if not self.failed:
+            self._str('*/')
+
+    def _s__comment_6_(self):
+        vs = []
+        while True:
+            p = self.pos
+            self._s__comment_7_()
+            if self.failed or self.pos == p:
+                self._rewind(p)
+                break
+            vs.append(self.val)
+        self._succeed(vs)
+
+    def _s__comment_7_(self):
+        self._s__comment_8_()
+        if not self.failed:
+            self._r_any_()
+
+    def _s__comment_8_(self):
+        p = self.pos
+        errpos = self.errpos
+        self._str('*/')
+        if self.failed:
+            self._succeed(None, p)
+        else:
+            self._rewind(p)
+            self.errpos = errpos
+            self._fail()
 
     def _r__filler_(self):
-        p = '(([ \n\r\t])|(((//[^\n]*)|(/\\*([^*]|\\*[^\\\\])*\\*/))))*'
-        if p not in self.regexps:
-            self.regexps[p] = re.compile(p)
-        m = self.regexps[p].match(self.text, self.pos)
-        if m:
-            self._succeed(m.group(0), m.end())
+        vs = []
+        while True:
+            p = self.pos
+            self._s__filler_1_()
+            if self.failed or self.pos == p:
+                self._rewind(p)
+                break
+            vs.append(self.val)
+        self._succeed(vs)
+
+    def _s__filler_1_(self):
+        p = self.pos
+        self._r__whitespace_()
+        if not self.failed:
             return
-        self._fail()
+        self._rewind(p)
+        self._r__comment_()
 
     def _r_any_(self):
         if self.pos < self.end:
@@ -2135,7 +2136,3 @@ def _strcat(a, b):
 
 def _xtou(s):
     return chr(int(s, base=16))
-
-
-if __name__ == '__main__':
-    sys.exit(main())

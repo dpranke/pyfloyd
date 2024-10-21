@@ -118,24 +118,6 @@ class GrammarTestsMixin:
     def test_c_style_comment(self):
         self.check('grammar = /* foo */ end -> true', text='', out=True)
 
-    def test_c_comment_style_with_range(self):
-        # This tests both the 'C' comment style and that filler around
-        # ranges are handled properly.
-        grammar = textwrap.dedent("""\
-            %whitespace_style standard
-            %comment_style    C
-
-            grammar = num '+' num end -> true
-
-            num     = '1'..'9'
-            """)
-        p, err, _ = self.compile(grammar)
-        self.assertIsNone(err)
-        self.checkp(p, ' 1 + 2 ', out=True)
-        self.checkp(p, ' 1/* comment */+2', out=True)
-        if hasattr(p, 'cleanup'):
-            p.cleanup()
-
     def test_choice(self):
         self.check(
             """\
@@ -174,51 +156,6 @@ class GrammarTestsMixin:
             foo     = 'foo'
             """
         self.check(grammar, text='foo\nfoo\n', out=True)
-
-    def test_comment_style_pragma(self):
-        grammar = """\
-            %token foo
-            %comment_style Python
-
-            grammar = (foo ' '* '\n')+  end -> true
-
-            foo     = 'foo'
-            """
-        self.check(grammar, text='foo\nfoo\n', out=True)
-        self.check(grammar, text='foo # bar\nfoo\n', out=True)
-
-    def test_comment_style_unknown(self):
-        grammar = """\
-            %token foo
-            %comment_style X
-            grammar = foo
-
-            foo     = "foo"
-            """
-        self.check(
-            grammar,
-            text='foo',
-            grammar_err=(
-                'Errors were found:\n' '  Unknown %comment_style "X"\n'
-            ),
-        )
-
-    def test_comment_style_pragma_both_is_an_error(self):
-        grammar = """\
-            %token foo
-            %comment = '//' (~'\n' any)*
-            %comment_style Python
-
-            grammar = (foo ' '* '\n')+  end -> true
-
-            foo     = 'foo'
-            """
-        self.check(
-            grammar,
-            text='foo\nfoo\n',
-            grammar_err=("Errors were found:\n  Can't set both comment "
-                         "and comment_style pragmas\n"),
-        )
 
     def test_count(self):
         grammar = "grammar = 'a'{3} 'b'{1,4} end"
@@ -719,7 +656,7 @@ class GrammarTestsMixin:
         # For now, precedence has no effect but this at least tests
         # that the pragmas get parsed.
         g = """
-            %whitespace_style standard
+            %whitespace = (' '|'\n'|'\r'|'\t')*
             %prec '+' '-'
             %prec '*' '/'
             %prec '^'
@@ -981,64 +918,6 @@ class GrammarTestsMixin:
             %whitespace = ' '
 
             grammar = foo foo end -> true
-
-            foo     = 'foo'
-            """
-        self.check(grammar, text='foofoo', out=True)
-
-    def test_whitespace_style_pragma(self):
-        grammar = """\
-            %token foo
-            %whitespace_style standard
-
-            grammar = foo foo end -> true
-
-            foo     = 'foo'
-            """
-        self.check(grammar, text='foofoo', out=True)
-
-        grammar = """\
-            %token foo
-            %whitespace_style X
-            grammar = foo
-
-            foo     = "foo"
-            """
-        self.check(
-            grammar,
-            text='foo',
-            grammar_err=(
-                'Errors were found:\n' '  Unknown %whitespace_style "X"\n'
-            ),
-        )
-
-    def test_whitespace_style_pragma_both_is_an_error(self):
-        grammar = """\
-            %token foo
-            %whitespace = ' '
-            %whitespace_style standard
-
-            grammar = foo foo end -> true
-
-            foo     = 'foo'
-            """
-        self.check(
-            grammar,
-            text='foofoo',
-            grammar_err=(
-                'Errors were found:\n'
-                "  Can't set both whitespace and whitespace_style pragmas\n"
-            ),
-        )
-
-    def test_whitespace_standard_and_cpp_comment(self):
-        grammar = """\
-            %token foo
-            %whitespace_style standard
-            %comment_style C++
-
-            grammar = foo foo end // comment 
-                        -> true
 
             foo     = 'foo'
             """

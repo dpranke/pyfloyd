@@ -1,17 +1,16 @@
-%whitespace_style standard
-%comment_style    C++
-%tokens           digits hexdigits ident lit
+%whitespace = (' ' | '\t' | '\r' | '\n')+
+
+%comment    = '//' (~'\n' any)*
+            | '/*' (~'*/' any)* '*/'
+
+%tokens     digits hexdigits ident lit
 
 grammar     = (pragma|rule)*:vs end             -> ['rules', null, vs]
 
 pragma      = '%tokens' ident_list:is          -> ['pragma', 'tokens', is]
             | '%token' ident:i                 -> ['pragma', 'token', [i]]
-            | '%whitespace_style' ident:i      -> ['pragma',
-                                                   'whitespace_style', i]
             | '%whitespace' '=' choice:cs
                                                -> ['pragma', 'whitespace', [cs]]
-            | '%comment_style'
-              ('C++' | ident):c                -> ['pragma', 'comment_style', c]
             | '%comment' '=' choice:cs         -> ['pragma', 'comment', [cs]]
             | '%assoc' lit:l dir:d             -> ['pragma', 'assoc', [l, d]]
             | '%prec' lit+:ls                  -> ['pragma', 'prec', ls]
@@ -67,8 +66,8 @@ prim_expr   = lit:i '..' lit:j                 -> ['range', null, [i, j]]
                 -> ['exclude', join('', es), []]
             | '[' ~'^' exchar+:es ']'
                 -> ['set', join('', es), []]
-            // | '/' rechar+:rs '/' 
-            //    -> ['regexp', join('', rs), []]
+            | '/' rechar+:rs '/'
+                -> ['regexp', join('', rs), []]
 
 lit         = squote sqchar*:cs squote         -> ['lit', join('', cs), []]
             | dquote dqchar*:cs dquote         -> ['lit', join('', cs), []]
@@ -112,6 +111,9 @@ escape      = '\\p{' ident:i '}'               -> ['unicat', i, []]
 
 exchar      = bslash (']' | esc_char):c        -> c
             | (~']' ~bslash any)+:cs           -> join('', cs)
+
+rechar      = bslash ('/' | esc_char):c           -> c
+            | [^/]+:cs                            -> join('', cs)
 
 ll_exprs    = ll_expr:e (',' ll_expr)*:es      -> arrcat([e], es)
             |                                  -> []

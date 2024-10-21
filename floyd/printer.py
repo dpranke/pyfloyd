@@ -39,10 +39,6 @@ class Printer:
                         cs = [(node[0], '')]
                     else:
                         cs = [(' '.join(node), '')]
-                elif rule_name == '%comment_style':
-                    cs = [(node, '')]
-                elif rule_name == '%whitespace_style':
-                    cs = [(node, '')]
                 else:
                     assert rule_name in (
                         '%comment',
