@@ -816,7 +816,7 @@ class _Parser:
             if not self.failed:
                 v_e = self.val
         if not self.failed:
-            self._succeed(['not-one', None, [v_e]])
+            self._succeed(['not_one', None, [v_e]])
 
     def _s_prim_expr_15_(self):
         self._r__filler_()
@@ -827,7 +827,7 @@ class _Parser:
             if not self.failed:
                 v_e = self.val
         if not self.failed:
-            self._succeed(['ends-in', None, [v_e]])
+            self._succeed(['ends_in', None, [v_e]])
 
     def _s_prim_expr_16_(self):
         self._r__filler_()

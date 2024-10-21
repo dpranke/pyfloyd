@@ -537,6 +537,13 @@ class GrammarTestsMixin:
     def test_long_unicode_literals(self):
         self.check("grammar = '\\U00000020' -> true", text=' ', out=True)
 
+    def test_not_one(self):
+        self.check("grammar = ^'a' 'b'-> true", text='cb', out=True)
+        self.check("grammar = ^'a' 'b'-> true", text='a', 
+                   err='<string>:1 Unexpected "a" at column 1')
+        self.check("grammar = ^'a' 'b'-> true", text='', 
+                   err='<string>:1 Unexpected end of input at column 1')
+
     def test_not_not(self):
         self.check("grammar = ~~('a') 'a' -> true", text='a', out=True)
 

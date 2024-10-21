@@ -223,6 +223,23 @@ class Interpreter:
         else:
             self._fail()
 
+    def _handle_not_one(self, node):
+        self._handle_not(['not', None, node[2]])
+        if not self.failed:
+            self._handle_apply(['apply', 'any', []])
+
+    def _handle_ends_in(self, node):
+        while True:
+            self._handle_not(node[2][0])
+            if self.failed:
+                break
+            self._handle_apply(['apply', 'any', []])
+            if self.failed:
+                return
+        self._interpret(node[2][0])
+
+
+
     def _handle_run(self, node):
         start = self.pos
         self._interpret(node[2][0])

@@ -214,12 +214,12 @@ class _Analyzer:
         elif ty in (
             'action',
             'count',
-            'ends-in',
+            'ends_in',
             'label',
             'll_getitem',
             'll_paren',
             'not',
-            'not-one',
+            'not_one',
             'paren',
             'post',
             'pred',
@@ -385,7 +385,7 @@ def _check_lr(name, node, rules, seen):
         return _check_lr(name, node[2][0], rules, seen)
     if ty == 'empty':
         return False
-    if ty == 'ends-in':
+    if ty == 'ends_in':
         return _check_lr(name, node[2][0], rules, seen)
     if ty == 'exclude':
         return False
@@ -397,7 +397,7 @@ def _check_lr(name, node, rules, seen):
         return False
     if ty == 'not':
         return _check_lr(name, node[2][0], rules, seen)
-    if ty == 'not-one':
+    if ty == 'not_one':
         return _check_lr(name, node[2][0], rules, seen)
     if ty == 'paren':
         return _check_lr(name, node[2][0], rules, seen)
@@ -665,6 +665,10 @@ class _SubRuleRewriter:
     def _ll_qual_(self, node):
         if node[2][0][0] == 'll_var' and node[2][1][0] == 'll_call':
             self._grammar.needed_builtin_functions.add(node[2][0][1])
+        return self._walkn(node)
+
+    def _not_one_(self, node):
+        self._grammar.needed_builtin_rules.add('any')
         return self._walkn(node)
 
     def _operator_(self, node):

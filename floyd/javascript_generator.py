@@ -336,6 +336,13 @@ class JavaScriptGenerator(Generator):
         )
         return lines
 
+    def _not_one_(self, node) -> List[str]:
+        sublines = self._gen(['not', None, node[2]])
+        return sublines + [
+            'if (!this.failed) {',
+            '    this.#_r_any_(p);',
+            '}',
+        ]
     def _operator_(self, node) -> List[str]:
         self._needed_methods.add('operator')
         # Operator nodes have no children, but subrules for each arm

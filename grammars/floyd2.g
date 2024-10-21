@@ -5,7 +5,7 @@
 
 %tokens     digits hexdigits ident lit
 
-grammar     = (pragma|rule)*:vs end             -> ['rules', null, vs]
+grammar     = (pragma|rule)*:vs end            -> ['rules', null, vs]
 
 pragma      = '%tokens' ident_list:is          -> ['pragma', 'tokens', is]
             | '%token' ident:i                 -> ['pragma', 'token', [i]]
@@ -57,8 +57,8 @@ prim_expr   = lit:i '..' lit:j                 -> ['range', null, [i, j]]
             | '->' ll_expr:e                   -> ['action', null, [e]]
             | '{' ll_expr:e '}'                -> ['action', null, [e]]
             | '~' prim_expr:e                  -> ['not', null, [e]]
-            | '^' prim_expr:e                  -> ['not-one', null, [e]]
-            | '^.' prim_expr:e                 -> ['ends-in', null, [e]]
+            | '^' prim_expr:e                  -> ['not_one', null, [e]]
+            | '^.' prim_expr:e                 -> ['ends_in', null, [e]]
             | '?(' ll_expr:e ')'               -> ['pred', null, [e]]
             | '?{' ll_expr:e '}'               -> ['pred', null, [e]]
             | '(' choice:e ')'                 -> ['paren', null, [e]]
