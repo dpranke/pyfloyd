@@ -23,6 +23,8 @@ Here are the basic rules:
 
 1.  Grammars are a list of one or more rules. A rule follows the format
     `rulename '=' expr`. Unless otherwise specified, parsing will begin
+    with the first rule in the list (skipping over `%whitespace` and
+    `%comment`, if they are present).
 
 2.  Rule names are identifiers, where identifiers are defined as they
     are in JavaScript: roughly, they start with a letter, an underscore ('_'),
@@ -108,29 +110,38 @@ Here are the basic rules:
       Equivalent to `expr |` (empty)
 
     * Range:    `'X' .. 'Y'`<br>
-      Matches any character between X and Y (inclusive). Equivalent
-      to `X | ... | Y`
+      Matches any character between X and Y (inclusive), where Y has a
+      greater code point than X. Equivalent to `'(' X '|' ... '|' Y ')'`.
 
     * Not-One: `'^' expr`<br>
       Matches any character as long as it does not match `expr`.
       Equivalent to `~expr any`.
 
-    * Charset: `'[' c1c2c3c4... ']'`<br>
-      Equivalent to: `c1 | c2 | c3 | c4 ...`
+    * Set: `'[' c1c2c3c4... ']'`<br>
+      Matches any of a set of characters, where `c1` ... `c_n` are 
+      either single characters, or two characters separated by a dash.
+      characters, optionally separated by '-'. Equivalent to: 
+      `c1 | c2 | c3 | c4 ...` where `c1` is either a single character
+      or the range of characters from `'c1'..'c2'` (inclusive), where
+      c2 has a greater code point value than c1. Each `c` may be an
+      escape sequence. To match against '-', it should be either the
+      first or the last character in the set, or you can match against
+      '\\-'. To match against ']', use an escaped version ('\\]').
 
-    * Not-charset:  `'[^' c1c2c3c4... ']'`<br>
-      Equivalent to: `~( c1 | c2 | c3 | c4 ...) any`.
+    * Not-set:  `'[^' c1c2c3c4... ']'`<br>
+      Matches anything not in the set of characters (using the same 
+      syntax and semantics as Set, above). Equivalent to:
+      `~( c1 | c2 | c3 | c4 ...) any`.
 
     * Ends-In: `'^.' expr`<br>
-      Matches everything up to the first occurence of `expr`. Equivalent to
+      Matches everything up to the first occurrence of `expr`. Equivalent to
       `(^expr)* expr`. This can be called a *non-greedy* match.
 
-    * Counted: `expr '{' number '}'`<br>
-      Matches &lt;number&gt; exprs in a row.
-
-    * Counted-Range: `expr '{' number1 ',' number2 '}'`<br>
-      Matches between &lt;number1&gt; and &lt;number2&gt; exprs in a row
-      (inclusive).
+    * Count: `expr '{' (n | n1 ',' n2) '}'`<br>
+      The first form matches `n` `expr`s in a row, where `n` is a 
+      non-negative integer. The second form matches from `n1` to `n2`
+      `expr`s (inclusive) in a row where n1 and n2 are both non-negative
+      integers and `n2` >= `n1`.
 
 ## Filler (whitespace and comments)
 
@@ -145,7 +156,7 @@ grammar = ws 'foo'* ws 'bar' ws end
 ```
 
 In Floyd, whitespace and comments are known as *filler*, and you can use the
-`%whitespace` and `%comment` rules to define how theye are recognized. If
+`%whitespace` and `%comment` rules to define how they are recognized. If
 either or both of those rules are specified, then whitespace and comment rules
 will be be inserted in front of every string literal and at the end of the
 grammar (but before `end`, if the grammar ends in `end`), allowing any
