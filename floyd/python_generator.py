@@ -457,8 +457,8 @@ class PythonGenerator(Generator):
         return [
             'if self.pos == self.end:',
             '    self._fail()',
-            f"m = re.match('[' + {lit.encode(node[1])} + ']', ",
-                'self.text, self.pos)',
+            f"p = re.compile('[' + {lit.encode(node[1])} + ']')",
+            'm = p.match(self.text, self.pos)',
             'if m:',
             '    self._succeed(m.group(0), m.end())',
             '    return',
@@ -871,6 +871,15 @@ def _atoi(a):
 def _arrcat(a, b):
     return a + b
 
+def _cat(strs):
+    return ''.join(strs)
+
+def _concat(xs, ys):
+    return xs.extend(ys)
+
+def _cons(hd, tl):
+    return [hd] + tl
+
 def _dict(pairs):
     return dict(pairs)
 
@@ -890,6 +899,12 @@ def _itou(n):
 
 def _join(s, vs):
     return s.join(vs)
+
+def _scat(ss):
+    return ''.join(ss)
+
+def _scons(hd, tl):
+    return [hd] + tl
 
 def _strcat(a, b):
     return a + b

@@ -89,28 +89,30 @@ class _Parser:
         if not self.failed:
             return
         self._rewind(p)
-        self._s_pragma_2_()
-        if not self.failed:
-            return
-        self._rewind(p)
         self._s_pragma_4_()
         if not self.failed:
             return
         self._rewind(p)
-        self._s_pragma_5_()
-        if not self.failed:
-            return
-        self._rewind(p)
-        self._s_pragma_6_()
-        if not self.failed:
-            return
-        self._rewind(p)
         self._s_pragma_8_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._s_pragma_9_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._s_pragma_10_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._s_pragma_12_()
 
     def _s_pragma_1_(self):
         self._r__filler_()
         if not self.failed:
             self._str('%tokens')
+        if not self.failed:
+            self._s_pragma_2_()
         if not self.failed:
             self._r_ident_list_()
             if not self.failed:
@@ -119,22 +121,50 @@ class _Parser:
             self._succeed(['pragma', 'tokens', v_is])
 
     def _s_pragma_2_(self):
+        p = self.pos
+        self._s_pragma_3_()
+        if self.failed:
+            self._succeed([], p)
+        else:
+            self._succeed([self.val])
+
+    def _s_pragma_3_(self):
+        self._r__filler_()
+        if not self.failed:
+            self._ch('=')
+
+    def _s_pragma_4_(self):
         self._r__filler_()
         if not self.failed:
             self._str('%token')
         if not self.failed:
-            self._s_pragma_3_()
+            self._s_pragma_5_()
+        if not self.failed:
+            self._s_pragma_7_()
             if not self.failed:
                 v_i = self.val
         if not self.failed:
             self._succeed(['pragma', 'token', [v_i]])
 
-    def _s_pragma_3_(self):
+    def _s_pragma_5_(self):
+        p = self.pos
+        self._s_pragma_6_()
+        if self.failed:
+            self._succeed([], p)
+        else:
+            self._succeed([self.val])
+
+    def _s_pragma_6_(self):
+        self._r__filler_()
+        if not self.failed:
+            self._ch('=')
+
+    def _s_pragma_7_(self):
         self._r__filler_()
         if not self.failed:
             self._r_ident_()
 
-    def _s_pragma_4_(self):
+    def _s_pragma_8_(self):
         self._r__filler_()
         if not self.failed:
             self._str('%whitespace')
@@ -149,7 +179,7 @@ class _Parser:
         if not self.failed:
             self._succeed(['pragma', 'whitespace', [v_cs]])
 
-    def _s_pragma_5_(self):
+    def _s_pragma_9_(self):
         self._r__filler_()
         if not self.failed:
             self._str('%comment')
@@ -164,12 +194,12 @@ class _Parser:
         if not self.failed:
             self._succeed(['pragma', 'comment', [v_cs]])
 
-    def _s_pragma_6_(self):
+    def _s_pragma_10_(self):
         self._r__filler_()
         if not self.failed:
             self._str('%assoc')
         if not self.failed:
-            self._s_pragma_7_()
+            self._s_pragma_11_()
             if not self.failed:
                 v_l = self.val
         if not self.failed:
@@ -179,38 +209,38 @@ class _Parser:
         if not self.failed:
             self._succeed(['pragma', 'assoc', [v_l, v_d]])
 
-    def _s_pragma_7_(self):
+    def _s_pragma_11_(self):
         self._r__filler_()
         if not self.failed:
             self._r_lit_()
 
-    def _s_pragma_8_(self):
+    def _s_pragma_12_(self):
         self._r__filler_()
         if not self.failed:
             self._str('%prec')
         if not self.failed:
-            self._s_pragma_9_()
+            self._s_pragma_13_()
             if not self.failed:
                 v_ls = self.val
         if not self.failed:
             self._succeed(['pragma', 'prec', v_ls])
 
-    def _s_pragma_9_(self):
+    def _s_pragma_13_(self):
         vs = []
-        self._s_pragma_10_()
+        self._s_pragma_14_()
         vs.append(self.val)
         if self.failed:
             return
         while True:
             p = self.pos
-            self._s_pragma_10_()
+            self._s_pragma_14_()
             if self.failed or self.pos == p:
                 self._rewind(p)
                 break
             vs.append(self.val)
         self._succeed(vs)
 
-    def _s_pragma_10_(self):
+    def _s_pragma_14_(self):
         self._r__filler_()
         if not self.failed:
             self._r_lit_()

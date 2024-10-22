@@ -1,4 +1,4 @@
-%whitespace = [ \f\n\r\t\v]*
+%whitespace = (' ' | '\f' | '\n' | '\r' | '\t' | '\v')+
 
 %comment    = ('//' | '#') [^\r\n]*
             | '/*' ^.'*/'
@@ -9,19 +9,18 @@ grammar     = rule* end                    { ['grammar', $1] }
 
 rule        = ident '=' choice             { ['rule', [$1, $3]] }
 
-ident       = id_start id_continue*        { scons($1, $2) }
+ident       = id_start id_continue*        { cat(scons($1, $2)) }
 
 id_start    = [a-zA-Z$_%]
 
-id_continue = id_start | digit
+id_continue = id_start | [0-9]
 
 choice      = seq ('|' seq)*               { ['choice', cons($1, $2)] }
 
 seq         = expr (expr)*                 { ['seq', cons($1, $2)] }
             |                              { ['empty'] }
 
-expr        = lit '..' lit                 { ['range', $1, $3] }
-            | '<' expr '>'                 { ['run', $2] }
+expr        = '<' choice '>'               { ['run', $2] }
             | '{' result '}'               { ['result', $2] }
             | '?{' result '}'              { ['pred', $2] }
             | post_expr ':' ident          { ['label', $1, $3] }
@@ -34,17 +33,16 @@ post_expr   = prim_expr '?'                { ['opt', $1] }
             | prim_expr
 
 count       = '{' zpos ',' zpos '}'        { [$2, $3] }
-            = '{' zpos '}'                 { [$2, $2] }
+            | '{' zpos '}'                 { [$2, $2] }
 
-prefix_expr = '~' prim_expr                { ['not', $2] }
-            | '^' prim_expr                { ['not-one', $2] }
-            | '^.' prim_expr               { ['ends-in', $2] }
-            | prim_expr
-
-prim_expr   = lit                          { ['lit', $1] }
+prim_expr   = lit '..' lit                 { ['range', $1, $3] }
+            | lit                          { ['lit', $1] }
             | '\\p{' ident '}'             { ['unicat', $2] }
             | '[' set_char+ ']'            { ['set', $2] }
-            | '[^' set_char+ ']'           { ['not-set', cat($2)] }
+            | '[^' set_char+ ']'           { ['excludes', cat($2)] }
+            | '~' prim_expr                { ['not', $2] }
+            | '^.' prim_expr               { ['ends_in', $2] }
+            | '^' prim_expr                { ['not_one', $2] }
             | ident ~'='                   { ['apply', $1] }
             | '(' choice ')'               { ['paren', $2] }
 
@@ -81,7 +79,8 @@ uni_esc     = '\\u' hex{4}                 { itou(atoi(scons('0x', $2))) }
             | '\\u{' hex+ '}'              { itou(atoi(scons('0x', $2))) }
             | '\\U' hex{8}                 { itou(atoi(scons('0x', $2))) }
 
-set_char     = escape
+set_char    = escape
+            | '\\]'                        { ']' }
             | ^']'
 
 zpos        = '0'                          { 0 }
@@ -106,13 +105,13 @@ r_prim      = 'false'                      { ['r_const', 'false'] }
             | ident                        { ['r_var', $1] }
             | hex                          { ['r_num', $1] }
             | int                          { ['r_num', $1] }
-            | lit                          { ['r_lit', $1[1]] }
+            | lit                          { ['r_lit', $1] }
             | '(' result ')'               { ['r_paren', $2] }
             | '[' results ']'              { ['r_array', $2] }
 
 int         = '0'
             | '-'? [1-9] [0-9]*            {
-                atoi(cat(concat(cat($1), scons($2, $3))))
+                atoi(cat(scons(cat($1), scons($2, $3))))
             }
 
 hex         = '0x' [0-9a-fA-F]+            { atoi(strcat('0x', cat($2))) }

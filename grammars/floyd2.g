@@ -7,8 +7,8 @@
 
 grammar     = (pragma|rule)*:vs end            -> ['rules', null, vs]
 
-pragma      = '%tokens' ident_list:is          -> ['pragma', 'tokens', is]
-            | '%token' ident:i                 -> ['pragma', 'token', [i]]
+pragma      = '%tokens' '='? ident_list:is     -> ['pragma', 'tokens', is]
+            | '%token'  '='? ident:i           -> ['pragma', 'token', [i]]
             | '%whitespace' '=' choice:cs
                                                -> ['pragma', 'whitespace', [cs]]
             | '%comment' '=' choice:cs         -> ['pragma', 'comment', [cs]]
