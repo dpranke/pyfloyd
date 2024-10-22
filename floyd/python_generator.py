@@ -442,6 +442,10 @@ class PythonGenerator(Generator):
             'self.val = self.text[start:end]'
         ]
 
+    def _set_(self, node) -> List[str]:
+        new_node = ['regexp', '[' + node[1] + ']', []]
+        return self._regexp(new_node)
+
     def _seq_(self, node) -> List[str]:
         lines = self._gen(node[2][0])
         for subnode in node[2][1:]:

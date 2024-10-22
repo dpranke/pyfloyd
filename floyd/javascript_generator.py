@@ -463,6 +463,11 @@ class JavaScriptGenerator(Generator):
             'let end = this.pos;',
             'this.val = this.text.substr(start, end);'
         ]
+
+    def _set_(self, node) -> List[str]:
+        new_node = ['regexp', '[' + node[1] + ']', []]
+        return self._regexp_(new_node)
+
     def _seq_(self, node) -> List[str]:
         lines = self._gen(node[2][0])
         for subnode in node[2][1:]:

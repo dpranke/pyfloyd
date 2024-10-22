@@ -474,14 +474,8 @@ class Interpreter:
         self.scopes.pop()
 
     def _handle_set(self, node):
-        if self.text == self.end:
-            self._fail()
-            return
-        m = re.match(node[1], self.text, self.pos)
-        if m:
-            self._succeed(m.group(0), m.end())
-            return
-        self._fail()
+        new_node = ['regexp', '[' + node[1] + ']', []]
+        self._interpret(new_node)
 
     def _handle_star(self, node):
         vs = []

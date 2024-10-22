@@ -506,7 +506,7 @@ class _FillerVisitor(Visitor):
         self.grammar.ast = walk(self.grammar.ast, self)
 
     def should_fill(self, node):
-        if node[0] in ('escape', 'exclude', 'lit', 'range', 'regexp'):
+        if node[0] in ('escape', 'exclude', 'lit', 'range', 'regexp', 'set'):
             return True
         if node[0] == 'apply' and (
             node[1] == 'end' or node[1] in self.grammar.tokens
@@ -623,7 +623,6 @@ class _SubRuleRewriter:
         if fn:
             return fn(node)
         return self._walkn(node)
-
     def _walkn(self, node):
         subnodes = []
         for child in node[2]:
@@ -638,7 +637,7 @@ class _SubRuleRewriter:
 
     def _can_inline(self, node) -> bool:
         if node[0] in ('choice', 'count', 'exclude', 'not', 'post', 'regexp',
-                       'seq'):
+                       'set', 'seq'):
             return False
         return True
 
@@ -698,6 +697,10 @@ class _SubRuleRewriter:
         return node
 
     def _regexp_(self, node):
+        self._grammar.re_needed = True
+        return node
+
+    def _set_(self, node):
         self._grammar.re_needed = True
         return node
 

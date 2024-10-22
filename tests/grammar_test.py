@@ -877,6 +877,22 @@ class GrammarTestsMixin:
     def test_seq(self):
         self.check("grammar = 'foo' 'bar' -> true", text='foobar', out=True)
 
+    def test_set(self):
+        g = 'g = [xa-e] -> true'
+        self.check(g, text='x', out=True)
+        self.check(g, text='a', out=True)
+        self.check(g, text='b', out=True)
+        self.check(g, text='e', out=True)
+        self.check(g, text='',
+                   err = '<string>:1 Unexpected end of input at column 1')
+        self.check(g, text='f', 
+                   err = '<string>:1 Unexpected "f" at column 1')
+
+    def disabled_test_set_escaped_right_bracket(self):
+        # TODO: Get this to pass.
+        g = 'g = [xa-e\\]] -> true'
+        self.check(g, text=']', out=True)
+
     def test_star(self):
         self.check("grammar = 'a'* -> true", text='', out=True)
         self.check("grammar = 'a'* -> true", text='a', out=True)
