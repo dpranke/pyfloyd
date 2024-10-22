@@ -36,7 +36,11 @@ def flatten(obj, max_length=67, indent='    '):
 def fmt(obj, current_depth, max_depth, indent):
     if isinstance(obj, str):
         return [obj]
-    return obj.fmt(current_depth, max_depth, indent)
+    try:
+        return obj.fmt(current_depth, max_depth, indent)
+    except Exception as e:
+        import pdb; pdb.set_trace()
+        pass
 
 
 class Formatter:
