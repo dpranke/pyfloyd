@@ -83,12 +83,10 @@ class Printer:
         lines = []
         for rule_name, choices in rules:
             if rule_name in (
-                '%comment_style',
                 '%token',
                 '%tokens',
-                '%whitespace_style',
             ):
-                lines.append(rule_name + ' ' + ' '.join(c[0] for c in choices))
+                lines.append(rule_name + ' = ' + ' '.join(c[0] for c in choices))
             else:
                 choice, act = choices[0]
                 lines.append(

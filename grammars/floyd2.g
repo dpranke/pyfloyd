@@ -3,17 +3,17 @@
 %comment    = '//' (~'\n' any)*
             | '/*' (~'*/' any)* '*/'
 
-%tokens     digits hexdigits ident lit
+%tokens     = digits hexdigits ident lit
 
 grammar     = (pragma|rule)*:vs end            -> ['rules', null, vs]
 
-pragma      = '%tokens' '='? ident_list:is     -> ['pragma', 'tokens', is]
-            | '%token'  '='? ident:i           -> ['pragma', 'token', [i]]
+pragma      = '%tokens' '=' ident_list:is     -> ['pragma', 'tokens', is]
+            | '%token'  '=' ident:i           -> ['pragma', 'token', [i]]
             | '%whitespace' '=' choice:cs
                                                -> ['pragma', 'whitespace', [cs]]
             | '%comment' '=' choice:cs         -> ['pragma', 'comment', [cs]]
-            | '%assoc' lit:l dir:d             -> ['pragma', 'assoc', [l, d]]
-            | '%prec' lit+:ls                  -> ['pragma', 'prec', ls]
+            | '%assoc' '=' lit:l dir:d             -> ['pragma', 'assoc', [l, d]]
+            | '%prec' '=' lit+:ls                  -> ['pragma', 'prec', ls]
 
 dir         = ('left'|'right'):d               -> d
 
@@ -23,7 +23,7 @@ rule        = ident:i '=' choice:cs ','?       -> ['rule', i, [cs]]
 
 ident       = id_start:hd id_continue*:tl      -> strcat(hd, join('', tl))
 
-id_start    = 'a'..'z' | 'A'..'Z' | '_' | '$'
+id_start    = 'a'..'z' | 'A'..'Z' | '_' | '%' | '$'
 
 id_continue = id_start | digit
 

@@ -13,7 +13,7 @@
 %comment       = '//' (~'\n' any)*
                | '/*' (~'*/' any)* '*/'
 
-%tokens        ident num_literal string
+%tokens        = ident num_literal string
 
 grammar        = value end                       { $1 }
 
