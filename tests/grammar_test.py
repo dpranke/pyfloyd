@@ -192,6 +192,17 @@ class GrammarTestsMixin:
             err='<string>:1 Unexpected "f" at column 1',
         )
 
+    def test_ends_in(self):
+        g = "g = ^.'a' -> true"
+        self.check(g, '',
+            err='<string>:1 Unexpected end of input at column 1'
+        )
+        self.check(
+            g, 'b',
+            err='<string>:1 Unexpected end of input at column 2'
+        )
+        self.check(g, 'ba', out=True)
+
     def test_error_on_second_line_of_grammar(self):
         self.check_grammar_error(
             """\

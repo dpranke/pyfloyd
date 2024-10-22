@@ -280,6 +280,22 @@ class JavaScriptGenerator(Generator):
         del node
         return ['this.#succeed(null);']
 
+    def _ends_in_(self, node) -> List[str]:
+        sublines = self._gen(node[2][0])
+        lines = [
+            'while (true) {',
+        ] + ['    ' + line for line in sublines] + [
+            '    if (!this.failed) {',
+            '        break;',
+            '    }',
+            '    this.#_r_any_();',
+            '    if (this.failed) {',
+            '        break;',
+            '    }',
+            '}',
+        ]
+        return lines
+
     def _exclude_(self, node) -> List[str]:
         s = lit.escape(node[1], ']')
         return [

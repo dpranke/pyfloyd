@@ -161,6 +161,15 @@ class Interpreter:
             return
         self._succeed()
 
+    def _handle_ends_in(self, node):
+        while True:
+            self._interpret(node[2][0])
+            if not self.failed:
+                return
+            self._handle_apply(['apply', 'any', []])
+            if self.failed:
+                return
+
     def _handle_exclude(self, node):
         if self.pos == self.end or self.text[self.pos] in node[1]:
             self._fail()
@@ -227,18 +236,6 @@ class Interpreter:
         self._handle_not(['not', None, node[2]])
         if not self.failed:
             self._handle_apply(['apply', 'any', []])
-
-    def _handle_ends_in(self, node):
-        while True:
-            self._handle_not(node[2][0])
-            if self.failed:
-                break
-            self._handle_apply(['apply', 'any', []])
-            if self.failed:
-                return
-        self._interpret(node[2][0])
-
-
 
     def _handle_run(self, node):
         start = self.pos

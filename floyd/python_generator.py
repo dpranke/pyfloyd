@@ -268,6 +268,18 @@ class PythonGenerator(Generator):
         del node
         return ['self._succeed(None)']
 
+    def _ends_in_(self, node) -> List[str]:
+        sublines = self._gen(node[2][0])
+        return [
+            'while True:',
+        ] + ['    ' + line for line in sublines] + [
+            '    if not self.failed:',
+            '        break',
+            '    self._r_any_()',
+            '    if self.failed:',
+            '        break',
+        ]
+
     def _exclude_(self, node) -> List[str]:
         return [
             (

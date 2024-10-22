@@ -652,6 +652,10 @@ class _SubRuleRewriter:
             self._grammar.needed_builtin_rules.add(node[1])
         return [node[0], self._rule_fmt.format(rule=node[1]), node[2]]
 
+    def _ends_in_(self, node):
+        self._grammar.needed_builtin_rules.add('any')
+        return self._walkn(node)
+
     def _leftrec_(self, node):
         self._grammar.leftrec_needed = True
         return self._split1(node)
