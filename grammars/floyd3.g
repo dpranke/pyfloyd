@@ -23,7 +23,7 @@ seq         = expr (expr)*                 -> ['seq', null, cons($1, $2)]
 expr        = '<' choice '>'               -> ['run', null, [$2]]
             | '->' ll_expr                 -> ['action', null, [$2]]
             | '?{' ll_expr '}'             -> ['pred', null, [$2]]
-            | post_expr ':' ident          -> ['label', $3, [$3]]
+            | post_expr ':' ident          -> ['label', $3, [$1]]
             | post_expr
 
 post_expr   = prim_expr '?'                -> ['post', $2, [$1]]
@@ -32,14 +32,14 @@ post_expr   = prim_expr '?'                -> ['post', $2, [$1]]
             | prim_expr count              -> ['count', $2, [$1]]
             | prim_expr
 
-count       = '{' zpos ',' zpos '}'        -> [$2, $3]
+count       = '{' zpos ',' zpos '}'        -> [$2, $4]
             | '{' zpos '}'                 -> [$2, $2]
 
 prim_expr   = lit '..' lit                 -> ['range', null, [$1, $3]]
             | lit                          -> ['lit', $1, []]
             | '\\p{' ident '}'             -> ['unicat', $2, []]
-            | '[' set_char+ ']'            -> ['set', $2, []]
-            | '[^' set_char+ ']'           -> ['excludes', cat($2), []]
+            | '[^' set_char+ ']'           -> ['exclude', cat($2), []]
+            | '[' ~'^' set_char+ ']'       -> ['set', cat($3), []]
             | '~' prim_expr                -> ['not', null, [$2]]
             | '^.' prim_expr               -> ['ends_in', null, [$2]]
             | '^' prim_expr                -> ['not_one', null, [$2]]

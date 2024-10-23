@@ -12,8 +12,8 @@ pragma      = '%tokens' '=' ident_list:is     -> ['pragma', 'tokens', is]
             | '%whitespace' '=' choice:cs
                                                -> ['pragma', 'whitespace', [cs]]
             | '%comment' '=' choice:cs         -> ['pragma', 'comment', [cs]]
-            | '%assoc' '=' lit:l dir:d             -> ['pragma', 'assoc', [l, d]]
-            | '%prec' '=' lit+:ls                  -> ['pragma', 'prec', ls]
+            | '%assoc' '=' lit:l dir:d         -> ['pragma', 'assoc', [l, d]]
+            | '%prec' '=' lit+:ls              -> ['pragma', 'prec', ls]
 
 dir         = ('left'|'right'):d               -> d
 

@@ -338,7 +338,10 @@ class Interpreter:
             return
 
         # Unknown variables should have been caught in analysis.
-        assert self.scopes and (node[1] in self.scopes[-1])
+        try:
+            assert self.scopes and (node[1] in self.scopes[-1])
+        except Exception as e:
+            import pdb; pdb.set_trace()
         self._succeed(self.scopes[-1][node[1]])
 
     def _handle_not(self, node):
@@ -474,8 +477,12 @@ class Interpreter:
         self.scopes.pop()
 
     def _handle_set(self, node):
-        new_node = ['regexp', '[' + node[1] + ']', []]
-        self._interpret(new_node)
+        try:
+            new_node = ['regexp', '[' + node[1] + ']', []]
+            self._interpret(new_node)
+        except Exception as e:
+            import pdb; pdb.set_trace()
+            pass
 
     def _handle_star(self, node):
         vs = []
@@ -492,11 +499,22 @@ class Interpreter:
             vs.append(self.val)
         self._succeed(vs)
 
-    def _builtin_fn_atoi(self, val):
-        return int(val)
-
     def _builtin_fn_arrcat(self, a, b):
         return a + b
+
+    def _builtin_fn_atoi(self, val):
+        if val.startswith('0x'):
+            return int(val, base=16)
+        return int(val)
+
+    def _builtin_fn_cat(self, val):
+        return ''.join(val)
+
+    def _builtin_fn_concat(self, xs, ys):
+        return xs + ys
+
+    def _builtin_fn_cons(self, hd, tl):
+        return [hd] + tl
 
     def _builtin_fn_dict(self, val):
         return dict(val)
@@ -517,6 +535,12 @@ class Interpreter:
 
     def _builtin_fn_join(self, val, vs):
         return val.join(vs)
+
+    def _builtin_fn_scat(self, xs):
+        return ''.join(xs)
+
+    def _builtin_fn_scons(self, hd, tl):
+        return [hd] + tl
 
     def _builtin_fn_strcat(self, a, b):
         return a + b

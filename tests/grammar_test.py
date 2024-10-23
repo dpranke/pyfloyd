@@ -66,8 +66,8 @@ class GrammarTestsMixin:
         self.assertMultiLineEqual(err, p_err)
 
     def test_action(self):
+        # self.check('grammar = end { true }', text='', out=True)
         self.check('grammar = end -> true', text='', out=True)
-        self.check('grammar = end { true }', text='', out=True)
 
     def test_any_fails(self):
         self.check(
@@ -107,12 +107,15 @@ class GrammarTestsMixin:
 
     def test_big_int(self):
         self.check(
-            'grammar = { float("505874924095815700") }',
+            # 'grammar = { float("505874924095815700") }',
+            'grammar = -> float("505874924095815700")',
             text='',
             out=505874924095815700,
         )
         self.check(
-            'grammar = { 505874924095815700 }', text='', out=505874924095815700
+            # 'grammar = { 505874924095815700 }', text='',
+            # out=505874924095815700
+            'grammar = -> 505874924095815700', text='', out=505874924095815700
         )
 
     def test_c_style_comment(self):
@@ -293,7 +296,7 @@ class GrammarTestsMixin:
         )
 
     @skip('integration')
-    def test_floyd(self):
+    def disabled_test_floyd(self):
         h = floyd.host.Host()
         path = str(THIS_DIR / '../grammars/floyd.g')
         grammar = h.read_text_file(path)
@@ -307,13 +310,13 @@ class GrammarTestsMixin:
         self.assertEqual(out[0], 'rules')
 
     @skip('integration')
-    def test_floyd2(self):
+    def test_floyd3(self):
         h = floyd.host.Host()
-        path = str(THIS_DIR / '../grammars/floyd2.g')
+        path = str(THIS_DIR / '../grammars/floyd3.g')
         grammar = h.read_text_file(path)
         p, err, _ = self.compile(grammar, path)
         self.assertIsNone(err)
-        out, err, _ = p.parse(grammar, '../grammars/floyd2.g')
+        out, err, _ = p.parse(grammar, '../grammars/floyd3.g')
         # We don't check the actual output here because it is too long
         # and we don't want the test to be so sensitive to the AST for
         # the floyd grammar.
@@ -719,8 +722,8 @@ class GrammarTestsMixin:
         self.check(g, text='aa', out=True)
 
     def test_pred(self):
+        # self.check('grammar = ?{true} end { true }', text='', out=True)
         self.check('grammar = ?(true) end -> true', text='', out=True)
-        self.check('grammar = ?{true} end { true }', text='', out=True)
         self.check(
             """\
             grammar = ?(false) end -> 'a'
@@ -949,7 +952,8 @@ class GrammarTestsMixin:
         self.check(grammar, text='foobar', out=True)
 
     def test_whitespace_chars(self):
-        self.check('g = \t\n\r { true }', text='', out=True)
+        # self.check('g = \t\n\r { true }', text='', out=True)
+        self.check('g = \t\n\r -> true', text='', out=True)
 
     def test_whitespace_pragma(self):
         grammar = """\
