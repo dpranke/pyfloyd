@@ -5,9 +5,9 @@
 
 %tokens     = escape hex ident int lit zpos
 
-grammar     = rule* end                    { ['rules', null, $1] }
+grammar     = rule* end                    { ['grammar', $1] }
 
-rule        = ident '=' choice             { ['rule', $1, [$3]] }
+rule        = ident '=' choice             { ['rule', [$1, $3]] }
 
 ident       = id_start id_continue*        { cat(scons($1, $2)) }
 
@@ -15,36 +15,36 @@ id_start    = [a-zA-Z$_%]
 
 id_continue = id_start | [0-9]
 
-choice      = seq ('|' seq)*               { ['choice', null, cons($1, $2)] }
+choice      = seq ('|' seq)*               { ['choice', cons($1, $2)] }
 
-seq         = expr (expr)*                 { ['seq', null, cons($1, $2)] }
-            |                              { ['empty', null, []] }
+seq         = expr (expr)*                 { ['seq', cons($1, $2)] }
+            |                              { ['empty'] }
 
-expr        = '<' choice '>'               { ['run', null, [$2]] }
-            | '{' ll_expr '}'              { ['action', null, [$2]] }
-            | '?{' ll_expr '}'             { ['pred', null, [$2]] }
-            | post_expr ':' ident          { ['label', $3, [$3]] }
+expr        = '<' choice '>'               { ['run', $2] }
+            | '{' result '}'               { ['result', $2] }
+            | '?{' result '}'              { ['pred', $2] }
+            | post_expr ':' ident          { ['label', $1, $3] }
             | post_expr
 
-post_expr   = prim_expr '?'                { ['post', $2, [$1]] }
-            | prim_expr '*'                { ['post', $2, [$1]] }
-            | prim_expr '+'                { ['post', $2, [$1]] }
-            | prim_expr count              { ['count', $2, [$1]] }
+post_expr   = prim_expr '?'                { ['opt', $1] }
+            | prim_expr '*'                { ['star', $1] }
+            | prim_expr '+'                { ['plus', $1] }
+            | prim_expr count              { ['count', $1, $2] }
             | prim_expr
 
 count       = '{' zpos ',' zpos '}'        { [$2, $3] }
             | '{' zpos '}'                 { [$2, $2] }
 
-prim_expr   = lit '..' lit                 { ['range', null, [$1, $3]] }
-            | lit                          { ['lit', $1, []] }
-            | '\\p{' ident '}'             { ['unicat', $2, []] }
-            | '[' set_char+ ']'            { ['set', $2, []] }
-            | '[^' set_char+ ']'           { ['excludes', cat($2), []] }
-            | '~' prim_expr                { ['not', null, [$2]] }
-            | '^.' prim_expr               { ['ends_in', null, [$2]] }
-            | '^' prim_expr                { ['not_one', null, [$2]] }
-            | ident ~'='                   { ['apply', $1, []] }
-            | '(' choice ')'               { ['paren', null, [$2]] }
+prim_expr   = lit '..' lit                 { ['range', $1, $3] }
+            | lit                          { ['lit', $1] }
+            | '\\p{' ident '}'             { ['unicat', $2] }
+            | '[' set_char+ ']'            { ['set', $2] }
+            | '[^' set_char+ ']'           { ['excludes', cat($2)] }
+            | '~' prim_expr                { ['not', $2] }
+            | '^.' prim_expr               { ['ends_in', $2] }
+            | '^' prim_expr                { ['not_one', $2] }
+            | ident ~'='                   { ['apply', $1] }
+            | '(' choice ')'               { ['paren', $2] }
 
 lit         = squote sqchar* squote        { cat($2) }
             | dquote dqchar* dquote        { cat($2) }
@@ -86,32 +86,32 @@ set_char    = escape
 zpos        = '0'                          { 0 }
             | [1-9] [0-9]*                 { atoi(scons($1, $2)) }
 
-ll_expr     = ll_qual '+' ll_expr          { ['ll_plus', null, [$1, $2]] }
-            | ll_qual '-' ll_expr          { ['ll_minus', null, [$1, $2]] }
-            | ll_qual
+result      = r_qual '+' result            { ['r_plus', [$1, $2]] }
+            | r_qual '-' result            { ['r_minus', [$1, $2]] }
+            | r_qual
 
-ll_exprs    = ll_expr (',' ll_expr)* ','?  { cons($1, $2) }
+results     = result (',' result)* ','?    { cons($1, $2) }
             |                              { [] }
 
-ll_qual     = ll_prim ll_post_op+          { ['ll_qual', null, cons($1, $2)] }
-            | ll_prim
+r_qual      = r_prim r_post_op+            { ['r_qual', cons($1, $2)] }
+            | r_prim
 
-ll_post_op  = '[' ll_expr ']'              { ['ll_getitem', null, [$2]] }
-            | '(' ll_exprs ')'             { ['ll_call', null, $2] }
+r_post_op   = '[' result ']'               { ['r_getitem', $2] }
+            | '(' results ')'              { ['r_call', $2] }
 
-ll_prim     = 'false'                      { ['ll_const', 'false', []] }
-            | 'null'                       { ['ll_const', 'null', []] }
-            | 'true'                       { ['ll_const', 'true', []] }
-            | ident                        { ['ll_var', $1, []] }
-            | hex                          { ['ll_num', $1, []] }
-            | int                          { ['ll_num', $1, []] }
-            | lit                          { ['ll_lit', $1, []] }
-            | '(' ll_expr ')'              { ['ll_paren', null, [$2]] }
-            | '[' ll_exprs ']'             { ['ll_arr', null, $2] }
+r_prim      = 'false'                      { ['r_const', 'false'] }
+            | 'null'                       { ['r_const', 'null'] }
+            | 'true'                       { ['r_const', 'true'] }
+            | ident                        { ['r_var', $1] }
+            | hex                          { ['r_num', $1] }
+            | int                          { ['r_num', $1] }
+            | lit                          { ['r_lit', $1] }
+            | '(' result ')'               { ['r_paren', $2] }
+            | '[' results ']'              { ['r_array', $2] }
 
 int         = '0'
             | '-'? [1-9] [0-9]*            {
-                cat(scons(cat($1), scons($2, $3)))
+                atoi(cat(scons(cat($1), scons($2, $3))))
             }
 
-hex         = '0x' [0-9a-fA-F]+            { cat(scons('0x', $2)) }
+hex         = '0x' [0-9a-fA-F]+            { atoi(strcat('0x', cat($2))) }

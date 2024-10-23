@@ -230,11 +230,7 @@ class _Analyzer:
             'pred',
             'run',
         ):
-            try:
-                self.walk(node[2][0])
-            except Exception as e:
-                import pdb; pdb.set_trace()
-                pass
+            self.walk(node[2][0])
         elif ty in ('ll_plus', 'll_minus'):
             self.walk(node[2][0])
             self.walk(node[2][0])
@@ -264,21 +260,13 @@ class _Analyzer:
         elif ty in ('ll_plus', 'll_minus'):
             self._vars_needed(node[2][0], max_num, vs)
             self._vars_needed(node[2][1], max_num, vs)
-        elif ty in ('ll_qual',):
-            try:
-                for n in node[2]:
-                    self._vars_needed(n, max_num, vs)
-            except Exception as e:
-                import pdb; pdb.set_trace()
-                pass
+        elif ty in ('ll_qual'):
+            for n in node[2]:
+                self._vars_needed(n, max_num, vs)
         elif ty in ('ll_const', 'll_lit', 'll_num'):
             pass
         else:  # pragma: no cover
-            try:
-                assert False, f'Unexpected AST node type: {ty}'
-            except Exception as e:
-                import pdb; pdb.set_trace()
-                pass
+            assert False, f'Unexpected AST node type: {ty}'
 
 
 class Visitor:
