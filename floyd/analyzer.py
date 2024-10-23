@@ -31,7 +31,7 @@ class AnalysisError(Exception):
 def _update_rules(grammar):
     rules = set()
     for rule in grammar.ast[2]:
-        if rule[0] == 'rule':
+        if rule[0] == 'rule' and not rule[1].startswith('%'):
             grammar.rules[rule[1]] = rule[2][0]
             rules.add(rule[1])
     for rule in grammar.rules:
@@ -44,6 +44,7 @@ class Grammar:
         self.ast = ast
         self.comment = None
         self.rules = collections.OrderedDict()
+        self.pragmas = []
         self.starting_rule = None
         self.tokens = set()
         self.whitespace = None
@@ -62,14 +63,18 @@ class Grammar:
 
         has_starting_rule = False
         for n in self.ast[2]:
-            if n[0] == 'rule':
-                if not has_starting_rule:
-                    self.starting_rule = n[1]
-                    has_starting_rule = True
-                self.rules[n[1]] = n[2][0]
-            elif n[0] == 'pragma' and n[1] in ('token', 'tokens'):
-                for t in n[2]:
-                    self.tokens.add(t)
+            if n[1].startswith('%'):
+                self.pragmas.append(n)
+                if n[1] in ('%token', '%tokens'):
+                    for t in n[2][0][2][0][2]:
+                        assert t[0] == 'apply'
+                        self.tokens.add(t[1])
+                continue
+
+            if not has_starting_rule:
+                self.starting_rule = n[1]
+                has_starting_rule = True
+            self.rules[n[1]] = n[2][0]
 
 
 class OperatorState:
@@ -141,8 +146,26 @@ class _Analyzer:
         self.current_prec = 0
 
     def analyze(self):
-        self.rules = set(n[1] for n in self.grammar.ast[2] if n[0] == 'rule')
-        self.walk(self.grammar.ast)
+        assert self.grammar.ast[0] == 'rules'
+
+        # First figure out the names of all the rules so we can check
+        # them as we walk the tree.
+        self.rules = set(n[1] for n in self.grammar.ast[2]
+                         if n[0] == 'rule' and not n[1].startswith('%'))
+
+        for node in self.grammar.ast[2]:
+            try:
+                assert node[0] == 'rule'
+            except Exception as e:
+                import pdb; pdb.set_trace()
+                pass
+            rule_name = node[1]
+            if rule_name[0] == '%':
+                self._handle_pragma(node)
+                continue
+            for n in node[2]:
+                self.walk(n)
+
         self.grammar.comment = self.comment
         self.grammar.whitespace = self.whitespace
         self.grammar.assoc = self.assoc
@@ -155,91 +178,94 @@ class _Analyzer:
         ty = node[0]
 
         if ty == 'seq':
-            # Figure out what, if any, variables are being bound in this
-            # sequence so that we can ensure that only bound variables
-            # are being dereferenced in ll_var nodes.
-            self.scopes.append([])
-            vs = set()
-            for i, n in enumerate(node[2], start=1):
-                if n[0] in ('action', 'pred'):
-                    self._vars_needed(n[2][0], i, vs)
-            for i, n in enumerate(node[2], start=1):
-                name = f'${i}'
-                if n[0] == 'label' and n[1][0] == '$':
-                    self.errors.append(
-                        (
-                            f'"{name}" is a reserved variable name '
-                            'and cannot be explicitly defined'
-                        )
-                    )
-                if name in vs and (n[0] != 'label' or n[1] != name):
-                    node[2][i - 1] = ['label', name, [n]]
-
-            for n in node[2]:
-                if n[0] == 'label':
-                    self.scopes[-1].append(n[1])
+            self._handle_seq(node)
+            return
 
         if ty == 'apply':
             if node[1] not in self.rules and node[1] not in ('any', 'end'):
                 self.errors.append(f'Unknown rule "{node[1]}"')
         if ty == 'll_qual':
             if node[2][1][0] == 'll_call':
+                assert node[2][0][0] == 'll_var'
                 name = node[2][0][1]
                 if name not in BUILTIN_FUNCTIONS:
                     self.errors.append(f'Unknown function "{name}" called')
-            else:
-                self.walk(node[2][0])
+                # Now skip over the var so we don't treat it as an actual var.
+                for n in node[2][1:]:
+                    self.walk(n)
+                return
+
         if ty == 'll_var':
             if node[1] not in self.scopes[-1] and node[1][0] != '$':
                 self.errors.append(f'Unknown variable "{node[1]}" referenced')
 
-        if ty in ('choice', 'll_arr', 'll_call', 'operator', 'rules', 'seq'):
-            for n in node[2]:
-                self.walk(n)
-        elif ty == 'pragma':
-            if node[1] in ('token', 'tokens'):
-                for n in node[2]:
-                    if n in self.rules:
-                        self.tokens.add(n)
-                    else:
-                        self.errors.append(f'Unknown token rule "{n}"')
-            elif node[1] == 'whitespace':
-                self.whitespace = node[2][0]
-            elif node[1] == 'comment':
-                self.comment = node[2][0]
-            elif node[1] == 'prec':
-                for n in node[2]:
-                    self.prec[n[1]] = self.current_prec
-                self.current_prec += 2
-            else:
-                assert node[1] == 'assoc'
-                self.assoc[node[2][0][1]] = node[2][1]
-        elif ty == 'rule':
-            self.walk(node[2][0])
-        elif ty in (
-            'action',
-            'count',
-            'ends_in',
-            'label',
-            'll_getitem',
-            'll_paren',
-            'not',
-            'not_one',
-            'paren',
-            'post',
-            'pred',
-            'run',
-        ):
-            self.walk(node[2][0])
-        elif ty in ('ll_plus', 'll_minus'):
-            self.walk(node[2][0])
-            self.walk(node[2][0])
-        elif ty == 'll_qual':
-            for n in node[2][1:]:
-                self.walk(n)
+        for n in node[2]:
+            self.walk(n)
 
-        if ty == 'seq':
-            self.scopes.pop()
+    def _handle_pragma(self, node):
+        rule_name = node[1]
+        assert len(node[2]) == 1
+        choice = node[2][0]
+        assert choice[0] == 'choice'
+        
+        if rule_name in ('%token', '%tokens'):
+            for subnode in choice[2]:
+                assert subnode[0] == 'seq'
+                for expr in subnode[2]:
+                    assert expr[0] == 'apply'
+                    token = expr[1]
+                    if token in self.rules:
+                        self.tokens.add(token)
+                    else:
+                        self.errors.append(f'Unknown token rule "{token}"')
+        elif rule_name == '%whitespace':
+            self.whitespace = choice
+        elif rule_name == '%comment':
+            self.comment = choice
+        elif rule_name == '%prec':
+            for c in choice[2]:
+                assert c[0] == 'seq'
+                for t in c[2]:
+                    assert t[0] == 'lit'
+                    self.prec[t[1]] = self.current_prec
+                self.current_prec += 2
+        else:
+            assert rule_name == '%assoc'
+            assert len(node[2]) == 1
+            subnode = node[2][0]
+            assert subnode[0] == 'seq'
+            assert len(subnode[2]) == 2
+            assert subnode[2][0][0] == 'lit'
+            operator = subnode[2][0][1]
+            direction = subnode[2][1][1]
+            assert direction in ('left', 'right')
+            self.assoc[operator] == direction
+
+    def _handle_seq(self, node):
+        # Figure out what, if any, variables are being bound in this
+        # sequence so that we can ensure that only bound variables
+        # are being dereferenced in ll_var nodes.
+        self.scopes.append([])
+        vs = set()
+        for i, n in enumerate(node[2], start=1):
+            if n[0] in ('action', 'pred'):
+                self._vars_needed(n[2][0], i, vs)
+        for i, n in enumerate(node[2], start=1):
+            name = f'${i}'
+            if n[0] == 'label' and n[1][0] == '$':
+                self.errors.append(
+                    f'"{name}" is a reserved variable name '
+                    'and cannot be explicitly defined'
+                )
+            if name in vs and (n[0] != 'label' or n[1] != name):
+                node[2][i - 1] = ['label', name, [n]]
+
+        for n in node[2]:
+            if n[0] == 'label':
+                self.scopes[-1].append(n[1])
+            self.walk(n)
+
+        self.scopes.pop()
 
     def _vars_needed(self, node, max_num, vs):
         ty = node[0]
@@ -260,7 +286,7 @@ class _Analyzer:
         elif ty in ('ll_plus', 'll_minus'):
             self._vars_needed(node[2][0], max_num, vs)
             self._vars_needed(node[2][1], max_num, vs)
-        elif ty in ('ll_qual'):
+        elif ty in ('ll_qual',):
             for n in node[2]:
                 self._vars_needed(n, max_num, vs)
         elif ty in ('ll_const', 'll_lit', 'll_num'):
