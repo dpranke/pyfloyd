@@ -866,6 +866,8 @@ _BUILTIN_METHODS = """\
 
 _BUILTIN_FUNCTIONS = """\
 def _atoi(a):
+    if a.startswith('0x'):
+        return int(a, base=16)
     return int(a)
 
 def _arrcat(a, b):
