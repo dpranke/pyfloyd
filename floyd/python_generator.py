@@ -65,6 +65,8 @@ class PythonGenerator(Generator):
 
     def _gen_rules(self) -> None:
         for rule, node in self.grammar.rules.items():
+            if rule == '_r_squote_':
+                import pdb; pdb.set_trace()
             self._methods[rule] = self._gen(node)
 
     def _gen_text(self) -> str:
@@ -173,6 +175,8 @@ class PythonGenerator(Generator):
     def _gen_methods(self) -> str:
         text = ''
         for rule, method_body in self._methods.items():
+            if rule[3] == '%':
+                continue
             memoize = self.options.memoize and rule.startswith('_r_')
             text += self._gen_method_text(rule, method_body, memoize)
         text += '\n'
@@ -907,6 +911,7 @@ def _scat(ss):
 
 def _scons(hd, tl):
     return [hd] + tl
+
 
 def _strcat(a, b):
     return a + b
