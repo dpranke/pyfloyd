@@ -109,8 +109,8 @@ num_literal    = '-' num_literal                 -> 0 - $2
                | '+' num_literal                 -> $2
                | dec_literal ~id_start           -> float($1)
                | hex_literal                     -> hex($1)
-               | 'Infinity'                      -> Infinity
-               | 'NaN'                           -> NaN
+               | 'Infinity'                      -> 'Infinity'
+               | 'NaN'                           -> 'NaN'
 
 dec_literal    = dec_int_lit frac? exp?          
                    -> join('', arrcat(arrcat([$1], $2), $3))

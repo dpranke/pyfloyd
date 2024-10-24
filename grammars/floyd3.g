@@ -35,11 +35,13 @@ post_expr   = prim_expr '?'                -> ['post', $2, [$1]]
 count       = '{' zpos ',' zpos '}'        -> [$2, $4]
             | '{' zpos '}'                 -> [$2, $2]
 
-prim_expr   = lit '..' lit                 -> ['range', null, [$1, $3]]
+prim_expr   = lit '..' lit                 -> ['range', null,
+                [['lit', $1, []], ['lit', $3, []]]]
             | lit                          -> ['lit', $1, []]
             | '\\p{' ident '}'             -> ['unicat', $2, []]
             | '[^' set_char+ ']'           -> ['exclude', cat($2), []]
             | '[' ~'^' set_char+ ']'       -> ['set', cat($3), []]
+            | '/' rechar+ '/'              -> ['regexp', cat($2), []]
             | '~' prim_expr                -> ['not', null, [$2]]
             | '^.' prim_expr               -> ['ends_in', null, [$2]]
             | '^' prim_expr                -> ['not_one', null, [$2]]
@@ -83,11 +85,15 @@ set_char    = escape
             | '\\]'                        -> ']'
             | ^']'
 
+rechar      = bslash '/'                   -> '/'
+            | escape
+            | [^/]
+
 zpos        = '0'                          -> 0
             | [1-9] [0-9]*                 -> atoi(cat(scons($1, $2)))
 
-ll_expr     = ll_qual '+' ll_expr          -> ['ll_plus', null, [$1, $2]]
-            | ll_qual '-' ll_expr          -> ['ll_minus', null, [$1, $2]]
+ll_expr     = ll_qual '+' ll_expr          -> ['ll_plus', null, [$1, $3]]
+            | ll_qual '-' ll_expr          -> ['ll_minus', null, [$1, $3]]
             | ll_qual
 
 ll_exprs    = ll_expr (',' ll_expr)* ','?  -> cons($1, $2)

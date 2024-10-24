@@ -228,14 +228,18 @@ class _Analyzer:
         else:
             assert rule_name == '%assoc'
             assert len(node[2]) == 1
-            subnode = node[2][0]
-            assert subnode[0] == 'seq'
-            assert len(subnode[2]) == 2
-            assert subnode[2][0][0] == 'lit'
-            operator = subnode[2][0][1]
-            direction = subnode[2][1][1]
+            choice = node[2][0]
+            assert choice[0] == 'choice'
+            assert len(choice[2]) == 1
+            seq = choice[2][0]
+            assert seq[0] == 'seq'
+            assert len(seq[2]) == 2
+            assert seq[2][0][0] == 'lit'
+            operator = seq[2][0][1]
+            assert seq[2][1][0] == 'apply'
+            direction = seq[2][1][1]
             assert direction in ('left', 'right')
-            self.assoc[operator] == direction
+            self.assoc[operator] = direction
 
     def _handle_seq(self, node):
         # Figure out what, if any, variables are being bound in this
@@ -473,10 +477,7 @@ def _rewrite_filler(grammar):
     _update_rules(grammar)
     new_rules = []
     for rule in grammar.ast[2]:
-        if rule[0] == 'pragma' and rule[1] in (
-            'whitespace',
-            'comment',
-        ):
+        if rule[1] in ('%whitespace', '%comment'):
             continue
         new_rules.append(rule)
     grammar.ast[2] = new_rules

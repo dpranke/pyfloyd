@@ -107,8 +107,8 @@ num_literal    = '-' num_literal:n                       -> 0 - n
                | '+' num_literal:n                       -> n
                | dec_literal:d ~id_start                 -> float(d)
                | hex_literal:h                           -> hex(h)
-               | 'Infinity'                              -> Infinity
-               | 'NaN'                                   -> NaN
+               | 'Infinity'                              -> 'Infinity'
+               | 'NaN'                                   -> 'NaN'
 
 dec_literal    = dec_int_lit:d frac:f exp:e              -> d + f + e
                | dec_int_lit:d frac:f                    -> d + f

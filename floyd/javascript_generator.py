@@ -61,7 +61,25 @@ class JavaScriptGenerator(Generator):
 
     def _gen_rules(self) -> None:
         for rule, node in self.grammar.rules.items():
-            self._methods[rule] = self._gen(node)
+            p_defined = False
+            errpos_defined = False
+            lines = []
+            for l in self._gen(node):
+                if 'let p =' in l:
+                    if p_defined:
+                        lines.append(l.replace('let p', 'p'))
+                    else:
+                        p_defined = True
+                        lines.append(l)
+                elif 'let errpos =' in l:
+                    if errpos_defined:
+                        lines.append(l.replace('let errpos', 'errpos'))
+                    else:
+                        errpos__defined = True
+                        lines.append(l)
+                else:
+                    lines.append(l)
+            self._methods[rule] = lines
 
     def _gen_text(self) -> str:
         if self.options.main:
@@ -442,11 +460,11 @@ class JavaScriptGenerator(Generator):
     def _regexp_(self, node) -> List[str]:
         s = lit.escape(node[1], '/')
         return [
-            f'let regexp = /{s}/g;',
+            f'let regexp = /{s}/gy;',
             'regexp.lastIndex = this.pos;',
             'let found = regexp.exec(this.text);',
             'if (found) {',
-            '    this.#succeed(found[0], regexp.lastIndex)',
+            '    this.#succeed(found[0], this.pos + found[0].length)',
             '    return;',
             '}',
             'this.#fail();',
@@ -909,6 +927,18 @@ atoi(a) {
   return parseInt(a);
 }
 
+cat(ss) {
+  return ss.join('');
+}
+
+concat(xs, ys) {
+  return xs.concat(ys);
+}
+
+cons(hd, tl) {
+  return [hd].concat(tl)
+}
+
 dict(pairs) {
   m = new Map();
   for ([k, v] of pairs) {
@@ -935,6 +965,14 @@ itou(n) {
 
 join(s, vs) {
   return vs.join(s);
+}
+
+scat(ss) {
+  return ss.join('');
+}
+
+scons(hd, tl) {
+  return [hd].concat(tl);
 }
 
 strcat(a, b) {

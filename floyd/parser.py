@@ -47,8 +47,6 @@ class _Parser:
         self.path = path
         self.pos = 0
         self.val = None
-        self.seeds = {}
-        self.blocked = set()
         self.regexps = {}
 
     def parse(self):
@@ -458,10 +456,6 @@ class _Parser:
         if not self.failed:
             return
         self._rewind(p)
-        self._s_prim_expr_15_()
-        if not self.failed:
-            return
-        self._rewind(p)
         self._s_prim_expr_16_()
         if not self.failed:
             return
@@ -470,7 +464,15 @@ class _Parser:
         if not self.failed:
             return
         self._rewind(p)
-        self._s_prim_expr_21_()
+        self._s_prim_expr_18_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._s_prim_expr_19_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._s_prim_expr_23_()
 
     def _s_prim_expr_1_(self):
         self._s_prim_expr_2_()
@@ -485,7 +487,9 @@ class _Parser:
             if not self.failed:
                 v__3 = self.val
         if not self.failed:
-            self._succeed(['range', None, [v__1, v__3]])
+            self._succeed(
+                ['range', None, [['lit', v__1, []], ['lit', v__3, []]]]
+            )
 
     def _s_prim_expr_2_(self):
         self._r__filler_()
@@ -610,6 +614,36 @@ class _Parser:
     def _s_prim_expr_14_(self):
         self._r__filler_()
         if not self.failed:
+            self._ch('/')
+        if not self.failed:
+            self._s_prim_expr_15_()
+            if not self.failed:
+                v__2 = self.val
+        if not self.failed:
+            self._r__filler_()
+        if not self.failed:
+            self._ch('/')
+        if not self.failed:
+            self._succeed(['regexp', _cat(v__2), []])
+
+    def _s_prim_expr_15_(self):
+        vs = []
+        self._r_rechar_()
+        vs.append(self.val)
+        if self.failed:
+            return
+        while True:
+            p = self.pos
+            self._r_rechar_()
+            if self.failed or self.pos == p:
+                self._rewind(p)
+                break
+            vs.append(self.val)
+        self._succeed(vs)
+
+    def _s_prim_expr_16_(self):
+        self._r__filler_()
+        if not self.failed:
             self._ch('\x7e')
         if not self.failed:
             self._r_prim_expr_()
@@ -618,7 +652,7 @@ class _Parser:
         if not self.failed:
             self._succeed(['not', None, [v__2]])
 
-    def _s_prim_expr_15_(self):
+    def _s_prim_expr_17_(self):
         self._r__filler_()
         if not self.failed:
             self._str('^.')
@@ -629,7 +663,7 @@ class _Parser:
         if not self.failed:
             self._succeed(['ends_in', None, [v__2]])
 
-    def _s_prim_expr_16_(self):
+    def _s_prim_expr_18_(self):
         self._r__filler_()
         if not self.failed:
             self._ch('^')
@@ -640,24 +674,24 @@ class _Parser:
         if not self.failed:
             self._succeed(['not_one', None, [v__2]])
 
-    def _s_prim_expr_17_(self):
-        self._s_prim_expr_18_()
+    def _s_prim_expr_19_(self):
+        self._s_prim_expr_20_()
         if not self.failed:
             v__1 = self.val
         if not self.failed:
-            self._s_prim_expr_19_()
+            self._s_prim_expr_21_()
         if not self.failed:
             self._succeed(['apply', v__1, []])
 
-    def _s_prim_expr_18_(self):
+    def _s_prim_expr_20_(self):
         self._r__filler_()
         if not self.failed:
             self._r_ident_()
 
-    def _s_prim_expr_19_(self):
+    def _s_prim_expr_21_(self):
         p = self.pos
         errpos = self.errpos
-        self._s_prim_expr_20_()
+        self._s_prim_expr_22_()
         if self.failed:
             self._succeed(None, p)
         else:
@@ -665,12 +699,12 @@ class _Parser:
             self.errpos = errpos
             self._fail()
 
-    def _s_prim_expr_20_(self):
+    def _s_prim_expr_22_(self):
         self._r__filler_()
         if not self.failed:
             self._ch('=')
 
-    def _s_prim_expr_21_(self):
+    def _s_prim_expr_23_(self):
         self._r__filler_()
         if not self.failed:
             self._ch('(')
@@ -1073,6 +1107,43 @@ class _Parser:
         if not self.failed:
             self._ch(']')
 
+    def _r_rechar_(self):
+        p = self.pos
+        self._s_rechar_1_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._s_rechar_2_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._s_rechar_3_()
+
+    def _s_rechar_1_(self):
+        self._r_bslash_()
+        if not self.failed:
+            self._r__filler_()
+        if not self.failed:
+            self._ch('/')
+        if not self.failed:
+            self._succeed('/')
+
+    def _s_rechar_2_(self):
+        self._r__filler_()
+        if not self.failed:
+            self._r_escape_()
+
+    def _s_rechar_3_(self):
+        self._r__filler_()
+        if not self.failed:
+            self._s_rechar_4_()
+
+    def _s_rechar_4_(self):
+        if self.pos == self.end or self.text[self.pos] in '/':
+            self._fail()
+            return
+        self._succeed(self.text[self.pos], self.pos + 1)
+
     def _r_zpos_(self):
         p = self.pos
         self._s_zpos_1_()
@@ -1130,11 +1201,11 @@ class _Parser:
 
     def _r_ll_expr_(self):
         p = self.pos
-        self._leftrec(self._s_ll_expr_1_, 'll_expr#1', True)
+        self._s_ll_expr_1_()
         if not self.failed:
             return
         self._rewind(p)
-        self._leftrec(self._s_ll_expr_3_, 'll_expr#2', True)
+        self._s_ll_expr_2_()
         if not self.failed:
             return
         self._rewind(p)
@@ -1145,36 +1216,30 @@ class _Parser:
         if not self.failed:
             v__1 = self.val
         if not self.failed:
-            self._s_ll_expr_2_()
-            if not self.failed:
-                v__2 = self.val
-        if not self.failed:
-            self._r_ll_expr_()
-        if not self.failed:
-            self._succeed(['ll_plus', None, [v__1, v__2]])
-
-    def _s_ll_expr_2_(self):
-        self._r__filler_()
+            self._r__filler_()
         if not self.failed:
             self._ch('+')
+        if not self.failed:
+            self._r_ll_expr_()
+            if not self.failed:
+                v__3 = self.val
+        if not self.failed:
+            self._succeed(['ll_plus', None, [v__1, v__3]])
 
-    def _s_ll_expr_3_(self):
+    def _s_ll_expr_2_(self):
         self._r_ll_qual_()
         if not self.failed:
             v__1 = self.val
         if not self.failed:
-            self._s_ll_expr_4_()
-            if not self.failed:
-                v__2 = self.val
-        if not self.failed:
-            self._r_ll_expr_()
-        if not self.failed:
-            self._succeed(['ll_minus', None, [v__1, v__2]])
-
-    def _s_ll_expr_4_(self):
-        self._r__filler_()
+            self._r__filler_()
         if not self.failed:
             self._ch('-')
+        if not self.failed:
+            self._r_ll_expr_()
+            if not self.failed:
+                v__3 = self.val
+        if not self.failed:
+            self._succeed(['ll_minus', None, [v__1, v__3]])
 
     def _r_ll_exprs_(self):
         p = self.pos
@@ -1685,34 +1750,6 @@ class _Parser:
         self.val = None
         self.failed = True
         self.errpos = max(self.errpos, self.pos)
-
-    def _leftrec(self, rule, rule_name, left_assoc):
-        pos = self.pos
-        key = (rule_name, pos)
-        seed = self.seeds.get(key)
-        if seed:
-            self.val, self.failed, self.pos = seed
-            return
-        if rule_name in self.blocked:
-            self.val = None
-            self.failed = True
-            return
-        current = (None, True, self.pos)
-        self.seeds[key] = current
-        if left_assoc:
-            self.blocked.add(rule_name)
-        while True:
-            rule()
-            if self.pos > current[2]:
-                current = (self.val, self.failed, self.pos)
-                self.seeds[key] = current
-                self.pos = pos
-            else:
-                del self.seeds[key]
-                self.val, self.failed, self.pos = current
-                if left_assoc:
-                    self.blocked.remove(rule_name)
-                return
 
     def _rewind(self, newpos):
         self._succeed(None, newpos)

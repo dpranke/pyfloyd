@@ -112,7 +112,7 @@ class PrinterTest(unittest.TestCase):
         self.assertIsNone(err)
 
     def test_pred(self):
-        grammar = 'grammar = ?(true) -> true\n'
+        grammar = 'grammar = ?{true} -> true\n'
         out, err = floyd.pretty_print(grammar)
         self.assertEqual(grammar, out)
         self.assertIsNone(err)
@@ -130,7 +130,7 @@ class PrinterTest(unittest.TestCase):
         out, err = floyd.pretty_print(grammar, rewrite_filler=True)
         self.assertEqual(
             textwrap.dedent("""\
-            %token = foo
+            %token = _filler foo
 
             grammar  = _filler foo _filler end
 
@@ -172,7 +172,7 @@ class PrinterTest(unittest.TestCase):
 
     def test_tokens_only_one_token(self):
         grammar = textwrap.dedent("""\
-            %tokens = foo
+            %token = foo
 
             grammar = foo
 

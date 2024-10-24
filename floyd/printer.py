@@ -172,7 +172,7 @@ class Printer:
         return '~%s' % self._proc(node[2][0])
 
     def _pred_(self, node):
-        return '?(%s)' % self._proc(node[2][0])
+        return '?{%s}' % self._proc(node[2][0])
 
     def _post_(self, node):
         return '%s%s' % (self._proc(node[2][0]), node[1])
