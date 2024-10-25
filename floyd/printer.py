@@ -86,7 +86,9 @@ class Printer:
                 '%token',
                 '%tokens',
             ):
-                lines.append(rule_name + ' = ' + ' '.join(c[0] for c in choices))
+                lines.append(
+                    rule_name + ' = ' + ' '.join(c[0] for c in choices)
+                )
             else:
                 choice, act = choices[0]
                 lines.append(

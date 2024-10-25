@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, List, Union
+from typing import Dict, List, Set, Union
 
 from floyd.analyzer import Grammar
 from floyd.formatter import flatten, Comma, Saw, Tree
@@ -64,21 +64,21 @@ class JavaScriptGenerator(Generator):
             p_defined = False
             errpos_defined = False
             lines = []
-            for l in self._gen(node):
-                if 'let p =' in l:
+            for line in self._gen(node):
+                if 'let p =' in line:
                     if p_defined:
-                        lines.append(l.replace('let p', 'p'))
+                        lines.append(line.replace('let p', 'p'))
                     else:
                         p_defined = True
-                        lines.append(l)
-                elif 'let errpos =' in l:
+                        lines.append(line)
+                elif 'let errpos =' in line:
                     if errpos_defined:
-                        lines.append(l.replace('let errpos', 'errpos'))
+                        lines.append(line.replace('let errpos', 'errpos'))
                     else:
-                        errpos__defined = True
-                        lines.append(l)
+                        errpos_defined = True
+                        lines.append(line)
                 else:
-                    lines.append(l)
+                    lines.append(line)
             self._methods[rule] = lines
 
     def _gen_text(self) -> str:
@@ -223,9 +223,9 @@ class JavaScriptGenerator(Generator):
 
     def _gen(self, node) -> List[str]:
         # All of the rule methods return a list of lines.
-        lines: list[str] = []
+        lines: List[str] = []
         if node[0] == 'seq':
-            vs: set[str] = set()
+            vs: Set[str] = set()
             self._find_vars(node, vs)
             lines = []
             for v in sorted(vs):
@@ -278,20 +278,22 @@ class JavaScriptGenerator(Generator):
             f'let cmax = {node[1][1]};',
             'while (i < cmax) {',
         ]
-        lines.extend(['    ' + l for l in self._gen(node[2][0])])
-        lines.extend([
-            '    if (this.failed) {',
-            '        if (i >= cmin) {',
-            '            this.#succeed(vs);',
-            '            return;',
-            '        }',
-            '        return;',
-            '    }',
-            '    vs.push(this.val);',
-            '    i += 1;',
-            '}',
-            'this.#succeed(vs);',
-        ])
+        lines.extend(['    ' + line for line in self._gen(node[2][0])])
+        lines.extend(
+            [
+                '    if (this.failed) {',
+                '        if (i >= cmin) {',
+                '            this.#succeed(vs);',
+                '            return;',
+                '        }',
+                '        return;',
+                '    }',
+                '    vs.push(this.val);',
+                '    i += 1;',
+                '}',
+                'this.#succeed(vs);',
+            ]
+        )
         return lines
 
     def _empty_(self, node) -> List[str]:
@@ -300,18 +302,22 @@ class JavaScriptGenerator(Generator):
 
     def _ends_in_(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
-        lines = [
-            'while (true) {',
-        ] + ['    ' + line for line in sublines] + [
-            '    if (!this.failed) {',
-            '        break;',
-            '    }',
-            '    this.#_r_any_();',
-            '    if (this.failed) {',
-            '        break;',
-            '    }',
-            '}',
-        ]
+        lines = (
+            [
+                'while (true) {',
+            ]
+            + ['    ' + line for line in sublines]
+            + [
+                '    if (!this.failed) {',
+                '        break;',
+                '    }',
+                '    this.#_r_any_();',
+                '    if (this.failed) {',
+                '        break;',
+                '    }',
+                '}',
+            ]
+        )
         return lines
 
     def _label_(self, node) -> List[str]:
@@ -366,6 +372,7 @@ class JavaScriptGenerator(Generator):
             '    this.#_r_any_(p);',
             '}',
         ]
+
     def _operator_(self, node) -> List[str]:
         self._needed_methods.add('operator')
         # Operator nodes have no children, but subrules for each arm
@@ -448,7 +455,7 @@ class JavaScriptGenerator(Generator):
 
     def _regexp_(self, node) -> List[str]:
         # TODO: Explain why this is correct.
-        s = lit.escape(node[1], '/').replace('\\\\', '\\') 
+        s = lit.escape(node[1], '/').replace('\\\\', '\\')
         return [
             f'let regexp = /{s}/gy;',
             'regexp.lastIndex = this.pos;',
@@ -462,15 +469,17 @@ class JavaScriptGenerator(Generator):
 
     def _run_(self, node) -> List[str]:
         lines = self._gen(node[2][0])
-        return [
-            'let start = this.pos;'
-        ] + lines + [
-            'if (this.failed) {',
-            '    return;',
-            '}',
-            'let end = this.pos;',
-            'this.val = this.text.substr(start, end);'
-        ]
+        return (
+            ['let start = this.pos;']
+            + lines
+            + [
+                'if (this.failed) {',
+                '    return;',
+                '}',
+                'let end = this.pos;',
+                'this.val = this.text.substr(start, end);',
+            ]
+        )
 
     def _set_(self, node) -> List[str]:
         new_node = ['regexp', '[' + node[1] + ']', []]

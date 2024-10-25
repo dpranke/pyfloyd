@@ -249,19 +249,21 @@ class PythonGenerator(Generator):
             'vs = []',
             'i = 0',
             f'cmin, cmax = {node[1]}',
-            f'while i < cmax:',
+            'while i < cmax:',
         ]
-        lines.extend(['    ' + l for l in self._gen(node[2][0])])
-        lines.extend([
-            '    if self.failed:',
-            '        if i >= cmin:',
-            '            self._succeed(vs)',
-            '            return',
-            '        return',
-            '    vs.append(self.val)',
-            '    i += 1',
-            'self._succeed(vs)',
-        ])
+        lines.extend(['    ' + line for line in self._gen(node[2][0])])
+        lines.extend(
+            [
+                '    if self.failed:',
+                '        if i >= cmin:',
+                '            self._succeed(vs)',
+                '            return',
+                '        return',
+                '    vs.append(self.val)',
+                '    i += 1',
+                'self._succeed(vs)',
+            ]
+        )
         return lines
 
     def _empty_(self, node) -> List[str]:
@@ -270,15 +272,19 @@ class PythonGenerator(Generator):
 
     def _ends_in_(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
-        return [
-            'while True:',
-        ] + ['    ' + line for line in sublines] + [
-            '    if not self.failed:',
-            '        break',
-            '    self._r_any_()',
-            '    if self.failed:',
-            '        break',
-        ]
+        return (
+            [
+                'while True:',
+            ]
+            + ['    ' + line for line in sublines]
+            + [
+                '    if not self.failed:',
+                '        break',
+                '    self._r_any_()',
+                '    if self.failed:',
+                '        break',
+            ]
+        )
 
     def _label_(self, node) -> List[str]:
         lines = self._gen(node[2][0])
@@ -327,10 +333,7 @@ class PythonGenerator(Generator):
 
     def _not_one_(self, node) -> List[str]:
         sublines = self._gen(['not', None, node[2]])
-        return sublines + [
-            'if not self.failed:',
-            '    self._r_any_()'
-        ]
+        return sublines + ['if not self.failed:', '    self._r_any_()']
 
     def _operator_(self, node) -> List[str]:
         self._needed_methods.add('operator')
@@ -410,7 +413,7 @@ class PythonGenerator(Generator):
     def _regexp_(self, node) -> List[str]:
         return [
             f'p = {lit.encode(node[1])}',
-            f'if p not in self.regexps:',
+            'if p not in self.regexps:',
             '    self.regexps[p] = re.compile(p)',
             'm = self.regexps[p].match(self.text, self.pos)',
             'if m:',
@@ -421,18 +424,20 @@ class PythonGenerator(Generator):
 
     def _run_(self, node) -> List[str]:
         lines = self._gen(node[2][0])
-        return [
-            'start = self.pos'
-        ] + lines + [
-            'if self.failed:',
-            '    return',
-            'end = self.pos',
-            'self.val = self.text[start:end]'
-        ]
+        return (
+            ['start = self.pos']
+            + lines
+            + [
+                'if self.failed:',
+                '    return',
+                'end = self.pos',
+                'self.val = self.text[start:end]',
+            ]
+        )
 
     def _set_(self, node) -> List[str]:
         new_node = ['regexp', '[' + node[1] + ']', []]
-        return self._regexp(new_node)
+        return self._regexp_(new_node)
 
     def _seq_(self, node) -> List[str]:
         lines = self._gen(node[2][0])
@@ -440,19 +445,6 @@ class PythonGenerator(Generator):
             lines.append('if not self.failed:')
             lines.extend('    ' + line for line in self._gen(subnode))
         return lines
-
-    def _set_(self, node) -> List[str]:
-        return [
-            'if self.pos == self.end:',
-            '    self._fail()',
-            f"p = re.compile('[' + {lit.encode(node[1])} + ']')",
-            'm = p.match(self.text, self.pos)',
-            'if m:',
-            '    self._succeed(m.group(0), m.end())',
-            '    return',
-            'self._fail()',
-        ]
-
 
     def _unicat_(self, node) -> List[str]:
         return ['self._unicat(%s)' % lit.encode(node[1])]

@@ -150,8 +150,11 @@ class _Analyzer:
 
         # First figure out the names of all the rules so we can check
         # them as we walk the tree.
-        self.rules = set(n[1] for n in self.grammar.ast[2]
-                         if n[0] == 'rule' and not n[1].startswith('%'))
+        self.rules = set(
+            n[1]
+            for n in self.grammar.ast[2]
+            if n[0] == 'rule' and not n[1].startswith('%')
+        )
 
         for node in self.grammar.ast[2]:
             assert node[0] == 'rule'
@@ -203,7 +206,7 @@ class _Analyzer:
         assert len(node[2]) == 1
         choice = node[2][0]
         assert choice[0] == 'choice'
-        
+
         if rule_name in ('%token', '%tokens'):
             for subnode in choice[2]:
                 assert subnode[0] == 'seq'
@@ -460,10 +463,7 @@ def _check_lr(name, node, rules, seen):
 
 
 def _rewrite_filler(grammar):
-    if (
-        not grammar.comment
-        and not grammar.whitespace
-    ):
+    if not grammar.comment and not grammar.whitespace:
         return
 
     # Compute the transitive closure of all the token rules.
@@ -649,6 +649,7 @@ class _SubRuleRewriter:
         if fn:
             return fn(node)
         return self._walkn(node)
+
     def _walkn(self, node):
         subnodes = []
         for child in node[2]:
@@ -662,8 +663,15 @@ class _SubRuleRewriter:
         return [node[0], node[1], [self._make_subrule(node[2][0])]]
 
     def _can_inline(self, node) -> bool:
-        if node[0] in ('choice', 'count', 'not', 'post', 'regexp',
-                       'set', 'seq'):
+        if node[0] in (
+            'choice',
+            'count',
+            'not',
+            'post',
+            'regexp',
+            'set',
+            'seq',
+        ):
             return False
         return True
 

@@ -15,7 +15,6 @@
 # pylint: disable=too-many-lines
 
 import json
-import math
 import os
 import pathlib
 import subprocess
@@ -115,7 +114,9 @@ class GrammarTestsMixin:
         self.check(
             # 'grammar = { 505874924095815700 }', text='',
             # out=505874924095815700
-            'grammar = -> 505874924095815700', text='', out=505874924095815700
+            'grammar = -> 505874924095815700',
+            text='',
+            out=505874924095815700,
         )
 
     def test_c_style_comment(self):
@@ -162,13 +163,22 @@ class GrammarTestsMixin:
 
     def test_count(self):
         grammar = "grammar = 'a'{3} 'b'{1,4} end"
-        self.check(grammar, text='a',
-                   err='<string>:1 Unexpected end of input at column 2')
-        self.check(grammar, text='aaa',
-                   err='<string>:1 Unexpected end of input at column 4')
+        self.check(
+            grammar,
+            text='a',
+            err='<string>:1 Unexpected end of input at column 2',
+        )
+        self.check(
+            grammar,
+            text='aaa',
+            err='<string>:1 Unexpected end of input at column 4',
+        )
         self.check(grammar, text='aaab', out=None)
-        self.check(grammar, text='aaabbbbb',
-                   err='<string>:1 Unexpected "b" at column 8')
+        self.check(
+            grammar,
+            text='aaabbbbb',
+            err='<string>:1 Unexpected "b" at column 8',
+        )
 
     def test_cpp_style_comment_in_grammar(self):
         self.check(
@@ -197,12 +207,9 @@ class GrammarTestsMixin:
 
     def test_ends_in(self):
         g = "g = ^.'a' -> true"
-        self.check(g, '',
-            err='<string>:1 Unexpected end of input at column 1'
-        )
+        self.check(g, '', err='<string>:1 Unexpected end of input at column 1')
         self.check(
-            g, 'b',
-            err='<string>:1 Unexpected end of input at column 2'
+            g, 'b', err='<string>:1 Unexpected end of input at column 2'
         )
         self.check(g, 'ba', out=True)
 
@@ -520,10 +527,16 @@ class GrammarTestsMixin:
 
     def test_not_one(self):
         self.check("grammar = ^'a' 'b'-> true", text='cb', out=True)
-        self.check("grammar = ^'a' 'b'-> true", text='a',
-                   err='<string>:1 Unexpected "a" at column 1')
-        self.check("grammar = ^'a' 'b'-> true", text='',
-                   err='<string>:1 Unexpected end of input at column 1')
+        self.check(
+            "grammar = ^'a' 'b'-> true",
+            text='a',
+            err='<string>:1 Unexpected "a" at column 1',
+        )
+        self.check(
+            "grammar = ^'a' 'b'-> true",
+            text='',
+            err='<string>:1 Unexpected end of input at column 1',
+        )
 
     def test_not_not(self):
         self.check("grammar = ~~('a') 'a' -> true", text='a', out=True)
@@ -838,8 +851,11 @@ class GrammarTestsMixin:
 
     def test_run(self):
         self.check("g = <'a' 'b' 'c'> -> true", text='abc', out=True)
-        self.check("g = <'a' 'b' 'c'> -> true", text='d',
-                   err= '<string>:1 Unexpected "d" at column 1')
+        self.check(
+            "g = <'a' 'b' 'c'> -> true",
+            text='d',
+            err='<string>:1 Unexpected "d" at column 1',
+        )
 
     def test_seq(self):
         self.check("grammar = 'foo' 'bar' -> true", text='foobar', out=True)
@@ -850,10 +866,10 @@ class GrammarTestsMixin:
         self.check(g, text='a', out=True)
         self.check(g, text='b', out=True)
         self.check(g, text='e', out=True)
-        self.check(g, text='',
-                   err = '<string>:1 Unexpected end of input at column 1')
-        self.check(g, text='f',
-                   err = '<string>:1 Unexpected "f" at column 1')
+        self.check(
+            g, text='', err='<string>:1 Unexpected end of input at column 1'
+        )
+        self.check(g, text='f', err='<string>:1 Unexpected "f" at column 1')
 
     def test_set_exclude(self):
         self.check('g = [^ab] -> true', text='c', out=True)

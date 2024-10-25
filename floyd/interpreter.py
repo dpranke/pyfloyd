@@ -332,10 +332,7 @@ class Interpreter:
             return
 
         # Unknown variables should have been caught in analysis.
-        try:
-            assert self.scopes and (node[1] in self.scopes[-1])
-        except Exception as e:
-            import pdb; pdb.set_trace()
+        assert self.scopes and (node[1] in self.scopes[-1])
         self._succeed(self.scopes[-1][node[1]])
 
     def _handle_not(self, node):
