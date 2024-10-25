@@ -404,7 +404,7 @@ class PythonGenerator(Generator):
     def _range_(self, node) -> List[str]:
         return [
             'self._range(%s, %s)'
-            % (lit.encode(node[2][0][1]), lit.encode(node[2][1][1]))
+            % (lit.encode(node[1][0]), lit.encode(node[1][1]))
         ]
 
     def _regexp_(self, node) -> List[str]:

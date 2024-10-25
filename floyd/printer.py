@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from floyd import string_literal
+from floyd import string_literal as lit
 
 
 class Printer:
@@ -125,7 +125,7 @@ class Printer:
         return self._proc(node[2][0])
 
     def _lit_(self, node):
-        return string_literal.encode(node[1])
+        return lit.encode(node[1])
 
     def _unicat_(self, node):
         return '\\p{%s}' % node[1]
@@ -163,7 +163,7 @@ class Printer:
         return node[1]
 
     def _range_(self, node):
-        return '%s..%s' % (self._proc(node[2][0]), self._proc(node[2][1]))
+        return '%s..%s' % (lit.encode(node[1][0]), lit.encode(node[1][1]))
 
     def _not_(self, node):
         return '~%s' % self._proc(node[2][0])
@@ -175,10 +175,10 @@ class Printer:
         return '%s%s' % (self._proc(node[2][0]), node[1])
 
     def _regexp_(self, node):
-        return f"/{string_literal.escape(node[1], '/')}/"
+        return f"/{lit.escape(node[1], '/')}/"
 
     def _set_(self, node):
-        return f"[{string_literal.escape(node[1], ']')}]"
+        return f"[{lit.escape(node[1], ']')}]"
 
     def _seq_(self, node):
         return ' '.join(self._proc(e) for e in node[2])

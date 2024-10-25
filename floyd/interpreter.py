@@ -443,11 +443,9 @@ class Interpreter:
             self._fail('Bad predicate value')
 
     def _handle_range(self, node):
-        assert node[2][0][0] == 'lit'
-        assert node[2][1][0] == 'lit'
         if (
             self.pos != self.end
-            and node[2][0][1] <= self.text[self.pos] <= node[2][1][1]
+            and node[1][0] <= self.text[self.pos] <= node[1][1]
         ):
             self._succeed(self.text[self.pos], self.pos + 1)
             return

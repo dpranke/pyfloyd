@@ -35,8 +35,7 @@ post_expr   = prim_expr '?'                -> ['post', $2, [$1]]
 count       = '{' zpos ',' zpos '}'        -> [$2, $4]
             | '{' zpos '}'                 -> [$2, $2]
 
-prim_expr   = lit '..' lit                 -> ['range', null,
-                [['lit', $1, []], ['lit', $3, []]]]
+prim_expr   = lit '..' lit                 -> ['range', [$1, $3], []]
             | lit                          -> ['lit', $1, []]
             | '\\p{' ident '}'             -> ['unicat', $2, []]
             | set                          -> ['set', $1, []]
@@ -73,12 +72,12 @@ escape      = '\\b'                        -> '\x08'
             | uni_esc
             | '\\' any                     -> $2
 
-hex_esc     = '\\x' hex_char{2}            -> itou(atoi(cat(scons('0x', $2))))
-            | '\\x{' hex_char+ '}'         -> itou(atoi(cat(scons('0x', $2))))
+hex_esc     = '\\x' hex_char{2}            -> xtou(cat($2))
+            | '\\x{' hex_char+ '}'         -> xtou(cat($2))
 
-uni_esc     = '\\u' hex_char{4}            -> itou(atoi(cat(scons('0x', $2))))
-            | '\\u{' hex_char+ '}'         -> itou(atoi(cat(scons('0x', $2))))
-            | '\\U' hex_char{8}            -> itou(atoi(cat(scons('0x', $2))))
+uni_esc     = '\\u' hex_char{4}            -> xtou(cat($2))
+            | '\\u{' hex_char+ '}'         -> xtou(cat($2))
+            | '\\U' hex_char{8}            -> xtou(cat($2))
 
 set         = '[' '^' set_char+ ']'        -> cat(scons($2, $3))
             | '[' ~'^' set_char+ ']'       -> cat($3)
@@ -94,7 +93,7 @@ re_char     = bslash '/'                   -> '/'
             | [^/]
 
 zpos        = '0'                          -> 0
-            | [1-9] [0-9]*                 -> atoi(cat(scons($1, $2)))
+            | <[1-9] [0-9]*>               -> atoi($1)
 
 ll_expr     = ll_qual '+' ll_expr          -> ['ll_plus', null, [$1, $3]]
             | ll_qual '-' ll_expr          -> ['ll_minus', null, [$1, $3]]
@@ -120,10 +119,8 @@ ll_prim     = 'false'                      -> ['ll_const', 'false', []]
             | '[' ll_exprs ']'             -> ['ll_arr', null, $2]
 
 int         = '0'
-            | '-'? [1-9] [0-9]*            ->
-                cat(scons(cat($1), scons($2, $3)))
+            | <'-'? [1-9] [0-9]*>
 
-
-hex         = '0x' hex_char+            -> cat(scons('0x', $2))
+hex         = <'0x' hex_char+>
 
 hex_char    = [0-9a-fA-F]

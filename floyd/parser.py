@@ -550,9 +550,7 @@ class _Parser:
             if not self.failed:
                 v__3 = self.val
         if not self.failed:
-            self._succeed(
-                ['range', None, [['lit', v__1, []], ['lit', v__3, []]]]
-            )
+            self._succeed(['range', [v__1, v__3], []])
 
     def _s_prim_expr_2_(self):
         self._r__filler_()
@@ -964,7 +962,7 @@ class _Parser:
             if not self.failed:
                 v__2 = self.val
         if not self.failed:
-            self._succeed(_itou(_atoi(_cat(_scons('0x', v__2)))))
+            self._succeed(_xtou(_cat(v__2)))
 
     def _s_hex_esc_2_(self):
         vs = []
@@ -990,7 +988,7 @@ class _Parser:
         if not self.failed:
             self._ch('}')
         if not self.failed:
-            self._succeed(_itou(_atoi(_cat(_scons('0x', v__2)))))
+            self._succeed(_xtou(_cat(v__2)))
 
     def _s_hex_esc_4_(self):
         vs = []
@@ -1032,7 +1030,7 @@ class _Parser:
             if not self.failed:
                 v__2 = self.val
         if not self.failed:
-            self._succeed(_itou(_atoi(_cat(_scons('0x', v__2)))))
+            self._succeed(_xtou(_cat(v__2)))
 
     def _s_uni_esc_2_(self):
         vs = []
@@ -1058,7 +1056,7 @@ class _Parser:
         if not self.failed:
             self._ch('}')
         if not self.failed:
-            self._succeed(_itou(_atoi(_cat(_scons('0x', v__2)))))
+            self._succeed(_xtou(_cat(v__2)))
 
     def _s_uni_esc_4_(self):
         vs = []
@@ -1082,7 +1080,7 @@ class _Parser:
             if not self.failed:
                 v__2 = self.val
         if not self.failed:
-            self._succeed(_itou(_atoi(_cat(_scons('0x', v__2)))))
+            self._succeed(_xtou(_cat(v__2)))
 
     def _s_uni_esc_6_(self):
         vs = []
@@ -1302,17 +1300,23 @@ class _Parser:
             self._succeed(0)
 
     def _s_zpos_2_(self):
+        start = self.pos
         self._s_zpos_3_()
+        if self.failed:
+            return
+        end = self.pos
+        self.val = self.text[start:end]
         if not self.failed:
             v__1 = self.val
         if not self.failed:
-            self._s_zpos_4_()
-            if not self.failed:
-                v__2 = self.val
-        if not self.failed:
-            self._succeed(_atoi(_cat(_scons(v__1, v__2))))
+            self._succeed(_atoi(v__1))
 
     def _s_zpos_3_(self):
+        self._s_zpos_4_()
+        if not self.failed:
+            self._s_zpos_5_()
+
+    def _s_zpos_4_(self):
         if self.pos == self.end:
             self._fail()
         p = re.compile('[' + '1-9' + ']')
@@ -1322,18 +1326,18 @@ class _Parser:
             return
         self._fail()
 
-    def _s_zpos_4_(self):
+    def _s_zpos_5_(self):
         vs = []
         while True:
             p = self.pos
-            self._s_zpos_5_()
+            self._s_zpos_6_()
             if self.failed or self.pos == p:
                 self._rewind(p)
                 break
             vs.append(self.val)
         self._succeed(vs)
 
-    def _s_zpos_5_(self):
+    def _s_zpos_6_(self):
         if self.pos == self.end:
             self._fail()
         p = re.compile('[' + '0-9' + ']')
@@ -1685,23 +1689,20 @@ class _Parser:
         if not self.failed:
             return
         self._rewind(p)
+        start = self.pos
         self._s_int_1_()
+        if self.failed:
+            return
+        end = self.pos
+        self.val = self.text[start:end]
         self.cache[("_r_int_", pos)] = (self.val, self.failed, self.pos)
 
     def _s_int_1_(self):
         self._s_int_2_()
         if not self.failed:
-            v__1 = self.val
-        if not self.failed:
             self._s_int_3_()
-            if not self.failed:
-                v__2 = self.val
         if not self.failed:
             self._s_int_4_()
-            if not self.failed:
-                v__3 = self.val
-        if not self.failed:
-            self._succeed(_cat(_scons(_cat(v__1), _scons(v__2, v__3))))
 
     def _s_int_2_(self):
         p = self.pos
@@ -1748,16 +1749,20 @@ class _Parser:
             self.val, self.failed, self.pos = r
             return
         pos = self.pos
-        self._str('0x')
-        if not self.failed:
-            self._s_hex_1_()
-            if not self.failed:
-                v__2 = self.val
-        if not self.failed:
-            self._succeed(_cat(_scons('0x', v__2)))
+        start = self.pos
+        self._s_hex_1_()
+        if self.failed:
+            return
+        end = self.pos
+        self.val = self.text[start:end]
         self.cache[("_r_hex_", pos)] = (self.val, self.failed, self.pos)
 
     def _s_hex_1_(self):
+        self._str('0x')
+        if not self.failed:
+            self._s_hex_2_()
+
+    def _s_hex_2_(self):
         vs = []
         self._r_hex_char_()
         vs.append(self.val)
@@ -1996,9 +2001,9 @@ def _cons(hd, tl):
     return [hd] + tl
 
 
-def _itou(n):
-    return chr(n)
-
-
 def _scons(hd, tl):
     return [hd] + tl
+
+
+def _xtou(s):
+    return chr(int(s, base=16))
