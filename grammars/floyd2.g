@@ -28,9 +28,9 @@ id_start    = 'a'..'z' | 'A'..'Z' | '_' | '%' | '$'
 id_continue = id_start | digit
 
 choice      = seq:s ('|' seq)*:ss              
-                -> ['choice', null, arrcat([s], ss)]
+                -> ['choice', null, concat([s], ss)]
 
-seq         = expr:e (expr)*:es                -> ['seq', null, arrcat([e], es)]
+seq         = expr:e (expr)*:es                -> ['seq', null, concat([e], es)]
             |                                  -> ['empty', null, []]
 
 expr        = '<' choice:c '>'                 -> ['run', null, [c]]
@@ -48,7 +48,7 @@ count       = '{' zpos:x ',' zpos:y '}'        -> [x, y]
 
 zpos        = '0'                              -> 0
             | ('1' .. '9'):hd ('0'..'9')*:tl 
-                 -> atoi(join('', arrcat([hd], tl)))
+                 -> atoi(join('', concat([hd], tl)))
 
 prim_expr   = lit:i '..' lit:j                 -> ['range', null, [i, j]]
             | lit:l                            -> l
@@ -115,7 +115,7 @@ exchar      = bslash (']' | esc_char):c        -> c
 rechar      = bslash ('/' | esc_char):c           -> c
             | [^/]+:cs                            -> join('', cs)
 
-ll_exprs    = ll_expr:e (',' ll_expr)*:es      -> arrcat([e], es)
+ll_exprs    = ll_expr:e (',' ll_expr)*:es      -> concat([e], es)
             |                                  -> []
 
 ll_expr     = ll_qual:e1 '+' ll_expr:e2        -> ['ll_plus', null, [e1, e2]]
@@ -123,7 +123,7 @@ ll_expr     = ll_qual:e1 '+' ll_expr:e2        -> ['ll_plus', null, [e1, e2]]
             | ll_qual
 
 ll_qual     = ll_prim:e ll_post_op+:ps
-                -> ['ll_qual', null, arrcat([e], ps)]
+                -> ['ll_qual', null, concat([e], ps)]
             | ll_prim
 
 ll_post_op  = '[' ll_expr:e ']'                -> ['ll_getitem', null, [e]]

@@ -91,7 +91,7 @@ class GrammarTestsMixin:
     def test_array(self):
         self.check(
             """\
-            grammar = '[' value:v (',' value)*:vs ','? ']' -> arrcat([v], vs)
+            grammar = '[' value:v (',' value)*:vs ','? ']' -> concat([v], vs)
             value   = '2':v                                -> float(v)
             """,
             text='[2]',
@@ -294,8 +294,8 @@ class GrammarTestsMixin:
         self.assertIsNone(err)
         self.assertEqual(out[0], 'rules')
 
-    def test_fn_arrcat(self):
-        self.check('g = -> arrcat([1], [2])', text='', out=[1, 2])
+    def test_fn_concat(self):
+        self.check('g = -> concat([1], [2])', text='', out=[1, 2])
 
     def test_fn_strcat(self):
         self.check("g = -> strcat('foo', 'bar')", text='', out='foobar')

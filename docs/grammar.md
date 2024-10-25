@@ -392,8 +392,8 @@ given types (using Python's type annotation syntax):
 
 * `atoi(s:str): int`<br>
   Returns the numeric (integral) equivalent of the string value
-  where the string matches either a floating-point number or a
-  hexadecimal number.
+  where the string is a series of decimal digits (and an optional
+  leading '-').
 
 * `atof(s:str): float`<br>
   Returns the numeric equivalent of the string value, where the
@@ -420,7 +420,8 @@ given types (using Python's type annotation syntax):
 
 * `hex(s:str): int`<br>
   Returns the numeric equivalent of the string, where the string
-  matches a hexadecimal number.
+  matches a hexadecimal number. The string may optionally begin with "0x",
+  or may be just a string of hex digits.
 
 * `int(f:float): int`<br>
   Returns the integer equivalent of the floating point number. values
@@ -439,15 +440,21 @@ given types (using Python's type annotation syntax):
   string in x in between them.
 
 * `scons(x:str, y:[str]): str`<br>
-  Returns the string produced by joining x and the result of `cat(y)`.
-  This is equivalent to `join('', cons(x, y))`.
+  Returns an array with `x` as the first element, followed by the
+  elements from `y`. Equivalen to `cons`, but takes strings instead of
+  Results.
 
 * `strcat(x:str, y:str): str`<br>
   Returns the string concatenation of `x` and `y`. Equivalent to
-  `cat([x, ])` or `join('', [x, y])`.
+  `cat([x, y])` or `join('', [x, y])`.
 
 * `utoi(x:char): int`<br>
   Returns the Unicode code point value for `x`.
+
+* `xtou(s:str): str`<br>
+  Returns the Unicode character with the code point value that is
+  the hexadecimal value in `s`. The string may have an optional "0x"
+  in front, or may be just a string of hexadecimal digits.
 
 ### Implementation-defined
 

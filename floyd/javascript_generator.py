@@ -918,12 +918,8 @@ _BUILTIN_METHODS = """\
 """
 
 _BUILTIN_FUNCTIONS = """\
-arrcat(a, b) {
-  return a.concat(b);
-}
-
 atoi(a) {
-  return parseInt(a);
+  return parseInt(a, 10);
 }
 
 cat(ss) {

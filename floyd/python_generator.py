@@ -846,18 +846,13 @@ _BUILTIN_METHODS = """\
 
 _BUILTIN_FUNCTIONS = """\
 def _atoi(a):
-    if a.startswith('0x'):
-        return int(a, base=16)
-    return int(a)
-
-def _arrcat(a, b):
-    return a + b
+    return int(a, base=10)
 
 def _cat(strs):
     return ''.join(strs)
 
 def _concat(xs, ys):
-    return xs.extend(ys)
+    return xs + ys
 
 def _cons(hd, tl):
     return [hd] + tl

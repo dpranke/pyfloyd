@@ -105,7 +105,6 @@ def analyze(ast, rewrite_filler=True):
 
 
 BUILTIN_FUNCTIONS = (
-    'arrcat',
     'atoi',
     'cat',
     'concat',

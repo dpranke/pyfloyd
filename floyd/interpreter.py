@@ -484,13 +484,8 @@ class Interpreter:
             vs.append(self.val)
         self._succeed(vs)
 
-    def _builtin_fn_arrcat(self, a, b):
-        return a + b
-
     def _builtin_fn_atoi(self, val):
-        if val.startswith('0x'):
-            return int(val, base=16)
-        return int(val)
+        return int(val, base=10)
 
     def _builtin_fn_cat(self, val):
         return ''.join(val)
