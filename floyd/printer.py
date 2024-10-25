@@ -116,11 +116,21 @@ class Printer:
     def _choice_(self, node):
         return ' | '.join(self._proc(e) for e in node[2])
 
+    def _count_(self, node):
+        if node[1][0] == node[1][1]:
+            return '%s{%d}' % (self._proc(node[2][0]), node[1][0])
+        return '%s{%d,%d}' % (self._proc(node[2][0]), node[1][0], node[1][1])
+
     def _empty_(self, node):
         del node
         return ''
 
+    def _ends_in_(self, node):
+        return '^.' + self._proc(node[2][0])
+
     def _label_(self, node):
+        if node[1].startswith('$'):
+            return '%s' % self._proc(node[2][0])
         return '%s:%s' % (self._proc(node[2][0]), node[1])
 
     def _leftrec_(self, node):
@@ -128,9 +138,6 @@ class Printer:
 
     def _lit_(self, node):
         return lit.encode(node[1])
-
-    def _unicat_(self, node):
-        return '\\p{%s}' % node[1]
 
     def _ll_arr_(self, node):
         return '[%s]' % ', '.join(self._proc(el) for el in node[2])
@@ -164,11 +171,14 @@ class Printer:
     def _ll_var_(self, node):
         return node[1]
 
-    def _range_(self, node):
-        return '%s..%s' % (lit.encode(node[1][0]), lit.encode(node[1][1]))
-
     def _not_(self, node):
         return '~%s' % self._proc(node[2][0])
+
+    def _not_one_(self, node):
+        return '^%s' % self._proc(node[2][0])
+
+    def _paren_(self, node):
+        return '(' + self._proc(node[2][0]) + ')'
 
     def _pred_(self, node):
         return '?{%s}' % self._proc(node[2][0])
@@ -176,8 +186,14 @@ class Printer:
     def _post_(self, node):
         return '%s%s' % (self._proc(node[2][0]), node[1])
 
+    def _range_(self, node):
+        return '%s..%s' % (lit.encode(node[1][0]), lit.encode(node[1][1]))
+
     def _regexp_(self, node):
         return f"/{lit.escape(node[1], '/')}/"
+
+    def _run_(self, node):
+        return '<%s>' % self._proc(node[2][0])
 
     def _set_(self, node):
         return f"[{lit.escape(node[1], ']')}]"
@@ -185,5 +201,5 @@ class Printer:
     def _seq_(self, node):
         return ' '.join(self._proc(e) for e in node[2])
 
-    def _paren_(self, node):
-        return '(' + self._proc(node[2][0]) + ')'
+    def _unicat_(self, node):
+        return '\\p{%s}' % node[1]

@@ -267,7 +267,7 @@ class GrammarTestsMixin:
         self.check("grammar = '\\'foo' -> true", text="'foo", out=True)
 
     @skip('integration')
-    def disabled_test_floyd(self):
+    def test_floyd(self):
         h = floyd.host.Host()
         path = str(THIS_DIR / '../grammars/floyd.g')
         grammar = h.read_text_file(path)
@@ -281,13 +281,13 @@ class GrammarTestsMixin:
         self.assertEqual(out[0], 'rules')
 
     @skip('integration')
-    def test_floyd3(self):
+    def test_floyd_ws(self):
         h = floyd.host.Host()
-        path = str(THIS_DIR / '../grammars/floyd3.g')
+        path = str(THIS_DIR / '../grammars/floyd_ws.g')
         grammar = h.read_text_file(path)
         p, err, _ = self.compile(grammar, path)
         self.assertIsNone(err)
-        out, err, _ = p.parse(grammar, '../grammars/floyd3.g')
+        out, err, _ = p.parse(grammar, '../grammars/floyd.g')
         # We don't check the actual output here because it is too long
         # and we don't want the test to be so sensitive to the AST for
         # the floyd grammar.
@@ -361,11 +361,25 @@ class GrammarTestsMixin:
         )
 
     @skip('integration')
+    def test_json(self):
+        h = floyd.host.Host()
+        path = str(THIS_DIR / '../grammars/json.g')
+        p, err, _ = self.compile(h.read_text_file(path))
+        self.assertIsNone(err)
+        self._common_json_checks(p)
+
+        self.checkp(p, text='"foo"', out='"foo"')
+
+        if hasattr(p, 'cleanup'):
+            p.cleanup()
+
+    @skip('integration')
     def test_json5(self):
         h = floyd.host.Host()
         path = str(THIS_DIR / '../grammars/json5.g')
         p, err, _ = self.compile(h.read_text_file(path))
         self.assertIsNone(err)
+        self._common_json_checks(p)
         self._common_json5_checks(p)
 
     @skip('integration')
@@ -388,21 +402,18 @@ class GrammarTestsMixin:
         if hasattr(p, 'cleanup'):
             p.cleanup()
 
-    def _common_json5_checks(self, p):
+    def _common_json_checks(self, p):
         self.checkp(p, text='123', out=123)
         self.checkp(p, text='1.5', out=1.5)
-        self.checkp(p, text='+1.5', out=1.5)
         self.checkp(p, text='-1.5', out=-1.5)
         self.checkp(p, text='1.5e2', out=150)
-        self.checkp(p, text='.5e-2', out=0.005)
         self.checkp(p, text='null', out=None)
         self.checkp(p, text='true', out=True)
         self.checkp(p, text='false', out=False)
-        self.checkp(p, text='"foo"', out='foo')
+
         self.checkp(p, text='[]', out=[])
         self.checkp(p, text='[2]', out=[2])
         self.checkp(p, text='{}', out={})
-        self.checkp(p, text='{foo: "bar"}', out={'foo': 'bar'})
 
         self.checkp(
             p, text='[1', err='<string>:1 Unexpected end of input at column 3'
@@ -411,8 +422,13 @@ class GrammarTestsMixin:
         # Check that leading whitespace is allowed.
         self.checkp(p, '  {}', {})
 
-        if hasattr(p, 'cleanup'):
-            p.cleanup()
+    def _common_json5_checks(self, p):
+        self.checkp(p, text='+1.5', out=1.5)
+        self.checkp(p, text='.5e-2', out=0.005)
+        self.checkp(p, text='"foo"', out='foo')
+        self.checkp(
+            p, text='{foo: "bar", a: "b"}', out={'foo': 'bar', 'a': 'b'}
+        )
 
     @skip('integration')
     def test_json5_sample(self):
@@ -471,16 +487,14 @@ class GrammarTestsMixin:
             p.cleanup()
 
     @skip('integration')
-    def test_json5_2(self):
+    def test_json5_ws(self):
         h = floyd.host.Host()
-        path = str(THIS_DIR / '../grammars/json5_2.g')
+        path = str(THIS_DIR / '../grammars/json5_ws.g')
         grammar = h.read_text_file(path)
         p, err, _ = self.compile(grammar)
         self.assertIsNone(err)
-        self.checkp(
-            p, text='{foo: "bar", a: "b"}', out={'foo': 'bar', 'a': 'b'}
-        )
-        # self._common_json5_checks(p)
+        self._common_json_checks(p)
+        self._common_json5_checks(p)
 
     def test_label(self):
         self.check("grammar = 'foobar':v -> v", text='foobar', out='foobar')
