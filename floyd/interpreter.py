@@ -170,12 +170,6 @@ class Interpreter:
             if self.failed:
                 return
 
-    def _handle_exclude(self, node):
-        if self.pos == self.end or self.text[self.pos] in node[1]:
-            self._fail()
-            return
-        self._succeed(self.text[self.pos], self.pos + 1)
-
     def _handle_label(self, node):
         self._interpret(node[2][0])
         if not self.failed:
@@ -477,12 +471,8 @@ class Interpreter:
         self.scopes.pop()
 
     def _handle_set(self, node):
-        try:
-            new_node = ['regexp', '[' + node[1] + ']', []]
-            self._interpret(new_node)
-        except Exception as e:
-            import pdb; pdb.set_trace()
-            pass
+        new_node = ['regexp', '[' + node[1] + ']', []]
+        self._interpret(new_node)
 
     def _handle_star(self, node):
         vs = []

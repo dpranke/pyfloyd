@@ -333,8 +333,8 @@ class Runner:
                 'parser.py',
                 '-c',
                 '--no-main',
-                '--no-memoize',
-                'grammars/floyd2.g',
+                '--memoize',
+                'grammars/floyd3.g',
             ]
         )
 

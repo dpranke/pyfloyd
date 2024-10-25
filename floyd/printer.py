@@ -118,9 +118,6 @@ class Printer:
         del node
         return ''
 
-    def _exclude_(self, node):
-        return f'[^{string_literal.encode(node[1])}]'
-
     def _label_(self, node):
         return '%s:%s' % (self._proc(node[2][0]), node[1])
 
@@ -179,6 +176,9 @@ class Printer:
 
     def _regexp_(self, node):
         return f"/{string_literal.escape(node[1], '/')}/"
+
+    def _set_(self, node):
+        return f"[{string_literal.escape(node[1], ']')}]"
 
     def _seq_(self, node):
         return ' '.join(self._proc(e) for e in node[2])

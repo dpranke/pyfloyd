@@ -3,7 +3,7 @@
 %comment    = ('//' | '#') [^\r\n]*
             | '/*' ^.'*/'
 
-%tokens     = escape hex ident int lit zpos
+%tokens     = escape hex ident int lit regexp set zpos
 
 grammar     = rule* end                    -> ['rules', null, $1]
 
@@ -39,9 +39,8 @@ prim_expr   = lit '..' lit                 -> ['range', null,
                 [['lit', $1, []], ['lit', $3, []]]]
             | lit                          -> ['lit', $1, []]
             | '\\p{' ident '}'             -> ['unicat', $2, []]
-            | '[^' set_char+ ']'           -> ['exclude', cat($2), []]
-            | '[' ~'^' set_char+ ']'       -> ['set', cat($3), []]
-            | '/' rechar+ '/'              -> ['regexp', cat($2), []]
+            | set                          -> ['set', $1, []]
+            | regexp                       -> ['regexp', $1, []]
             | '~' prim_expr                -> ['not', null, [$2]]
             | '^.' prim_expr               -> ['ends_in', null, [$2]]
             | '^' prim_expr                -> ['not_one', null, [$2]]
@@ -81,11 +80,16 @@ uni_esc     = '\\u' hex_char{4}            -> itou(atoi(cat(scons('0x', $2))))
             | '\\u{' hex_char+ '}'         -> itou(atoi(cat(scons('0x', $2))))
             | '\\U' hex_char{8}            -> itou(atoi(cat(scons('0x', $2))))
 
+set         = '[' '^' set_char+ ']'        -> cat(scons($2, $3))
+            | '[' ~'^' set_char+ ']'       -> cat($3)
+
 set_char    = escape
             | '\\]'                        -> ']'
             | ^']'
 
-rechar      = bslash '/'                   -> '/'
+regexp      = '/' re_char+ '/'             -> cat($2)
+
+re_char     = bslash '/'                   -> '/'
             | escape
             | [^/]
 

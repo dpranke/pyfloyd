@@ -280,18 +280,6 @@ class PythonGenerator(Generator):
             '        break',
         ]
 
-    def _exclude_(self, node) -> List[str]:
-        return [
-            (
-                'if self.pos == self.end or self.text[self.pos] in '
-                + lit.encode(node[1])
-            )
-            + ':',
-            '    self._fail()',
-            '    return',
-            'self._succeed(self.text[self.pos], self.pos + 1)',
-        ]
-
     def _label_(self, node) -> List[str]:
         lines = self._gen(node[2][0])
         lines.extend(

@@ -418,8 +418,6 @@ def _check_lr(name, node, rules, seen):
         return False
     if ty == 'ends_in':
         return _check_lr(name, node[2][0], rules, seen)
-    if ty == 'exclude':
-        return False
     if ty == 'label':
         return _check_lr(name, node[2][0], rules, seen)
     if ty == 'leftrec':
@@ -534,7 +532,7 @@ class _FillerVisitor(Visitor):
         self.grammar.ast = walk(self.grammar.ast, self)
 
     def should_fill(self, node):
-        if node[0] in ('escape', 'exclude', 'lit', 'range', 'regexp', 'set'):
+        if node[0] in ('escape', 'lit', 'range', 'regexp', 'set'):
             return True
         if node[0] == 'apply' and (
             node[1] == 'end' or node[1] in self.grammar.tokens
@@ -664,7 +662,7 @@ class _SubRuleRewriter:
         return [node[0], node[1], [self._make_subrule(node[2][0])]]
 
     def _can_inline(self, node) -> bool:
-        if node[0] in ('choice', 'count', 'exclude', 'not', 'post', 'regexp',
+        if node[0] in ('choice', 'count', 'not', 'post', 'regexp',
                        'set', 'seq'):
             return False
         return True

@@ -314,17 +314,6 @@ class JavaScriptGenerator(Generator):
         ]
         return lines
 
-    def _exclude_(self, node) -> List[str]:
-        s = lit.escape(node[1], ']')
-        return [
-            f'let m = /^[{s}]/;',
-            'if (this.pos === this.end || this.text[this.pos].match(m)) {',
-            '  this.#fail();',
-            '  return;',
-            '}',
-            'this.#succeed(this.text[this.pos], this.pos + 1);',
-        ]
-
     def _label_(self, node) -> List[str]:
         lines = self._gen(node[2][0])
         varname = self._varname(node[1])
@@ -458,7 +447,8 @@ class JavaScriptGenerator(Generator):
         ]
 
     def _regexp_(self, node) -> List[str]:
-        s = lit.escape(node[1], '/')
+        # TODO: Explain why this is correct.
+        s = lit.escape(node[1], '/').replace('\\\\', '\\') 
         return [
             f'let regexp = /{s}/gy;',
             'regexp.lastIndex = this.pos;',

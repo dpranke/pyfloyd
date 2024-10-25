@@ -143,7 +143,7 @@ class GrammarTestsMixin:
     def test_choice_with_rewind(self):
         self.check(
             """\
-            grammar = 'a' 'b' -> false 
+            grammar = 'a' 'b' -> false
                     | 'a' 'c' -> true
             """,
             text='ac',
@@ -258,42 +258,6 @@ class GrammarTestsMixin:
     def test_escapes_in_string(self):
         self.check('grammar = "\\n\\"foo" -> true', text='\n"foo', out=True)
         self.check("grammar = '\\'foo' -> true", text="'foo", out=True)
-
-    def test_exclude(self):
-        self.check('g = [^ab] -> true', text='c', out=True)
-        self.check(
-            'g = [^a] -> true',
-            text='a',
-            err='<string>:1 Unexpected "a" at column 1',
-        )
-        self.check(
-            'g = [^a] -> true',
-            text='',
-            err='<string>:1 Unexpected end of input at column 1',
-        )
-        self.check(
-            'g = [^\\]] -> true',
-            text=']',
-            err='<string>:1 Unexpected "]" at column 1',
-        )
-        self.check(
-            'g = [^] -> true',
-            text='',
-            grammar_err='<string>:1 Unexpected "]" at column 7',
-        )
-        self.check(
-            'g = [^',
-            text='',
-            grammar_err='<string>:1 Unexpected end of input at column 7',
-        )
-        self.check('g = [^\\ta\\n] -> true', text='e', out=True)
-
-    def test_exclude_esc_char(self):
-        self.check(
-            'g = [^\\n] -> true',
-            text='\n',
-            err='<string>:1 Unexpected "\\n" at column 1',
-        )
 
     @skip('integration')
     def disabled_test_floyd(self):
@@ -556,9 +520,9 @@ class GrammarTestsMixin:
 
     def test_not_one(self):
         self.check("grammar = ^'a' 'b'-> true", text='cb', out=True)
-        self.check("grammar = ^'a' 'b'-> true", text='a', 
+        self.check("grammar = ^'a' 'b'-> true", text='a',
                    err='<string>:1 Unexpected "a" at column 1')
-        self.check("grammar = ^'a' 'b'-> true", text='', 
+        self.check("grammar = ^'a' 'b'-> true", text='',
                    err='<string>:1 Unexpected end of input at column 1')
 
     def test_not_not(self):
@@ -888,12 +852,48 @@ class GrammarTestsMixin:
         self.check(g, text='e', out=True)
         self.check(g, text='',
                    err = '<string>:1 Unexpected end of input at column 1')
-        self.check(g, text='f', 
+        self.check(g, text='f',
                    err = '<string>:1 Unexpected "f" at column 1')
 
-    def disabled_test_set_escaped_right_bracket(self):
+    def test_set_exclude(self):
+        self.check('g = [^ab] -> true', text='c', out=True)
+        self.check(
+            'g = [^a] -> true',
+            text='a',
+            err='<string>:1 Unexpected "a" at column 1',
+        )
+        self.check(
+            'g = [^a] -> true',
+            text='',
+            err='<string>:1 Unexpected end of input at column 1',
+        )
+        self.check(
+            'g = [^\\]] -> true',
+            text=']',
+            err='<string>:1 Unexpected "]" at column 1',
+        )
+        self.check(
+            'g = [^] -> true',
+            text='',
+            grammar_err='<string>:1 Unexpected "]" at column 7',
+        )
+        self.check(
+            'g = [^',
+            text='',
+            grammar_err='<string>:1 Unexpected end of input at column 7',
+        )
+        self.check('g = [^\\ta\\n] -> true', text='e', out=True)
+
+    def test_set_exclude_esc_char(self):
+        self.check(
+            'g = [^\\n] -> true',
+            text='\n',
+            err='<string>:1 Unexpected "\\n" at column 1',
+        )
+
+    def test_set_escaped_right_bracket(self):
         # TODO: Get this to pass.
-        g = 'g = [xa-e\\]] -> true'
+        g = r'g = [xa-e\\\]] -> true'
         self.check(g, text=']', out=True)
 
     def test_star(self):
@@ -1032,7 +1032,7 @@ class JavaScriptGenerator(unittest.TestCase, GrammarTestsMixin):
         h.write_text_file(d + '/parser.js', source_code)
         return _JavaScriptParserWrapper(h, d), None, 0
 
-    def test_exclude_esc_char(self):
+    def test_set_exclude_esc_char(self):
         # The JS implementation isn't smart enough to escape unexpected
         # characters yet.
         # TODO: Fix this.
