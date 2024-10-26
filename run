@@ -109,6 +109,7 @@ class Runner:
             action='store_true',
             help='Report branch coverage.',
         )
+        subp.add_argument('test', nargs='*', action='store')
 
         subp = self.add_parser(
             'format', help='Format the source code with ruff.'
@@ -176,6 +177,12 @@ class Runner:
 
         subp = self.add_parser('tests', help='Run the tests.')
         subp.add_argument(
+            '-d', '--durations',
+            metavar='N',
+            action='store',
+            help='show the N slowed test cases (N=0 for all)'
+        )
+        subp.add_argument(
             '-f',
             '--failfast',
             action='store_true',
@@ -184,6 +191,7 @@ class Runner:
         subp.add_argument(
             '-u', '--unit', action='store_true', help='Only run unit tests.'
         )
+        subp.add_argument('test', nargs='*', action='store')
 
         self.args = self.parser.parse_args(argv)
         self.no_execute = self.args.no_execute
@@ -228,6 +236,10 @@ class Runner:
                 '*_test.py',
             ],
         )
+        if self.verbose:
+            cmd.append('-v')
+        for test in self.args.test:
+            cmd.extend(['-k', self._trim_test_glob(test)])
         self.call(cmd, env=env)
         cmd = [sys.executable, '-m', 'coverage', 'report', '--show-missing']
         if self.args.omit:
@@ -315,10 +327,26 @@ class Runner:
             cmd.append('-v')
         if self.args.failfast:
             cmd.append('-f')
+        if self.args.durations:
+            cmd.extend(['--durations', self.args.durations])
+
+        for test in self.args.test:
+            cmd.extend(['-k', self._trim_test_glob(test)])
         env = os.environ.copy()
         if self.args.unit:
             env['SKIP'] = 'integration'
         self.call(cmd, env=env)
+
+    def _trim_test_glob(self, test):
+        if test.startswith('^'):
+            test = test[1:]
+        else:
+            test = '*' + test
+        if test.endswith('$'):
+            test = test[:-1]
+        else:
+            test = test + '*'
+        return test
 
     def set_func(self, subp, method):
         subp.set_defaults(func=lambda _: method())
