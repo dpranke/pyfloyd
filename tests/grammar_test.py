@@ -44,7 +44,8 @@ def skip(kind):
 
 
 class GrammarTestsMixin:
-    def check(self, grammar, text, out=None, err=None, grammar_err=None):
+    def check(self, grammar, text, out=None, err=None, grammar_err=None,
+              memoize=False):
         p, p_err, _ = self.compile(grammar)
         self.assertMultiLineEqual(grammar_err or '', p_err or '')
         if p:
@@ -271,7 +272,7 @@ class GrammarTestsMixin:
         h = floyd.host.Host()
         path = str(THIS_DIR / '../grammars/floyd.g')
         grammar = h.read_text_file(path)
-        p, err, _ = self.compile(grammar, path)
+        p, err, _ = self.compile(grammar, path, memoize=True)
         self.assertIsNone(err)
         out, err, _ = p.parse(grammar, '../grammars/floyd.g')
         # We don't check the actual output here because it is too long

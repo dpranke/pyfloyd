@@ -41,6 +41,7 @@ class Interpreter:
         self.end = -1
         self.errstr = 'Error: uninitialized'
         self.errpos = 0
+        self.cache = {}
         self.scopes = []
         self.seeds = {}
         self.blocked = set()
@@ -122,7 +123,15 @@ class Interpreter:
 
         # Unknown rules should have been caught in analysis, so we don't
         # need to worry about one here and can jump straight to the rule.
+        pos = self.pos
+        if self.memoize:
+            r = self.cache.get((rule_name, pos))
+            if r is not None:
+                self.val, self.failed, self.pos = r
+                return
         self._interpret(self.grammar.rules[rule_name])
+        if self.memoize:
+            self.cache[(rule_name, pos)] = self.val, self.failed, self.pos
 
     def _handle_choice(self, node):
         count = 1
