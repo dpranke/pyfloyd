@@ -22,8 +22,7 @@ choice      = seq ('|' seq)*               -> ['choice', null, cons($1, $2)]
 seq         = expr (expr)*                 -> ['seq', null, cons($1, $2)]
             |                              -> ['empty', null, []]
 
-expr        = '<' choice '>'               -> ['run', null, [$2]]
-            | '->' ll_expr                 -> ['action', null, [$2]]
+expr        = '->' ll_expr                 -> ['action', null, [$2]]
             | '?{' ll_expr '}'             -> ['pred', null, [$2]]
             | post_expr ':' ident          -> ['label', $3, [$1]]
             | post_expr
@@ -47,6 +46,7 @@ prim_expr   = lit '..' lit                 -> ['range', [$1, $3], []]
             | '^' prim_expr                -> ['not_one', null, [$2]]
             | ident ~'='                   -> ['apply', $1, []]
             | '(' choice ')'               -> ['paren', null, [$2]]
+            | '<' choice '>'               -> ['run', null, [$2]]
 
 lit         = squote sqchar* squote        -> cat($2)
             | dquote dqchar* dquote        -> cat($2)

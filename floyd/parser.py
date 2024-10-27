@@ -166,7 +166,11 @@ class _Parser:
             return
         self._rewind(p)
         self._s_id_continue_1_()
-        self.cache[('_r_id_continue_', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('_r_id_continue_', pos)] = (
+            self.val,
+            self.failed,
+            self.pos,
+        )
 
     def _s_id_continue_1_(self):
         p = '[0-9]'
@@ -271,29 +275,10 @@ class _Parser:
         if not self.failed:
             return
         self._rewind(p)
-        self._s_expr_4_()
-        if not self.failed:
-            return
-        self._rewind(p)
         self._r_post_expr_()
         self.cache[('_r_expr_', pos)] = (self.val, self.failed, self.pos)
 
     def _s_expr_1_(self):
-        self._r__filler_()
-        if not self.failed:
-            self._ch('<')
-        if not self.failed:
-            self._r_choice_()
-            if not self.failed:
-                v__2 = self.val
-        if not self.failed:
-            self._r__filler_()
-        if not self.failed:
-            self._ch('>')
-        if not self.failed:
-            self._succeed(['run', None, [v__2]])
-
-    def _s_expr_2_(self):
         self._r__filler_()
         if not self.failed:
             self._str('->')
@@ -304,7 +289,7 @@ class _Parser:
         if not self.failed:
             self._succeed(['action', None, [v__2]])
 
-    def _s_expr_3_(self):
+    def _s_expr_2_(self):
         self._r__filler_()
         if not self.failed:
             self._str('?{')
@@ -319,7 +304,7 @@ class _Parser:
         if not self.failed:
             self._succeed(['pred', None, [v__2]])
 
-    def _s_expr_4_(self):
+    def _s_expr_3_(self):
         self._r_post_expr_()
         if not self.failed:
             v__1 = self.val
@@ -328,13 +313,13 @@ class _Parser:
         if not self.failed:
             self._ch(':')
         if not self.failed:
-            self._s_expr_5_()
+            self._s_expr_4_()
             if not self.failed:
                 v__3 = self.val
         if not self.failed:
             self._succeed(['label', v__3, [v__1]])
 
-    def _s_expr_5_(self):
+    def _s_expr_4_(self):
         self._r__filler_()
         if not self.failed:
             self._r_ident_()
@@ -535,6 +520,10 @@ class _Parser:
             return
         self._rewind(p)
         self._s_prim_expr_19_()
+        if not self.failed:
+            return
+        self._rewind(p)
+        self._s_prim_expr_20_()
         self.cache[('_r_prim_expr_', pos)] = (self.val, self.failed, self.pos)
 
     def _s_prim_expr_1_(self):
@@ -695,6 +684,21 @@ class _Parser:
             self._ch(')')
         if not self.failed:
             self._succeed(['paren', None, [v__2]])
+
+    def _s_prim_expr_20_(self):
+        self._r__filler_()
+        if not self.failed:
+            self._ch('<')
+        if not self.failed:
+            self._r_choice_()
+            if not self.failed:
+                v__2 = self.val
+        if not self.failed:
+            self._r__filler_()
+        if not self.failed:
+            self._ch('>')
+        if not self.failed:
+            self._succeed(['run', None, [v__2]])
 
     def _r_lit_(self):
         r = self.cache.get(('_r_lit_', self.pos))
@@ -1812,7 +1816,11 @@ class _Parser:
                 break
             vs.append(self.val)
         self._succeed(vs)
-        self.cache[('_r__whitespace_', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('_r__whitespace_', pos)] = (
+            self.val,
+            self.failed,
+            self.pos,
+        )
 
     def _s__whitespace_1_(self):
         p = self.pos
