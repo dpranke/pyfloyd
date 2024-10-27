@@ -490,7 +490,7 @@ class JavaScriptGenerator(Generator):
 
     def _unicat_(self, node) -> List[str]:
         return [
-            fr'let regexp = /\p{{{node[1]}}}/guy;',
+            rf'let regexp = /\p{{{node[1]}}}/guy;',
             'regexp.lastIndex = this.pos;',
             'let found = regexp.exec(this.text);',
             'if (!found) {',
@@ -499,9 +499,6 @@ class JavaScriptGenerator(Generator):
             '}',
             'this.#succeed(found[0], this.pos + found[0].length);',
         ]
-        new_node = ['regexp', fr'\p{{{node[1]}}}', []]
-        return self._regexp_(new_node)
-        # return ['this.#unicat(%s);' % lit.encode(node[1])]
 
     #
     # Handlers for the host nodes in the AST

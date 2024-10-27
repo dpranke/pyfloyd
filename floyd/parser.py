@@ -1996,9 +1996,7 @@ class _Parser:
 
 
 def _atoi(a):
-    if a.startswith('0x'):
-        return int(a, base=16)
-    return int(a)
+    return int(a, base=10)
 
 
 def _cat(strs):

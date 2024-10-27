@@ -177,10 +177,11 @@ class Runner:
 
         subp = self.add_parser('tests', help='Run the tests.')
         subp.add_argument(
-            '-d', '--durations',
+            '-d',
+            '--durations',
             metavar='N',
             action='store',
-            help='show the N slowed test cases (N=0 for all)'
+            help='show the N slowed test cases (N=0 for all)',
         )
         subp.add_argument(
             '-f',

@@ -44,8 +44,14 @@ def skip(kind):
 
 
 class GrammarTestsMixin:
-    def check(self, grammar, text, out=None, err=None, grammar_err=None,
-              memoize=False):
+    def check(
+        self,
+        grammar,
+        text,
+        out=None,
+        err=None,
+        grammar_err=None,
+    ):
         p, p_err, _ = self.compile(grammar)
         self.assertMultiLineEqual(grammar_err or '', p_err or '')
         if p:
