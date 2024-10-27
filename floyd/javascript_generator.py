@@ -183,7 +183,7 @@ class JavaScriptGenerator(Generator):
 
         if self.grammar.needed_builtin_rules:
             for name in sorted(self.grammar.needed_builtin_rules):
-                method_txt = self._builtin_methods[f'_r_{name}_']
+                method_txt = self._builtin_methods[f'_r_{name}']
                 text += '  #' + method_txt
                 text += '\n'
 
@@ -228,12 +228,12 @@ class JavaScriptGenerator(Generator):
             for v in sorted(vs):
                 lines.append(f'let {v};')
 
-        fn = getattr(self, f'_{node[0]}_')
+        fn = getattr(self, f'_ty_{node[0]}')
         return lines + fn(node)
 
     def _gen_expr(self, node) -> _FormatObj:
         # All of the host methods return a formatter object.
-        fn = getattr(self, f'_{node[0]}_')
+        fn = getattr(self, f'_ty_{node[0]}')
         return fn(node)
 
     def _find_vars(self, node, vs):
@@ -249,14 +249,14 @@ class JavaScriptGenerator(Generator):
     # Handlers for each non-host node in the glop AST follow.
     #
 
-    def _action_(self, node) -> List[str]:
+    def _ty_action(self, node) -> List[str]:
         obj = self._gen_expr(node[2][0])
         return flatten(Saw('this.#succeed(', obj, ');'), indent='  ')
 
-    def _apply_(self, node) -> List[str]:
+    def _ty_apply(self, node) -> List[str]:
         return [f'this.#{node[1]}();']
 
-    def _choice_(self, node) -> List[str]:
+    def _ty_choice(self, node) -> List[str]:
         lines = ['let p = this.pos;']
         for subnode in node[2][:-1]:
             lines.extend(self._gen(subnode))
@@ -267,7 +267,7 @@ class JavaScriptGenerator(Generator):
         lines.extend(self._gen(node[2][-1]))
         return lines
 
-    def _count_(self, node) -> List[str]:
+    def _ty_count(self, node) -> List[str]:
         lines = [
             'let vs = [];',
             'let i = 0;',
@@ -293,11 +293,11 @@ class JavaScriptGenerator(Generator):
         )
         return lines
 
-    def _empty_(self, node) -> List[str]:
+    def _ty_empty(self, node) -> List[str]:
         del node
         return ['this.#succeed(null);']
 
-    def _ends_in_(self, node) -> List[str]:
+    def _ty_ends_in(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
         lines = (
             [
@@ -308,7 +308,7 @@ class JavaScriptGenerator(Generator):
                 '    if (!this.failed) {',
                 '        break;',
                 '    }',
-                '    this.#_r_any_();',
+                '    this.#_r_any();',
                 '    if (this.failed) {',
                 '        break;',
                 '    }',
@@ -317,13 +317,13 @@ class JavaScriptGenerator(Generator):
         )
         return lines
 
-    def _label_(self, node) -> List[str]:
+    def _ty_label(self, node) -> List[str]:
         lines = self._gen(node[2][0])
         varname = self._varname(node[1])
         lines.extend(['if (!this.failed) {', f'  {varname} = this.val;', '}'])
         return lines
 
-    def _leftrec_(self, node) -> List[str]:
+    def _ty_leftrec(self, node) -> List[str]:
         if self.grammar.assoc.get(node[1], 'true') == 'true':
             left_assoc = 'true'
         else:
@@ -334,7 +334,7 @@ class JavaScriptGenerator(Generator):
         ]
         return lines
 
-    def _lit_(self, node) -> List[str]:
+    def _ty_lit(self, node) -> List[str]:
         expr = lit.encode(node[1])
         if len(node[1]) == 1:
             method = 'ch'
@@ -342,7 +342,7 @@ class JavaScriptGenerator(Generator):
             method = 'str'
         return [f'this.#{method}({expr});']
 
-    def _not_(self, node) -> List[str]:
+    def _ty_not(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
         lines = (
             [
@@ -362,15 +362,15 @@ class JavaScriptGenerator(Generator):
         )
         return lines
 
-    def _not_one_(self, node) -> List[str]:
+    def _ty_not_one(self, node) -> List[str]:
         sublines = self._gen(['not', None, node[2]])
         return sublines + [
             'if (!this.failed) {',
-            '    this.#_r_any_(p);',
+            '    this.#_r_any(p);',
             '}',
         ]
 
-    def _operator_(self, node) -> List[str]:
+    def _ty_operator(self, node) -> List[str]:
         self._needed_methods.add('operator')
         # Operator nodes have no children, but subrules for each arm
         # of the expression cluster have been defined and are referenced
@@ -378,7 +378,7 @@ class JavaScriptGenerator(Generator):
         assert node[2] == []
         return [f"this.#operator('{node[1]}')"]
 
-    def _opt_(self, node) -> List[str]:
+    def _ty_opt(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
         lines = (
             [
@@ -395,10 +395,10 @@ class JavaScriptGenerator(Generator):
         )
         return lines
 
-    def _paren_(self, node) -> List[str]:
+    def _ty_paren(self, node) -> List[str]:
         return self._gen(node[2][0])
 
-    def _plus_(self, node) -> List[str]:
+    def _ty_plus(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
         lines = (
             ['let vs = [];']
@@ -424,7 +424,7 @@ class JavaScriptGenerator(Generator):
         )
         return lines
 
-    def _pred_(self, node) -> List[str]:
+    def _ty_pred(self, node) -> List[str]:
         arg = self._gen_expr(node[2][0])
         # TODO: Figure out how to statically analyze predicates to
         # catch ones that don't return booleans, so that we don't need
@@ -441,13 +441,13 @@ class JavaScriptGenerator(Generator):
             '}',
         ]
 
-    def _range_(self, node) -> List[str]:
+    def _ty_range(self, node) -> List[str]:
         return [
             'this.#range(%s, %s);'
             % (lit.encode(node[1][0]), lit.encode(node[1][1]))
         ]
 
-    def _regexp_(self, node) -> List[str]:
+    def _ty_regexp(self, node) -> List[str]:
         # TODO: Explain why this is correct.
         s = lit.escape(node[1], '/').replace('\\\\', '\\')
         return [
@@ -461,7 +461,7 @@ class JavaScriptGenerator(Generator):
             'this.#fail();',
         ]
 
-    def _run_(self, node) -> List[str]:
+    def _ty_run(self, node) -> List[str]:
         lines = self._gen(node[2][0])
         return (
             ['let start = this.pos;']
@@ -475,11 +475,11 @@ class JavaScriptGenerator(Generator):
             ]
         )
 
-    def _set_(self, node) -> List[str]:
+    def _ty_set(self, node) -> List[str]:
         new_node = ['regexp', '[' + node[1] + ']', []]
-        return self._regexp_(new_node)
+        return self._ty_regexp(new_node)
 
-    def _seq_(self, node) -> List[str]:
+    def _ty_seq(self, node) -> List[str]:
         lines = self._gen(node[2][0])
         for subnode in node[2][1:]:
             lines.append('if (!this.failed) {')
@@ -487,7 +487,7 @@ class JavaScriptGenerator(Generator):
             lines.append('}')
         return lines
 
-    def _star_(self, node) -> List[str]:
+    def _ty_star(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
         lines = (
             [
@@ -508,7 +508,7 @@ class JavaScriptGenerator(Generator):
         )
         return lines
 
-    def _unicat_(self, node) -> List[str]:
+    def _ty_unicat(self, node) -> List[str]:
         return [
             rf'let regexp = /\p{{{node[1]}}}/guy;',
             'regexp.lastIndex = this.pos;',
@@ -523,13 +523,13 @@ class JavaScriptGenerator(Generator):
     #
     # Handlers for the host nodes in the AST
     #
-    def _ll_arr_(self, node) -> _FormatObj:
+    def _ty_ll_arr(self, node) -> _FormatObj:
         if len(node[2]) == 0:
             return '[]'
         args = [self._gen_expr(n) for n in node[2]]
         return Saw('[', Comma(args), ']')
 
-    def _ll_call_(self, node) -> Saw:
+    def _ty_ll_call(self, node) -> Saw:
         # There are no built-in functions that take no arguments, so make
         # sure we're not being called that way.
         # TODO: Figure out if we need this routine or not when we also
@@ -538,29 +538,29 @@ class JavaScriptGenerator(Generator):
         args = [self._gen_expr(n) for n in node[2]]
         return Saw('(', Comma(args), ')')
 
-    def _ll_getitem_(self, node) -> Saw:
+    def _ty_ll_getitem(self, node) -> Saw:
         return Saw('[', self._gen_expr(node[2][0]), ']')
 
-    def _ll_lit_(self, node) -> str:
+    def _ty_ll_lit(self, node) -> str:
         return lit.encode(node[1])
 
-    def _ll_minus_(self, node) -> Tree:
+    def _ty_ll_minus(self, node) -> Tree:
         return Tree(
             self._gen_expr(node[2][0]), '-', self._gen_expr(node[2][1])
         )
 
-    def _ll_num_(self, node) -> str:
+    def _ty_ll_num(self, node) -> str:
         return node[1]
 
-    def _ll_paren_(self, node) -> _FormatObj:
+    def _ty_ll_paren(self, node) -> _FormatObj:
         return self._gen_expr(node[2][0])
 
-    def _ll_plus_(self, node) -> Tree:
+    def _ty_ll_plus(self, node) -> Tree:
         return Tree(
             self._gen_expr(node[2][0]), '+', self._gen_expr(node[2][1])
         )
 
-    def _ll_qual_(self, node) -> Saw:
+    def _ty_ll_qual(self, node) -> Saw:
         first = node[2][0]
         second = node[2][1]
         if first[0] == 'll_var':
@@ -573,7 +573,7 @@ class JavaScriptGenerator(Generator):
                 start = f'{fn}'
             else:
                 # If second isn't a call, then first refers to a variable.
-                start = self._ll_var_(first)
+                start = self._ty_ll_var(first)
             saw = self._gen_expr(second)
             if not isinstance(saw, Saw):  # pragma: no cover
                 raise TypeError(second)
@@ -596,10 +596,10 @@ class JavaScriptGenerator(Generator):
             next_saw = new_saw
         return saw
 
-    def _ll_var_(self, node) -> str:
+    def _ty_ll_var(self, node) -> str:
         return 'v_' + node[1].replace('$', '_')
 
-    def _ll_const_(self, node) -> str:
+    def _ty_ll_const(self, node) -> str:
         return node[1]
 
 
@@ -720,7 +720,7 @@ class Parser {
 
 _PARSE = """\
   parse() {
-    this.#_r_{starting_rule}_();
+    this.#_r_{starting_rule}();
     if (this.failed) {
       return new Result(null, this.#error(), this.errpos);
     } else {
@@ -732,7 +732,7 @@ _PARSE = """\
 _PARSE_WITH_EXCEPTION = """\
   parse() {
     try {
-      this.#_r_{starting_rule}_();
+      this.#_r_{starting_rule}();
       if (this.failed) {
         return new Result(null, this.#error(), this.errpos);
       } else {
@@ -750,7 +750,7 @@ _PARSE_WITH_EXCEPTION = """\
 """
 
 _BUILTIN_METHODS = """\
-  #_r_any_() {
+  #_r_any() {
     if (this.pos < this.end) {
       this.#succeed(this.text[this.pos], this.pos + 1);
     } else {
@@ -758,7 +758,7 @@ _BUILTIN_METHODS = """\
     }
   }
 
-  #_r_end_() {
+  #_r_end() {
     if (this.pos === this.end) {
       this.#succeed(null);
     } else {

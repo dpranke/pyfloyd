@@ -176,7 +176,7 @@ class PythonGenerator(Generator):
 
         if self.grammar.needed_builtin_rules:
             text += '\n'.join(
-                self._builtin_methods[f'r_{name}_']
+                self._builtin_methods[f'r_{name}']
                 for name in sorted(self.grammar.needed_builtin_rules)
             )
             text += '\n'
@@ -212,26 +212,26 @@ class PythonGenerator(Generator):
 
     def _gen(self, node) -> List[str]:
         # All of the rule methods return a list of lines.
-        fn = getattr(self, f'_{node[0]}_')
+        fn = getattr(self, f'_ty_{node[0]}')
         return fn(node)
 
     def _gen_expr(self, node) -> _FormatObj:
         # All of the host methods return a formatter object.
-        fn = getattr(self, f'_{node[0]}_')
+        fn = getattr(self, f'_ty_{node[0]}')
         return fn(node)
 
     #
     # Handlers for each non-host node in the glop AST follow.
     #
 
-    def _action_(self, node) -> List[str]:
+    def _ty_action(self, node) -> List[str]:
         obj = self._gen_expr(node[2][0])
         return flatten(Saw('self._succeed(', obj, ')'))
 
-    def _apply_(self, node) -> List[str]:
+    def _ty_apply(self, node) -> List[str]:
         return [f'self.{node[1]}()']
 
-    def _choice_(self, node) -> List[str]:
+    def _ty_choice(self, node) -> List[str]:
         lines = ['p = self.pos']
         for subnode in node[2][:-1]:
             lines.extend(self._gen(subnode))
@@ -241,7 +241,7 @@ class PythonGenerator(Generator):
         lines.extend(self._gen(node[2][-1]))
         return lines
 
-    def _count_(self, node) -> List[str]:
+    def _ty_count(self, node) -> List[str]:
         lines = [
             'vs = []',
             'i = 0',
@@ -263,11 +263,11 @@ class PythonGenerator(Generator):
         )
         return lines
 
-    def _empty_(self, node) -> List[str]:
+    def _ty_empty(self, node) -> List[str]:
         del node
         return ['self._succeed(None)']
 
-    def _ends_in_(self, node) -> List[str]:
+    def _ty_ends_in(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
         return (
             [
@@ -277,13 +277,13 @@ class PythonGenerator(Generator):
             + [
                 '    if not self.failed:',
                 '        break',
-                '    self._r_any_()',
+                '    self._r_any()',
                 '    if self.failed:',
                 '        break',
             ]
         )
 
-    def _label_(self, node) -> List[str]:
+    def _ty_label(self, node) -> List[str]:
         lines = self._gen(node[2][0])
         lines.extend(
             [
@@ -293,7 +293,7 @@ class PythonGenerator(Generator):
         )
         return lines
 
-    def _leftrec_(self, node) -> List[str]:
+    def _ty_leftrec(self, node) -> List[str]:
         left_assoc = self.grammar.assoc.get(node[1], 'left') == 'left'
         lines = [
             f'self._leftrec(self.{node[2][0][1]}, '
@@ -301,7 +301,7 @@ class PythonGenerator(Generator):
         ]
         return lines
 
-    def _lit_(self, node) -> List[str]:
+    def _ty_lit(self, node) -> List[str]:
         expr = lit.encode(node[1])
         if len(node[1]) == 1:
             method = 'ch'
@@ -309,7 +309,7 @@ class PythonGenerator(Generator):
             method = 'str'
         return [f'self._{method}({expr})']
 
-    def _not_(self, node) -> List[str]:
+    def _ty_not(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
         lines = (
             [
@@ -328,11 +328,11 @@ class PythonGenerator(Generator):
         )
         return lines
 
-    def _not_one_(self, node) -> List[str]:
+    def _ty_not_one(self, node) -> List[str]:
         sublines = self._gen(['not', None, node[2]])
-        return sublines + ['if not self.failed:', '    self._r_any_()']
+        return sublines + ['if not self.failed:', '    self._r_any()']
 
-    def _operator_(self, node) -> List[str]:
+    def _ty_operator(self, node) -> List[str]:
         self._needed_methods.add('operator')
         # Operator nodes have no children, but subrules for each arm
         # of the expression cluster have been defined and are referenced
@@ -340,7 +340,7 @@ class PythonGenerator(Generator):
         assert node[2] == []
         return [f"self._operator(f'{node[1]}')"]
 
-    def _opt_(self, node) -> List[str]:
+    def _ty_opt(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
         lines = (
             [
@@ -356,10 +356,10 @@ class PythonGenerator(Generator):
         )
         return lines
 
-    def _paren_(self, node) -> List[str]:
+    def _ty_paren(self, node) -> List[str]:
         return self._gen(node[2][0])
 
-    def _plus_(self, node) -> List[str]:
+    def _ty_plus(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
         lines = (
             ['vs = []']
@@ -383,7 +383,7 @@ class PythonGenerator(Generator):
 
         return lines
 
-    def _pred_(self, node) -> List[str]:
+    def _ty_pred(self, node) -> List[str]:
         arg = self._gen_expr(node[2][0])
         # TODO: Figure out how to statically analyze predicates to
         # catch ones that don't return booleans, so that we don't need
@@ -399,13 +399,13 @@ class PythonGenerator(Generator):
             "    raise _ParsingRuntimeError('Bad predicate value')",
         ]
 
-    def _range_(self, node) -> List[str]:
+    def _ty_range(self, node) -> List[str]:
         return [
             'self._range(%s, %s)'
             % (lit.encode(node[1][0]), lit.encode(node[1][1]))
         ]
 
-    def _regexp_(self, node) -> List[str]:
+    def _ty_regexp(self, node) -> List[str]:
         return [
             f'p = {lit.encode(node[1])}',
             'if p not in self.regexps:',
@@ -417,7 +417,7 @@ class PythonGenerator(Generator):
             'self._fail()',
         ]
 
-    def _run_(self, node) -> List[str]:
+    def _ty_run(self, node) -> List[str]:
         lines = self._gen(node[2][0])
         return (
             ['start = self.pos']
@@ -430,18 +430,18 @@ class PythonGenerator(Generator):
             ]
         )
 
-    def _set_(self, node) -> List[str]:
+    def _ty_set(self, node) -> List[str]:
         new_node = ['regexp', '[' + node[1] + ']', []]
-        return self._regexp_(new_node)
+        return self._ty_regexp(new_node)
 
-    def _seq_(self, node) -> List[str]:
+    def _ty_seq(self, node) -> List[str]:
         lines = self._gen(node[2][0])
         for subnode in node[2][1:]:
             lines.append('if not self.failed:')
             lines.extend('    ' + line for line in self._gen(subnode))
         return lines
 
-    def _star_(self, node) -> List[str]:
+    def _ty_star(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
         lines = (
             [
@@ -460,19 +460,19 @@ class PythonGenerator(Generator):
         )
         return lines
 
-    def _unicat_(self, node) -> List[str]:
+    def _ty_unicat(self, node) -> List[str]:
         return ['self._unicat(%s)' % lit.encode(node[1])]
 
     #
     # Handlers for the host nodes in the AST
     #
-    def _ll_arr_(self, node) -> _FormatObj:
+    def _ty_ll_arr(self, node) -> _FormatObj:
         if len(node[2]) == 0:
             return '[]'
         args = [self._gen(n) for n in node[2]]
         return Saw('[', Comma(args), ']')
 
-    def _ll_call_(self, node) -> Saw:
+    def _ty_ll_call(self, node) -> Saw:
         # There are no built-in functions that take no arguments, so make
         # sure we're not being called that way.
         # TODO: Figure out if we need this routine or not when we also
@@ -481,29 +481,29 @@ class PythonGenerator(Generator):
         args = [self._gen(n) for n in node[2]]
         return Saw('(', Comma(args), ')')
 
-    def _ll_getitem_(self, node) -> Saw:
+    def _ty_ll_getitem(self, node) -> Saw:
         return Saw('[', self._gen(node[2][0]), ']')
 
-    def _ll_lit_(self, node) -> str:
+    def _ty_ll_lit(self, node) -> str:
         return lit.encode(node[1])
 
-    def _ll_minus_(self, node) -> Tree:
+    def _ty_ll_minus(self, node) -> Tree:
         return Tree(
             self._gen_expr(node[2][0]), '-', self._gen_expr(node[2][1])
         )
 
-    def _ll_num_(self, node) -> str:
+    def _ty_ll_num(self, node) -> str:
         return node[1]
 
-    def _ll_paren_(self, node) -> _FormatObj:
+    def _ty_ll_paren(self, node) -> _FormatObj:
         return self._gen_expr(node[2][0])
 
-    def _ll_plus_(self, node) -> Tree:
+    def _ty_ll_plus(self, node) -> Tree:
         return Tree(
             self._gen_expr(node[2][0]), '+', self._gen_expr(node[2][1])
         )
 
-    def _ll_qual_(self, node) -> Saw:
+    def _ty_ll_qual(self, node) -> Saw:
         first = node[2][0]
         second = node[2][1]
         if first[0] == 'll_var':
@@ -516,7 +516,7 @@ class PythonGenerator(Generator):
                 start = f'_{fn}'
             else:
                 # If second isn't a call, then first refers to a variable.
-                start = self._ll_var_(first)
+                start = self._ty_ll_var(first)
             saw = self._gen_expr(second)
             if not isinstance(saw, Saw):  # pragma: no cover
                 raise TypeError(second)
@@ -539,10 +539,10 @@ class PythonGenerator(Generator):
             next_saw = new_saw
         return saw
 
-    def _ll_var_(self, node) -> str:
+    def _ty_ll_var(self, node) -> str:
         return 'v_' + node[1].replace('$', '_')
 
-    def _ll_const_(self, node) -> str:
+    def _ty_ll_const(self, node) -> str:
         if node[1] == 'false':
             return 'False'
         if node[1] == 'null':
@@ -686,7 +686,7 @@ class _Parser:
 
 _PARSE = """\
     def parse(self):
-        self._r_{starting_rule}_()
+        self._r_{starting_rule}()
         if self.failed:
             return Result(None, self._err_str(), self.errpos)
         return Result(self.val, None, self.pos)
@@ -696,7 +696,7 @@ _PARSE = """\
 _PARSE_WITH_EXCEPTION = """\
     def parse(self):
         try:
-            self._r_{starting_rule}_()
+            self._r_{starting_rule}()
             if self.failed:
                 return None, self._err_str(), self.errpos
             return self.val, None, self.pos
@@ -711,13 +711,13 @@ _PARSE_WITH_EXCEPTION = """\
 
 
 _BUILTIN_METHODS = """\
-    def _r_any_(self):
+    def _r_any(self):
         if self.pos < self.end:
             self._succeed(self.text[self.pos], self.pos + 1)
         else:
             self._fail()
 
-    def _r_end_(self):
+    def _r_end(self):
         if self.pos == self.end:
             self._succeed(None)
         else:

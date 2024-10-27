@@ -65,8 +65,8 @@ class Interpreter:
         return parser.Result(self.val, None, self.pos)
 
     def _interpret(self, node):
-        node_handler = getattr(self, '_handle_' + node[0], None)
-        assert node_handler, "Unimplemented node type '%s'" % node[0]
+        node_handler = getattr(self, f'_ty_{node[0]}', None)
+        assert node_handler, f"Unimplemented node type '{node[0]}'"
         node_handler(node)
 
     def _fail(self, errstr=None):
@@ -105,20 +105,29 @@ class Interpreter:
         msg = '%s:%d %s' % (self.path, lineno, self.errstr)
         return parser.Result(None, msg, self.errpos)
 
-    def _handle_action(self, node):
+    def _r_any(self):
+        if self.pos != self.end:
+            self._succeed(self.text[self.pos], self.pos + 1)
+            return
+        self._fail()
+
+    def _r_end(self):
+        if self.pos != self.end:
+            self._fail()
+            return
+        self._succeed()
+
+    def _ty_action(self, node):
         self._interpret(node[2][0])
 
-    def _handle_apply(self, node):
+    def _ty_apply(self, node):
         rule_name = node[1]
-        if rule_name == 'end':
-            self._handle_end()
+        if rule_name == 'any':
+            self._r_any()
             return
 
-        if rule_name == 'any':
-            if self.pos != self.end:
-                self._succeed(self.text[self.pos], self.pos + 1)
-                return
-            self._fail()
+        if rule_name == 'end':
+            self._r_end()
             return
 
         # Unknown rules should have been caught in analysis, so we don't
@@ -133,7 +142,7 @@ class Interpreter:
         if self.memoize:
             self.cache[(rule_name, pos)] = self.val, self.failed, self.pos
 
-    def _handle_choice(self, node):
+    def _ty_choice(self, node):
         count = 1
         pos = self.pos
         for rule in node[2][:-1]:
@@ -145,7 +154,7 @@ class Interpreter:
         self._interpret(node[2][-1])
         return
 
-    def _handle_count(self, node):
+    def _ty_count(self, node):
         vs = []
         i = 0
         cmin, cmax = node[1]
@@ -160,32 +169,26 @@ class Interpreter:
             i += 1
         self._succeed(vs)
 
-    def _handle_empty(self, node):
+    def _ty_empty(self, node):
         del node
         self._succeed()
 
-    def _handle_end(self):
-        if self.pos != self.end:
-            self._fail()
-            return
-        self._succeed()
-
-    def _handle_ends_in(self, node):
+    def _ty_ends_in(self, node):
         while True:
             self._interpret(node[2][0])
             if not self.failed:
                 return
-            self._handle_apply(['apply', 'any', []])
+            self._ty_apply(['apply', 'any', []])
             if self.failed:
                 return
 
-    def _handle_label(self, node):
+    def _ty_label(self, node):
         self._interpret(node[2][0])
         if not self.failed:
             self.scopes[-1][node[1]] = self.val
             self._succeed()
 
-    def _handle_leftrec(self, node):
+    def _ty_leftrec(self, node):
         # This approach to handling left-recursion is based on the approach
         # described in "Parsing Expression Grammars Made Practical" by
         # Laurent and Mens, 2016.
@@ -218,7 +221,7 @@ class Interpreter:
                     self.blocked.remove(rule_name)
                 return
 
-    def _handle_lit(self, node):
+    def _ty_lit(self, node):
         i = 0
         lit = node[1]
         lit_len = len(lit)
@@ -235,12 +238,12 @@ class Interpreter:
         else:
             self._fail()
 
-    def _handle_not_one(self, node):
-        self._handle_not(['not', None, node[2]])
+    def _ty_not_one(self, node):
+        self._ty_not(['not', None, node[2]])
         if not self.failed:
-            self._handle_apply(['apply', 'any', []])
+            self._ty_apply(['apply', 'any', []])
 
-    def _handle_run(self, node):
+    def _ty_run(self, node):
         start = self.pos
         self._interpret(node[2][0])
         if self.failed:
@@ -248,21 +251,21 @@ class Interpreter:
         end = self.pos
         self.val = self.text[start:end]
 
-    def _handle_unicat(self, node):
+    def _ty_unicat(self, node):
         p = self.pos
         if p < self.end and unicodedata.category(self.text[p]) == node[1]:
             self._succeed(self.text[p], newpos=p + 1)
         else:
             self._fail()
 
-    def _handle_ll_arr(self, node):
+    def _ty_ll_arr(self, node):
         vals = []
         for subnode in node[2]:
             self._interpret(subnode)
             vals.append(self.val)
         self._succeed(vals)
 
-    def _handle_ll_call(self, node):
+    def _ty_ll_call(self, node):
         vals = []
         for subnode in node[2]:
             self._interpret(subnode)
@@ -270,7 +273,7 @@ class Interpreter:
         # Return 'll_call' as a tag here so we can check it in ll_qual.
         self._succeed(['ll_call', vals])
 
-    def _handle_ll_const(self, node):
+    def _ty_ll_const(self, node):
         if node[1] == 'true':
             self._succeed(True)
         elif node[1] == 'false':
@@ -283,36 +286,36 @@ class Interpreter:
             assert node[1] == 'NaN'
             self._succeed(float('NaN'))
 
-    def _handle_ll_getitem(self, node):
+    def _ty_ll_getitem(self, node):
         self._interpret(node[2][0])
         assert not self.failed
         # Return 'll_getitem' as a tag here so we can check it in ll_qual.
         self._succeed(['ll_getitem', self.val])
 
-    def _handle_ll_minus(self, node):
+    def _ty_ll_minus(self, node):
         self._interpret(node[2][0])
         v1 = self.val
         self._interpret(node[2][1])
         v2 = self.val
         self._succeed(v1 - v2)
 
-    def _handle_ll_num(self, node):
+    def _ty_ll_num(self, node):
         if node[1].startswith('0x'):
             self._succeed(int(node[1], base=16))
         else:
             self._succeed(int(node[1]))
 
-    def _handle_ll_paren(self, node):
+    def _ty_ll_paren(self, node):
         self._interpret(node[2][0])
 
-    def _handle_ll_plus(self, node):
+    def _ty_ll_plus(self, node):
         self._interpret(node[2][0])
         v1 = self.val
         self._interpret(node[2][1])
         v2 = self.val
         self._succeed(v1 + v2)
 
-    def _handle_ll_qual(self, node):
+    def _ty_ll_qual(self, node):
         # TODO: is it possible for this to fail?
         self._interpret(node[2][0])
         assert not self.failed
@@ -328,14 +331,14 @@ class Interpreter:
                 assert op == 'll_call'
                 # Note that unknown functions were caught during analysis
                 # so it's safe to dereference this without checking.
-                fn = getattr(self, '_builtin_fn_' + lhs, None)
+                fn = getattr(self, '_fn_' + lhs, None)
                 self.val = fn(*rhs)
 
-    def _handle_ll_lit(self, node):
+    def _ty_ll_lit(self, node):
         self._succeed(node[1])
 
-    def _handle_ll_var(self, node):
-        v = getattr(self, '_builtin_fn_' + node[1], None)
+    def _ty_ll_var(self, node):
+        v = getattr(self, '_fn_' + node[1], None)
         if v:
             self._succeed(node[1])
             return
@@ -344,7 +347,7 @@ class Interpreter:
         assert self.scopes and (node[1] in self.scopes[-1])
         self._succeed(self.scopes[-1][node[1]])
 
-    def _handle_not(self, node):
+    def _ty_not(self, node):
         pos = self.pos
         val = self.val
         self._interpret(node[2][0])
@@ -354,7 +357,7 @@ class Interpreter:
             self.pos = pos
             self._fail(val)
 
-    def _handle_operator(self, node):
+    def _ty_operator(self, node):
         pos = self.pos
         rule_name = node[1]
         key = (rule_name, self.pos)
@@ -406,7 +409,7 @@ class Interpreter:
             o.current_prec = 0
         self.val, self.failed, self.pos = current
 
-    def _handle_opt(self, node):
+    def _ty_opt(self, node):
         pos = self.pos
         self._interpret(node[2][0])
         if self.failed:
@@ -416,17 +419,17 @@ class Interpreter:
         else:
             self.val = [self.val]
 
-    def _handle_paren(self, node):
+    def _ty_paren(self, node):
         self._interpret(node[2][0])
 
-    def _handle_plus(self, node):
+    def _ty_plus(self, node):
         self._interpret(node[2][0])
         hd = self.val
         if not self.failed:
-            self._handle_star(node)
+            self._ty_star(node)
             self.val = [hd] + self.val
 
-    def _handle_pred(self, node):
+    def _ty_pred(self, node):
         self._interpret(node[2][0])
         if self.val is True:
             self._succeed(True)
@@ -439,7 +442,7 @@ class Interpreter:
             # this code path.
             self._fail('Bad predicate value')
 
-    def _handle_range(self, node):
+    def _ty_range(self, node):
         if (
             self.pos != self.end
             and node[1][0] <= self.text[self.pos] <= node[1][1]
@@ -448,7 +451,7 @@ class Interpreter:
             return
         self._fail()
 
-    def _handle_regexp(self, node):
+    def _ty_regexp(self, node):
         if node[1] not in self.regexps:
             self.regexps[node[1]] = re.compile(node[1])
         m = self.regexps[node[1]].match(self.text, self.pos)
@@ -457,7 +460,7 @@ class Interpreter:
             return
         self._fail()
 
-    def _handle_seq(self, node):
+    def _ty_seq(self, node):
         self.scopes.append({})
         for subnode in node[2]:
             self._interpret(subnode)
@@ -465,11 +468,11 @@ class Interpreter:
                 break
         self.scopes.pop()
 
-    def _handle_set(self, node):
+    def _ty_set(self, node):
         new_node = ['regexp', '[' + node[1] + ']', []]
         self._interpret(new_node)
 
-    def _handle_star(self, node):
+    def _ty_star(self, node):
         vs = []
         while not self.failed and self.pos < self.end:
             p = self.pos
@@ -484,49 +487,49 @@ class Interpreter:
             vs.append(self.val)
         self._succeed(vs)
 
-    def _builtin_fn_atoi(self, val):
+    def _fn_atoi(self, val):
         return int(val, base=10)
 
-    def _builtin_fn_cat(self, val):
+    def _fn_cat(self, val):
         return ''.join(val)
 
-    def _builtin_fn_concat(self, xs, ys):
+    def _fn_concat(self, xs, ys):
         return xs + ys
 
-    def _builtin_fn_cons(self, hd, tl):
+    def _fn_cons(self, hd, tl):
         return [hd] + tl
 
-    def _builtin_fn_dict(self, val):
+    def _fn_dict(self, val):
         return dict(val)
 
-    def _builtin_fn_float(self, val):
+    def _fn_float(self, val):
         if '.' in val or 'e' in val or 'E' in val:
             return float(val)
         return int(val)
 
-    def _builtin_fn_hex(self, val):
+    def _fn_hex(self, val):
         return int(val, base=16)
 
-    def _builtin_fn_itou(self, val):
+    def _fn_itou(self, val):
         return chr(val)
 
-    def _builtin_fn_join(self, val, vs):
+    def _fn_join(self, val, vs):
         return val.join(vs)
 
-    def _builtin_fn_scat(self, xs):
+    def _fn_scat(self, xs):
         return ''.join(xs)
 
-    def _builtin_fn_scons(self, hd, tl):
+    def _fn_scons(self, hd, tl):
         return [hd] + tl
 
-    def _builtin_fn_strcat(self, a, b):
+    def _fn_strcat(self, a, b):
         return a + b
 
-    def _builtin_fn_utoi(self, val):
+    def _fn_utoi(self, val):
         return ord(val)
 
-    def _builtin_fn_xtoi(self, val):
+    def _fn_xtoi(self, val):
         return int(val, base=16)
 
-    def _builtin_fn_xtou(self, val):
+    def _fn_xtou(self, val):
         return chr(int(val, base=16))

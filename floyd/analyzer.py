@@ -594,7 +594,7 @@ def _add_filler_rules(grammar):
 
 
 def rewrite_subrules(
-    grammar, rule_fmt='_r_{rule}_', subrule_fmt='_s_{rule}_{counter}_'
+    grammar, rule_fmt='_r_{rule}', subrule_fmt='_s_{rule}_{counter}'
 ):
     sr = _SubRuleRewriter(grammar, rule_fmt, subrule_fmt)
     sr.rewrite()
@@ -635,7 +635,7 @@ class _SubRuleRewriter:
         )
 
     def _walk(self, node):
-        fn = getattr(self, f'_{node[0]}_', None)
+        fn = getattr(self, f'_ty_{node[0]}', None)
         if fn:
             return fn(node)
         return self._walkn(node)
@@ -670,35 +670,35 @@ class _SubRuleRewriter:
         self._subrules[subnode_rule] = self._walk(child)
         return ['apply', subnode_rule, []]
 
-    def _apply_(self, node):
+    def _ty_apply(self, node):
         if node[1] in ('any', 'end'):
             self._grammar.needed_builtin_rules.add(node[1])
         return [node[0], self._rule_fmt.format(rule=node[1]), node[2]]
 
-    def _ends_in_(self, node):
+    def _ty_ends_in(self, node):
         self._grammar.needed_builtin_rules.add('any')
         return self._walkn(node)
 
-    def _leftrec_(self, node):
+    def _ty_leftrec(self, node):
         self._grammar.leftrec_needed = True
         return self._split1(node)
 
-    def _lit_(self, node):
+    def _ty_lit(self, node):
         self._grammar.ch_needed = True
         if len(node[1]) > 1:
             self._grammar.str_needed = True
         return node
 
-    def _ll_qual_(self, node):
+    def _ty_ll_qual(self, node):
         if node[2][0][0] == 'll_var' and node[2][1][0] == 'll_call':
             self._grammar.needed_builtin_functions.add(node[2][0][1])
         return self._walkn(node)
 
-    def _not_one_(self, node):
+    def _ty_not_one(self, node):
         self._grammar.needed_builtin_rules.add('any')
         return self._walkn(node)
 
-    def _operator_(self, node):
+    def _ty_operator(self, node):
         self._grammar.operator_needed = True
         o = OperatorState()
         for operator in node[2]:
@@ -713,21 +713,21 @@ class _SubRuleRewriter:
         self._grammar.operators[node[1]] = o
         return [node[0], node[1], []]
 
-    def _paren_(self, node):
+    def _ty_paren(self, node):
         return self._split1(node)
 
-    def _range_(self, node):
+    def _ty_range(self, node):
         self._grammar.range_needed = True
         return node
 
-    def _regexp_(self, node):
+    def _ty_regexp(self, node):
         self._grammar.re_needed = True
         return node
 
-    def _set_(self, node):
+    def _ty_set(self, node):
         self._grammar.re_needed = True
         return node
 
-    def _unicat_(self, node):
+    def _ty_unicat(self, node):
         self._grammar.unicat_needed = True
         return node

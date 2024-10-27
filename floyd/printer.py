@@ -100,112 +100,112 @@ class Printer:
         return '\n'.join(lines).strip() + '\n'
 
     def _proc(self, node):
-        fn = getattr(self, '_' + node[0] + '_')
+        fn = getattr(self, f'_ty_{node[0]}')
         return fn(node)
 
     #
     # Handlers for each node in the glop AST follow.
     #
 
-    def _action_(self, node):
+    def _ty_action(self, node):
         return '-> %s' % self._proc(node[2][0])
 
-    def _apply_(self, node):
+    def _ty_apply(self, node):
         return node[1]
 
-    def _choice_(self, node):
+    def _ty_choice(self, node):
         return ' | '.join(self._proc(e) for e in node[2])
 
-    def _count_(self, node):
+    def _ty_count(self, node):
         if node[1][0] == node[1][1]:
             return '%s{%d}' % (self._proc(node[2][0]), node[1][0])
         return '%s{%d,%d}' % (self._proc(node[2][0]), node[1][0], node[1][1])
 
-    def _empty_(self, node):
+    def _ty_empty(self, node):
         del node
         return ''
 
-    def _ends_in_(self, node):
+    def _ty_ends_in(self, node):
         return '^.' + self._proc(node[2][0])
 
-    def _label_(self, node):
+    def _ty_label(self, node):
         if node[1].startswith('$'):
             return '%s' % self._proc(node[2][0])
         return '%s:%s' % (self._proc(node[2][0]), node[1])
 
-    def _leftrec_(self, node):
+    def _ty_leftrec(self, node):
         return self._proc(node[2][0])
 
-    def _lit_(self, node):
+    def _ty_lit(self, node):
         return lit.encode(node[1])
 
-    def _ll_arr_(self, node):
+    def _ty_ll_arr(self, node):
         return '[%s]' % ', '.join(self._proc(el) for el in node[2])
 
-    def _ll_call_(self, node):
+    def _ty_ll_call(self, node):
         return '(%s)' % ', '.join(self._proc(arg) for arg in node[2])
 
-    def _ll_const_(self, node):
+    def _ty_ll_const(self, node):
         return node[1]
 
-    def _ll_getitem_(self, node):
+    def _ty_ll_getitem(self, node):
         return '[%s]' % self._proc(node[2][0])
 
-    def _ll_lit_(self, node):
-        return self._lit_(node)
+    def _ty_ll_lit(self, node):
+        return self._ty_lit(node)
 
-    def _ll_minus_(self, node):
+    def _ty_ll_minus(self, node):
         return '%s - %s' % (self._proc(node[2][0]), self._proc(node[2][1]))
 
-    def _ll_num_(self, node):
+    def _ty_ll_num(self, node):
         return str(node[1])
 
-    def _ll_plus_(self, node):
+    def _ty_ll_plus(self, node):
         return '%s + %s' % (self._proc(node[2][0]), self._proc(node[2][1]))
 
-    def _ll_qual_(self, node):
+    def _ty_ll_qual(self, node):
         _, _, ops = node
         v = self._proc(ops[0])
         return '%s%s' % (v, ''.join(self._proc(op) for op in ops[1:]))
 
-    def _ll_var_(self, node):
+    def _ty_ll_var(self, node):
         return node[1]
 
-    def _not_(self, node):
+    def _ty_not(self, node):
         return '~%s' % self._proc(node[2][0])
 
-    def _not_one_(self, node):
+    def _ty_not_one(self, node):
         return '^%s' % self._proc(node[2][0])
 
-    def _paren_(self, node):
+    def _ty_paren(self, node):
         return '(' + self._proc(node[2][0]) + ')'
 
-    def _pred_(self, node):
+    def _ty_pred(self, node):
         return '?{%s}' % self._proc(node[2][0])
 
-    def _opt_(self, node):
+    def _ty_opt(self, node):
         return self._proc(node[2][0]) + '?'
 
-    def _plus_(self, node):
+    def _ty_plus(self, node):
         return self._proc(node[2][0]) + '+'
 
-    def _star_(self, node):
+    def _ty_star(self, node):
         return self._proc(node[2][0]) + '*'
 
-    def _range_(self, node):
+    def _ty_range(self, node):
         return '%s..%s' % (lit.encode(node[1][0]), lit.encode(node[1][1]))
 
-    def _regexp_(self, node):
+    def _ty_regexp(self, node):
         return f"/{lit.escape(node[1], '/')}/"
 
-    def _run_(self, node):
+    def _ty_run(self, node):
         return '<%s>' % self._proc(node[2][0])
 
-    def _set_(self, node):
+    def _ty_set(self, node):
         return f"[{lit.escape(node[1], ']')}]"
 
-    def _seq_(self, node):
+    def _ty_seq(self, node):
         return ' '.join(self._proc(e) for e in node[2])
 
-    def _unicat_(self, node):
+    def _ty_unicat(self, node):
         return '\\p{%s}' % node[1]
