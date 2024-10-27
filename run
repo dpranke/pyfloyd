@@ -362,7 +362,7 @@ class Runner:
                 '-c',
                 '--no-main',
                 '--memoize',
-                'grammars/floyd3.g',
+                'grammars/floyd.g',
             ]
         )
 
