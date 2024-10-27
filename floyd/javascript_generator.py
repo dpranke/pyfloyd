@@ -52,32 +52,27 @@ class JavaScriptGenerator(Generator):
             self._needed_methods.add('range')
         if grammar.str_needed:
             self._needed_methods.add('str')
-        if grammar.unicat_needed:
-            self._needed_methods.add('unicat')
 
     def generate(self) -> str:
         self._gen_rules()
         return self._gen_text()
 
     def _gen_rules(self) -> None:
+        local_vars = ('errpos', 'found', 'p', 'regexp')
         for rule, node in self.grammar.rules.items():
-            p_defined = False
-            errpos_defined = False
+            local_vars_defined = set()
             lines = []
-            for line in self._gen(node):
-                if 'let p =' in line:
-                    if p_defined:
-                        lines.append(line.replace('let p', 'p'))
-                    else:
-                        p_defined = True
-                        lines.append(line)
-                elif 'let errpos =' in line:
-                    if errpos_defined:
-                        lines.append(line.replace('let errpos', 'errpos'))
-                    else:
-                        errpos_defined = True
-                        lines.append(line)
-                else:
+            original_lines = self._gen(node)
+            for line in original_lines:
+                modified = False
+                for v in local_vars:
+                    if f'let {v} =' in line:
+                        if v in local_vars_defined:
+                            lines.append(line.replace(f'let {v}', v))
+                            modified = True
+                            break
+                        local_vars_defined.add(v)
+                if not modified:
                     lines.append(line)
             self._methods[rule] = lines
 
@@ -461,7 +456,7 @@ class JavaScriptGenerator(Generator):
             'regexp.lastIndex = this.pos;',
             'let found = regexp.exec(this.text);',
             'if (found) {',
-            '    this.#succeed(found[0], this.pos + found[0].length)',
+            '    this.#succeed(found[0], this.pos + found[0].length);',
             '    return;',
             '}',
             'this.#fail();',
@@ -494,7 +489,19 @@ class JavaScriptGenerator(Generator):
         return lines
 
     def _unicat_(self, node) -> List[str]:
-        return ['this.#unicat(%s);' % lit.encode(node[1])]
+        return [
+            fr'let regexp = /\p{{{node[1]}}}/guy;',
+            'regexp.lastIndex = this.pos;',
+            'let found = regexp.exec(this.text);',
+            'if (!found) {',
+            '    this.#fail();',
+            '    return;',
+            '}',
+            'this.#succeed(found[0], this.pos + found[0].length);',
+        ]
+        new_node = ['regexp', fr'\p{{{node[1]}}}', []]
+        return self._regexp_(new_node)
+        # return ['this.#unicat(%s);' % lit.encode(node[1])]
 
     #
     # Handlers for the host nodes in the AST
@@ -771,7 +778,8 @@ _BUILTIN_METHODS = """\
     if (this.errpos === this.end) {
       thing = 'end of input';
     } else {
-      thing = `"${this.text[this.errpos]}"`;
+      thing = JSON.stringify(this.text[this.errpos]);
+      // thing = JSON.stringify(`"${this.text[this.errpos]}"`);
     }
     return `${this.path}:${lineno} Unexpected ${thing} at column ${colno}`;
   }
@@ -948,10 +956,6 @@ float(s) {
 
 hex(s) {
   return Number.parseInt(s, 16);
-}
-
-is_unicat(var, cat) {
-  throw Exception('is_unicat is not implemented');
 }
 
 itou(n) {

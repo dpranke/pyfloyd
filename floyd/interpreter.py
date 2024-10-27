@@ -516,9 +516,6 @@ class Interpreter:
     def _builtin_fn_hex(self, val):
         return int(val, base=16)
 
-    def _builtin_fn_is_unicat(self, var, cat):
-        return unicodedata.category(var) == cat
-
     def _builtin_fn_itou(self, val):
         return chr(val)
 

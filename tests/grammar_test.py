@@ -309,9 +309,6 @@ class GrammarTestsMixin:
     def test_fn_float(self):
         self.check("g = -> float('4.3')", text='', out=4.3)
 
-    def test_fn_is_unicat(self):
-        self.check("g = -> is_unicat('1', 'Nd')", text='', out=True)
-
     def test_fn_itou(self):
         self.check('grammar = -> itou(97)', text='', out='a')
 
@@ -923,7 +920,6 @@ class GrammarTestsMixin:
         )
 
     def test_set_escaped_right_bracket(self):
-        # TODO: Get this to pass.
         g = r'g = [xa-e\\\]] -> true'
         self.check(g, text=']', out=True)
 
@@ -1062,16 +1058,6 @@ class JavaScriptGenerator(unittest.TestCase, GrammarTestsMixin):
         d = h.mkdtemp()
         h.write_text_file(d + '/parser.js', source_code)
         return _JavaScriptParserWrapper(h, d), None, 0
-
-    def test_set_exclude_esc_char(self):
-        # The JS implementation isn't smart enough to escape unexpected
-        # characters yet.
-        # TODO: Fix this.
-        pass
-
-    def test_fn_is_unicat(self):
-        # Can't implement this in JavaScript.
-        pass
 
     @skip('integration')
     def test_json5_special_floats(self):
