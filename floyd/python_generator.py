@@ -140,7 +140,7 @@ class PythonGenerator(Generator):
             text += '])\n'
             text += '        o.choices = {\n'
             for op in o.choices:
-                text += "            '%s': self.%s,\n" % (op, o.choices[op])
+                text += "            '%s': self._%s,\n" % (op, o.choices[op])
             text += '        }\n'
             text += "        self.operators['%s'] = o\n" % rule
         return text
@@ -158,7 +158,7 @@ class PythonGenerator(Generator):
     def _gen_methods(self) -> str:
         text = ''
         for rule, method_body in self._methods.items():
-            memoize = self.options.memoize and rule.startswith('_r_')
+            memoize = self.options.memoize and rule.startswith('r_')
             text += self._gen_method_text(rule, method_body, memoize)
         text += '\n'
 
@@ -184,7 +184,7 @@ class PythonGenerator(Generator):
 
     def _gen_method_text(self, method_name, method_body, memoize) -> str:
         text = '\n'
-        text += '    def %s(self):\n' % method_name
+        text += '    def _%s(self):\n' % method_name
         if memoize:
             text += "        r = self.cache.get(('%s', " % method_name
             text += 'self.pos))\n'
@@ -218,7 +218,7 @@ class PythonGenerator(Generator):
         return flatten(Saw('self._succeed(', obj, ')'))
 
     def _ty_apply(self, node) -> List[str]:
-        return [f'self.{node[1]}()']
+        return [f'self._{node[1]}()']
 
     def _ty_choice(self, node) -> List[str]:
         lines = ['p = self.pos']
@@ -285,7 +285,7 @@ class PythonGenerator(Generator):
     def _ty_leftrec(self, node) -> List[str]:
         left_assoc = self.grammar.assoc.get(node[1], 'left') == 'left'
         lines = [
-            f'self._leftrec(self.{node[2][0][1]}, '
+            f'self._leftrec(self._{node[2][0][1]}, '
             + f"'{node[1]}', {str(left_assoc)})"
         ]
         return lines

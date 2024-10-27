@@ -57,7 +57,7 @@ class _Parser:
         return Result(self.val, None, self.pos)
 
     def _r_grammar(self):
-        r = self.cache.get(('_r_grammar', self.pos))
+        r = self.cache.get(('r_grammar', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -71,7 +71,7 @@ class _Parser:
             self._r_end()
         if not self.failed:
             self._succeed(['rules', None, v__1])
-        self.cache[('_r_grammar', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_grammar', pos)] = (self.val, self.failed, self.pos)
 
     def _s_grammar_1(self):
         vs = []
@@ -85,7 +85,7 @@ class _Parser:
         self._succeed(vs)
 
     def _r_rule(self):
-        r = self.cache.get(('_r_rule', self.pos))
+        r = self.cache.get(('r_rule', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -103,7 +103,7 @@ class _Parser:
                 v__3 = self.val
         if not self.failed:
             self._succeed(['rule', v__1, [v__3]])
-        self.cache[('_r_rule', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_rule', pos)] = (self.val, self.failed, self.pos)
 
     def _s_rule_1(self):
         self._r__filler()
@@ -111,7 +111,7 @@ class _Parser:
             self._r_ident()
 
     def _r_ident(self):
-        r = self.cache.get(('_r_ident', self.pos))
+        r = self.cache.get(('r_ident', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -125,7 +125,7 @@ class _Parser:
                 v__2 = self.val
         if not self.failed:
             self._succeed(self._fn_cat(self._fn_scons(v__1, v__2)))
-        self.cache[('_r_ident', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_ident', pos)] = (self.val, self.failed, self.pos)
 
     def _s_ident_1(self):
         vs = []
@@ -139,7 +139,7 @@ class _Parser:
         self._succeed(vs)
 
     def _r_id_start(self):
-        r = self.cache.get(('_r_id_start', self.pos))
+        r = self.cache.get(('r_id_start', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -152,10 +152,10 @@ class _Parser:
             self._succeed(m.group(0), m.end())
             return
         self._fail()
-        self.cache[('_r_id_start', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_id_start', pos)] = (self.val, self.failed, self.pos)
 
     def _r_id_continue(self):
-        r = self.cache.get(('_r_id_continue', self.pos))
+        r = self.cache.get(('r_id_continue', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -166,7 +166,7 @@ class _Parser:
             return
         self._rewind(p)
         self._s_id_continue_1()
-        self.cache[('_r_id_continue', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_id_continue', pos)] = (self.val, self.failed, self.pos)
 
     def _s_id_continue_1(self):
         p = '[0-9]'
@@ -179,7 +179,7 @@ class _Parser:
         self._fail()
 
     def _r_choice(self):
-        r = self.cache.get(('_r_choice', self.pos))
+        r = self.cache.get(('r_choice', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -193,7 +193,7 @@ class _Parser:
                 v__2 = self.val
         if not self.failed:
             self._succeed(['choice', None, self._fn_cons(v__1, v__2)])
-        self.cache[('_r_choice', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_choice', pos)] = (self.val, self.failed, self.pos)
 
     def _s_choice_1(self):
         vs = []
@@ -214,7 +214,7 @@ class _Parser:
             self._r_seq()
 
     def _r_seq(self):
-        r = self.cache.get(('_r_seq', self.pos))
+        r = self.cache.get(('r_seq', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -225,7 +225,7 @@ class _Parser:
             return
         self._rewind(p)
         self._succeed(['empty', None, []])
-        self.cache[('_r_seq', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_seq', pos)] = (self.val, self.failed, self.pos)
 
     def _s_seq_1(self):
         self._r_expr()
@@ -253,7 +253,7 @@ class _Parser:
         self._r_expr()
 
     def _r_expr(self):
-        r = self.cache.get(('_r_expr', self.pos))
+        r = self.cache.get(('r_expr', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -272,7 +272,7 @@ class _Parser:
             return
         self._rewind(p)
         self._r_post_expr()
-        self.cache[('_r_expr', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_expr', pos)] = (self.val, self.failed, self.pos)
 
     def _s_expr_1(self):
         self._r__filler()
@@ -321,7 +321,7 @@ class _Parser:
             self._r_ident()
 
     def _r_post_expr(self):
-        r = self.cache.get(('_r_post_expr', self.pos))
+        r = self.cache.get(('r_post_expr', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -344,7 +344,7 @@ class _Parser:
             return
         self._rewind(p)
         self._r_prim_expr()
-        self.cache[('_r_post_expr', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_post_expr', pos)] = (self.val, self.failed, self.pos)
 
     def _s_post_expr_1(self):
         self._r_prim_expr()
@@ -391,7 +391,7 @@ class _Parser:
             self._succeed(['count', v__2, [v__1]])
 
     def _r_count(self):
-        r = self.cache.get(('_r_count', self.pos))
+        r = self.cache.get(('r_count', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -402,7 +402,7 @@ class _Parser:
             return
         self._rewind(p)
         self._s_count_4()
-        self.cache[('_r_count', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_count', pos)] = (self.val, self.failed, self.pos)
 
     def _s_count_1(self):
         self._r__filler()
@@ -458,7 +458,7 @@ class _Parser:
             self._r_zpos()
 
     def _r_prim_expr(self):
-        r = self.cache.get(('_r_prim_expr', self.pos))
+        r = self.cache.get(('r_prim_expr', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -505,7 +505,7 @@ class _Parser:
             return
         self._rewind(p)
         self._s_prim_expr_20()
-        self.cache[('_r_prim_expr', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_prim_expr', pos)] = (self.val, self.failed, self.pos)
 
     def _s_prim_expr_1(self):
         self._s_prim_expr_2()
@@ -682,7 +682,7 @@ class _Parser:
             self._succeed(['run', None, [v__2]])
 
     def _r_lit(self):
-        r = self.cache.get(('_r_lit', self.pos))
+        r = self.cache.get(('r_lit', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -693,7 +693,7 @@ class _Parser:
             return
         self._rewind(p)
         self._s_lit_3()
-        self.cache[('_r_lit', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_lit', pos)] = (self.val, self.failed, self.pos)
 
     def _s_lit_1(self):
         self._r_squote()
@@ -740,7 +740,7 @@ class _Parser:
         self._succeed(vs)
 
     def _r_sqchar(self):
-        r = self.cache.get(('_r_sqchar', self.pos))
+        r = self.cache.get(('r_sqchar', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -761,10 +761,10 @@ class _Parser:
             self._fail()
         if not self.failed:
             self._r_any()
-        self.cache[('_r_sqchar', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_sqchar', pos)] = (self.val, self.failed, self.pos)
 
     def _r_dqchar(self):
-        r = self.cache.get(('_r_dqchar', self.pos))
+        r = self.cache.get(('r_dqchar', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -785,37 +785,37 @@ class _Parser:
             self._fail()
         if not self.failed:
             self._r_any()
-        self.cache[('_r_dqchar', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_dqchar', pos)] = (self.val, self.failed, self.pos)
 
     def _r_bslash(self):
-        r = self.cache.get(('_r_bslash', self.pos))
+        r = self.cache.get(('r_bslash', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
         pos = self.pos
         self._ch('\\')
-        self.cache[('_r_bslash', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_bslash', pos)] = (self.val, self.failed, self.pos)
 
     def _r_squote(self):
-        r = self.cache.get(('_r_squote', self.pos))
+        r = self.cache.get(('r_squote', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
         pos = self.pos
         self._ch("'")
-        self.cache[('_r_squote', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_squote', pos)] = (self.val, self.failed, self.pos)
 
     def _r_dquote(self):
-        r = self.cache.get(('_r_dquote', self.pos))
+        r = self.cache.get(('r_dquote', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
         pos = self.pos
         self._ch('"')
-        self.cache[('_r_dquote', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_dquote', pos)] = (self.val, self.failed, self.pos)
 
     def _r_escape(self):
-        r = self.cache.get(('_r_escape', self.pos))
+        r = self.cache.get(('r_escape', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -866,7 +866,7 @@ class _Parser:
             return
         self._rewind(p)
         self._s_escape_10()
-        self.cache[('_r_escape', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_escape', pos)] = (self.val, self.failed, self.pos)
 
     def _s_escape_1(self):
         self._str('\\b')
@@ -927,7 +927,7 @@ class _Parser:
             self._succeed(v__2)
 
     def _r_hex_esc(self):
-        r = self.cache.get(('_r_hex_esc', self.pos))
+        r = self.cache.get(('r_hex_esc', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -938,7 +938,7 @@ class _Parser:
             return
         self._rewind(p)
         self._s_hex_esc_3()
-        self.cache[('_r_hex_esc', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_hex_esc', pos)] = (self.val, self.failed, self.pos)
 
     def _s_hex_esc_1(self):
         self._str('\\x')
@@ -991,7 +991,7 @@ class _Parser:
         self._succeed(vs)
 
     def _r_uni_esc(self):
-        r = self.cache.get(('_r_uni_esc', self.pos))
+        r = self.cache.get(('r_uni_esc', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -1006,7 +1006,7 @@ class _Parser:
             return
         self._rewind(p)
         self._s_uni_esc_5()
-        self.cache[('_r_uni_esc', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_uni_esc', pos)] = (self.val, self.failed, self.pos)
 
     def _s_uni_esc_1(self):
         self._str('\\u')
@@ -1083,7 +1083,7 @@ class _Parser:
         self._succeed(vs)
 
     def _r_set(self):
-        r = self.cache.get(('_r_set', self.pos))
+        r = self.cache.get(('r_set', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -1094,7 +1094,7 @@ class _Parser:
             return
         self._rewind(p)
         self._s_set_3()
-        self.cache[('_r_set', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_set', pos)] = (self.val, self.failed, self.pos)
 
     def _s_set_1(self):
         self._ch('[')
@@ -1166,7 +1166,7 @@ class _Parser:
         self._succeed(vs)
 
     def _r_set_char(self):
-        r = self.cache.get(('_r_set_char', self.pos))
+        r = self.cache.get(('r_set_char', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -1191,7 +1191,7 @@ class _Parser:
             self._fail()
         if not self.failed:
             self._r_any()
-        self.cache[('_r_set_char', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_set_char', pos)] = (self.val, self.failed, self.pos)
 
     def _s_set_char_1(self):
         self._str('\\]')
@@ -1199,7 +1199,7 @@ class _Parser:
             self._succeed(']')
 
     def _r_regexp(self):
-        r = self.cache.get(('_r_regexp', self.pos))
+        r = self.cache.get(('r_regexp', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -1213,7 +1213,7 @@ class _Parser:
             self._ch('/')
         if not self.failed:
             self._succeed(self._fn_cat(v__2))
-        self.cache[('_r_regexp', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_regexp', pos)] = (self.val, self.failed, self.pos)
 
     def _s_regexp_1(self):
         vs = []
@@ -1231,7 +1231,7 @@ class _Parser:
         self._succeed(vs)
 
     def _r_re_char(self):
-        r = self.cache.get(('_r_re_char', self.pos))
+        r = self.cache.get(('r_re_char', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -1246,7 +1246,7 @@ class _Parser:
             return
         self._rewind(p)
         self._s_re_char_2()
-        self.cache[('_r_re_char', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_re_char', pos)] = (self.val, self.failed, self.pos)
 
     def _s_re_char_1(self):
         self._r_bslash()
@@ -1266,7 +1266,7 @@ class _Parser:
         self._fail()
 
     def _r_zpos(self):
-        r = self.cache.get(('_r_zpos', self.pos))
+        r = self.cache.get(('r_zpos', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -1277,7 +1277,7 @@ class _Parser:
             return
         self._rewind(p)
         self._s_zpos_2()
-        self.cache[('_r_zpos', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_zpos', pos)] = (self.val, self.failed, self.pos)
 
     def _s_zpos_1(self):
         self._ch('0')
@@ -1333,7 +1333,7 @@ class _Parser:
         self._fail()
 
     def _r_ll_expr(self):
-        r = self.cache.get(('_r_ll_expr', self.pos))
+        r = self.cache.get(('r_ll_expr', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -1348,7 +1348,7 @@ class _Parser:
             return
         self._rewind(p)
         self._r_ll_qual()
-        self.cache[('_r_ll_expr', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_ll_expr', pos)] = (self.val, self.failed, self.pos)
 
     def _s_ll_expr_1(self):
         self._r_ll_qual()
@@ -1381,7 +1381,7 @@ class _Parser:
             self._succeed(['ll_minus', None, [v__1, v__3]])
 
     def _r_ll_exprs(self):
-        r = self.cache.get(('_r_ll_exprs', self.pos))
+        r = self.cache.get(('r_ll_exprs', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -1392,7 +1392,7 @@ class _Parser:
             return
         self._rewind(p)
         self._succeed([])
-        self.cache[('_r_ll_exprs', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_ll_exprs', pos)] = (self.val, self.failed, self.pos)
 
     def _s_ll_exprs_1(self):
         self._r_ll_expr()
@@ -1439,7 +1439,7 @@ class _Parser:
             self._ch(',')
 
     def _r_ll_qual(self):
-        r = self.cache.get(('_r_ll_qual', self.pos))
+        r = self.cache.get(('r_ll_qual', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -1450,7 +1450,7 @@ class _Parser:
             return
         self._rewind(p)
         self._r_ll_prim()
-        self.cache[('_r_ll_qual', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_ll_qual', pos)] = (self.val, self.failed, self.pos)
 
     def _s_ll_qual_1(self):
         self._r_ll_prim()
@@ -1479,7 +1479,7 @@ class _Parser:
         self._succeed(vs)
 
     def _r_ll_post_op(self):
-        r = self.cache.get(('_r_ll_post_op', self.pos))
+        r = self.cache.get(('r_ll_post_op', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -1490,7 +1490,7 @@ class _Parser:
             return
         self._rewind(p)
         self._s_ll_post_op_2()
-        self.cache[('_r_ll_post_op', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_ll_post_op', pos)] = (self.val, self.failed, self.pos)
 
     def _s_ll_post_op_1(self):
         self._r__filler()
@@ -1523,7 +1523,7 @@ class _Parser:
             self._succeed(['ll_call', None, v__2])
 
     def _r_ll_prim(self):
-        r = self.cache.get(('_r_ll_prim', self.pos))
+        r = self.cache.get(('r_ll_prim', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -1562,7 +1562,7 @@ class _Parser:
             return
         self._rewind(p)
         self._s_ll_prim_13()
-        self.cache[('_r_ll_prim', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_ll_prim', pos)] = (self.val, self.failed, self.pos)
 
     def _s_ll_prim_1(self):
         self._r__filler()
@@ -1664,7 +1664,7 @@ class _Parser:
             self._succeed(['ll_arr', None, v__2])
 
     def _r_int(self):
-        r = self.cache.get(('_r_int', self.pos))
+        r = self.cache.get(('r_int', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -1680,7 +1680,7 @@ class _Parser:
             return
         end = self.pos
         self.val = self.text[start:end]
-        self.cache[('_r_int', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_int', pos)] = (self.val, self.failed, self.pos)
 
     def _s_int_1(self):
         self._s_int_2()
@@ -1729,7 +1729,7 @@ class _Parser:
         self._fail()
 
     def _r_hex(self):
-        r = self.cache.get(('_r_hex', self.pos))
+        r = self.cache.get(('r_hex', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -1740,7 +1740,7 @@ class _Parser:
             return
         end = self.pos
         self.val = self.text[start:end]
-        self.cache[('_r_hex', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_hex', pos)] = (self.val, self.failed, self.pos)
 
     def _s_hex_1(self):
         self._str('0x')
@@ -1763,7 +1763,7 @@ class _Parser:
         self._succeed(vs)
 
     def _r_hex_char(self):
-        r = self.cache.get(('_r_hex_char', self.pos))
+        r = self.cache.get(('r_hex_char', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -1776,10 +1776,10 @@ class _Parser:
             self._succeed(m.group(0), m.end())
             return
         self._fail()
-        self.cache[('_r_hex_char', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r_hex_char', pos)] = (self.val, self.failed, self.pos)
 
     def _r__whitespace(self):
-        r = self.cache.get(('_r__whitespace', self.pos))
+        r = self.cache.get(('r__whitespace', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -1797,7 +1797,7 @@ class _Parser:
                 break
             vs.append(self.val)
         self._succeed(vs)
-        self.cache[('_r__whitespace', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r__whitespace', pos)] = (self.val, self.failed, self.pos)
 
     def _s__whitespace_1(self):
         p = self.pos
@@ -1824,7 +1824,7 @@ class _Parser:
         self._ch('\v')
 
     def _r__comment(self):
-        r = self.cache.get(('_r__comment', self.pos))
+        r = self.cache.get(('r__comment', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -1835,7 +1835,7 @@ class _Parser:
             return
         self._rewind(p)
         self._s__comment_5()
-        self.cache[('_r__comment', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r__comment', pos)] = (self.val, self.failed, self.pos)
 
     def _s__comment_1(self):
         self._s__comment_2()
@@ -1883,7 +1883,7 @@ class _Parser:
                     break
 
     def _r__filler(self):
-        r = self.cache.get(('_r__filler', self.pos))
+        r = self.cache.get(('r__filler', self.pos))
         if r is not None:
             self.val, self.failed, self.pos = r
             return
@@ -1897,7 +1897,7 @@ class _Parser:
                 break
             vs.append(self.val)
         self._succeed(vs)
-        self.cache[('_r__filler', pos)] = (self.val, self.failed, self.pos)
+        self.cache[('r__filler', pos)] = (self.val, self.failed, self.pos)
 
     def _s__filler_1(self):
         p = self.pos

@@ -594,7 +594,7 @@ def _add_filler_rules(grammar):
 
 
 def rewrite_subrules(
-    grammar, rule_fmt='_r_{rule}', subrule_fmt='_s_{rule}_{counter}'
+    grammar, rule_fmt='r_{rule}', subrule_fmt='s_{rule}_{counter}'
 ):
     sr = _SubRuleRewriter(grammar, rule_fmt, subrule_fmt)
     sr.rewrite()
@@ -629,7 +629,7 @@ class _SubRuleRewriter:
 
     def _subrule_key(self, s: str) -> int:
         return int(
-            s.replace('_s_{rule}_'.format(rule=self._rule), '').replace(
+            s.replace('s_{rule}_'.format(rule=self._rule), '').replace(
                 '_', ''
             )
         )

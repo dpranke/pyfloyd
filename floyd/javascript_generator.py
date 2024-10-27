@@ -145,7 +145,7 @@ class JavaScriptGenerator(Generator):
             for op in o.choices:
                 text += "    o.choices.set('%s', this.%s)\n" % (
                     op,
-                    o.choices[op][1:],
+                    o.choices[op],
                 )
             text += "    this.operators['%s'] = o;\n" % rule
         return text
@@ -195,7 +195,7 @@ class JavaScriptGenerator(Generator):
 
     def _gen_method_text(self, method_name, method_body, memoize) -> str:
         text = '\n\n'
-        text += '  %s() {\n' % method_name[1:]
+        text += '  %s() {\n' % method_name
         if memoize:
             text += '    let r = this.cache.get(("%s", ' % method_name
             text += 'this.pos))\n'
@@ -248,7 +248,7 @@ class JavaScriptGenerator(Generator):
         return flatten(Saw('this.succeed(', obj, ');'), indent='  ')
 
     def _ty_apply(self, node) -> List[str]:
-        return [f'this.{node[1][1:]}();']
+        return [f'this.{node[1]}();']
 
     def _ty_choice(self, node) -> List[str]:
         lines = ['let p = this.pos;']
@@ -323,7 +323,7 @@ class JavaScriptGenerator(Generator):
         else:
             left_assoc = 'false'
         lines = [
-            f'this.leftrec(this.{node[2][0][1][1:]}, '
+            f'this.leftrec(this.{node[2][0][1]}, '
             + f"'{node[1]}', {left_assoc});"
         ]
         return lines
