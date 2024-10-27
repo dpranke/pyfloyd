@@ -112,7 +112,6 @@ BUILTIN_FUNCTIONS = (
     'dict',
     'float',
     'hex',
-    'is_unicat',
     'itou',
     'join',
     'scat',

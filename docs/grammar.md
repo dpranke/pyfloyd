@@ -427,11 +427,6 @@ given types (using Python's type annotation syntax):
   Returns the integer equivalent of the floating point number. values
   are truncated towards zero (i.e., int(3.5) returns 3).
 
-* `is_unicat(x:char, cat:str): bool`<br>
-  *Deprecated*. Returns true if `x` is a single character in the
-  the Unicode category `cat`. You should match against a
-  unicode-category expression instead.
-
 * `itou(i:int): char`<br>
   Returns the unicode character with code point `x`.
 

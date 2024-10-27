@@ -31,10 +31,7 @@ class PythonGenerator(Generator):
         self._exception_needed = False
         self._methods: Dict[str, List[str]] = {}
         self._operators: Dict[str, str] = {}
-        self._unicodedata_needed = (
-            grammar.unicat_needed
-            or 'is_unicat' in grammar.needed_builtin_functions
-        )
+        self._unicodedata_needed = grammar.unicat_needed
 
         # These methods are pretty much always needed.
         self._needed_methods = set(
@@ -867,9 +864,6 @@ def _float(s):
 
 def _hex(s):
     return int(s, base=16)
-
-def _is_unicat(var, cat):
-    return unicodedata.category(var) == cat
 
 def _itou(n):
     return chr(n)
