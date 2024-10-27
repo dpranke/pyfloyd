@@ -335,15 +335,15 @@ class _Parser:
         if not self.failed:
             return
         self._rewind(p)
+        self._s_post_expr_2_()
+        if not self.failed:
+            return
+        self._rewind(p)
         self._s_post_expr_3_()
         if not self.failed:
             return
         self._rewind(p)
-        self._s_post_expr_5_()
-        if not self.failed:
-            return
-        self._rewind(p)
-        self._s_post_expr_7_()
+        self._s_post_expr_4_()
         if not self.failed:
             return
         self._rewind(p)
@@ -355,50 +355,35 @@ class _Parser:
         if not self.failed:
             v__1 = self.val
         if not self.failed:
-            self._s_post_expr_2_()
-            if not self.failed:
-                v__2 = self.val
-        if not self.failed:
-            self._succeed(['post', v__2, [v__1]])
-
-    def _s_post_expr_2_(self):
-        self._r__filler_()
+            self._r__filler_()
         if not self.failed:
             self._ch('?')
+        if not self.failed:
+            self._succeed(['opt', None, [v__1]])
+
+    def _s_post_expr_2_(self):
+        self._r_prim_expr_()
+        if not self.failed:
+            v__1 = self.val
+        if not self.failed:
+            self._r__filler_()
+        if not self.failed:
+            self._ch('*')
+        if not self.failed:
+            self._succeed(['star', None, [v__1]])
 
     def _s_post_expr_3_(self):
         self._r_prim_expr_()
         if not self.failed:
             v__1 = self.val
         if not self.failed:
-            self._s_post_expr_4_()
-            if not self.failed:
-                v__2 = self.val
-        if not self.failed:
-            self._succeed(['post', v__2, [v__1]])
-
-    def _s_post_expr_4_(self):
-        self._r__filler_()
-        if not self.failed:
-            self._ch('*')
-
-    def _s_post_expr_5_(self):
-        self._r_prim_expr_()
-        if not self.failed:
-            v__1 = self.val
-        if not self.failed:
-            self._s_post_expr_6_()
-            if not self.failed:
-                v__2 = self.val
-        if not self.failed:
-            self._succeed(['post', v__2, [v__1]])
-
-    def _s_post_expr_6_(self):
-        self._r__filler_()
+            self._r__filler_()
         if not self.failed:
             self._ch('+')
+        if not self.failed:
+            self._succeed(['plus', None, [v__1]])
 
-    def _s_post_expr_7_(self):
+    def _s_post_expr_4_(self):
         self._r_prim_expr_()
         if not self.failed:
             v__1 = self.val

@@ -183,8 +183,14 @@ class Printer:
     def _pred_(self, node):
         return '?{%s}' % self._proc(node[2][0])
 
-    def _post_(self, node):
-        return '%s%s' % (self._proc(node[2][0]), node[1])
+    def _opt_(self, node):
+        return self._proc(node[2][0]) + '?'
+
+    def _plus_(self, node):
+        return self._proc(node[2][0]) + '+'
+
+    def _star_(self, node):
+        return self._proc(node[2][0]) + '*'
 
     def _range_(self, node):
         return '%s..%s' % (lit.encode(node[1][0]), lit.encode(node[1][1]))

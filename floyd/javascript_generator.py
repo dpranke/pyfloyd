@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pylint: disable=too-many-lines
+
 from typing import Dict, List, Set, Union
 
 from floyd.analyzer import Grammar
@@ -376,53 +378,50 @@ class JavaScriptGenerator(Generator):
         assert node[2] == []
         return [f"this.#operator('{node[1]}')"]
 
+    def _opt_(self, node) -> List[str]:
+        sublines = self._gen(node[2][0])
+        lines = (
+            [
+                'let p = this.pos;',
+            ]
+            + sublines
+            + [
+                'if (this.failed) {',
+                '  this.#succeed([], p);',
+                '} else {',
+                '  this.#succeed([this.val]);',
+                '}',
+            ]
+        )
+        return lines
+
     def _paren_(self, node) -> List[str]:
         return self._gen(node[2][0])
 
-    def _post_(self, node) -> List[str]:
+    def _plus_(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
-        if node[1] == '?':
-            lines = (
-                [
-                    'let p = this.pos;',
-                ]
-                + sublines
-                + [
-                    'if (this.failed) {',
-                    '  this.#succeed([], p);',
-                    '} else {',
-                    '  this.#succeed([this.val]);',
-                    '}',
-                ]
-            )
-        else:
-            lines = ['let vs = [];']
-            if node[1] == '+':
-                lines.extend(sublines)
-                lines.extend(
-                    [
-                        'vs.push(this.val);',
-                        'if (this.failed) {',
-                        '  return;',
-                        '}',
-                    ]
-                )
-            lines.extend(
-                [
-                    'while (true) {',
-                    '  let p = this.pos;',
-                ]
-                + ['  ' + line for line in sublines]
-                + [
-                    '  if (this.failed || this.pos === p) {',
-                    '    this.#rewind(p);',
-                    '    break;',
-                    '  }',
-                    '  vs.push(this.val);',
-                    '}',
-                    'this.#succeed(vs);',
-                ]
-            )
+        lines = (
+            ['let vs = [];']
+            + sublines
+            + [
+                'vs.push(this.val);',
+                'if (this.failed) {',
+                '  return;',
+                '}',
+                'while (true) {',
+                '  let p = this.pos;',
+            ]
+            + ['  ' + line for line in sublines]
+            + [
+                '  if (this.failed || this.pos === p) {',
+                '    this.#rewind(p);',
+                '    break;',
+                '  }',
+                '  vs.push(this.val);',
+                '}',
+                'this.#succeed(vs);',
+            ]
+        )
         return lines
 
     def _pred_(self, node) -> List[str]:
@@ -486,6 +485,27 @@ class JavaScriptGenerator(Generator):
             lines.append('if (!this.failed) {')
             lines.extend('  ' + line for line in self._gen(subnode))
             lines.append('}')
+        return lines
+
+    def _star_(self, node) -> List[str]:
+        sublines = self._gen(node[2][0])
+        lines = (
+            [
+                'let vs = [];',
+                'while (true) {',
+                '  let p = this.pos;',
+            ]
+            + ['  ' + line for line in sublines]
+            + [
+                '  if (this.failed || this.pos === p) {',
+                '    this.#rewind(p);',
+                '    break;',
+                '  }',
+                '  vs.push(this.val);',
+                '}',
+                'this.#succeed(vs);',
+            ]
+        )
         return lines
 
     def _unicat_(self, node) -> List[str]:

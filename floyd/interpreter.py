@@ -426,15 +426,6 @@ class Interpreter:
             self._handle_star(node)
             self.val = [hd] + self.val
 
-    def _handle_post(self, node):
-        if node[1] == '?':
-            self._handle_opt(node)
-        elif node[1] == '*':
-            self._handle_star(node)
-        else:
-            assert node[1] == '+'
-            self._handle_plus(node)
-
     def _handle_pred(self, node):
         self._interpret(node[2][0])
         if self.val is True:

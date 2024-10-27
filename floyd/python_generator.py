@@ -340,49 +340,47 @@ class PythonGenerator(Generator):
         assert node[2] == []
         return [f"self._operator(f'{node[1]}')"]
 
+    def _opt_(self, node) -> List[str]:
+        sublines = self._gen(node[2][0])
+        lines = (
+            [
+                'p = self.pos',
+            ]
+            + sublines
+            + [
+                'if self.failed:',
+                '    self._succeed([], p)',
+                'else:',
+                '    self._succeed([self.val])',
+            ]
+        )
+        return lines
+
     def _paren_(self, node) -> List[str]:
         return self._gen(node[2][0])
 
-    def _post_(self, node) -> List[str]:
+    def _plus_(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
-        if node[1] == '?':
-            lines = (
-                [
-                    'p = self.pos',
-                ]
-                + sublines
-                + [
-                    'if self.failed:',
-                    '    self._succeed([], p)',
-                    'else:',
-                    '    self._succeed([self.val])',
-                ]
-            )
-        else:
-            lines = ['vs = []']
-            if node[1] == '+':
-                lines.extend(sublines)
-                lines.extend(
-                    [
-                        'vs.append(self.val)',
-                        'if self.failed:',
-                        '    return',
-                    ]
-                )
-            lines.extend(
-                [
-                    'while True:',
-                    '    p = self.pos',
-                ]
-                + ['    ' + line for line in sublines]
-                + [
-                    '    if self.failed or self.pos == p:',
-                    '        self._rewind(p)',
-                    '        break',
-                    '    vs.append(self.val)',
-                    'self._succeed(vs)',
-                ]
-            )
+        lines = (
+            ['vs = []']
+            + sublines
+            + [
+                'vs.append(self.val)',
+                'if self.failed:',
+                '    return',
+                'while True:',
+                '    p = self.pos',
+            ]
+            + ['    ' + line for line in sublines]
+            + [
+                '    if self.failed or self.pos == p:',
+                '        self._rewind(p)',
+                '        break',
+                '    vs.append(self.val)',
+                'self._succeed(vs)',
+            ]
+        )
+
         return lines
 
     def _pred_(self, node) -> List[str]:
@@ -441,6 +439,25 @@ class PythonGenerator(Generator):
         for subnode in node[2][1:]:
             lines.append('if not self.failed:')
             lines.extend('    ' + line for line in self._gen(subnode))
+        return lines
+
+    def _star_(self, node) -> List[str]:
+        sublines = self._gen(node[2][0])
+        lines = (
+            [
+                'vs = []',
+                'while True:',
+                '    p = self.pos',
+            ]
+            + ['    ' + line for line in sublines]
+            + [
+                '    if self.failed or self.pos == p:',
+                '        self._rewind(p)',
+                '        break',
+                '    vs.append(self.val)',
+                'self._succeed(vs)',
+            ]
+        )
         return lines
 
     def _unicat_(self, node) -> List[str]:

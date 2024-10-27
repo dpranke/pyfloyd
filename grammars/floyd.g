@@ -27,9 +27,9 @@ expr        = '->' ll_expr                 -> ['action', null, [$2]]
             | post_expr ':' ident          -> ['label', $3, [$1]]
             | post_expr
 
-post_expr   = prim_expr '?'                -> ['post', $2, [$1]]
-            | prim_expr '*'                -> ['post', $2, [$1]]
-            | prim_expr '+'                -> ['post', $2, [$1]]
+post_expr   = prim_expr '?'                -> ['opt', null, [$1]]
+            | prim_expr '*'                -> ['star', null, [$1]]
+            | prim_expr '+'                -> ['plus', null, [$1]]
             | prim_expr count              -> ['count', $2, [$1]]
             | prim_expr
 

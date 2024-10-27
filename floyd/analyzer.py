@@ -399,8 +399,6 @@ def _check_operator(grammar, name, choices):
 def _check_lr(name, node, rules, seen):
     # pylint: disable=too-many-branches
     ty = node[0]
-    if ty == 'action':
-        return False
     if ty == 'apply':
         if node[1] == name:
             return True  # Direct recursion.
@@ -411,38 +409,6 @@ def _check_lr(name, node, rules, seen):
             return False
         seen.add(node[1])
         return _check_lr(name, rules[node[1]], rules, seen)
-    if ty == 'choice':
-        return any(_check_lr(name, n, rules, seen) for n in node[2])
-    if ty == 'count':
-        return _check_lr(name, node[2][0], rules, seen)
-    if ty == 'empty':
-        return False
-    if ty == 'ends_in':
-        return _check_lr(name, node[2][0], rules, seen)
-    if ty == 'label':
-        return _check_lr(name, node[2][0], rules, seen)
-    if ty == 'leftrec':
-        return False
-    if ty == 'lit':
-        return False
-    if ty == 'not':
-        return _check_lr(name, node[2][0], rules, seen)
-    if ty == 'not_one':
-        return _check_lr(name, node[2][0], rules, seen)
-    if ty == 'paren':
-        return _check_lr(name, node[2][0], rules, seen)
-    if ty == 'post':
-        return _check_lr(name, node[2][0], rules, seen)
-    if ty == 'pred':
-        return False
-    if ty == 'range':
-        return False
-    if ty == 'regexp':
-        return False
-    if ty == 'run':
-        return _check_lr(name, node[2][0], rules, seen)
-    if ty == 'set':
-        return False
     if ty == 'seq':
         for subnode in node[2]:
             if subnode[0] == 'lit':
@@ -451,13 +417,39 @@ def _check_lr(name, node, rules, seen):
             if r:
                 return r
         return False
-    if ty == 'unicat':
-        return False
+    if ty == 'choice':
+        return any(_check_lr(name, n, rules, seen) for n in node[2])
+    if ty in (
+        'count',
+        'ends_in',
+        'label',
+        'not',
+        'not_one',
+        'opt',
+        'paren',
+        'plus',
+        'run',
+        'star',
+    ):
+        return _check_lr(name, node[2][0], rules, seen)
 
     # If we get here, either this is an unknown AST node type, or
     # it is one we think we shouldn't be able to reach, like an
     # operator node or a ll_* node.
-    assert False, 'unexpected AST node type %s' % ty  # pragma: no cover
+    assert ty in (
+        'action',
+        'empty',
+        'leftrec',
+        'lit',
+        'pred',
+        'range',
+        'regexp',
+        'set',
+        'unicat',
+    ), (
+        'unexpected AST node type %s' % ty  # pragma: no cover
+    )
+    return False
 
 
 def _rewrite_filler(grammar):
@@ -559,8 +551,8 @@ def _add_filler_rules(grammar):
             ]
         else:
             grammar.rules['_filler'] = [
-                'post',
-                '*',
+                'star',
+                None,
                 [
                     [
                         'choice',
@@ -581,8 +573,8 @@ def _add_filler_rules(grammar):
             ]
         else:
             grammar.rules['_filler'] = [
-                'post',
-                '*',
+                'star',
+                None,
                 [['apply', '_comment', []]],
             ]
     else:
@@ -595,8 +587,8 @@ def _add_filler_rules(grammar):
             ]
         else:
             grammar.rules['_filler'] = [
-                'post',
-                '*',
+                'star',
+                None,
                 [['apply', '_whitespace', []]],
             ]
 
@@ -661,17 +653,17 @@ class _SubRuleRewriter:
         return [node[0], node[1], [self._make_subrule(node[2][0])]]
 
     def _can_inline(self, node) -> bool:
-        if node[0] in (
+        return node[0] not in (
             'choice',
             'count',
             'not',
-            'post',
+            'opt',
+            'plus',
             'regexp',
             'set',
             'seq',
-        ):
-            return False
-        return True
+            'star',
+        )
 
     def _make_subrule(self, child):
         subnode_rule = self._subrule()
