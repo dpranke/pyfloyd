@@ -27,7 +27,6 @@ class PythonGenerator(Generator):
     def __init__(self, grammar: Grammar, options: GeneratorOptions):
         super().__init__(grammar, options)
         self._builtin_methods = self._load_builtin_methods()
-        self._builtin_functions = self._load_builtin_functions()
         self._exception_needed = False
         self._methods: Dict[str, List[str]] = {}
         self._operators: Dict[str, str] = {}
@@ -206,7 +205,7 @@ class PythonGenerator(Generator):
 
     def _gen_functions(self) -> str:
         return '\n\n'.join(
-            self._builtin_functions[name]
+            self._builtin_methods[f'_fn_{name}']
             for name in sorted(self.grammar.needed_builtin_functions)
         )
 
@@ -513,7 +512,7 @@ class PythonGenerator(Generator):
                 fn = first[1]
                 # Note that unknown functions were caught during analysis
                 # so we don't have to worry about that here.
-                start = f'_{fn}'
+                start = f'self._fn_{fn}'
             else:
                 # If second isn't a call, then first refers to a variable.
                 start = self._ty_ll_var(first)
@@ -856,53 +855,51 @@ _BUILTIN_METHODS = """\
             self._succeed(self.text[p], self.pos + 1)
         else:
             self._fail()
-"""
 
-_BUILTIN_FUNCTIONS = """\
-def _atoi(a):
-    return int(a, base=10)
-
-def _cat(strs):
-    return ''.join(strs)
-
-def _concat(xs, ys):
-    return xs + ys
-
-def _cons(hd, tl):
-    return [hd] + tl
-
-def _dict(pairs):
-    return dict(pairs)
-
-def _float(s):
-    if '.' in s or 'e' in s or 'E' in s:
-        return float(s)
-    return int(s)
-
-def _hex(s):
-    return int(s, base=16)
-
-def _itou(n):
-    return chr(n)
-
-def _join(s, vs):
-    return s.join(vs)
-
-def _scat(ss):
-    return ''.join(ss)
-
-def _scons(hd, tl):
-    return [hd] + tl
-
-def _strcat(a, b):
-    return a + b
-
-def _utoi(s):
-    return ord(s)
-
-def _xtoi(s):
-    return int(s, base=16)
-
-def _xtou(s):
-    return chr(int(s, base=16))
+    def _fn_atoi(self, a):
+        return int(a, base=10)
+    
+    def _fn_cat(self, strs):
+        return ''.join(strs)
+    
+    def _fn_concat(self, xs, ys):
+        return xs + ys
+    
+    def _fn_cons(self, hd, tl):
+        return [hd] + tl
+    
+    def _fn_dict(self, pairs):
+        return dict(pairs)
+    
+    def _fn_float(self, s):
+        if '.' in s or 'e' in s or 'E' in s:
+            return float(s)
+        return int(s)
+    
+    def _fn_hex(self, s):
+        return int(s, base=16)
+    
+    def _fn_itou(self, n):
+        return chr(n)
+    
+    def _fn_join(self, s, vs):
+        return s.join(vs)
+    
+    def _fn_scat(self, ss):
+        return ''.join(ss)
+    
+    def _fn_scons(self, hd, tl):
+        return [hd] + tl
+    
+    def _fn_strcat(self, a, b):
+        return a + b
+    
+    def _fn_utoi(self, s):
+        return ord(s)
+    
+    def _fn_xtoi(self, s):
+        return int(s, base=16)
+    
+    def _fn_xtou(self, s):
+        return chr(int(s, base=16))
 """
