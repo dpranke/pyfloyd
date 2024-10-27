@@ -102,9 +102,6 @@ class PythonGenerator(Generator):
             text += _PARSE.format(starting_rule=self.grammar.starting_rule)
 
         text += self._gen_methods()
-        if self.grammar.needed_builtin_functions:
-            text += '\n\n'
-            text += self._gen_functions()
         if self.options.main:
             text += _MAIN_FOOTER
         else:
@@ -158,14 +155,6 @@ class PythonGenerator(Generator):
             builtins[name] = text
         return builtins
 
-    def _load_builtin_functions(self) -> Dict[str, str]:
-        blocks = _BUILTIN_FUNCTIONS[:-1].split('\n\n')
-        builtins = {}
-        for block in blocks:
-            name = block[5 : block.find('(')]
-            builtins[name] = block + '\n'
-        return builtins
-
     def _gen_methods(self) -> str:
         text = ''
         for rule, method_body in self._methods.items():
@@ -184,6 +173,13 @@ class PythonGenerator(Generator):
             self._builtin_methods[name]
             for name in sorted(self._needed_methods)
         )
+
+        if self.grammar.needed_builtin_functions:
+            text += '\n'
+            text += '\n'.join(
+                self._builtin_methods[f'fn_{name}']
+                for name in sorted(self.grammar.needed_builtin_functions)
+            )
         return text
 
     def _gen_method_text(self, method_name, method_body, memoize) -> str:
@@ -202,12 +198,6 @@ class PythonGenerator(Generator):
             text += f"        self.cache[('{method_name}', pos)] = ("
             text += 'self.val, self.failed, self.pos)\n'
         return text
-
-    def _gen_functions(self) -> str:
-        return '\n\n'.join(
-            self._builtin_methods[f'_fn_{name}']
-            for name in sorted(self.grammar.needed_builtin_functions)
-        )
 
     def _gen(self, node) -> List[str]:
         # All of the rule methods return a list of lines.
@@ -858,48 +848,48 @@ _BUILTIN_METHODS = """\
 
     def _fn_atoi(self, a):
         return int(a, base=10)
-    
+
     def _fn_cat(self, strs):
         return ''.join(strs)
-    
+
     def _fn_concat(self, xs, ys):
         return xs + ys
-    
+
     def _fn_cons(self, hd, tl):
         return [hd] + tl
-    
+
     def _fn_dict(self, pairs):
         return dict(pairs)
-    
+
     def _fn_float(self, s):
         if '.' in s or 'e' in s or 'E' in s:
             return float(s)
         return int(s)
-    
+
     def _fn_hex(self, s):
         return int(s, base=16)
-    
+
     def _fn_itou(self, n):
         return chr(n)
-    
+
     def _fn_join(self, s, vs):
         return s.join(vs)
-    
+
     def _fn_scat(self, ss):
         return ''.join(ss)
-    
+
     def _fn_scons(self, hd, tl):
         return [hd] + tl
-    
+
     def _fn_strcat(self, a, b):
         return a + b
-    
+
     def _fn_utoi(self, s):
         return ord(s)
-    
+
     def _fn_xtoi(self, s):
         return int(s, base=16)
-    
+
     def _fn_xtou(self, s):
         return chr(int(s, base=16))
 """

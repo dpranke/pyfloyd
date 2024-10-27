@@ -29,7 +29,6 @@ class JavaScriptGenerator(Generator):
     def __init__(self, grammar: Grammar, options: GeneratorOptions):
         super().__init__(grammar, options)
         self._builtin_methods = self._load_builtin_methods()
-        self._builtin_functions = self._load_builtin_functions()
         self._exception_needed = False
         self._methods: Dict[str, List[str]] = {}
         self._operators: Dict[str, str] = {}
@@ -106,9 +105,6 @@ class JavaScriptGenerator(Generator):
 
         text += self._gen_methods()
         text += '}\n'
-        if self.grammar.needed_builtin_functions:
-            text += '\n'
-            text += self._gen_functions()
 
         if self.options.main:
             text += _MAIN_FOOTER
@@ -147,35 +143,31 @@ class JavaScriptGenerator(Generator):
             text += ']);\n'
             text += '    o.choices = new Map()\n'
             for op in o.choices:
-                text += "    o.choices.set('%s', this.#%s)\n" % (
+                text += "    o.choices.set('%s', this.%s)\n" % (
                     op,
-                    o.choices[op],
+                    o.choices[op][1:],
                 )
             text += "    this.operators['%s'] = o;\n" % rule
         return text
 
     def _load_builtin_methods(self) -> Dict[str, str]:
-        blocks = _BUILTIN_METHODS.split('\n  #')
-        blocks[0] = blocks[0][3:]
+        blocks = _BUILTIN_METHODS.split('\n  }\n\n  ')
+        blocks[0] = blocks[0][2:]
         builtins = {}
-        for block in blocks:
+        for block in blocks[:-1]:
             name = block[: block.find('(')]
-            text = block
+            text = block + '\n  }\n'
             builtins[name] = text
-        return builtins
-
-    def _load_builtin_functions(self) -> Dict[str, str]:
-        blocks = _BUILTIN_FUNCTIONS[:-1].split('\n\n')
-        builtins = {}
-        for block in blocks:
-            name = block[: block.find('(')]
-            builtins[name] = block + '\n'
+        block = blocks[-1]
+        name = block[: block.find('(')]
+        text = block
+        builtins[name] = text
         return builtins
 
     def _gen_methods(self) -> str:
         text = ''
         for rule, method_body in self._methods.items():
-            memoize = self.options.memoize and rule.startswith('_r_')
+            memoize = self.options.memoize and rule.startswith('r_')
             text += self._gen_method_text(rule, method_body, memoize)
         text += '\n'
         if self.grammar.needed_builtin_rules or self._needed_methods:
@@ -183,19 +175,27 @@ class JavaScriptGenerator(Generator):
 
         if self.grammar.needed_builtin_rules:
             for name in sorted(self.grammar.needed_builtin_rules):
-                method_txt = self._builtin_methods[f'_r_{name}']
-                text += '  #' + method_txt
+                method_txt = self._builtin_methods[f'r_{name}']
+                text += '  ' + method_txt
                 text += '\n'
 
-        text += '  #' + '\n  #'.join(
-            self._builtin_methods[name]
-            for name in sorted(self._needed_methods)
-        )
+        if self._needed_methods:
+            text += '  ' + '\n  '.join(
+                self._builtin_methods[name]
+                for name in sorted(self._needed_methods)
+            )
+
+        if self.grammar.needed_builtin_functions:
+            text += '\n'
+            text += '  ' + '\n  '.join(
+                self._builtin_methods[f'fn_{name}']
+                for name in sorted(self.grammar.needed_builtin_functions)
+            )
         return text
 
     def _gen_method_text(self, method_name, method_body, memoize) -> str:
         text = '\n\n'
-        text += '  #%s() {\n' % method_name
+        text += '  %s() {\n' % method_name[1:]
         if memoize:
             text += '    let r = this.cache.get(("%s", ' % method_name
             text += 'this.pos))\n'
@@ -211,12 +211,6 @@ class JavaScriptGenerator(Generator):
             text += 'this.val, this.failed, this.pos);\n'
         text += '  }'
         return text
-
-    def _gen_functions(self) -> str:
-        return 'function ' + '\nfunction '.join(
-            self._builtin_functions[name]
-            for name in sorted(self.grammar.needed_builtin_functions)
-        )
 
     def _gen(self, node) -> List[str]:
         # All of the rule methods return a list of lines.
@@ -251,10 +245,10 @@ class JavaScriptGenerator(Generator):
 
     def _ty_action(self, node) -> List[str]:
         obj = self._gen_expr(node[2][0])
-        return flatten(Saw('this.#succeed(', obj, ');'), indent='  ')
+        return flatten(Saw('this.succeed(', obj, ');'), indent='  ')
 
     def _ty_apply(self, node) -> List[str]:
-        return [f'this.#{node[1]}();']
+        return [f'this.{node[1][1:]}();']
 
     def _ty_choice(self, node) -> List[str]:
         lines = ['let p = this.pos;']
@@ -263,7 +257,7 @@ class JavaScriptGenerator(Generator):
             lines.append('if (!this.failed) {')
             lines.append('  return;')
             lines.append('}')
-            lines.append('this.#rewind(p);')
+            lines.append('this.rewind(p);')
         lines.extend(self._gen(node[2][-1]))
         return lines
 
@@ -280,7 +274,7 @@ class JavaScriptGenerator(Generator):
             [
                 '    if (this.failed) {',
                 '        if (i >= cmin) {',
-                '            this.#succeed(vs);',
+                '            this.succeed(vs);',
                 '            return;',
                 '        }',
                 '        return;',
@@ -288,14 +282,14 @@ class JavaScriptGenerator(Generator):
                 '    vs.push(this.val);',
                 '    i += 1;',
                 '}',
-                'this.#succeed(vs);',
+                'this.succeed(vs);',
             ]
         )
         return lines
 
     def _ty_empty(self, node) -> List[str]:
         del node
-        return ['this.#succeed(null);']
+        return ['this.succeed(null);']
 
     def _ty_ends_in(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
@@ -308,7 +302,7 @@ class JavaScriptGenerator(Generator):
                 '    if (!this.failed) {',
                 '        break;',
                 '    }',
-                '    this.#_r_any();',
+                '    this.r_any();',
                 '    if (this.failed) {',
                 '        break;',
                 '    }',
@@ -329,7 +323,7 @@ class JavaScriptGenerator(Generator):
         else:
             left_assoc = 'false'
         lines = [
-            f'this.#leftrec(this.#{node[2][0][1]}, '
+            f'this.leftrec(this.{node[2][0][1][1:]}, '
             + f"'{node[1]}', {left_assoc});"
         ]
         return lines
@@ -340,7 +334,7 @@ class JavaScriptGenerator(Generator):
             method = 'ch'
         else:
             method = 'str'
-        return [f'this.#{method}({expr});']
+        return [f'this.{method}({expr});']
 
     def _ty_not(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
@@ -352,11 +346,11 @@ class JavaScriptGenerator(Generator):
             + sublines
             + [
                 'if (this.failed) {',
-                '  this.#succeed(null, p);',
+                '  this.succeed(null, p);',
                 '} else {',
-                '  this.#rewind(p);',
+                '  this.rewind(p);',
                 '  this.errpos = errpos;',
-                '  this.#fail();',
+                '  this.fail();',
                 '}',
             ]
         )
@@ -366,7 +360,7 @@ class JavaScriptGenerator(Generator):
         sublines = self._gen(['not', None, node[2]])
         return sublines + [
             'if (!this.failed) {',
-            '    this.#_r_any(p);',
+            '    this.r_any(p);',
             '}',
         ]
 
@@ -376,7 +370,7 @@ class JavaScriptGenerator(Generator):
         # of the expression cluster have been defined and are referenced
         # from self.grammar.operators[node[1]].choices.
         assert node[2] == []
-        return [f"this.#operator('{node[1]}')"]
+        return [f"this.operator('{node[1]}')"]
 
     def _ty_opt(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
@@ -387,9 +381,9 @@ class JavaScriptGenerator(Generator):
             + sublines
             + [
                 'if (this.failed) {',
-                '  this.#succeed([], p);',
+                '  this.succeed([], p);',
                 '} else {',
-                '  this.#succeed([this.val]);',
+                '  this.succeed([this.val]);',
                 '}',
             ]
         )
@@ -414,12 +408,12 @@ class JavaScriptGenerator(Generator):
             + ['  ' + line for line in sublines]
             + [
                 '  if (this.failed || this.pos === p) {',
-                '    this.#rewind(p);',
+                '    this.rewind(p);',
                 '    break;',
                 '  }',
                 '  vs.push(this.val);',
                 '}',
-                'this.#succeed(vs);',
+                'this.succeed(vs);',
             ]
         )
         return lines
@@ -433,9 +427,9 @@ class JavaScriptGenerator(Generator):
         return [
             'let v = ' + flatten(arg, indent='  ')[0],
             'if (v === true) {',
-            '  this.#succeed(v);',
+            '  this.succeed(v);',
             '} else if (v === false) {',
-            '  this.#fail();',
+            '  this.fail();',
             '} else {',
             "  throw new ParsingRuntimeError('Bad predicate value');",
             '}',
@@ -443,7 +437,7 @@ class JavaScriptGenerator(Generator):
 
     def _ty_range(self, node) -> List[str]:
         return [
-            'this.#range(%s, %s);'
+            'this.range(%s, %s);'
             % (lit.encode(node[1][0]), lit.encode(node[1][1]))
         ]
 
@@ -455,10 +449,10 @@ class JavaScriptGenerator(Generator):
             'regexp.lastIndex = this.pos;',
             'let found = regexp.exec(this.text);',
             'if (found) {',
-            '    this.#succeed(found[0], this.pos + found[0].length);',
+            '    this.succeed(found[0], this.pos + found[0].length);',
             '    return;',
             '}',
-            'this.#fail();',
+            'this.fail();',
         ]
 
     def _ty_run(self, node) -> List[str]:
@@ -498,12 +492,12 @@ class JavaScriptGenerator(Generator):
             + ['  ' + line for line in sublines]
             + [
                 '  if (this.failed || this.pos === p) {',
-                '    this.#rewind(p);',
+                '    this.rewind(p);',
                 '    break;',
                 '  }',
                 '  vs.push(this.val);',
                 '}',
-                'this.#succeed(vs);',
+                'this.succeed(vs);',
             ]
         )
         return lines
@@ -514,10 +508,10 @@ class JavaScriptGenerator(Generator):
             'regexp.lastIndex = this.pos;',
             'let found = regexp.exec(this.text);',
             'if (!found) {',
-            '    this.#fail();',
+            '    this.fail();',
             '    return;',
             '}',
-            'this.#succeed(found[0], this.pos + found[0].length);',
+            'this.succeed(found[0], this.pos + found[0].length);',
         ]
 
     #
@@ -570,7 +564,7 @@ class JavaScriptGenerator(Generator):
                 fn = first[1]
                 # Note that unknown functions were caught during analysis
                 # so we don't have to worry about that here.
-                start = f'{fn}'
+                start = f'this.fn_{fn}'
             else:
                 # If second isn't a call, then first refers to a variable.
                 start = self._ty_ll_var(first)
@@ -720,9 +714,9 @@ class Parser {
 
 _PARSE = """\
   parse() {
-    this.#_r_{starting_rule}();
+    this.r_{starting_rule}();
     if (this.failed) {
-      return new Result(null, this.#error(), this.errpos);
+      return new Result(null, this.error(), this.errpos);
     } else {
       return new Result(this.val, null, this.pos);
     }
@@ -732,15 +726,15 @@ _PARSE = """\
 _PARSE_WITH_EXCEPTION = """\
   parse() {
     try {
-      this.#_r_{starting_rule}();
+      this.r_{starting_rule}();
       if (this.failed) {
-        return new Result(null, this.#error(), this.errpos);
+        return new Result(null, this.error(), this.errpos);
       } else {
         return new Result(this.val, null, this.pos);
       }
     } catch (e) {
       if (e instanceof ParsingRuntimeError) {
-        let [lineno, _] = this.#errorOffsets();
+        let [lineno, _] = this.errorOffsets();
         return new Result(null, this.path + ':' + lineno + ' ' + e.toString());
       } else {
         throw e;
@@ -750,32 +744,32 @@ _PARSE_WITH_EXCEPTION = """\
 """
 
 _BUILTIN_METHODS = """\
-  #_r_any() {
+  r_any() {
     if (this.pos < this.end) {
-      this.#succeed(this.text[this.pos], this.pos + 1);
+      this.succeed(this.text[this.pos], this.pos + 1);
     } else {
-      this.#fail();
+      this.fail();
     }
   }
 
-  #_r_end() {
+  r_end() {
     if (this.pos === this.end) {
-      this.#succeed(null);
+      this.succeed(null);
     } else {
-      this.#fail();
+      this.fail();
     }
   }
 
-  #ch(ch) {
+  ch(c) {
     let p = this.pos;
-    if (p < this.end && this.text[p] === ch) {
-      this.#succeed(ch, this.pos + 1);
+    if (p < this.end && this.text[p] === c) {
+      this.succeed(c, this.pos + 1);
     } else {
-      this.#fail();
+      this.fail();
     }
   }
 
-  #errorOffsets() {
+  errorOffsets() {
     let lineno = 1;
     let colno = 1;
     for (let i = 0; i < this.errpos; i++) {
@@ -789,8 +783,8 @@ _BUILTIN_METHODS = """\
     return [lineno, colno];
   }
 
-  #error() {
-    let [lineno, colno] = this.#errorOffsets();
+  error() {
+    let [lineno, colno] = this.errorOffsets();
     let thing;
     if (this.errpos === this.end) {
       thing = 'end of input';
@@ -801,13 +795,13 @@ _BUILTIN_METHODS = """\
     return `${this.path}:${lineno} Unexpected ${thing} at column ${colno}`;
   }
 
-  #fail() {
+  fail() {
     this.val = undefined;
     this.failed = true;
     this.errpos = Math.max(this.errpos, this.pos);
   }
 
-  #leftrec(rule, rule_name, left_assoc) {
+  leftrec(rule, rule_name, left_assoc) {
     let pos = this.pos;
     let key = [rule_name, pos];
     let seed = this.seeds[key];
@@ -842,7 +836,7 @@ _BUILTIN_METHODS = """\
     }
   }
 
-  #operator(rule_name) {
+  operator(rule_name) {
     let o = this.operators[rule_name];
     let pos = this.pos;
     let key = [rule_name, pos];
@@ -876,7 +870,7 @@ _BUILTIN_METHODS = """\
           repeat = true;
           break;
         }
-        this.#rewind(pos);
+        this.rewind(pos);
       }
       if (!repeat) {
         i += 1;
@@ -891,27 +885,27 @@ _BUILTIN_METHODS = """\
     [this.val, this.failed, this.pos] = current;
   }
 
-  #range(i, j) {
+  range(i, j) {
     let p = this.pos;
     if (p == this.end) {
-      this.#fail();
+      this.fail();
       return;
     }
     let c = this.text[p];
     if (i <= c && c <= j) {
-      this.#succeed(this.text[p], this.pos + 1);
+      this.succeed(this.text[p], this.pos + 1);
     } else {
-      this.#fail();
+      this.fail();
     }
   }
 
-  #rewind(newpos) {
-    this.#succeed(null, newpos);
+  rewind(newpos) {
+    this.succeed(null, newpos);
   }
 
-  #str(s) {
+  str(s) {
     for (let ch of s) {
-      this.#ch(ch);
+      this.ch(ch);
       if (this.failed) {
         return;
       }
@@ -919,7 +913,7 @@ _BUILTIN_METHODS = """\
     }
   }
 
-  #succeed(v, newpos = null) {
+  succeed(v, newpos = null) {
     this.val = v;
     this.failed = false;
     if (newpos !== null) {
@@ -927,83 +921,81 @@ _BUILTIN_METHODS = """\
     }
   }
 
-  #unicat(cat) {
+  unicat(cat) {
     if (this.pos == this.end) {
-      this.#fail();
+      this.fail();
       return
     }
     let c = this.text[this.pos];
     let re = new RegExp(`\\\\p{${cat}}`, 'u');
     if (c.match(re)) {
-      this.#succeed(c, this.pos + 1);
+      this.succeed(c, this.pos + 1);
     } else {
-      this.#fail();
+      this.fail();
     }
   }
-"""
 
-_BUILTIN_FUNCTIONS = """\
-atoi(a) {
-  return parseInt(a, 10);
-}
-
-cat(ss) {
-  return ss.join('');
-}
-
-concat(xs, ys) {
-  return xs.concat(ys);
-}
-
-cons(hd, tl) {
-  return [hd].concat(tl)
-}
-
-dict(pairs) {
-  m = new Map();
-  for ([k, v] of pairs) {
-    m[k] = v;
+  fn_atoi(a) {
+    return parseInt(a, 10);
   }
-  return m;
-}
 
-float(s) {
-  return Number.parseFloat(s)
-}
+  fn_cat(ss) {
+    return ss.join('');
+  }
 
-hex(s) {
-  return Number.parseInt(s, 16);
-}
+  fn_concat(xs, ys) {
+    return xs.concat(ys);
+  }
 
-itou(n) {
-  return String.fromCharCode(n);
-}
+  fn_cons(hd, tl) {
+    return [hd].concat(tl)
+  }
 
-join(s, vs) {
-  return vs.join(s);
-}
+  fn_dict(pairs) {
+    let m = new Map();
+    for (let [k, v] of pairs) {
+      m[k] = v;
+    }
+    return m;
+  }
 
-scat(ss) {
-  return ss.join('');
-}
+  fn_float(s) {
+    return Number.parseFloat(s)
+  }
 
-scons(hd, tl) {
-  return [hd].concat(tl);
-}
+  fn_hex(s) {
+    return Number.parseInt(s, 16);
+  }
 
-strcat(a, b) {
-  return a.concat(b);
-}
+  fn_itou(n) {
+    return String.fromCharCode(n);
+  }
 
-utoi(s) {
-  return s.charCodeAt(0);
-}
+  fn_join(s, vs) {
+    return vs.join(s);
+  }
 
-xtoi(s) {
-  return Number.parseInt(s, 16);
-}
+  fn_scat(ss) {
+    return ss.join('');
+  }
 
-xtou(s) {
-  return String.fromCharCode(Number.parseInt(s, 16));
-}
+  fn_scons(hd, tl) {
+    return [hd].concat(tl);
+  }
+
+  fn_strcat(a, b) {
+    return a.concat(b);
+  }
+
+  fn_utoi(s) {
+    return s.charCodeAt(0);
+  }
+
+  fn_xtoi(s) {
+    return Number.parseInt(s, 16);
+  }
+
+  fn_xtou(s) {
+    return String.fromCharCode(Number.parseInt(s, 16));
+  }
 """

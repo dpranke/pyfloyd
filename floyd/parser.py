@@ -124,7 +124,7 @@ class _Parser:
             if not self.failed:
                 v__2 = self.val
         if not self.failed:
-            self._succeed(_cat(_scons(v__1, v__2)))
+            self._succeed(self._fn_cat(self._fn_scons(v__1, v__2)))
         self.cache[('_r_ident', pos)] = (self.val, self.failed, self.pos)
 
     def _s_ident_1(self):
@@ -192,7 +192,7 @@ class _Parser:
             if not self.failed:
                 v__2 = self.val
         if not self.failed:
-            self._succeed(['choice', None, _cons(v__1, v__2)])
+            self._succeed(['choice', None, self._fn_cons(v__1, v__2)])
         self.cache[('_r_choice', pos)] = (self.val, self.failed, self.pos)
 
     def _s_choice_1(self):
@@ -236,7 +236,7 @@ class _Parser:
             if not self.failed:
                 v__2 = self.val
         if not self.failed:
-            self._succeed(['seq', None, _cons(v__1, v__2)])
+            self._succeed(['seq', None, self._fn_cons(v__1, v__2)])
 
     def _s_seq_2(self):
         vs = []
@@ -704,7 +704,7 @@ class _Parser:
         if not self.failed:
             self._r_squote()
         if not self.failed:
-            self._succeed(_cat(v__2))
+            self._succeed(self._fn_cat(v__2))
 
     def _s_lit_2(self):
         vs = []
@@ -726,7 +726,7 @@ class _Parser:
         if not self.failed:
             self._r_dquote()
         if not self.failed:
-            self._succeed(_cat(v__2))
+            self._succeed(self._fn_cat(v__2))
 
     def _s_lit_4(self):
         vs = []
@@ -947,7 +947,7 @@ class _Parser:
             if not self.failed:
                 v__2 = self.val
         if not self.failed:
-            self._succeed(_xtou(_cat(v__2)))
+            self._succeed(self._fn_xtou(self._fn_cat(v__2)))
 
     def _s_hex_esc_2(self):
         vs = []
@@ -973,7 +973,7 @@ class _Parser:
         if not self.failed:
             self._ch('}')
         if not self.failed:
-            self._succeed(_xtou(_cat(v__2)))
+            self._succeed(self._fn_xtou(self._fn_cat(v__2)))
 
     def _s_hex_esc_4(self):
         vs = []
@@ -1015,7 +1015,7 @@ class _Parser:
             if not self.failed:
                 v__2 = self.val
         if not self.failed:
-            self._succeed(_xtou(_cat(v__2)))
+            self._succeed(self._fn_xtou(self._fn_cat(v__2)))
 
     def _s_uni_esc_2(self):
         vs = []
@@ -1041,7 +1041,7 @@ class _Parser:
         if not self.failed:
             self._ch('}')
         if not self.failed:
-            self._succeed(_xtou(_cat(v__2)))
+            self._succeed(self._fn_xtou(self._fn_cat(v__2)))
 
     def _s_uni_esc_4(self):
         vs = []
@@ -1065,7 +1065,7 @@ class _Parser:
             if not self.failed:
                 v__2 = self.val
         if not self.failed:
-            self._succeed(_xtou(_cat(v__2)))
+            self._succeed(self._fn_xtou(self._fn_cat(v__2)))
 
     def _s_uni_esc_6(self):
         vs = []
@@ -1109,7 +1109,7 @@ class _Parser:
         if not self.failed:
             self._ch(']')
         if not self.failed:
-            self._succeed(_cat(_scons(v__2, v__3)))
+            self._succeed(self._fn_cat(self._fn_scons(v__2, v__3)))
 
     def _s_set_2(self):
         vs = []
@@ -1137,7 +1137,7 @@ class _Parser:
         if not self.failed:
             self._ch(']')
         if not self.failed:
-            self._succeed(_cat(v__3))
+            self._succeed(self._fn_cat(v__3))
 
     def _s_set_4(self):
         p = self.pos
@@ -1212,7 +1212,7 @@ class _Parser:
         if not self.failed:
             self._ch('/')
         if not self.failed:
-            self._succeed(_cat(v__2))
+            self._succeed(self._fn_cat(v__2))
         self.cache[('_r_regexp', pos)] = (self.val, self.failed, self.pos)
 
     def _s_regexp_1(self):
@@ -1294,7 +1294,7 @@ class _Parser:
         if not self.failed:
             v__1 = self.val
         if not self.failed:
-            self._succeed(_atoi(v__1))
+            self._succeed(self._fn_atoi(v__1))
 
     def _s_zpos_3(self):
         self._s_zpos_4()
@@ -1405,7 +1405,7 @@ class _Parser:
         if not self.failed:
             self._s_ll_exprs_4()
         if not self.failed:
-            self._succeed(_cons(v__1, v__2))
+            self._succeed(self._fn_cons(v__1, v__2))
 
     def _s_ll_exprs_2(self):
         vs = []
@@ -1461,7 +1461,7 @@ class _Parser:
             if not self.failed:
                 v__2 = self.val
         if not self.failed:
-            self._succeed(['ll_qual', None, _cons(v__1, v__2)])
+            self._succeed(['ll_qual', None, self._fn_cons(v__1, v__2)])
 
     def _s_ll_qual_2(self):
         vs = []
@@ -1971,22 +1971,17 @@ class _Parser:
         if newpos is not None:
             self.pos = newpos
 
+    def _fn_atoi(self, a):
+        return int(a, base=10)
 
-def _atoi(a):
-    return int(a, base=10)
+    def _fn_cat(self, strs):
+        return ''.join(strs)
 
+    def _fn_cons(self, hd, tl):
+        return [hd] + tl
 
-def _cat(strs):
-    return ''.join(strs)
+    def _fn_scons(self, hd, tl):
+        return [hd] + tl
 
-
-def _cons(hd, tl):
-    return [hd] + tl
-
-
-def _scons(hd, tl):
-    return [hd] + tl
-
-
-def _xtou(s):
-    return chr(int(s, base=16))
+    def _fn_xtou(self, s):
+        return chr(int(s, base=16))
