@@ -166,11 +166,7 @@ class _Parser:
             return
         self._rewind(p)
         self._s_id_continue_1_()
-        self.cache[('_r_id_continue_', pos)] = (
-            self.val,
-            self.failed,
-            self.pos,
-        )
+        self.cache[('_r_id_continue_', pos)] = (self.val, self.failed, self.pos)
 
     def _s_id_continue_1_(self):
         p = '[0-9]'
@@ -1816,11 +1812,7 @@ class _Parser:
                 break
             vs.append(self.val)
         self._succeed(vs)
-        self.cache[('_r__whitespace_', pos)] = (
-            self.val,
-            self.failed,
-            self.pos,
-        )
+        self.cache[('_r__whitespace_', pos)] = (self.val, self.failed, self.pos)
 
     def _s__whitespace_1_(self):
         p = self.pos

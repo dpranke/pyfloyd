@@ -191,7 +191,7 @@ class PythonGenerator(Generator):
         text = '\n'
         text += '    def %s(self):\n' % method_name
         if memoize:
-            text += '        r = self.cache.get(("%s", ' % method_name
+            text += "        r = self.cache.get(('%s', " % method_name
             text += 'self.pos))\n'
             text += '        if r is not None:\n'
             text += '            self.val, self.failed, self.pos = r\n'
@@ -200,7 +200,7 @@ class PythonGenerator(Generator):
         for line in method_body:
             text += f'        {line}\n'
         if memoize:
-            text += f'        self.cache[("{method_name}", pos)] = ('
+            text += f"        self.cache[('{method_name}', pos)] = ("
             text += 'self.val, self.failed, self.pos)\n'
         return text
 
