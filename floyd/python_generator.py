@@ -54,6 +54,8 @@ class PythonGenerator(Generator):
             self._needed_methods.add('str')
         if grammar.unicat_needed:
             self._needed_methods.add('unicat')
+        if self._options.memoize:
+            self._needed_methods.add('memoize')
 
     def generate(self) -> str:
         self._gen_rules()
@@ -158,8 +160,7 @@ class PythonGenerator(Generator):
     def _gen_methods(self) -> str:
         text = ''
         for rule, method_body in self._methods.items():
-            memoize = self._options.memoize and rule.startswith('r_')
-            text += self._gen_method_text(rule, method_body, memoize)
+            text += self._gen_method_text(rule, method_body)
         text += '\n'
 
         if self._grammar.needed_builtin_rules:
@@ -182,21 +183,11 @@ class PythonGenerator(Generator):
             )
         return text
 
-    def _gen_method_text(self, method_name, method_body, memoize) -> str:
+    def _gen_method_text(self, method_name, method_body) -> str:
         text = '\n'
         text += '    def _%s(self):\n' % method_name
-        if memoize:
-            text += "        r = self._cache.get(('%s', " % method_name
-            text += 'self._pos))\n'
-            text += '        if r is not None:\n'
-            text += '            self._val, self._failed, self._pos = r\n'
-            text += '            return\n'
-            text += '        pos = self._pos\n'
         for line in method_body:
             text += f'        {line}\n'
-        if memoize:
-            text += f"        self._cache[('{method_name}', pos)] = ("
-            text += 'self._val, self._failed, self._pos)\n'
         return text
 
     def _gen(self, node) -> List[str]:
@@ -218,6 +209,8 @@ class PythonGenerator(Generator):
         return flatten(Saw('self._succeed(', obj, ')'))
 
     def _ty_apply(self, node) -> List[str]:
+        if self._options.memoize and node[1].startswith('r_'):
+            return [f"self._memoize('{node[1]}', self._{node[1]})"]
         return [f'self._{node[1]}()']
 
     def _ty_choice(self, node) -> List[str]:
@@ -772,6 +765,15 @@ _BUILTIN_METHODS = """\
                 if left_assoc:
                     self._blocked.remove(rule_name)
                 return
+
+    def _memoize(self, rule_name, fn):
+        p = self._pos
+        r = self._cache.get((rule_name, p))
+        if r:
+            self._val, self._failed, self._pos = r
+            return
+        fn()
+        self._cache[(rule_name, p)] = (self._val, self._failed, self._pos)
 
     def _operator(self, rule_name):
         o = self._operators[rule_name]
