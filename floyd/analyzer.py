@@ -181,9 +181,9 @@ class _Analyzer:
         if ty == 'apply':
             if node[1] not in self.rules and node[1] not in ('any', 'end'):
                 self.errors.append(f'Unknown rule "{node[1]}"')
-        if ty == 'll_qual':
-            if node[2][1][0] == 'll_call':
-                assert node[2][0][0] == 'll_var'
+        if ty == 'e_qual':
+            if node[2][1][0] == 'e_call':
+                assert node[2][0][0] == 'e_var'
                 name = node[2][0][1]
                 if name not in BUILTIN_FUNCTIONS:
                     self.errors.append(f'Unknown function "{name}" called')
@@ -192,7 +192,7 @@ class _Analyzer:
                     self.walk(n)
                 return
 
-        if ty == 'll_var':
+        if ty == 'e_var':
             if node[1] not in self.scopes[-1] and node[1][0] != '$':
                 self.errors.append(f'Unknown variable "{node[1]}" referenced')
 
@@ -245,7 +245,7 @@ class _Analyzer:
     def _handle_seq(self, node):
         # Figure out what, if any, variables are being bound in this
         # sequence so that we can ensure that only bound variables
-        # are being dereferenced in ll_var nodes.
+        # are being dereferenced in e_var nodes.
         self.scopes.append([])
         vs = set()
         for i, n in enumerate(node[2], start=1):
@@ -270,7 +270,7 @@ class _Analyzer:
 
     def _vars_needed(self, node, max_num, vs):
         ty = node[0]
-        if ty == 'll_var':
+        if ty == 'e_var':
             if node[1][0] == '$':
                 num = int(node[1][1:])
                 if num >= max_num:
@@ -279,18 +279,18 @@ class _Analyzer:
                     )
                 else:
                     vs.add(node[1])
-        elif ty in ('ll_arr', 'll_call'):
+        elif ty in ('e_arr', 'e_call'):
             for n in node[2]:
                 self._vars_needed(n, max_num, vs)
-        elif ty in ('ll_getitem', 'll_paren'):
+        elif ty in ('e_getitem', 'e_paren'):
             self._vars_needed(node[2][0], max_num, vs)
-        elif ty in ('ll_plus', 'll_minus'):
+        elif ty in ('e_plus', 'e_minus'):
             self._vars_needed(node[2][0], max_num, vs)
             self._vars_needed(node[2][1], max_num, vs)
-        elif ty in ('ll_qual',):
+        elif ty in ('e_qual',):
             for n in node[2]:
                 self._vars_needed(n, max_num, vs)
-        elif ty in ('ll_const', 'll_lit', 'll_num'):
+        elif ty in ('e_const', 'e_lit', 'e_num'):
             pass
         else:  # pragma: no cover
             assert False, f'Unexpected AST node type: {ty}'
@@ -435,7 +435,7 @@ def _check_lr(name, node, rules, seen):
 
     # If we get here, either this is an unknown AST node type, or
     # it is one we think we shouldn't be able to reach, like an
-    # operator node or a ll_* node.
+    # operator node or a e_* node.
     assert ty in (
         'action',
         'empty',
@@ -629,9 +629,7 @@ class _SubRuleRewriter:
 
     def _subrule_key(self, s: str) -> int:
         return int(
-            s.replace('s_{rule}_'.format(rule=self._rule), '').replace(
-                '_', ''
-            )
+            s.replace('s_{rule}_'.format(rule=self._rule), '').replace('_', '')
         )
 
     def _walk(self, node):
@@ -689,8 +687,8 @@ class _SubRuleRewriter:
             self._grammar.str_needed = True
         return node
 
-    def _ty_ll_qual(self, node):
-        if node[2][0][0] == 'll_var' and node[2][1][0] == 'll_call':
+    def _ty_e_qual(self, node):
+        if node[2][0][0] == 'e_var' and node[2][1][0] == 'e_call':
             self._grammar.needed_builtin_functions.add(node[2][0][1])
         return self._walkn(node)
 

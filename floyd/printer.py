@@ -139,36 +139,36 @@ class Printer:
     def _ty_lit(self, node):
         return lit.encode(node[1])
 
-    def _ty_ll_arr(self, node):
+    def _ty_e_arr(self, node):
         return '[%s]' % ', '.join(self._proc(el) for el in node[2])
 
-    def _ty_ll_call(self, node):
+    def _ty_e_call(self, node):
         return '(%s)' % ', '.join(self._proc(arg) for arg in node[2])
 
-    def _ty_ll_const(self, node):
+    def _ty_e_const(self, node):
         return node[1]
 
-    def _ty_ll_getitem(self, node):
+    def _ty_e_getitem(self, node):
         return '[%s]' % self._proc(node[2][0])
 
-    def _ty_ll_lit(self, node):
+    def _ty_e_lit(self, node):
         return self._ty_lit(node)
 
-    def _ty_ll_minus(self, node):
+    def _ty_e_minus(self, node):
         return '%s - %s' % (self._proc(node[2][0]), self._proc(node[2][1]))
 
-    def _ty_ll_num(self, node):
+    def _ty_e_num(self, node):
         return str(node[1])
 
-    def _ty_ll_plus(self, node):
+    def _ty_e_plus(self, node):
         return '%s + %s' % (self._proc(node[2][0]), self._proc(node[2][1]))
 
-    def _ty_ll_qual(self, node):
+    def _ty_e_qual(self, node):
         _, _, ops = node
         v = self._proc(ops[0])
         return '%s%s' % (v, ''.join(self._proc(op) for op in ops[1:]))
 
-    def _ty_ll_var(self, node):
+    def _ty_e_var(self, node):
         return node[1]
 
     def _ty_not(self, node):

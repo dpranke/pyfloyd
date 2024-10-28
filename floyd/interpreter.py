@@ -258,22 +258,22 @@ class Interpreter:
         else:
             self._fail()
 
-    def _ty_ll_arr(self, node):
+    def _ty_e_arr(self, node):
         vals = []
         for subnode in node[2]:
             self._interpret(subnode)
             vals.append(self._val)
         self._succeed(vals)
 
-    def _ty_ll_call(self, node):
+    def _ty_e_call(self, node):
         vals = []
         for subnode in node[2]:
             self._interpret(subnode)
             vals.append(self._val)
-        # Return 'll_call' as a tag here so we can check it in ll_qual.
-        self._succeed(['ll_call', vals])
+        # Return 'e_call' as a tag here so we can check it in e_qual.
+        self._succeed(['e_call', vals])
 
-    def _ty_ll_const(self, node):
+    def _ty_e_const(self, node):
         if node[1] == 'true':
             self._succeed(True)
         elif node[1] == 'false':
@@ -286,36 +286,36 @@ class Interpreter:
             assert node[1] == 'NaN'
             self._succeed(float('NaN'))
 
-    def _ty_ll_getitem(self, node):
+    def _ty_e_getitem(self, node):
         self._interpret(node[2][0])
         assert not self._failed
-        # Return 'll_getitem' as a tag here so we can check it in ll_qual.
-        self._succeed(['ll_getitem', self._val])
+        # Return 'e_getitem' as a tag here so we can check it in e_qual.
+        self._succeed(['e_getitem', self._val])
 
-    def _ty_ll_minus(self, node):
+    def _ty_e_minus(self, node):
         self._interpret(node[2][0])
         v1 = self._val
         self._interpret(node[2][1])
         v2 = self._val
         self._succeed(v1 - v2)
 
-    def _ty_ll_num(self, node):
+    def _ty_e_num(self, node):
         if node[1].startswith('0x'):
             self._succeed(int(node[1], base=16))
         else:
             self._succeed(int(node[1]))
 
-    def _ty_ll_paren(self, node):
+    def _ty_e_paren(self, node):
         self._interpret(node[2][0])
 
-    def _ty_ll_plus(self, node):
+    def _ty_e_plus(self, node):
         self._interpret(node[2][0])
         v1 = self._val
         self._interpret(node[2][1])
         v2 = self._val
         self._succeed(v1 + v2)
 
-    def _ty_ll_qual(self, node):
+    def _ty_e_qual(self, node):
         # TODO: is it possible for this to fail?
         self._interpret(node[2][0])
         assert not self._failed
@@ -325,19 +325,19 @@ class Interpreter:
             self._interpret(n)
             assert not self._failed
             op, rhs = self._val
-            if op == 'll_getitem':
+            if op == 'e_getitem':
                 self._val = lhs[rhs]
             else:
-                assert op == 'll_call'
+                assert op == 'e_call'
                 # Note that unknown functions were caught during analysis
                 # so it's safe to dereference this without checking.
                 fn = getattr(self, '_fn_' + lhs, None)
                 self._val = fn(*rhs)
 
-    def _ty_ll_lit(self, node):
+    def _ty_e_lit(self, node):
         self._succeed(node[1])
 
-    def _ty_ll_var(self, node):
+    def _ty_e_var(self, node):
         v = getattr(self, '_fn_' + node[1], None)
         if v:
             self._succeed(node[1])

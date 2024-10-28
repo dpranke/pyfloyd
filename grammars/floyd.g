@@ -22,8 +22,8 @@ choice      = seq ('|' seq)*               -> ['choice', null, cons($1, $2)]
 seq         = expr (expr)*                 -> ['seq', null, cons($1, $2)]
             |                              -> ['empty', null, []]
 
-expr        = '->' ll_expr                 -> ['action', null, [$2]]
-            | '?{' ll_expr '}'             -> ['pred', null, [$2]]
+expr        = '->' e_expr                 -> ['action', null, [$2]]
+            | '?{' e_expr '}'             -> ['pred', null, [$2]]
             | post_expr ':' ident          -> ['label', $3, [$1]]
             | post_expr
 
@@ -97,28 +97,28 @@ re_char     = bslash '/'                   -> '/'
 zpos        = '0'                          -> 0
             | <[1-9] [0-9]*>               -> atoi($1)
 
-ll_expr     = ll_qual '+' ll_expr          -> ['ll_plus', null, [$1, $3]]
-            | ll_qual '-' ll_expr          -> ['ll_minus', null, [$1, $3]]
-            | ll_qual
+e_expr     = e_qual '+' e_expr             -> ['e_plus', null, [$1, $3]]
+           | e_qual '-' e_expr             -> ['e_minus', null, [$1, $3]]
+           | e_qual
 
-ll_exprs    = ll_expr (',' ll_expr)* ','?  -> cons($1, $2)
+e_exprs    = e_expr (',' e_expr)* ','?     -> cons($1, $2)
             |                              -> []
 
-ll_qual     = ll_prim ll_post_op+          -> ['ll_qual', null, cons($1, $2)]
-            | ll_prim
+e_qual     = e_prim e_post_op+             -> ['e_qual', null, cons($1, $2)]
+            | e_prim
 
-ll_post_op  = '[' ll_expr ']'              -> ['ll_getitem', null, [$2]]
-            | '(' ll_exprs ')'             -> ['ll_call', null, $2]
+e_post_op  = '[' e_expr ']'               -> ['e_getitem', null, [$2]]
+            | '(' e_exprs ')'             -> ['e_call', null, $2]
 
-ll_prim     = 'false'                      -> ['ll_const', 'false', []]
-            | 'null'                       -> ['ll_const', 'null', []]
-            | 'true'                       -> ['ll_const', 'true', []]
-            | ident                        -> ['ll_var', $1, []]
-            | hex                          -> ['ll_num', $1, []]
-            | int                          -> ['ll_num', $1, []]
-            | lit                          -> ['ll_lit', $1, []]
-            | '(' ll_expr ')'              -> ['ll_paren', null, [$2]]
-            | '[' ll_exprs ']'             -> ['ll_arr', null, $2]
+e_prim     = 'false'                      -> ['e_const', 'false', []]
+            | 'null'                      -> ['e_const', 'null', []]
+            | 'true'                      -> ['e_const', 'true', []]
+            | ident                       -> ['e_var', $1, []]
+            | hex                         -> ['e_num', $1, []]
+            | int                         -> ['e_num', $1, []]
+            | lit                         -> ['e_lit', $1, []]
+            | '(' e_expr ')'              -> ['e_paren', null, [$2]]
+            | '[' e_exprs ']'             -> ['e_arr', null, $2]
 
 int         = '0'
             | <'-'? [1-9] [0-9]*>

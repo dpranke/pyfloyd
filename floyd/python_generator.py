@@ -455,13 +455,13 @@ class PythonGenerator(Generator):
     #
     # Handlers for the host nodes in the AST
     #
-    def _ty_ll_arr(self, node) -> _FormatObj:
+    def _ty_e_arr(self, node) -> _FormatObj:
         if len(node[2]) == 0:
             return '[]'
         args = [self._gen(n) for n in node[2]]
         return Saw('[', Comma(args), ']')
 
-    def _ty_ll_call(self, node) -> Saw:
+    def _ty_e_call(self, node) -> Saw:
         # There are no built-in functions that take no arguments, so make
         # sure we're not being called that way.
         # TODO: Figure out if we need this routine or not when we also
@@ -470,33 +470,33 @@ class PythonGenerator(Generator):
         args = [self._gen(n) for n in node[2]]
         return Saw('(', Comma(args), ')')
 
-    def _ty_ll_getitem(self, node) -> Saw:
+    def _ty_e_getitem(self, node) -> Saw:
         return Saw('[', self._gen(node[2][0]), ']')
 
-    def _ty_ll_lit(self, node) -> str:
+    def _ty_e_lit(self, node) -> str:
         return lit.encode(node[1])
 
-    def _ty_ll_minus(self, node) -> Tree:
+    def _ty_e_minus(self, node) -> Tree:
         return Tree(
             self._gen_expr(node[2][0]), '-', self._gen_expr(node[2][1])
         )
 
-    def _ty_ll_num(self, node) -> str:
+    def _ty_e_num(self, node) -> str:
         return node[1]
 
-    def _ty_ll_paren(self, node) -> _FormatObj:
+    def _ty_e_paren(self, node) -> _FormatObj:
         return self._gen_expr(node[2][0])
 
-    def _ty_ll_plus(self, node) -> Tree:
+    def _ty_e_plus(self, node) -> Tree:
         return Tree(
             self._gen_expr(node[2][0]), '+', self._gen_expr(node[2][1])
         )
 
-    def _ty_ll_qual(self, node) -> Saw:
+    def _ty_e_qual(self, node) -> Saw:
         first = node[2][0]
         second = node[2][1]
-        if first[0] == 'll_var':
-            if second[0] == 'll_call':
+        if first[0] == 'e_var':
+            if second[0] == 'e_call':
                 # first is an identifier, but it must refer to a
                 # built-in function if second is a call.
                 fn = first[1]
@@ -505,7 +505,7 @@ class PythonGenerator(Generator):
                 start = f'self._fn_{fn}'
             else:
                 # If second isn't a call, then first refers to a variable.
-                start = self._ty_ll_var(first)
+                start = self._ty_e_var(first)
             saw = self._gen_expr(second)
             if not isinstance(saw, Saw):  # pragma: no cover
                 raise TypeError(second)
@@ -528,10 +528,10 @@ class PythonGenerator(Generator):
             next_saw = new_saw
         return saw
 
-    def _ty_ll_var(self, node) -> str:
+    def _ty_e_var(self, node) -> str:
         return 'v_' + node[1].replace('$', '_')
 
-    def _ty_ll_const(self, node) -> str:
+    def _ty_e_const(self, node) -> str:
         if node[1] == 'false':
             return 'False'
         if node[1] == 'null':
