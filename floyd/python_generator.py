@@ -201,14 +201,13 @@ class PythonGenerator(Generator):
         return fn(node)
 
     def _can_fail(self, node):
-        if node[0] in ('action', 'empty', 'label', 'opt', 'star'):
-            # TODO: Check for sure that label can't fail
+        if node[0] in ('action', 'empty', 'opt', 'star'):
             return False
         if node[0] == 'apply':
             if node[1] in ('r_any', 'r_end'):
                 return True
             return self._can_fail(self._grammar.rules[node[1]])
-        if node[0] in ('paren', 'run'):
+        if node[0] in ('label', 'paren', 'run'):
             return self._can_fail(node[2][0])
         if node[0] == 'count':
             return node[1][0] != 0
