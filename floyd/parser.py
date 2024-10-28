@@ -58,14 +58,14 @@ class _Parser:
 
     def _r_grammar(self):
         self._s_grammar_1()
-        if not self._failed:
-            v__1 = self._val
-        if not self._failed:
-            self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._memoize('r_end', self._r_end)
-        if not self._failed:
-            self._succeed(['rules', None, v__1])
+        if self._failed:
+            return
+        v__1 = self._val
+        self._memoize('r__filler', self._r__filler)
+        self._memoize('r_end', self._r_end)
+        if self._failed:
+            return
+        self._succeed(['rules', None, v__1])
 
     def _s_grammar_1(self):
         vs = []
@@ -80,34 +80,33 @@ class _Parser:
 
     def _r_rule(self):
         self._s_rule_1()
-        if not self._failed:
-            v__1 = self._val
-        if not self._failed:
-            self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch('=')
-        if not self._failed:
-            self._memoize('r_choice', self._r_choice)
-            if not self._failed:
-                v__3 = self._val
-        if not self._failed:
-            self._succeed(['rule', v__1, [v__3]])
+        if self._failed:
+            return
+        v__1 = self._val
+        self._memoize('r__filler', self._r__filler)
+        self._ch('=')
+        if self._failed:
+            return
+        self._memoize('r_choice', self._r_choice)
+        if self._failed:
+            return
+        v__3 = self._val
+        self._succeed(['rule', v__1, [v__3]])
 
     def _s_rule_1(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._memoize('r_ident', self._r_ident)
+        self._memoize('r_ident', self._r_ident)
 
     def _r_ident(self):
         self._memoize('r_id_start', self._r_id_start)
-        if not self._failed:
-            v__1 = self._val
-        if not self._failed:
-            self._s_ident_1()
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._succeed(self._fn_cat(self._fn_scons(v__1, v__2)))
+        if self._failed:
+            return
+        v__1 = self._val
+        self._s_ident_1()
+        if self._failed:
+            return
+        v__2 = self._val
+        self._succeed(self._fn_cat(self._fn_scons(v__1, v__2)))
 
     def _s_ident_1(self):
         vs = []
@@ -150,14 +149,14 @@ class _Parser:
 
     def _r_choice(self):
         self._memoize('r_seq', self._r_seq)
-        if not self._failed:
-            v__1 = self._val
-        if not self._failed:
-            self._s_choice_1()
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._succeed(['choice', None, self._fn_cons(v__1, v__2)])
+        if self._failed:
+            return
+        v__1 = self._val
+        self._s_choice_1()
+        if self._failed:
+            return
+        v__2 = self._val
+        self._succeed(['choice', None, self._fn_cons(v__1, v__2)])
 
     def _s_choice_1(self):
         vs = []
@@ -172,10 +171,10 @@ class _Parser:
 
     def _s_choice_2(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch('|')
-        if not self._failed:
-            self._memoize('r_seq', self._r_seq)
+        self._ch('|')
+        if self._failed:
+            return
+        self._memoize('r_seq', self._r_seq)
 
     def _r_seq(self):
         p = self._pos
@@ -187,14 +186,14 @@ class _Parser:
 
     def _s_seq_1(self):
         self._memoize('r_expr', self._r_expr)
-        if not self._failed:
-            v__1 = self._val
-        if not self._failed:
-            self._s_seq_2()
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._succeed(['seq', None, self._fn_cons(v__1, v__2)])
+        if self._failed:
+            return
+        v__1 = self._val
+        self._s_seq_2()
+        if self._failed:
+            return
+        v__2 = self._val
+        self._succeed(['seq', None, self._fn_cons(v__1, v__2)])
 
     def _s_seq_2(self):
         vs = []
@@ -228,49 +227,48 @@ class _Parser:
 
     def _s_expr_1(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._str('->')
-        if not self._failed:
-            self._memoize('r_e_expr', self._r_e_expr)
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._succeed(['action', None, [v__2]])
+        self._str('->')
+        if self._failed:
+            return
+        self._memoize('r_e_expr', self._r_e_expr)
+        if self._failed:
+            return
+        v__2 = self._val
+        self._succeed(['action', None, [v__2]])
 
     def _s_expr_2(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._str('?{')
-        if not self._failed:
-            self._memoize('r_e_expr', self._r_e_expr)
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch('}')
-        if not self._failed:
-            self._succeed(['pred', None, [v__2]])
+        self._str('?{')
+        if self._failed:
+            return
+        self._memoize('r_e_expr', self._r_e_expr)
+        if self._failed:
+            return
+        v__2 = self._val
+        self._memoize('r__filler', self._r__filler)
+        self._ch('}')
+        if self._failed:
+            return
+        self._succeed(['pred', None, [v__2]])
 
     def _s_expr_3(self):
         self._memoize('r_post_expr', self._r_post_expr)
-        if not self._failed:
-            v__1 = self._val
-        if not self._failed:
-            self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch(':')
-        if not self._failed:
-            self._s_expr_4()
-            if not self._failed:
-                v__3 = self._val
-        if not self._failed:
-            self._succeed(['label', v__3, [v__1]])
+        if self._failed:
+            return
+        v__1 = self._val
+        self._memoize('r__filler', self._r__filler)
+        self._ch(':')
+        if self._failed:
+            return
+        self._s_expr_4()
+        if self._failed:
+            return
+        v__3 = self._val
+        self._succeed(['label', v__3, [v__1]])
 
     def _s_expr_4(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._memoize('r_ident', self._r_ident)
+        self._memoize('r_ident', self._r_ident)
 
     def _r_post_expr(self):
         p = self._pos
@@ -294,47 +292,47 @@ class _Parser:
 
     def _s_post_expr_1(self):
         self._memoize('r_prim_expr', self._r_prim_expr)
-        if not self._failed:
-            v__1 = self._val
-        if not self._failed:
-            self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch('?')
-        if not self._failed:
-            self._succeed(['opt', None, [v__1]])
+        if self._failed:
+            return
+        v__1 = self._val
+        self._memoize('r__filler', self._r__filler)
+        self._ch('?')
+        if self._failed:
+            return
+        self._succeed(['opt', None, [v__1]])
 
     def _s_post_expr_2(self):
         self._memoize('r_prim_expr', self._r_prim_expr)
-        if not self._failed:
-            v__1 = self._val
-        if not self._failed:
-            self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch('*')
-        if not self._failed:
-            self._succeed(['star', None, [v__1]])
+        if self._failed:
+            return
+        v__1 = self._val
+        self._memoize('r__filler', self._r__filler)
+        self._ch('*')
+        if self._failed:
+            return
+        self._succeed(['star', None, [v__1]])
 
     def _s_post_expr_3(self):
         self._memoize('r_prim_expr', self._r_prim_expr)
-        if not self._failed:
-            v__1 = self._val
-        if not self._failed:
-            self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch('+')
-        if not self._failed:
-            self._succeed(['plus', None, [v__1]])
+        if self._failed:
+            return
+        v__1 = self._val
+        self._memoize('r__filler', self._r__filler)
+        self._ch('+')
+        if self._failed:
+            return
+        self._succeed(['plus', None, [v__1]])
 
     def _s_post_expr_4(self):
         self._memoize('r_prim_expr', self._r_prim_expr)
-        if not self._failed:
-            v__1 = self._val
-        if not self._failed:
-            self._memoize('r_count', self._r_count)
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._succeed(['count', v__2, [v__1]])
+        if self._failed:
+            return
+        v__1 = self._val
+        self._memoize('r_count', self._r_count)
+        if self._failed:
+            return
+        v__2 = self._val
+        self._succeed(['count', v__2, [v__1]])
 
     def _r_count(self):
         p = self._pos
@@ -346,56 +344,53 @@ class _Parser:
 
     def _s_count_1(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch('{')
-        if not self._failed:
-            self._s_count_2()
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch(',')
-        if not self._failed:
-            self._s_count_3()
-            if not self._failed:
-                v__4 = self._val
-        if not self._failed:
-            self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch('}')
-        if not self._failed:
-            self._succeed([v__2, v__4])
+        self._ch('{')
+        if self._failed:
+            return
+        self._s_count_2()
+        if self._failed:
+            return
+        v__2 = self._val
+        self._memoize('r__filler', self._r__filler)
+        self._ch(',')
+        if self._failed:
+            return
+        self._s_count_3()
+        if self._failed:
+            return
+        v__4 = self._val
+        self._memoize('r__filler', self._r__filler)
+        self._ch('}')
+        if self._failed:
+            return
+        self._succeed([v__2, v__4])
 
     def _s_count_2(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._memoize('r_zpos', self._r_zpos)
+        self._memoize('r_zpos', self._r_zpos)
 
     def _s_count_3(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._memoize('r_zpos', self._r_zpos)
+        self._memoize('r_zpos', self._r_zpos)
 
     def _s_count_4(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch('{')
-        if not self._failed:
-            self._s_count_5()
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch('}')
-        if not self._failed:
-            self._succeed([v__2, v__2])
+        self._ch('{')
+        if self._failed:
+            return
+        self._s_count_5()
+        if self._failed:
+            return
+        v__2 = self._val
+        self._memoize('r__filler', self._r__filler)
+        self._ch('}')
+        if self._failed:
+            return
+        self._succeed([v__2, v__2])
 
     def _s_count_5(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._memoize('r_zpos', self._r_zpos)
+        self._memoize('r_zpos', self._r_zpos)
 
     def _r_prim_expr(self):
         p = self._pos
@@ -443,131 +438,125 @@ class _Parser:
 
     def _s_prim_expr_1(self):
         self._s_prim_expr_2()
-        if not self._failed:
-            v__1 = self._val
-        if not self._failed:
-            self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._str('..')
-        if not self._failed:
-            self._s_prim_expr_3()
-            if not self._failed:
-                v__3 = self._val
-        if not self._failed:
-            self._succeed(['range', [v__1, v__3], []])
+        if self._failed:
+            return
+        v__1 = self._val
+        self._memoize('r__filler', self._r__filler)
+        self._str('..')
+        if self._failed:
+            return
+        self._s_prim_expr_3()
+        if self._failed:
+            return
+        v__3 = self._val
+        self._succeed(['range', [v__1, v__3], []])
 
     def _s_prim_expr_2(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._memoize('r_lit', self._r_lit)
+        self._memoize('r_lit', self._r_lit)
 
     def _s_prim_expr_3(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._memoize('r_lit', self._r_lit)
+        self._memoize('r_lit', self._r_lit)
 
     def _s_prim_expr_4(self):
         self._s_prim_expr_5()
-        if not self._failed:
-            v__1 = self._val
-        if not self._failed:
-            self._succeed(['lit', v__1, []])
+        if self._failed:
+            return
+        v__1 = self._val
+        self._succeed(['lit', v__1, []])
 
     def _s_prim_expr_5(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._memoize('r_lit', self._r_lit)
+        self._memoize('r_lit', self._r_lit)
 
     def _s_prim_expr_6(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._str('\\p{')
-        if not self._failed:
-            self._s_prim_expr_7()
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch('}')
-        if not self._failed:
-            self._succeed(['unicat', v__2, []])
+        self._str('\\p{')
+        if self._failed:
+            return
+        self._s_prim_expr_7()
+        if self._failed:
+            return
+        v__2 = self._val
+        self._memoize('r__filler', self._r__filler)
+        self._ch('}')
+        if self._failed:
+            return
+        self._succeed(['unicat', v__2, []])
 
     def _s_prim_expr_7(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._memoize('r_ident', self._r_ident)
+        self._memoize('r_ident', self._r_ident)
 
     def _s_prim_expr_8(self):
         self._s_prim_expr_9()
-        if not self._failed:
-            v__1 = self._val
-        if not self._failed:
-            self._succeed(['set', v__1, []])
+        if self._failed:
+            return
+        v__1 = self._val
+        self._succeed(['set', v__1, []])
 
     def _s_prim_expr_9(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._memoize('r_set', self._r_set)
+        self._memoize('r_set', self._r_set)
 
     def _s_prim_expr_10(self):
         self._s_prim_expr_11()
-        if not self._failed:
-            v__1 = self._val
-        if not self._failed:
-            self._succeed(['regexp', v__1, []])
+        if self._failed:
+            return
+        v__1 = self._val
+        self._succeed(['regexp', v__1, []])
 
     def _s_prim_expr_11(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._memoize('r_regexp', self._r_regexp)
+        self._memoize('r_regexp', self._r_regexp)
 
     def _s_prim_expr_12(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch('\x7e')
-        if not self._failed:
-            self._memoize('r_prim_expr', self._r_prim_expr)
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._succeed(['not', None, [v__2]])
+        self._ch('\x7e')
+        if self._failed:
+            return
+        self._memoize('r_prim_expr', self._r_prim_expr)
+        if self._failed:
+            return
+        v__2 = self._val
+        self._succeed(['not', None, [v__2]])
 
     def _s_prim_expr_13(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._str('^.')
-        if not self._failed:
-            self._memoize('r_prim_expr', self._r_prim_expr)
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._succeed(['ends_in', None, [v__2]])
+        self._str('^.')
+        if self._failed:
+            return
+        self._memoize('r_prim_expr', self._r_prim_expr)
+        if self._failed:
+            return
+        v__2 = self._val
+        self._succeed(['ends_in', None, [v__2]])
 
     def _s_prim_expr_14(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch('^')
-        if not self._failed:
-            self._memoize('r_prim_expr', self._r_prim_expr)
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._succeed(['not_one', None, [v__2]])
+        self._ch('^')
+        if self._failed:
+            return
+        self._memoize('r_prim_expr', self._r_prim_expr)
+        if self._failed:
+            return
+        v__2 = self._val
+        self._succeed(['not_one', None, [v__2]])
 
     def _s_prim_expr_15(self):
         self._s_prim_expr_16()
-        if not self._failed:
-            v__1 = self._val
-        if not self._failed:
-            self._s_prim_expr_17()
-        if not self._failed:
-            self._succeed(['apply', v__1, []])
+        if self._failed:
+            return
+        v__1 = self._val
+        self._s_prim_expr_17()
+        if self._failed:
+            return
+        self._succeed(['apply', v__1, []])
 
     def _s_prim_expr_16(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._memoize('r_ident', self._r_ident)
+        self._memoize('r_ident', self._r_ident)
 
     def _s_prim_expr_17(self):
         p = self._pos
@@ -582,38 +571,37 @@ class _Parser:
 
     def _s_prim_expr_18(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch('=')
+        self._ch('=')
 
     def _s_prim_expr_19(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch('(')
-        if not self._failed:
-            self._memoize('r_choice', self._r_choice)
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch(')')
-        if not self._failed:
-            self._succeed(['paren', None, [v__2]])
+        self._ch('(')
+        if self._failed:
+            return
+        self._memoize('r_choice', self._r_choice)
+        if self._failed:
+            return
+        v__2 = self._val
+        self._memoize('r__filler', self._r__filler)
+        self._ch(')')
+        if self._failed:
+            return
+        self._succeed(['paren', None, [v__2]])
 
     def _s_prim_expr_20(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch('<')
-        if not self._failed:
-            self._memoize('r_choice', self._r_choice)
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch('>')
-        if not self._failed:
-            self._succeed(['run', None, [v__2]])
+        self._ch('<')
+        if self._failed:
+            return
+        self._memoize('r_choice', self._r_choice)
+        if self._failed:
+            return
+        v__2 = self._val
+        self._memoize('r__filler', self._r__filler)
+        self._ch('>')
+        if self._failed:
+            return
+        self._succeed(['run', None, [v__2]])
 
     def _r_lit(self):
         p = self._pos
@@ -625,14 +613,16 @@ class _Parser:
 
     def _s_lit_1(self):
         self._memoize('r_squote', self._r_squote)
-        if not self._failed:
-            self._s_lit_2()
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._memoize('r_squote', self._r_squote)
-        if not self._failed:
-            self._succeed(self._fn_cat(v__2))
+        if self._failed:
+            return
+        self._s_lit_2()
+        if self._failed:
+            return
+        v__2 = self._val
+        self._memoize('r_squote', self._r_squote)
+        if self._failed:
+            return
+        self._succeed(self._fn_cat(v__2))
 
     def _s_lit_2(self):
         vs = []
@@ -647,14 +637,16 @@ class _Parser:
 
     def _s_lit_3(self):
         self._memoize('r_dquote', self._r_dquote)
-        if not self._failed:
-            self._s_lit_4()
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._memoize('r_dquote', self._r_dquote)
-        if not self._failed:
-            self._succeed(self._fn_cat(v__2))
+        if self._failed:
+            return
+        self._s_lit_4()
+        if self._failed:
+            return
+        v__2 = self._val
+        self._memoize('r_dquote', self._r_dquote)
+        if self._failed:
+            return
+        self._succeed(self._fn_cat(v__2))
 
     def _s_lit_4(self):
         vs = []
@@ -762,61 +754,73 @@ class _Parser:
 
     def _s_escape_1(self):
         self._str('\\b')
-        if not self._failed:
-            self._succeed('\b')
+        if self._failed:
+            return
+        self._succeed('\b')
 
     def _s_escape_2(self):
         self._str('\\f')
-        if not self._failed:
-            self._succeed('\f')
+        if self._failed:
+            return
+        self._succeed('\f')
 
     def _s_escape_3(self):
         self._str('\\n')
-        if not self._failed:
-            self._succeed('\n')
+        if self._failed:
+            return
+        self._succeed('\n')
 
     def _s_escape_4(self):
         self._str('\\r')
-        if not self._failed:
-            self._succeed('\r')
+        if self._failed:
+            return
+        self._succeed('\r')
 
     def _s_escape_5(self):
         self._str('\\t')
-        if not self._failed:
-            self._succeed('\t')
+        if self._failed:
+            return
+        self._succeed('\t')
 
     def _s_escape_6(self):
         self._str('\\v')
-        if not self._failed:
-            self._succeed('\v')
+        if self._failed:
+            return
+        self._succeed('\v')
 
     def _s_escape_7(self):
         self._ch('\\')
-        if not self._failed:
-            self._memoize('r_squote', self._r_squote)
-        if not self._failed:
-            self._succeed("'")
+        if self._failed:
+            return
+        self._memoize('r_squote', self._r_squote)
+        if self._failed:
+            return
+        self._succeed("'")
 
     def _s_escape_8(self):
         self._ch('\\')
-        if not self._failed:
-            self._memoize('r_dquote', self._r_dquote)
-        if not self._failed:
-            self._succeed('"')
+        if self._failed:
+            return
+        self._memoize('r_dquote', self._r_dquote)
+        if self._failed:
+            return
+        self._succeed('"')
 
     def _s_escape_9(self):
         self._str('\\\\')
-        if not self._failed:
-            self._succeed('\\')
+        if self._failed:
+            return
+        self._succeed('\\')
 
     def _s_escape_10(self):
         self._ch('\\')
-        if not self._failed:
-            self._memoize('r_any', self._r_any)
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._succeed(v__2)
+        if self._failed:
+            return
+        self._memoize('r_any', self._r_any)
+        if self._failed:
+            return
+        v__2 = self._val
+        self._succeed(v__2)
 
     def _r_hex_esc(self):
         p = self._pos
@@ -828,12 +832,13 @@ class _Parser:
 
     def _s_hex_esc_1(self):
         self._str('\\x')
-        if not self._failed:
-            self._s_hex_esc_2()
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._succeed(self._fn_xtou(self._fn_cat(v__2)))
+        if self._failed:
+            return
+        self._s_hex_esc_2()
+        if self._failed:
+            return
+        v__2 = self._val
+        self._succeed(self._fn_xtou(self._fn_cat(v__2)))
 
     def _s_hex_esc_2(self):
         vs = []
@@ -852,14 +857,16 @@ class _Parser:
 
     def _s_hex_esc_3(self):
         self._str('\\x{')
-        if not self._failed:
-            self._s_hex_esc_4()
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._ch('}')
-        if not self._failed:
-            self._succeed(self._fn_xtou(self._fn_cat(v__2)))
+        if self._failed:
+            return
+        self._s_hex_esc_4()
+        if self._failed:
+            return
+        v__2 = self._val
+        self._ch('}')
+        if self._failed:
+            return
+        self._succeed(self._fn_xtou(self._fn_cat(v__2)))
 
     def _s_hex_esc_4(self):
         vs = []
@@ -890,12 +897,13 @@ class _Parser:
 
     def _s_uni_esc_1(self):
         self._str('\\u')
-        if not self._failed:
-            self._s_uni_esc_2()
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._succeed(self._fn_xtou(self._fn_cat(v__2)))
+        if self._failed:
+            return
+        self._s_uni_esc_2()
+        if self._failed:
+            return
+        v__2 = self._val
+        self._succeed(self._fn_xtou(self._fn_cat(v__2)))
 
     def _s_uni_esc_2(self):
         vs = []
@@ -914,14 +922,16 @@ class _Parser:
 
     def _s_uni_esc_3(self):
         self._str('\\u{')
-        if not self._failed:
-            self._s_uni_esc_4()
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._ch('}')
-        if not self._failed:
-            self._succeed(self._fn_xtou(self._fn_cat(v__2)))
+        if self._failed:
+            return
+        self._s_uni_esc_4()
+        if self._failed:
+            return
+        v__2 = self._val
+        self._ch('}')
+        if self._failed:
+            return
+        self._succeed(self._fn_xtou(self._fn_cat(v__2)))
 
     def _s_uni_esc_4(self):
         vs = []
@@ -940,12 +950,13 @@ class _Parser:
 
     def _s_uni_esc_5(self):
         self._str('\\U')
-        if not self._failed:
-            self._s_uni_esc_6()
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._succeed(self._fn_xtou(self._fn_cat(v__2)))
+        if self._failed:
+            return
+        self._s_uni_esc_6()
+        if self._failed:
+            return
+        v__2 = self._val
+        self._succeed(self._fn_xtou(self._fn_cat(v__2)))
 
     def _s_uni_esc_6(self):
         vs = []
@@ -972,18 +983,20 @@ class _Parser:
 
     def _s_set_1(self):
         self._ch('[')
-        if not self._failed:
-            self._ch('^')
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._s_set_2()
-            if not self._failed:
-                v__3 = self._val
-        if not self._failed:
-            self._ch(']')
-        if not self._failed:
-            self._succeed(self._fn_cat(self._fn_scons(v__2, v__3)))
+        if self._failed:
+            return
+        self._ch('^')
+        if self._failed:
+            return
+        v__2 = self._val
+        self._s_set_2()
+        if self._failed:
+            return
+        v__3 = self._val
+        self._ch(']')
+        if self._failed:
+            return
+        self._succeed(self._fn_cat(self._fn_scons(v__2, v__3)))
 
     def _s_set_2(self):
         vs = []
@@ -1002,16 +1015,19 @@ class _Parser:
 
     def _s_set_3(self):
         self._ch('[')
-        if not self._failed:
-            self._s_set_4()
-        if not self._failed:
-            self._s_set_5()
-            if not self._failed:
-                v__3 = self._val
-        if not self._failed:
-            self._ch(']')
-        if not self._failed:
-            self._succeed(self._fn_cat(v__3))
+        if self._failed:
+            return
+        self._s_set_4()
+        if self._failed:
+            return
+        self._s_set_5()
+        if self._failed:
+            return
+        v__3 = self._val
+        self._ch(']')
+        if self._failed:
+            return
+        self._succeed(self._fn_cat(v__3))
 
     def _s_set_4(self):
         p = self._pos
@@ -1063,19 +1079,22 @@ class _Parser:
 
     def _s_set_char_1(self):
         self._str('\\]')
-        if not self._failed:
-            self._succeed(']')
+        if self._failed:
+            return
+        self._succeed(']')
 
     def _r_regexp(self):
         self._ch('/')
-        if not self._failed:
-            self._s_regexp_1()
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._ch('/')
-        if not self._failed:
-            self._succeed(self._fn_cat(v__2))
+        if self._failed:
+            return
+        self._s_regexp_1()
+        if self._failed:
+            return
+        v__2 = self._val
+        self._ch('/')
+        if self._failed:
+            return
+        self._succeed(self._fn_cat(v__2))
 
     def _s_regexp_1(self):
         vs = []
@@ -1106,10 +1125,12 @@ class _Parser:
 
     def _s_re_char_1(self):
         self._memoize('r_bslash', self._r_bslash)
-        if not self._failed:
-            self._ch('/')
-        if not self._failed:
-            self._succeed('/')
+        if self._failed:
+            return
+        self._ch('/')
+        if self._failed:
+            return
+        self._succeed('/')
 
     def _s_re_char_2(self):
         p = '[^/]'
@@ -1131,8 +1152,9 @@ class _Parser:
 
     def _s_zpos_1(self):
         self._ch('0')
-        if not self._failed:
-            self._succeed(0)
+        if self._failed:
+            return
+        self._succeed(0)
 
     def _s_zpos_2(self):
         start = self._pos
@@ -1141,15 +1163,16 @@ class _Parser:
             return
         end = self._pos
         self._val = self._text[start:end]
-        if not self._failed:
-            v__1 = self._val
-        if not self._failed:
-            self._succeed(self._fn_atoi(v__1))
+        if self._failed:
+            return
+        v__1 = self._val
+        self._succeed(self._fn_atoi(v__1))
 
     def _s_zpos_3(self):
         self._s_zpos_4()
-        if not self._failed:
-            self._s_zpos_5()
+        if self._failed:
+            return
+        self._s_zpos_5()
 
     def _s_zpos_4(self):
         p = '[1-9]'
@@ -1196,33 +1219,33 @@ class _Parser:
 
     def _s_e_expr_1(self):
         self._memoize('r_e_qual', self._r_e_qual)
-        if not self._failed:
-            v__1 = self._val
-        if not self._failed:
-            self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch('+')
-        if not self._failed:
-            self._memoize('r_e_expr', self._r_e_expr)
-            if not self._failed:
-                v__3 = self._val
-        if not self._failed:
-            self._succeed(['e_plus', None, [v__1, v__3]])
+        if self._failed:
+            return
+        v__1 = self._val
+        self._memoize('r__filler', self._r__filler)
+        self._ch('+')
+        if self._failed:
+            return
+        self._memoize('r_e_expr', self._r_e_expr)
+        if self._failed:
+            return
+        v__3 = self._val
+        self._succeed(['e_plus', None, [v__1, v__3]])
 
     def _s_e_expr_2(self):
         self._memoize('r_e_qual', self._r_e_qual)
-        if not self._failed:
-            v__1 = self._val
-        if not self._failed:
-            self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch('-')
-        if not self._failed:
-            self._memoize('r_e_expr', self._r_e_expr)
-            if not self._failed:
-                v__3 = self._val
-        if not self._failed:
-            self._succeed(['e_minus', None, [v__1, v__3]])
+        if self._failed:
+            return
+        v__1 = self._val
+        self._memoize('r__filler', self._r__filler)
+        self._ch('-')
+        if self._failed:
+            return
+        self._memoize('r_e_expr', self._r_e_expr)
+        if self._failed:
+            return
+        v__3 = self._val
+        self._succeed(['e_minus', None, [v__1, v__3]])
 
     def _r_e_exprs(self):
         p = self._pos
@@ -1234,16 +1257,15 @@ class _Parser:
 
     def _s_e_exprs_1(self):
         self._memoize('r_e_expr', self._r_e_expr)
-        if not self._failed:
-            v__1 = self._val
-        if not self._failed:
-            self._s_e_exprs_2()
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._s_e_exprs_4()
-        if not self._failed:
-            self._succeed(self._fn_cons(v__1, v__2))
+        if self._failed:
+            return
+        v__1 = self._val
+        self._s_e_exprs_2()
+        if self._failed:
+            return
+        v__2 = self._val
+        self._s_e_exprs_4()
+        self._succeed(self._fn_cons(v__1, v__2))
 
     def _s_e_exprs_2(self):
         vs = []
@@ -1258,10 +1280,10 @@ class _Parser:
 
     def _s_e_exprs_3(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch(',')
-        if not self._failed:
-            self._memoize('r_e_expr', self._r_e_expr)
+        self._ch(',')
+        if self._failed:
+            return
+        self._memoize('r_e_expr', self._r_e_expr)
 
     def _s_e_exprs_4(self):
         p = self._pos
@@ -1273,8 +1295,7 @@ class _Parser:
 
     def _s_e_exprs_5(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch(',')
+        self._ch(',')
 
     def _r_e_qual(self):
         p = self._pos
@@ -1286,14 +1307,14 @@ class _Parser:
 
     def _s_e_qual_1(self):
         self._memoize('r_e_prim', self._r_e_prim)
-        if not self._failed:
-            v__1 = self._val
-        if not self._failed:
-            self._s_e_qual_2()
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._succeed(['e_qual', None, self._fn_cons(v__1, v__2)])
+        if self._failed:
+            return
+        v__1 = self._val
+        self._s_e_qual_2()
+        if self._failed:
+            return
+        v__2 = self._val
+        self._succeed(['e_qual', None, self._fn_cons(v__1, v__2)])
 
     def _s_e_qual_2(self):
         vs = []
@@ -1320,33 +1341,33 @@ class _Parser:
 
     def _s_e_post_op_1(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch('[')
-        if not self._failed:
-            self._memoize('r_e_expr', self._r_e_expr)
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch(']')
-        if not self._failed:
-            self._succeed(['e_getitem', None, [v__2]])
+        self._ch('[')
+        if self._failed:
+            return
+        self._memoize('r_e_expr', self._r_e_expr)
+        if self._failed:
+            return
+        v__2 = self._val
+        self._memoize('r__filler', self._r__filler)
+        self._ch(']')
+        if self._failed:
+            return
+        self._succeed(['e_getitem', None, [v__2]])
 
     def _s_e_post_op_2(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch('(')
-        if not self._failed:
-            self._memoize('r_e_exprs', self._r_e_exprs)
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch(')')
-        if not self._failed:
-            self._succeed(['e_call', None, v__2])
+        self._ch('(')
+        if self._failed:
+            return
+        self._memoize('r_e_exprs', self._r_e_exprs)
+        if self._failed:
+            return
+        v__2 = self._val
+        self._memoize('r__filler', self._r__filler)
+        self._ch(')')
+        if self._failed:
+            return
+        self._succeed(['e_call', None, v__2])
 
     def _r_e_prim(self):
         p = self._pos
@@ -1386,102 +1407,98 @@ class _Parser:
 
     def _s_e_prim_1(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._str('false')
-        if not self._failed:
-            self._succeed(['e_const', 'false', []])
+        self._str('false')
+        if self._failed:
+            return
+        self._succeed(['e_const', 'false', []])
 
     def _s_e_prim_2(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._str('null')
-        if not self._failed:
-            self._succeed(['e_const', 'null', []])
+        self._str('null')
+        if self._failed:
+            return
+        self._succeed(['e_const', 'null', []])
 
     def _s_e_prim_3(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._str('true')
-        if not self._failed:
-            self._succeed(['e_const', 'true', []])
+        self._str('true')
+        if self._failed:
+            return
+        self._succeed(['e_const', 'true', []])
 
     def _s_e_prim_4(self):
         self._s_e_prim_5()
-        if not self._failed:
-            v__1 = self._val
-        if not self._failed:
-            self._succeed(['e_var', v__1, []])
+        if self._failed:
+            return
+        v__1 = self._val
+        self._succeed(['e_var', v__1, []])
 
     def _s_e_prim_5(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._memoize('r_ident', self._r_ident)
+        self._memoize('r_ident', self._r_ident)
 
     def _s_e_prim_6(self):
         self._s_e_prim_7()
-        if not self._failed:
-            v__1 = self._val
-        if not self._failed:
-            self._succeed(['e_num', v__1, []])
+        if self._failed:
+            return
+        v__1 = self._val
+        self._succeed(['e_num', v__1, []])
 
     def _s_e_prim_7(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._memoize('r_hex', self._r_hex)
+        self._memoize('r_hex', self._r_hex)
 
     def _s_e_prim_8(self):
         self._s_e_prim_9()
-        if not self._failed:
-            v__1 = self._val
-        if not self._failed:
-            self._succeed(['e_num', v__1, []])
+        if self._failed:
+            return
+        v__1 = self._val
+        self._succeed(['e_num', v__1, []])
 
     def _s_e_prim_9(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._memoize('r_int', self._r_int)
+        self._memoize('r_int', self._r_int)
 
     def _s_e_prim_10(self):
         self._s_e_prim_11()
-        if not self._failed:
-            v__1 = self._val
-        if not self._failed:
-            self._succeed(['e_lit', v__1, []])
+        if self._failed:
+            return
+        v__1 = self._val
+        self._succeed(['e_lit', v__1, []])
 
     def _s_e_prim_11(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._memoize('r_lit', self._r_lit)
+        self._memoize('r_lit', self._r_lit)
 
     def _s_e_prim_12(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch('(')
-        if not self._failed:
-            self._memoize('r_e_expr', self._r_e_expr)
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch(')')
-        if not self._failed:
-            self._succeed(['e_paren', None, [v__2]])
+        self._ch('(')
+        if self._failed:
+            return
+        self._memoize('r_e_expr', self._r_e_expr)
+        if self._failed:
+            return
+        v__2 = self._val
+        self._memoize('r__filler', self._r__filler)
+        self._ch(')')
+        if self._failed:
+            return
+        self._succeed(['e_paren', None, [v__2]])
 
     def _s_e_prim_13(self):
         self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch('[')
-        if not self._failed:
-            self._memoize('r_e_exprs', self._r_e_exprs)
-            if not self._failed:
-                v__2 = self._val
-        if not self._failed:
-            self._memoize('r__filler', self._r__filler)
-        if not self._failed:
-            self._ch(']')
-        if not self._failed:
-            self._succeed(['e_arr', None, v__2])
+        self._ch('[')
+        if self._failed:
+            return
+        self._memoize('r_e_exprs', self._r_e_exprs)
+        if self._failed:
+            return
+        v__2 = self._val
+        self._memoize('r__filler', self._r__filler)
+        self._ch(']')
+        if self._failed:
+            return
+        self._succeed(['e_arr', None, v__2])
 
     def _r_int(self):
         p = self._pos
@@ -1498,10 +1515,10 @@ class _Parser:
 
     def _s_int_1(self):
         self._s_int_2()
-        if not self._failed:
-            self._s_int_3()
-        if not self._failed:
-            self._s_int_4()
+        self._s_int_3()
+        if self._failed:
+            return
+        self._s_int_4()
 
     def _s_int_2(self):
         p = self._pos
@@ -1552,8 +1569,9 @@ class _Parser:
 
     def _s_hex_1(self):
         self._str('0x')
-        if not self._failed:
-            self._s_hex_2()
+        if self._failed:
+            return
+        self._s_hex_2()
 
     def _s_hex_2(self):
         vs = []
@@ -1629,8 +1647,9 @@ class _Parser:
 
     def _s__comment_1(self):
         self._s__comment_2()
-        if not self._failed:
-            self._s__comment_3()
+        if self._failed:
+            return
+        self._s__comment_3()
 
     def _s__comment_2(self):
         p = self._pos
@@ -1663,14 +1682,15 @@ class _Parser:
 
     def _s__comment_5(self):
         self._str('/*')
-        if not self._failed:
-            while True:
-                self._str('*/')
-                if not self._failed:
-                    break
-                self._r_any()
-                if self._failed:
-                    break
+        if self._failed:
+            return
+        while True:
+            self._str('*/')
+            if not self._failed:
+                break
+            self._r_any()
+            if self._failed:
+                break
 
     def _r__filler(self):
         vs = []

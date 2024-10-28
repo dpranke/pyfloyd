@@ -200,6 +200,26 @@ class PythonGenerator(Generator):
         fn = getattr(self, f'_ty_{node[0]}')
         return fn(node)
 
+    def _can_fail(self, node):
+        if node[0] in ('action', 'empty', 'label', 'opt', 'star'):
+            # TODO: Check for sure that label can't fail
+            return False
+        if node[0] == 'apply':
+            if node[1] in ('r_any', 'r_end'):
+                return True
+            return self._can_fail(self._grammar.rules[node[1]])
+        if node[0] in ('paren', 'run'):
+            return self._can_fail(node[2][0])
+        if node[0] == 'count':
+            return node[1][0] != 0
+        if node[0] in ('leftrec', 'not_one', 'operator'):
+            # TODO: Figure out if there's a way to tell if these can not fail.
+            return True
+        if node[0] in ('choice', 'seq'):
+            r = any(self._can_fail(n) for n in node[2])
+            return r
+        return True
+
     #
     # Handlers for each non-host node in the glop AST follow.
     #
@@ -355,10 +375,11 @@ class PythonGenerator(Generator):
 
     def _ty_label(self, node) -> List[str]:
         lines = self._gen(node[2][0])
+        # if self._can_fail(node[2][0]):
+        lines.extend(['if self._failed:', '    return'])
         lines.extend(
             [
-                'if not self._failed:',
-                f'    v_{node[1].replace("$", "_")} = self._val',
+                f'v_{node[1].replace("$", "_")} = self._val',
             ]
         )
         return lines
@@ -506,9 +527,13 @@ class PythonGenerator(Generator):
 
     def _ty_seq(self, node) -> List[str]:
         lines = self._gen(node[2][0])
-        for subnode in node[2][1:]:
-            lines.append('if not self._failed:')
-            lines.extend('    ' + line for line in self._gen(subnode))
+        if self._can_fail(node[2][0]):
+            lines.extend([ 'if self._failed:', '    return' ])
+        for subnode in node[2][1:-1]:
+            lines.extend(self._gen(subnode))
+            if self._can_fail(subnode):
+                lines.extend([ 'if self._failed:', '    return' ])
+        lines.extend(self._gen(node[2][-1]))
         return lines
 
     def _ty_star(self, node) -> List[str]:
