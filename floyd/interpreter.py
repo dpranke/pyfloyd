@@ -169,6 +169,95 @@ class Interpreter:
             i += 1
         self._succeed(vs)
 
+    def _ty_e_arr(self, node):
+        vals = []
+        for subnode in node[2]:
+            self._interpret(subnode)
+            vals.append(self._val)
+        self._succeed(vals)
+
+    def _ty_e_call(self, node):
+        vals = []
+        for subnode in node[2]:
+            self._interpret(subnode)
+            vals.append(self._val)
+        # Return 'e_call' as a tag here so we can check it in e_qual.
+        self._succeed(['e_call', vals])
+
+    def _ty_e_const(self, node):
+        if node[1] == 'true':
+            self._succeed(True)
+        elif node[1] == 'false':
+            self._succeed(False)
+        elif node[1] == 'null':
+            self._succeed(None)
+        elif node[1] == 'Infinity':
+            self._succeed(float('inf'))
+        else:
+            assert node[1] == 'NaN'
+            self._succeed(float('NaN'))
+
+    def _ty_e_getitem(self, node):
+        self._interpret(node[2][0])
+        assert not self._failed
+        # Return 'e_getitem' as a tag here so we can check it in e_qual.
+        self._succeed(['e_getitem', self._val])
+
+    def _ty_e_lit(self, node):
+        self._succeed(node[1])
+
+    def _ty_e_minus(self, node):
+        self._interpret(node[2][0])
+        v1 = self._val
+        self._interpret(node[2][1])
+        v2 = self._val
+        self._succeed(v1 - v2)
+
+    def _ty_e_num(self, node):
+        if node[1].startswith('0x'):
+            self._succeed(int(node[1], base=16))
+        else:
+            self._succeed(int(node[1]))
+
+    def _ty_e_paren(self, node):
+        self._interpret(node[2][0])
+
+    def _ty_e_plus(self, node):
+        self._interpret(node[2][0])
+        v1 = self._val
+        self._interpret(node[2][1])
+        v2 = self._val
+        self._succeed(v1 + v2)
+
+    def _ty_e_qual(self, node):
+        # TODO: is it possible for this to fail?
+        self._interpret(node[2][0])
+        assert not self._failed
+        for n in node[2][1:]:
+            lhs = self._val
+            # TODO: is it possible for this to fail?
+            self._interpret(n)
+            assert not self._failed
+            op, rhs = self._val
+            if op == 'e_getitem':
+                self._val = lhs[rhs]
+            else:
+                assert op == 'e_call'
+                # Note that unknown functions were caught during analysis
+                # so it's safe to dereference this without checking.
+                fn = getattr(self, '_fn_' + lhs, None)
+                self._val = fn(*rhs)
+
+    def _ty_e_var(self, node):
+        v = getattr(self, '_fn_' + node[1], None)
+        if v:
+            self._succeed(node[1])
+            return
+
+        # Unknown variables should have been caught in analysis.
+        assert self._scopes and (node[1] in self._scopes[-1])
+        self._succeed(self._scopes[-1][node[1]])
+
     def _ty_empty(self, node):
         del node
         self._succeed()
@@ -238,115 +327,6 @@ class Interpreter:
         else:
             self._fail()
 
-    def _ty_not_one(self, node):
-        self._ty_not(['not', None, node[2]])
-        if not self._failed:
-            self._ty_apply(['apply', 'any', []])
-
-    def _ty_run(self, node):
-        start = self._pos
-        self._interpret(node[2][0])
-        if self._failed:
-            return
-        end = self._pos
-        self._val = self._text[start:end]
-
-    def _ty_unicat(self, node):
-        p = self._pos
-        if p < self._end and unicodedata.category(self._text[p]) == node[1]:
-            self._succeed(self._text[p], newpos=p + 1)
-        else:
-            self._fail()
-
-    def _ty_e_arr(self, node):
-        vals = []
-        for subnode in node[2]:
-            self._interpret(subnode)
-            vals.append(self._val)
-        self._succeed(vals)
-
-    def _ty_e_call(self, node):
-        vals = []
-        for subnode in node[2]:
-            self._interpret(subnode)
-            vals.append(self._val)
-        # Return 'e_call' as a tag here so we can check it in e_qual.
-        self._succeed(['e_call', vals])
-
-    def _ty_e_const(self, node):
-        if node[1] == 'true':
-            self._succeed(True)
-        elif node[1] == 'false':
-            self._succeed(False)
-        elif node[1] == 'null':
-            self._succeed(None)
-        elif node[1] == 'Infinity':
-            self._succeed(float('inf'))
-        else:
-            assert node[1] == 'NaN'
-            self._succeed(float('NaN'))
-
-    def _ty_e_getitem(self, node):
-        self._interpret(node[2][0])
-        assert not self._failed
-        # Return 'e_getitem' as a tag here so we can check it in e_qual.
-        self._succeed(['e_getitem', self._val])
-
-    def _ty_e_minus(self, node):
-        self._interpret(node[2][0])
-        v1 = self._val
-        self._interpret(node[2][1])
-        v2 = self._val
-        self._succeed(v1 - v2)
-
-    def _ty_e_num(self, node):
-        if node[1].startswith('0x'):
-            self._succeed(int(node[1], base=16))
-        else:
-            self._succeed(int(node[1]))
-
-    def _ty_e_paren(self, node):
-        self._interpret(node[2][0])
-
-    def _ty_e_plus(self, node):
-        self._interpret(node[2][0])
-        v1 = self._val
-        self._interpret(node[2][1])
-        v2 = self._val
-        self._succeed(v1 + v2)
-
-    def _ty_e_qual(self, node):
-        # TODO: is it possible for this to fail?
-        self._interpret(node[2][0])
-        assert not self._failed
-        for n in node[2][1:]:
-            lhs = self._val
-            # TODO: is it possible for this to fail?
-            self._interpret(n)
-            assert not self._failed
-            op, rhs = self._val
-            if op == 'e_getitem':
-                self._val = lhs[rhs]
-            else:
-                assert op == 'e_call'
-                # Note that unknown functions were caught during analysis
-                # so it's safe to dereference this without checking.
-                fn = getattr(self, '_fn_' + lhs, None)
-                self._val = fn(*rhs)
-
-    def _ty_e_lit(self, node):
-        self._succeed(node[1])
-
-    def _ty_e_var(self, node):
-        v = getattr(self, '_fn_' + node[1], None)
-        if v:
-            self._succeed(node[1])
-            return
-
-        # Unknown variables should have been caught in analysis.
-        assert self._scopes and (node[1] in self._scopes[-1])
-        self._succeed(self._scopes[-1][node[1]])
-
     def _ty_not(self, node):
         pos = self._pos
         val = self._val
@@ -356,6 +336,11 @@ class Interpreter:
         else:
             self._pos = pos
             self._fail(val)
+
+    def _ty_not_one(self, node):
+        self._ty_not(['not', None, node[2]])
+        if not self._failed:
+            self._ty_apply(['apply', 'any', []])
 
     def _ty_operator(self, node):
         pos = self._pos
@@ -460,6 +445,14 @@ class Interpreter:
             return
         self._fail()
 
+    def _ty_run(self, node):
+        start = self._pos
+        self._interpret(node[2][0])
+        if self._failed:
+            return
+        end = self._pos
+        self._val = self._text[start:end]
+
     def _ty_seq(self, node):
         self._scopes.append({})
         for subnode in node[2]:
@@ -486,6 +479,13 @@ class Interpreter:
                 break
             vs.append(self._val)
         self._succeed(vs)
+
+    def _ty_unicat(self, node):
+        p = self._pos
+        if p < self._end and unicodedata.category(self._text[p]) == node[1]:
+            self._succeed(self._text[p], newpos=p + 1)
+        else:
+            self._fail()
 
     def _fn_atoi(self, val):
         return int(val, base=10)

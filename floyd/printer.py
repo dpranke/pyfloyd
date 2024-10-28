@@ -121,24 +121,6 @@ class Printer:
             return '%s{%d}' % (self._proc(node[2][0]), node[1][0])
         return '%s{%d,%d}' % (self._proc(node[2][0]), node[1][0], node[1][1])
 
-    def _ty_empty(self, node):
-        del node
-        return ''
-
-    def _ty_ends_in(self, node):
-        return '^.' + self._proc(node[2][0])
-
-    def _ty_label(self, node):
-        if node[1].startswith('$'):
-            return '%s' % self._proc(node[2][0])
-        return '%s:%s' % (self._proc(node[2][0]), node[1])
-
-    def _ty_leftrec(self, node):
-        return self._proc(node[2][0])
-
-    def _ty_lit(self, node):
-        return lit.encode(node[1])
-
     def _ty_e_arr(self, node):
         return '[%s]' % ', '.join(self._proc(el) for el in node[2])
 
@@ -171,26 +153,41 @@ class Printer:
     def _ty_e_var(self, node):
         return node[1]
 
+    def _ty_empty(self, node):
+        del node
+        return ''
+
+    def _ty_ends_in(self, node):
+        return '^.' + self._proc(node[2][0])
+
+    def _ty_label(self, node):
+        if node[1].startswith('$'):
+            return '%s' % self._proc(node[2][0])
+        return '%s:%s' % (self._proc(node[2][0]), node[1])
+
+    def _ty_leftrec(self, node):
+        return self._proc(node[2][0])
+
+    def _ty_lit(self, node):
+        return lit.encode(node[1])
+
     def _ty_not(self, node):
         return '~%s' % self._proc(node[2][0])
 
     def _ty_not_one(self, node):
         return '^%s' % self._proc(node[2][0])
 
-    def _ty_paren(self, node):
-        return '(' + self._proc(node[2][0]) + ')'
-
-    def _ty_pred(self, node):
-        return '?{%s}' % self._proc(node[2][0])
-
     def _ty_opt(self, node):
         return self._proc(node[2][0]) + '?'
+
+    def _ty_paren(self, node):
+        return '(' + self._proc(node[2][0]) + ')'
 
     def _ty_plus(self, node):
         return self._proc(node[2][0]) + '+'
 
-    def _ty_star(self, node):
-        return self._proc(node[2][0]) + '*'
+    def _ty_pred(self, node):
+        return '?{%s}' % self._proc(node[2][0])
 
     def _ty_range(self, node):
         return '%s..%s' % (lit.encode(node[1][0]), lit.encode(node[1][1]))
@@ -206,6 +203,9 @@ class Printer:
 
     def _ty_seq(self, node):
         return ' '.join(self._proc(e) for e in node[2])
+
+    def _ty_star(self, node):
+        return self._proc(node[2][0]) + '*'
 
     def _ty_unicat(self, node):
         return '\\p{%s}' % node[1]

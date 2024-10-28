@@ -252,6 +252,94 @@ class PythonGenerator(Generator):
         )
         return lines
 
+    def _ty_e_arr(self, node) -> _FormatObj:
+        if len(node[2]) == 0:
+            return '[]'
+        args = [self._gen(n) for n in node[2]]
+        return Saw('[', Comma(args), ']')
+
+    def _ty_e_call(self, node) -> Saw:
+        # There are no built-in functions that take no arguments, so make
+        # sure we're not being called that way.
+        # TODO: Figure out if we need this routine or not when we also
+        # fix the quals.
+        assert len(node[2]) != 0
+        args = [self._gen(n) for n in node[2]]
+        return Saw('(', Comma(args), ')')
+
+    def _ty_e_const(self, node) -> str:
+        if node[1] == 'false':
+            return 'False'
+        if node[1] == 'null':
+            return 'None'
+        if node[1] == 'true':
+            return 'True'
+        if node[1] == 'Infinity':
+            return "float('inf')"
+        assert node[1] == 'NaN'
+        return "float('NaN')"
+
+    def _ty_e_getitem(self, node) -> Saw:
+        return Saw('[', self._gen(node[2][0]), ']')
+
+    def _ty_e_lit(self, node) -> str:
+        return lit.encode(node[1])
+
+    def _ty_e_minus(self, node) -> Tree:
+        return Tree(
+            self._gen_expr(node[2][0]), '-', self._gen_expr(node[2][1])
+        )
+
+    def _ty_e_num(self, node) -> str:
+        return node[1]
+
+    def _ty_e_paren(self, node) -> _FormatObj:
+        return self._gen_expr(node[2][0])
+
+    def _ty_e_plus(self, node) -> Tree:
+        return Tree(
+            self._gen_expr(node[2][0]), '+', self._gen_expr(node[2][1])
+        )
+
+    def _ty_e_qual(self, node) -> Saw:
+        first = node[2][0]
+        second = node[2][1]
+        if first[0] == 'e_var':
+            if second[0] == 'e_call':
+                # first is an identifier, but it must refer to a
+                # built-in function if second is a call.
+                fn = first[1]
+                # Note that unknown functions were caught during analysis
+                # so we don't have to worry about that here.
+                start = f'self._fn_{fn}'
+            else:
+                # If second isn't a call, then first refers to a variable.
+                start = self._ty_e_var(first)
+            saw = self._gen_expr(second)
+            if not isinstance(saw, Saw):  # pragma: no cover
+                raise TypeError(second)
+            saw.start = start + saw.start
+            i = 2
+        else:
+            # TODO: We need to do typechecking, and figure out a better
+            # strategy for propagating errors/exceptions.
+            saw = self._gen_expr(first)
+            if not isinstance(saw, Saw):  # pragma: no cover
+                raise TypeError(first)
+            i = 1
+        next_saw = saw
+        for n in node[2][i:]:
+            new_saw = self._gen_expr(n)
+            if not isinstance(new_saw, Saw):  # pragma: no cover
+                raise TypeError(n)
+            new_saw.start = next_saw.end + new_saw.start
+            next_saw.end = new_saw
+            next_saw = new_saw
+        return saw
+
+    def _ty_e_var(self, node) -> str:
+        return 'v_' + node[1].replace('$', '_')
+
     def _ty_empty(self, node) -> List[str]:
         del node
         return ['self._succeed(None)']
@@ -451,97 +539,6 @@ class PythonGenerator(Generator):
 
     def _ty_unicat(self, node) -> List[str]:
         return ['self._unicat(%s)' % lit.encode(node[1])]
-
-    #
-    # Handlers for the host nodes in the AST
-    #
-    def _ty_e_arr(self, node) -> _FormatObj:
-        if len(node[2]) == 0:
-            return '[]'
-        args = [self._gen(n) for n in node[2]]
-        return Saw('[', Comma(args), ']')
-
-    def _ty_e_call(self, node) -> Saw:
-        # There are no built-in functions that take no arguments, so make
-        # sure we're not being called that way.
-        # TODO: Figure out if we need this routine or not when we also
-        # fix the quals.
-        assert len(node[2]) != 0
-        args = [self._gen(n) for n in node[2]]
-        return Saw('(', Comma(args), ')')
-
-    def _ty_e_getitem(self, node) -> Saw:
-        return Saw('[', self._gen(node[2][0]), ']')
-
-    def _ty_e_lit(self, node) -> str:
-        return lit.encode(node[1])
-
-    def _ty_e_minus(self, node) -> Tree:
-        return Tree(
-            self._gen_expr(node[2][0]), '-', self._gen_expr(node[2][1])
-        )
-
-    def _ty_e_num(self, node) -> str:
-        return node[1]
-
-    def _ty_e_paren(self, node) -> _FormatObj:
-        return self._gen_expr(node[2][0])
-
-    def _ty_e_plus(self, node) -> Tree:
-        return Tree(
-            self._gen_expr(node[2][0]), '+', self._gen_expr(node[2][1])
-        )
-
-    def _ty_e_qual(self, node) -> Saw:
-        first = node[2][0]
-        second = node[2][1]
-        if first[0] == 'e_var':
-            if second[0] == 'e_call':
-                # first is an identifier, but it must refer to a
-                # built-in function if second is a call.
-                fn = first[1]
-                # Note that unknown functions were caught during analysis
-                # so we don't have to worry about that here.
-                start = f'self._fn_{fn}'
-            else:
-                # If second isn't a call, then first refers to a variable.
-                start = self._ty_e_var(first)
-            saw = self._gen_expr(second)
-            if not isinstance(saw, Saw):  # pragma: no cover
-                raise TypeError(second)
-            saw.start = start + saw.start
-            i = 2
-        else:
-            # TODO: We need to do typechecking, and figure out a better
-            # strategy for propagating errors/exceptions.
-            saw = self._gen_expr(first)
-            if not isinstance(saw, Saw):  # pragma: no cover
-                raise TypeError(first)
-            i = 1
-        next_saw = saw
-        for n in node[2][i:]:
-            new_saw = self._gen_expr(n)
-            if not isinstance(new_saw, Saw):  # pragma: no cover
-                raise TypeError(n)
-            new_saw.start = next_saw.end + new_saw.start
-            next_saw.end = new_saw
-            next_saw = new_saw
-        return saw
-
-    def _ty_e_var(self, node) -> str:
-        return 'v_' + node[1].replace('$', '_')
-
-    def _ty_e_const(self, node) -> str:
-        if node[1] == 'false':
-            return 'False'
-        if node[1] == 'null':
-            return 'None'
-        if node[1] == 'true':
-            return 'True'
-        if node[1] == 'Infinity':
-            return "float('inf')"
-        assert node[1] == 'NaN'
-        return "float('NaN')"
 
 
 _DEFAULT_HEADER = """\
