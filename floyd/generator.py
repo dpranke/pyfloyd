@@ -47,8 +47,8 @@ class GeneratorOptions:
 
 class Generator:
     def __init__(self, grammar: Grammar, options: GeneratorOptions):
-        self.grammar = grammar
-        self.options = options
+        self._grammar = grammar
+        self._options = options
 
     def generate(self) -> str:  # pragma: no cover
         return ''

@@ -60,25 +60,25 @@ class PythonGenerator(Generator):
         return self._gen_text()
 
     def _gen_rules(self) -> None:
-        for rule, node in self.grammar.rules.items():
+        for rule, node in self._grammar.rules.items():
             self._methods[rule] = self._gen(node)
 
     def _gen_text(self) -> str:
         imports = ''
-        if self.options.main:
+        if self._options.main:
             imports += 'import argparse\n'
-        if self.options.main:
+        if self._options.main:
             imports += 'import json\n'
             imports += 'import os\n'
-        if self.grammar.re_needed:
+        if self._grammar.re_needed:
             imports += 'import re\n'
-        if self.options.main:
+        if self._options.main:
             imports += 'import sys\n'
         imports += 'from typing import Any, NamedTuple, Optional\n'
         if self._unicodedata_needed:
             imports += 'import unicodedata\n'
 
-        if self.options.main:
+        if self._options.main:
             text = _MAIN_HEADER.format(imports=imports)
         else:
             text = _DEFAULT_HEADER.format(imports=imports)
@@ -86,7 +86,7 @@ class PythonGenerator(Generator):
         if self._exception_needed:
             text += _PARSING_RUNTIME_EXCEPTION
 
-        if self.grammar.operators:
+        if self._grammar.operators:
             text += _OPERATOR_CLASS
 
         text += _CLASS
@@ -96,13 +96,13 @@ class PythonGenerator(Generator):
 
         if self._exception_needed:
             text += _PARSE_WITH_EXCEPTION.format(
-                starting_rule=self.grammar.starting_rule
+                starting_rule=self._grammar.starting_rule
             )
         else:
-            text += _PARSE.format(starting_rule=self.grammar.starting_rule)
+            text += _PARSE.format(starting_rule=self._grammar.starting_rule)
 
         text += self._gen_methods()
-        if self.options.main:
+        if self._options.main:
             text += _MAIN_FOOTER
         else:
             text += _DEFAULT_FOOTER
@@ -110,23 +110,23 @@ class PythonGenerator(Generator):
 
     def _state(self) -> str:
         text = ''
-        if self.options.memoize:
-            text += '        self.cache = {}\n'
-        if self.grammar.leftrec_needed or self.grammar.operator_needed:
-            text += '        self.seeds = {}\n'
-        if self.grammar.leftrec_needed:
-            text += '        self.blocked = set()\n'
-        if self.grammar.re_needed:
-            text += '        self.regexps = {}\n'
-        if self.grammar.operator_needed:
+        if self._options.memoize:
+            text += '        self._cache = {}\n'
+        if self._grammar.leftrec_needed or self._grammar.operator_needed:
+            text += '        self._seeds = {}\n'
+        if self._grammar.leftrec_needed:
+            text += '        self._blocked = set()\n'
+        if self._grammar.re_needed:
+            text += '        self._regexps = {}\n'
+        if self._grammar.operator_needed:
             text += self._operator_state()
             text += '\n'
 
         return text
 
     def _operator_state(self) -> str:
-        text = '        self.operators = {}\n'
-        for rule, o in self.grammar.operators.items():
+        text = '        self._operators = {}\n'
+        for rule, o in self._grammar.operators.items():
             text += '        o = _OperatorState()\n'
             text += '        o.prec_ops = {\n'
             for prec in sorted(o.prec_ops):
@@ -142,7 +142,7 @@ class PythonGenerator(Generator):
             for op in o.choices:
                 text += "            '%s': self._%s,\n" % (op, o.choices[op])
             text += '        }\n'
-            text += "        self.operators['%s'] = o\n" % rule
+            text += "        self._operators['%s'] = o\n" % rule
         return text
 
     def _load_builtin_methods(self) -> Dict[str, str]:
@@ -158,14 +158,14 @@ class PythonGenerator(Generator):
     def _gen_methods(self) -> str:
         text = ''
         for rule, method_body in self._methods.items():
-            memoize = self.options.memoize and rule.startswith('r_')
+            memoize = self._options.memoize and rule.startswith('r_')
             text += self._gen_method_text(rule, method_body, memoize)
         text += '\n'
 
-        if self.grammar.needed_builtin_rules:
+        if self._grammar.needed_builtin_rules:
             text += '\n'.join(
                 self._builtin_methods[f'r_{name}']
-                for name in sorted(self.grammar.needed_builtin_rules)
+                for name in sorted(self._grammar.needed_builtin_rules)
             )
             text += '\n'
 
@@ -174,11 +174,11 @@ class PythonGenerator(Generator):
             for name in sorted(self._needed_methods)
         )
 
-        if self.grammar.needed_builtin_functions:
+        if self._grammar.needed_builtin_functions:
             text += '\n'
             text += '\n'.join(
                 self._builtin_methods[f'fn_{name}']
-                for name in sorted(self.grammar.needed_builtin_functions)
+                for name in sorted(self._grammar.needed_builtin_functions)
             )
         return text
 
@@ -186,17 +186,17 @@ class PythonGenerator(Generator):
         text = '\n'
         text += '    def _%s(self):\n' % method_name
         if memoize:
-            text += "        r = self.cache.get(('%s', " % method_name
-            text += 'self.pos))\n'
+            text += "        r = self._cache.get(('%s', " % method_name
+            text += 'self._pos))\n'
             text += '        if r is not None:\n'
-            text += '            self.val, self.failed, self.pos = r\n'
+            text += '            self._val, self._failed, self._pos = r\n'
             text += '            return\n'
-            text += '        pos = self.pos\n'
+            text += '        pos = self._pos\n'
         for line in method_body:
             text += f'        {line}\n'
         if memoize:
-            text += f"        self.cache[('{method_name}', pos)] = ("
-            text += 'self.val, self.failed, self.pos)\n'
+            text += f"        self._cache[('{method_name}', pos)] = ("
+            text += 'self._val, self._failed, self._pos)\n'
         return text
 
     def _gen(self, node) -> List[str]:
@@ -221,10 +221,10 @@ class PythonGenerator(Generator):
         return [f'self._{node[1]}()']
 
     def _ty_choice(self, node) -> List[str]:
-        lines = ['p = self.pos']
+        lines = ['p = self._pos']
         for subnode in node[2][:-1]:
             lines.extend(self._gen(subnode))
-            lines.append('if not self.failed:')
+            lines.append('if not self._failed:')
             lines.append('    return')
             lines.append('self._rewind(p)')
         lines.extend(self._gen(node[2][-1]))
@@ -240,12 +240,12 @@ class PythonGenerator(Generator):
         lines.extend(['    ' + line for line in self._gen(node[2][0])])
         lines.extend(
             [
-                '    if self.failed:',
+                '    if self._failed:',
                 '        if i >= cmin:',
                 '            self._succeed(vs)',
                 '            return',
                 '        return',
-                '    vs.append(self.val)',
+                '    vs.append(self._val)',
                 '    i += 1',
                 'self._succeed(vs)',
             ]
@@ -264,10 +264,10 @@ class PythonGenerator(Generator):
             ]
             + ['    ' + line for line in sublines]
             + [
-                '    if not self.failed:',
+                '    if not self._failed:',
                 '        break',
                 '    self._r_any()',
-                '    if self.failed:',
+                '    if self._failed:',
                 '        break',
             ]
         )
@@ -276,14 +276,14 @@ class PythonGenerator(Generator):
         lines = self._gen(node[2][0])
         lines.extend(
             [
-                'if not self.failed:',
-                f'    v_{node[1].replace("$", "_")} = self.val',
+                'if not self._failed:',
+                f'    v_{node[1].replace("$", "_")} = self._val',
             ]
         )
         return lines
 
     def _ty_leftrec(self, node) -> List[str]:
-        left_assoc = self.grammar.assoc.get(node[1], 'left') == 'left'
+        left_assoc = self._grammar.assoc.get(node[1], 'left') == 'left'
         lines = [
             f'self._leftrec(self._{node[2][0][1]}, '
             + f"'{node[1]}', {str(left_assoc)})"
@@ -302,16 +302,16 @@ class PythonGenerator(Generator):
         sublines = self._gen(node[2][0])
         lines = (
             [
-                'p = self.pos',
-                'errpos = self.errpos',
+                'p = self._pos',
+                'errpos = self._errpos',
             ]
             + sublines
             + [
-                'if self.failed:',
+                'if self._failed:',
                 '    self._succeed(None, p)',
                 'else:',
                 '    self._rewind(p)',
-                '    self.errpos = errpos',
+                '    self._errpos = errpos',
                 '    self._fail()',
             ]
         )
@@ -319,13 +319,13 @@ class PythonGenerator(Generator):
 
     def _ty_not_one(self, node) -> List[str]:
         sublines = self._gen(['not', None, node[2]])
-        return sublines + ['if not self.failed:', '    self._r_any()']
+        return sublines + ['if not self._failed:', '    self._r_any()']
 
     def _ty_operator(self, node) -> List[str]:
         self._needed_methods.add('operator')
         # Operator nodes have no children, but subrules for each arm
         # of the expression cluster have been defined and are referenced
-        # from self.grammar.operators[node[1]].choices.
+        # from self._grammar.operators[node[1]].choices.
         assert node[2] == []
         return [f"self._operator(f'{node[1]}')"]
 
@@ -333,14 +333,14 @@ class PythonGenerator(Generator):
         sublines = self._gen(node[2][0])
         lines = (
             [
-                'p = self.pos',
+                'p = self._pos',
             ]
             + sublines
             + [
-                'if self.failed:',
+                'if self._failed:',
                 '    self._succeed([], p)',
                 'else:',
-                '    self._succeed([self.val])',
+                '    self._succeed([self._val])',
             ]
         )
         return lines
@@ -354,18 +354,18 @@ class PythonGenerator(Generator):
             ['vs = []']
             + sublines
             + [
-                'vs.append(self.val)',
-                'if self.failed:',
+                'vs.append(self._val)',
+                'if self._failed:',
                 '    return',
                 'while True:',
-                '    p = self.pos',
+                '    p = self._pos',
             ]
             + ['    ' + line for line in sublines]
             + [
-                '    if self.failed or self.pos == p:',
+                '    if self._failed or self._pos == p:',
                 '        self._rewind(p)',
                 '        break',
-                '    vs.append(self.val)',
+                '    vs.append(self._val)',
                 'self._succeed(vs)',
             ]
         )
@@ -397,9 +397,9 @@ class PythonGenerator(Generator):
     def _ty_regexp(self, node) -> List[str]:
         return [
             f'p = {lit.encode(node[1])}',
-            'if p not in self.regexps:',
-            '    self.regexps[p] = re.compile(p)',
-            'm = self.regexps[p].match(self.text, self.pos)',
+            'if p not in self._regexps:',
+            '    self._regexps[p] = re.compile(p)',
+            'm = self._regexps[p].match(self._text, self._pos)',
             'if m:',
             '    self._succeed(m.group(0), m.end())',
             '    return',
@@ -409,13 +409,13 @@ class PythonGenerator(Generator):
     def _ty_run(self, node) -> List[str]:
         lines = self._gen(node[2][0])
         return (
-            ['start = self.pos']
+            ['start = self._pos']
             + lines
             + [
-                'if self.failed:',
+                'if self._failed:',
                 '    return',
-                'end = self.pos',
-                'self.val = self.text[start:end]',
+                'end = self._pos',
+                'self._val = self._text[start:end]',
             ]
         )
 
@@ -426,7 +426,7 @@ class PythonGenerator(Generator):
     def _ty_seq(self, node) -> List[str]:
         lines = self._gen(node[2][0])
         for subnode in node[2][1:]:
-            lines.append('if not self.failed:')
+            lines.append('if not self._failed:')
             lines.extend('    ' + line for line in self._gen(subnode))
         return lines
 
@@ -436,14 +436,14 @@ class PythonGenerator(Generator):
             [
                 'vs = []',
                 'while True:',
-                '    p = self.pos',
+                '    p = self._pos',
             ]
             + ['    ' + line for line in sublines]
             + [
-                '    if self.failed or self.pos == p:',
+                '    if self._failed or self._pos == p:',
                 '        self._rewind(p)',
                 '        break',
-                '    vs.append(self.val)',
+                '    vs.append(self._val)',
                 'self._succeed(vs)',
             ]
         )
@@ -663,22 +663,22 @@ def parse(text: str, path: str = '<string>') -> Result:
 
 class _Parser:
     def __init__(self, text, path):
-        self.text = text
-        self.end = len(self.text)
-        self.errpos = 0
-        self.failed = False
-        self.path = path
-        self.pos = 0
-        self.val = None
+        self._text = text
+        self._end = len(self._text)
+        self._errpos = 0
+        self._failed = False
+        self._path = path
+        self._pos = 0
+        self._val = None
 """
 
 
 _PARSE = """\
     def parse(self):
         self._r_{starting_rule}()
-        if self.failed:
-            return Result(None, self._err_str(), self.errpos)
-        return Result(self.val, None, self.pos)
+        if self._failed:
+            return Result(None, self._err_str(), self._errpos)
+        return Result(self._val, None, self._pos)
 """
 
 
@@ -686,44 +686,44 @@ _PARSE_WITH_EXCEPTION = """\
     def parse(self):
         try:
             self._r_{starting_rule}()
-            if self.failed:
-                return None, self._err_str(), self.errpos
-            return self.val, None, self.pos
+            if self._failed:
+                return None, self._err_str(), self._errpos
+            return self._val, None, self._pos
         except _ParsingRuntimeError as e:  # pragma: no cover
             lineno, _ = self._err_offsets()
             return (
                 None,
-                self.path + ':' + str(lineno) + ' ' + str(e),
-                self.errpos,
+                self._path + ':' + str(lineno) + ' ' + str(e),
+                self._errpos,
             )
 """
 
 
 _BUILTIN_METHODS = """\
     def _r_any(self):
-        if self.pos < self.end:
-            self._succeed(self.text[self.pos], self.pos + 1)
+        if self._pos < self._end:
+            self._succeed(self._text[self._pos], self._pos + 1)
         else:
             self._fail()
 
     def _r_end(self):
-        if self.pos == self.end:
+        if self._pos == self._end:
             self._succeed(None)
         else:
             self._fail()
 
     def _ch(self, ch):
-        p = self.pos
-        if p < self.end and self.text[p] == ch:
-            self._succeed(ch, self.pos + 1)
+        p = self._pos
+        if p < self._end and self._text[p] == ch:
+            self._succeed(ch, self._pos + 1)
         else:
             self._fail()
 
     def _err_offsets(self):
         lineno = 1
         colno = 1
-        for i in range(self.errpos):
-            if self.text[i] == '\\n':
+        for i in range(self._errpos):
+            if self._text[i] == '\\n':
                 lineno += 1
                 colno = 1
             else:
@@ -732,61 +732,61 @@ _BUILTIN_METHODS = """\
 
     def _err_str(self):
         lineno, colno = self._err_offsets()
-        if self.errpos == len(self.text):
+        if self._errpos == len(self._text):
             thing = 'end of input'
         else:
-            thing = repr(self.text[self.errpos]).replace("'", '"')
+            thing = repr(self._text[self._errpos]).replace("'", '"')
         return '%s:%d Unexpected %s at column %d' % (
-            self.path,
+            self._path,
             lineno,
             thing,
             colno,
         )
 
     def _fail(self):
-        self.val = None
-        self.failed = True
-        self.errpos = max(self.errpos, self.pos)
+        self._val = None
+        self._failed = True
+        self._errpos = max(self._errpos, self._pos)
 
     def _leftrec(self, rule, rule_name, left_assoc):
-        pos = self.pos
+        pos = self._pos
         key = (rule_name, pos)
-        seed = self.seeds.get(key)
+        seed = self._seeds.get(key)
         if seed:
-            self.val, self.failed, self.pos = seed
+            self._val, self._failed, self._pos = seed
             return
-        if rule_name in self.blocked:
-            self.val = None
-            self.failed = True
+        if rule_name in self._blocked:
+            self._val = None
+            self._failed = True
             return
-        current = (None, True, self.pos)
-        self.seeds[key] = current
+        current = (None, True, self._pos)
+        self._seeds[key] = current
         if left_assoc:
-            self.blocked.add(rule_name)
+            self._blocked.add(rule_name)
         while True:
             rule()
-            if self.pos > current[2]:
-                current = (self.val, self.failed, self.pos)
-                self.seeds[key] = current
-                self.pos = pos
+            if self._pos > current[2]:
+                current = (self._val, self._failed, self._pos)
+                self._seeds[key] = current
+                self._pos = pos
             else:
-                del self.seeds[key]
-                self.val, self.failed, self.pos = current
+                del self._seeds[key]
+                self._val, self._failed, self._pos = current
                 if left_assoc:
-                    self.blocked.remove(rule_name)
+                    self._blocked.remove(rule_name)
                 return
 
     def _operator(self, rule_name):
-        o = self.operators[rule_name]
-        pos = self.pos
-        key = (rule_name, self.pos)
-        seed = self.seeds.get(key)
+        o = self._operators[rule_name]
+        pos = self._pos
+        key = (rule_name, self._pos)
+        seed = self._seeds.get(key)
         if seed:
-            self.val, self.failed, self.pos = seed
+            self._val, self._failed, self._pos = seed
             return
         o.current_depth += 1
-        current = (None, True, self.pos)
-        self.seeds[key] = current
+        current = (None, True, self._pos)
+        self._seeds[key] = current
         min_prec = o.current_prec
         i = 0
         while i < len(o.precs):
@@ -801,25 +801,25 @@ _BUILTIN_METHODS = """\
             for j, _ in enumerate(prec_ops):
                 op = prec_ops[j]
                 o.choices[op]()
-                if not self.failed and self.pos > pos:
-                    current = (self.val, self.failed, self.pos)
-                    self.seeds[key] = current
+                if not self._failed and self._pos > pos:
+                    current = (self._val, self._failed, self._pos)
+                    self._seeds[key] = current
                     repeat = True
                     break
                 self._rewind(pos)
             if not repeat:
                 i += 1
 
-        del self.seeds[key]
+        del self._seeds[key]
         o.current_depth -= 1
         if o.current_depth == 0:
             o.current_prec = 0
-        self.val, self.failed, self.pos = current
+        self._val, self._failed, self._pos = current
 
     def _range(self, i, j):
-        p = self.pos
-        if p != self.end and ord(i) <= ord(self.text[p]) <= ord(j):
-            self._succeed(self.text[p], self.pos + 1)
+        p = self._pos
+        if p != self._end and ord(i) <= ord(self._text[p]) <= ord(j):
+            self._succeed(self._text[p], self._pos + 1)
         else:
             self._fail()
 
@@ -829,20 +829,20 @@ _BUILTIN_METHODS = """\
     def _str(self, s):
         for ch in s:
             self._ch(ch)
-            if self.failed:
+            if self._failed:
                 return
-        self.val = s
+        self._val = s
 
     def _succeed(self, v, newpos=None):
-        self.val = v
-        self.failed = False
+        self._val = v
+        self._failed = False
         if newpos is not None:
-            self.pos = newpos
+            self._pos = newpos
 
     def _unicat(self, cat):
-        p = self.pos
-        if p < self.end and unicodedata.category(self.text[p]) == cat:
-            self._succeed(self.text[p], self.pos + 1)
+        p = self._pos
+        if p < self._end and unicodedata.category(self._text[p]) == cat:
+            self._succeed(self._text[p], self._pos + 1)
         else:
             self._fail()
 

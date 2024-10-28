@@ -60,7 +60,7 @@ class JavaScriptGenerator(Generator):
 
     def _gen_rules(self) -> None:
         local_vars = ('errpos', 'found', 'p', 'regexp')
-        for rule, node in self.grammar.rules.items():
+        for rule, node in self._grammar.rules.items():
             local_vars_defined = set()
             lines = []
             original_lines = self._gen(node)
@@ -78,7 +78,7 @@ class JavaScriptGenerator(Generator):
             self._methods[rule] = lines
 
     def _gen_text(self) -> str:
-        if self.options.main:
+        if self._options.main:
             text = _MAIN_HEADER
         else:
             text = _DEFAULT_HEADER
@@ -86,7 +86,7 @@ class JavaScriptGenerator(Generator):
         if self._exception_needed:
             text += _PARSING_RUNTIME_EXCEPTION
 
-        if self.grammar.operators:
+        if self._grammar.operators:
             text += _OPERATOR_CLASS
 
         text += _CLASS
@@ -96,17 +96,17 @@ class JavaScriptGenerator(Generator):
 
         if self._exception_needed:
             text += _PARSE_WITH_EXCEPTION.replace(
-                '{starting_rule}', self.grammar.starting_rule
+                '{starting_rule}', self._grammar.starting_rule
             )
         else:
             text += _PARSE.replace(
-                '{starting_rule}', self.grammar.starting_rule
+                '{starting_rule}', self._grammar.starting_rule
             )
 
         text += self._gen_methods()
         text += '}\n'
 
-        if self.options.main:
+        if self._options.main:
             text += _MAIN_FOOTER
         else:
             text += _DEFAULT_FOOTER
@@ -114,13 +114,13 @@ class JavaScriptGenerator(Generator):
 
     def _state(self) -> str:
         text = ''
-        if self.options.memoize:
+        if self._options.memoize:
             text += '    this.cache = {}\n'
-        if self.grammar.leftrec_needed or self.grammar.operator_needed:
+        if self._grammar.leftrec_needed or self._grammar.operator_needed:
             text += '    this.seeds = {}\n'
-        if self.grammar.leftrec_needed:
+        if self._grammar.leftrec_needed:
             text += '    this.blocked = new Set()\n'
-        if self.grammar.operator_needed:
+        if self._grammar.operator_needed:
             text += self._operator_state()
         text += '  }\n'
 
@@ -129,7 +129,7 @@ class JavaScriptGenerator(Generator):
     def _operator_state(self) -> str:
         text = '    this.operators = {}\n'
         text += '    let o;\n'
-        for rule, o in self.grammar.operators.items():
+        for rule, o in self._grammar.operators.items():
             text += '    o = new OperatorState()\n'
             text += '    o.precOps = new Map()\n'
             for prec in sorted(o.prec_ops):
@@ -167,14 +167,14 @@ class JavaScriptGenerator(Generator):
     def _gen_methods(self) -> str:
         text = ''
         for rule, method_body in self._methods.items():
-            memoize = self.options.memoize and rule.startswith('r_')
+            memoize = self._options.memoize and rule.startswith('r_')
             text += self._gen_method_text(rule, method_body, memoize)
         text += '\n'
-        if self.grammar.needed_builtin_rules or self._needed_methods:
+        if self._grammar.needed_builtin_rules or self._needed_methods:
             text += '\n'
 
-        if self.grammar.needed_builtin_rules:
-            for name in sorted(self.grammar.needed_builtin_rules):
+        if self._grammar.needed_builtin_rules:
+            for name in sorted(self._grammar.needed_builtin_rules):
                 method_txt = self._builtin_methods[f'r_{name}']
                 text += '  ' + method_txt
                 text += '\n'
@@ -185,11 +185,11 @@ class JavaScriptGenerator(Generator):
                 for name in sorted(self._needed_methods)
             )
 
-        if self.grammar.needed_builtin_functions:
+        if self._grammar.needed_builtin_functions:
             text += '\n'
             text += '  ' + '\n  '.join(
                 self._builtin_methods[f'fn_{name}']
-                for name in sorted(self.grammar.needed_builtin_functions)
+                for name in sorted(self._grammar.needed_builtin_functions)
             )
         return text
 
@@ -318,7 +318,7 @@ class JavaScriptGenerator(Generator):
         return lines
 
     def _ty_leftrec(self, node) -> List[str]:
-        if self.grammar.assoc.get(node[1], 'true') == 'true':
+        if self._grammar.assoc.get(node[1], 'true') == 'true':
             left_assoc = 'true'
         else:
             left_assoc = 'false'
@@ -368,7 +368,7 @@ class JavaScriptGenerator(Generator):
         self._needed_methods.add('operator')
         # Operator nodes have no children, but subrules for each arm
         # of the expression cluster have been defined and are referenced
-        # from self.grammar.operators[node[1]].choices.
+        # from self._grammar.operators[node[1]].choices.
         assert node[2] == []
         return [f"this.operator('{node[1]}')"]
 

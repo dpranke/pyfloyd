@@ -17,9 +17,9 @@ from floyd import string_literal as lit
 
 class Printer:
     def __init__(self, grammar):
-        self.grammar = grammar
-        self.max_rule_len = 0
-        self.max_choice_len = 0
+        self._grammar = grammar
+        self._max_rule_len = 0
+        self._max_choice_len = 0
 
     def dumps(self) -> str:
         rules = self._build_rules()
@@ -27,10 +27,10 @@ class Printer:
 
     def _build_rules(self):
         rules = []
-        for ty, rule_name, node in self.grammar.ast[2]:
+        for ty, rule_name, node in self._grammar.ast[2]:
             if ty == 'pragma':
                 rule_name = '%' + rule_name
-                self.max_rule_len = max(len(rule_name), self.max_rule_len)
+                self._max_rule_len = max(len(rule_name), self._max_rule_len)
                 if rule_name == '%token':
                     cs = [(node[0], '')]
                 elif rule_name == '%tokens':
@@ -46,7 +46,7 @@ class Printer:
                     )
                     cs = self._fmt_rule(node[0])
             else:
-                self.max_rule_len = max(len(rule_name), self.max_rule_len)
+                self._max_rule_len = max(len(rule_name), self._max_rule_len)
                 cs = self._fmt_rule(node[0])
             rules.append((rule_name, cs))
         return rules
@@ -57,12 +57,12 @@ class Printer:
             cs = []
             for choice_node in node[2]:
                 choice, action = self._split_action(choice_node)
-                self.max_choice_len = max(len(choice), self.max_choice_len)
+                self._max_choice_len = max(len(choice), self._max_choice_len)
                 cs.append((choice, action))
         else:
             choice, action = self._split_action(node)
             cs = [(choice, action)]
-            self.max_choice_len = max(len(choice), self.max_choice_len)
+            self._max_choice_len = max(len(choice), self._max_choice_len)
         return cs
 
     def _split_action(self, node):
@@ -75,9 +75,9 @@ class Printer:
 
     def _format_rules(self, rules):
         line_fmt = (
-            '%%-%ds' % self.max_rule_len
+            '%%-%ds' % self._max_rule_len
             + ' %s '
-            + '%%-%ds' % self.max_choice_len
+            + '%%-%ds' % self._max_choice_len
             + ' %s'
         )
         lines = []

@@ -30,39 +30,39 @@ class _OperatorState:
 
 class Interpreter:
     def __init__(self, grammar, memoize):
-        self.memoize = memoize
-        self.grammar = grammar
+        self._memoize = memoize
+        self._grammar = grammar
 
-        self.text = None
-        self.path = None
-        self.failed = False
-        self.val = None
-        self.pos = 0
-        self.end = -1
-        self.errstr = 'Error: uninitialized'
-        self.errpos = 0
-        self.cache = {}
-        self.scopes = []
-        self.seeds = {}
-        self.blocked = set()
-        self.operators = {}
-        self.regexps = {}
+        self._text = None
+        self._path = None
+        self._failed = False
+        self._val = None
+        self._pos = 0
+        self._end = -1
+        self._errstr = 'Error: uninitialized'
+        self._errpos = 0
+        self._cache = {}
+        self._scopes = []
+        self._seeds = {}
+        self._blocked = set()
+        self._operators = {}
+        self._regexps = {}
 
     def parse(self, text: str, path: str = '<string>') -> parser.Result:
-        self.text = text
-        self.path = path
-        self.failed = False
-        self.val = None
-        self.pos = 0
-        self.end = len(self.text)
-        self.errstr = None
-        self.errpos = 0
-        self.scopes = []
+        self._text = text
+        self._path = path
+        self._failed = False
+        self._val = None
+        self._pos = 0
+        self._end = len(self._text)
+        self._errstr = None
+        self._errpos = 0
+        self._scopes = []
 
-        self._interpret(self.grammar.rules[self.grammar.starting_rule])
-        if self.failed:
+        self._interpret(self._grammar.rules[self._grammar.starting_rule])
+        if self._failed:
             return self._format_error()
-        return parser.Result(self.val, None, self.pos)
+        return parser.Result(self._val, None, self._pos)
 
     def _interpret(self, node):
         node_handler = getattr(self, f'_ty_{node[0]}', None)
@@ -70,18 +70,18 @@ class Interpreter:
         node_handler(node)
 
     def _fail(self, errstr=None):
-        self.failed = True
-        self.val = None
-        if self.pos >= self.errpos:
-            self.errpos = self.pos
-            self.errstr = errstr
+        self._failed = True
+        self._val = None
+        if self._pos >= self._errpos:
+            self._errpos = self._pos
+            self._errstr = errstr
 
     def _succeed(self, val=None, newpos=None):
-        self.val = val
-        self.failed = False
-        self.errstr = None
+        self._val = val
+        self._failed = False
+        self._errstr = None
         if newpos is not None:
-            self.pos = newpos
+            self._pos = newpos
 
     def _rewind(self, newpos):
         self._succeed(None, newpos)
@@ -89,30 +89,30 @@ class Interpreter:
     def _format_error(self):
         lineno = 1
         colno = 1
-        for ch in self.text[: self.errpos]:
+        for ch in self._text[: self._errpos]:
             if ch == '\n':
                 lineno += 1
                 colno = 1
             else:
                 colno += 1
-        if not self.errstr:
-            if self.errpos == len(self.text):
+        if not self._errstr:
+            if self._errpos == len(self._text):
                 thing = 'end of input'
             else:
-                thing = repr(self.text[self.errpos]).replace("'", '"')
-            self.errstr = 'Unexpected %s at column %d' % (thing, colno)
+                thing = repr(self._text[self._errpos]).replace("'", '"')
+            self._errstr = 'Unexpected %s at column %d' % (thing, colno)
 
-        msg = '%s:%d %s' % (self.path, lineno, self.errstr)
-        return parser.Result(None, msg, self.errpos)
+        msg = '%s:%d %s' % (self._path, lineno, self._errstr)
+        return parser.Result(None, msg, self._errpos)
 
     def _r_any(self):
-        if self.pos != self.end:
-            self._succeed(self.text[self.pos], self.pos + 1)
+        if self._pos != self._end:
+            self._succeed(self._text[self._pos], self._pos + 1)
             return
         self._fail()
 
     def _r_end(self):
-        if self.pos != self.end:
+        if self._pos != self._end:
             self._fail()
             return
         self._succeed()
@@ -132,22 +132,22 @@ class Interpreter:
 
         # Unknown rules should have been caught in analysis, so we don't
         # need to worry about one here and can jump straight to the rule.
-        pos = self.pos
-        if self.memoize:
-            r = self.cache.get((rule_name, pos))
+        pos = self._pos
+        if self._memoize:
+            r = self._cache.get((rule_name, pos))
             if r is not None:
-                self.val, self.failed, self.pos = r
+                self._val, self._failed, self._pos = r
                 return
-        self._interpret(self.grammar.rules[rule_name])
-        if self.memoize:
-            self.cache[(rule_name, pos)] = self.val, self.failed, self.pos
+        self._interpret(self._grammar.rules[rule_name])
+        if self._memoize:
+            self._cache[(rule_name, pos)] = self._val, self._failed, self._pos
 
     def _ty_choice(self, node):
         count = 1
-        pos = self.pos
+        pos = self._pos
         for rule in node[2][:-1]:
             self._interpret(rule)
-            if not self.failed:
+            if not self._failed:
                 return
             self._rewind(pos)
             count += 1
@@ -160,12 +160,12 @@ class Interpreter:
         cmin, cmax = node[1]
         while i < cmax:
             self._interpret(node[2][0])
-            if self.failed:
+            if self._failed:
                 if i >= cmin:
                     self._succeed(vs)
                     return
                 return
-            vs.append(self.val)
+            vs.append(self._val)
             i += 1
         self._succeed(vs)
 
@@ -176,85 +176,85 @@ class Interpreter:
     def _ty_ends_in(self, node):
         while True:
             self._interpret(node[2][0])
-            if not self.failed:
+            if not self._failed:
                 return
             self._ty_apply(['apply', 'any', []])
-            if self.failed:
+            if self._failed:
                 return
 
     def _ty_label(self, node):
         self._interpret(node[2][0])
-        if not self.failed:
-            self.scopes[-1][node[1]] = self.val
+        if not self._failed:
+            self._scopes[-1][node[1]] = self._val
             self._succeed()
 
     def _ty_leftrec(self, node):
         # This approach to handling left-recursion is based on the approach
         # described in "Parsing Expression Grammars Made Practical" by
         # Laurent and Mens, 2016.
-        pos = self.pos
+        pos = self._pos
         rule_name = node[1]
-        assoc = self.grammar.assoc.get(rule_name, 'left')
+        assoc = self._grammar.assoc.get(rule_name, 'left')
         key = (rule_name, pos)
-        seed = self.seeds.get(key)
+        seed = self._seeds.get(key)
         if seed:
-            self.val, self.failed, self.pos = seed
+            self._val, self._failed, self._pos = seed
             return
-        if rule_name in self.blocked:
-            self.val = None
-            self.failed = True
+        if rule_name in self._blocked:
+            self._val = None
+            self._failed = True
             return
-        current = (None, True, self.pos)
-        self.seeds[key] = current
+        current = (None, True, self._pos)
+        self._seeds[key] = current
         if assoc == 'left':
-            self.blocked.add(rule_name)
+            self._blocked.add(rule_name)
         while True:
             self._interpret(node[2][0])
-            if self.pos > current[2]:
-                current = (self.val, self.failed, self.pos)
-                self.seeds[key] = current
-                self.pos = pos
+            if self._pos > current[2]:
+                current = (self._val, self._failed, self._pos)
+                self._seeds[key] = current
+                self._pos = pos
             else:
-                del self.seeds[key]
-                self.val, self.failed, self.pos = current
+                del self._seeds[key]
+                self._val, self._failed, self._pos = current
                 if assoc == 'left':
-                    self.blocked.remove(rule_name)
+                    self._blocked.remove(rule_name)
                 return
 
     def _ty_lit(self, node):
         i = 0
         lit = node[1]
         lit_len = len(lit)
-        pos = self.pos
+        pos = self._pos
         while (
             i < lit_len
-            and self.pos < self.end
-            and self.text[self.pos] == lit[i]
+            and self._pos < self._end
+            and self._text[self._pos] == lit[i]
         ):
-            self.pos += 1
+            self._pos += 1
             i += 1
         if i == lit_len:
-            self._succeed(self.text[pos : self.pos])
+            self._succeed(self._text[pos : self._pos])
         else:
             self._fail()
 
     def _ty_not_one(self, node):
         self._ty_not(['not', None, node[2]])
-        if not self.failed:
+        if not self._failed:
             self._ty_apply(['apply', 'any', []])
 
     def _ty_run(self, node):
-        start = self.pos
+        start = self._pos
         self._interpret(node[2][0])
-        if self.failed:
+        if self._failed:
             return
-        end = self.pos
-        self.val = self.text[start:end]
+        end = self._pos
+        self._val = self._text[start:end]
 
     def _ty_unicat(self, node):
-        p = self.pos
-        if p < self.end and unicodedata.category(self.text[p]) == node[1]:
-            self._succeed(self.text[p], newpos=p + 1)
+        p = self._pos
+        if p < self._end and unicodedata.category(self._text[p]) == node[1]:
+            self._succeed(self._text[p], newpos=p + 1)
         else:
             self._fail()
 
@@ -262,14 +262,14 @@ class Interpreter:
         vals = []
         for subnode in node[2]:
             self._interpret(subnode)
-            vals.append(self.val)
+            vals.append(self._val)
         self._succeed(vals)
 
     def _ty_ll_call(self, node):
         vals = []
         for subnode in node[2]:
             self._interpret(subnode)
-            vals.append(self.val)
+            vals.append(self._val)
         # Return 'll_call' as a tag here so we can check it in ll_qual.
         self._succeed(['ll_call', vals])
 
@@ -288,15 +288,15 @@ class Interpreter:
 
     def _ty_ll_getitem(self, node):
         self._interpret(node[2][0])
-        assert not self.failed
+        assert not self._failed
         # Return 'll_getitem' as a tag here so we can check it in ll_qual.
-        self._succeed(['ll_getitem', self.val])
+        self._succeed(['ll_getitem', self._val])
 
     def _ty_ll_minus(self, node):
         self._interpret(node[2][0])
-        v1 = self.val
+        v1 = self._val
         self._interpret(node[2][1])
-        v2 = self.val
+        v2 = self._val
         self._succeed(v1 - v2)
 
     def _ty_ll_num(self, node):
@@ -310,29 +310,29 @@ class Interpreter:
 
     def _ty_ll_plus(self, node):
         self._interpret(node[2][0])
-        v1 = self.val
+        v1 = self._val
         self._interpret(node[2][1])
-        v2 = self.val
+        v2 = self._val
         self._succeed(v1 + v2)
 
     def _ty_ll_qual(self, node):
         # TODO: is it possible for this to fail?
         self._interpret(node[2][0])
-        assert not self.failed
+        assert not self._failed
         for n in node[2][1:]:
-            lhs = self.val
+            lhs = self._val
             # TODO: is it possible for this to fail?
             self._interpret(n)
-            assert not self.failed
-            op, rhs = self.val
+            assert not self._failed
+            op, rhs = self._val
             if op == 'll_getitem':
-                self.val = lhs[rhs]
+                self._val = lhs[rhs]
             else:
                 assert op == 'll_call'
                 # Note that unknown functions were caught during analysis
                 # so it's safe to dereference this without checking.
                 fn = getattr(self, '_fn_' + lhs, None)
-                self.val = fn(*rhs)
+                self._val = fn(*rhs)
 
     def _ty_ll_lit(self, node):
         self._succeed(node[1])
@@ -344,43 +344,43 @@ class Interpreter:
             return
 
         # Unknown variables should have been caught in analysis.
-        assert self.scopes and (node[1] in self.scopes[-1])
-        self._succeed(self.scopes[-1][node[1]])
+        assert self._scopes and (node[1] in self._scopes[-1])
+        self._succeed(self._scopes[-1][node[1]])
 
     def _ty_not(self, node):
-        pos = self.pos
-        val = self.val
+        pos = self._pos
+        val = self._val
         self._interpret(node[2][0])
-        if self.failed:
+        if self._failed:
             self._succeed(val, newpos=pos)
         else:
-            self.pos = pos
+            self._pos = pos
             self._fail(val)
 
     def _ty_operator(self, node):
-        pos = self.pos
+        pos = self._pos
         rule_name = node[1]
-        key = (rule_name, self.pos)
-        seed = self.seeds.get(key)
+        key = (rule_name, self._pos)
+        seed = self._seeds.get(key)
         if seed:
-            self.val, self.failed, self.pos = seed
+            self._val, self._failed, self._pos = seed
             return
 
-        o = self.operators.get(node[1])
+        o = self._operators.get(node[1])
         if o is None:
             o = _OperatorState()
             for op_node in node[2]:
                 op, prec = op_node[1]
                 o.prec_ops.setdefault(prec, []).append(op)
-                if self.grammar.assoc.get(op) == 'right':
+                if self._grammar.assoc.get(op) == 'right':
                     o.rassoc.add(op)
                 o.choices[op] = op_node[2]
             o.precs = sorted(o.prec_ops, reverse=True)
-            self.operators[node[1]] = o
+            self._operators[node[1]] = o
 
         o.current_depth += 1
-        current = (None, True, self.pos)
-        self.seeds[key] = current
+        current = (None, True, self._pos)
+        self._seeds[key] = current
         min_prec = o.current_prec
         i = 0
         while i < len(o.precs):
@@ -395,46 +395,46 @@ class Interpreter:
 
             for op in ops:
                 self._interpret(o.choices[op][0])
-                if not self.failed and self.pos > pos:
-                    current = (self.val, self.failed, self.pos)
-                    self.seeds[key] = current
+                if not self._failed and self._pos > pos:
+                    current = (self._val, self._failed, self._pos)
+                    self._seeds[key] = current
                     repeat = True
                     break
                 self._rewind(pos)
             if not repeat:
                 i += 1
-        del self.seeds[key]
+        del self._seeds[key]
         o.current_depth -= 1
         if o.current_depth == 0:
             o.current_prec = 0
-        self.val, self.failed, self.pos = current
+        self._val, self._failed, self._pos = current
 
     def _ty_opt(self, node):
-        pos = self.pos
+        pos = self._pos
         self._interpret(node[2][0])
-        if self.failed:
-            self.failed = False
-            self.val = []
-            self.pos = pos
+        if self._failed:
+            self._failed = False
+            self._val = []
+            self._pos = pos
         else:
-            self.val = [self.val]
+            self._val = [self._val]
 
     def _ty_paren(self, node):
         self._interpret(node[2][0])
 
     def _ty_plus(self, node):
         self._interpret(node[2][0])
-        hd = self.val
-        if not self.failed:
+        hd = self._val
+        if not self._failed:
             self._ty_star(node)
-            self.val = [hd] + self.val
+            self._val = [hd] + self._val
 
     def _ty_pred(self, node):
         self._interpret(node[2][0])
-        if self.val is True:
+        if self._val is True:
             self._succeed(True)
-        elif self.val is False:
-            self.val = False
+        elif self._val is False:
+            self._val = False
             self._fail()
         else:
             # TODO: Figure out how to statically analyze predicates to
@@ -444,29 +444,29 @@ class Interpreter:
 
     def _ty_range(self, node):
         if (
-            self.pos != self.end
-            and node[1][0] <= self.text[self.pos] <= node[1][1]
+            self._pos != self._end
+            and node[1][0] <= self._text[self._pos] <= node[1][1]
         ):
-            self._succeed(self.text[self.pos], self.pos + 1)
+            self._succeed(self._text[self._pos], self._pos + 1)
             return
         self._fail()
 
     def _ty_regexp(self, node):
-        if node[1] not in self.regexps:
-            self.regexps[node[1]] = re.compile(node[1])
-        m = self.regexps[node[1]].match(self.text, self.pos)
+        if node[1] not in self._regexps:
+            self._regexps[node[1]] = re.compile(node[1])
+        m = self._regexps[node[1]].match(self._text, self._pos)
         if m:
             self._succeed(m.group(0), m.end())
             return
         self._fail()
 
     def _ty_seq(self, node):
-        self.scopes.append({})
+        self._scopes.append({})
         for subnode in node[2]:
             self._interpret(subnode)
-            if self.failed:
+            if self._failed:
                 break
-        self.scopes.pop()
+        self._scopes.pop()
 
     def _ty_set(self, node):
         new_node = ['regexp', '[' + node[1] + ']', []]
@@ -474,17 +474,17 @@ class Interpreter:
 
     def _ty_star(self, node):
         vs = []
-        while not self.failed and self.pos < self.end:
-            p = self.pos
+        while not self._failed and self._pos < self._end:
+            p = self._pos
             self._interpret(node[2][0])
-            if self.failed:
+            if self._failed:
                 self._rewind(p)
                 break
-            if self.pos == p:
+            if self._pos == p:
                 # We didn't actually consume anything, so break out so
                 # that we don't get stuck in an infinite loop.
                 break
-            vs.append(self.val)
+            vs.append(self._val)
         self._succeed(vs)
 
     def _fn_atoi(self, val):
