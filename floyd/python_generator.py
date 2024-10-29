@@ -200,23 +200,56 @@ class PythonGenerator(Generator):
         fn = getattr(self, f'_ty_{node[0]}')
         return fn(node)
 
-    def _can_fail(self, node):
+    def _can_fail(self, node, inline):
         if node[0] in ('action', 'empty', 'opt', 'star'):
             return False
         if node[0] == 'apply':
             if node[1] in ('r_any', 'r_end'):
                 return True
-            return self._can_fail(self._grammar.rules[node[1]])
+            return self._can_fail(self._grammar.rules[node[1]], inline=False)
+        if node[0] == 'label':
+            # When the code for a label is being inlined, if the child
+            # node can fail, its return will exit the outer method as well,
+            # so we don't have to worry about it. At that point, then
+            # we just have the label code itself, which can't fail.
+            # When the code isn't being inlined into the outer method,
+            # we do have to include the failure of the child node.
+            # TODO: This same reasoning may be true for other types of nodes.
+            return False if inline else self._can_fail(node[2][0], inline)
         if node[0] in ('label', 'paren', 'run'):
-            return self._can_fail(node[2][0])
+            return self._can_fail(node[2][0], inline)
         if node[0] == 'count':
             return node[1][0] != 0
-        if node[0] in ('leftrec', 'not_one', 'operator'):
+        if node[0] in ('leftrec', 'operator'):
             # TODO: Figure out if there's a way to tell if these can not fail.
             return True
-        if node[0] in ('choice', 'seq'):
-            r = any(self._can_fail(n) for n in node[2])
+        if node[0] == 'choice':
+            r = all(self._can_fail(n, inline) for n in node[2])
             return r
+        if node[0] == 'seq':
+            r = any(self._can_fail(n, inline) for n in node[2])
+            return r
+
+        # You might think that if a not's child node can fail, then
+        # the not can't fail, but it doesn't work that way. If the
+        # child == ['lit', 'foo'], then it'll fail if foo isn't next,
+        # so it can fail, but ['not', [child]] can fail also (if
+        # foo is next).
+        # Note that some regexps might not fail, but to figure that
+        # out we'd have to analyze the regexp itself, which I don't want to
+        # do yet.
+        assert node[0] in (
+            'ends_in',
+            'lit',
+            'not',
+            'not_one',
+            'plus',
+            'pred',
+            'range',
+            'regexp',
+            'set',
+            'unicat',
+        )
         return True
 
     #
@@ -358,24 +391,24 @@ class PythonGenerator(Generator):
 
     def _ty_ends_in(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
-        return (
+        lines = [
+            'while True:',
+        ] + ['    ' + line for line in sublines]
+        if self._can_fail(node[2][0], True):
+            lines.extend(['    if not self._failed:', '        break'])
+        lines.extend(
             [
-                'while True:',
-            ]
-            + ['    ' + line for line in sublines]
-            + [
-                '    if not self._failed:',
-                '        break',
                 '    self._r_any()',
                 '    if self._failed:',
                 '        break',
             ]
         )
+        return lines
 
     def _ty_label(self, node) -> List[str]:
         lines = self._gen(node[2][0])
-        # if self._can_fail(node[2][0]):
-        lines.extend(['if self._failed:', '    return'])
+        if self._can_fail(node[2][0], True):
+            lines.extend(['if self._failed:', '    return'])
         lines.extend(
             [
                 f'v_{node[1].replace("$", "_")} = self._val',
@@ -455,9 +488,9 @@ class PythonGenerator(Generator):
             ['vs = []']
             + sublines
             + [
-                'vs.append(self._val)',
                 'if self._failed:',
                 '    return',
+                'vs.append(self._val)',
                 'while True:',
                 '    p = self._pos',
             ]
@@ -508,17 +541,17 @@ class PythonGenerator(Generator):
         ]
 
     def _ty_run(self, node) -> List[str]:
-        lines = self._gen(node[2][0])
-        return (
-            ['start = self._pos']
-            + lines
-            + [
-                'if self._failed:',
-                '    return',
+        sublines = self._gen(node[2][0])
+        lines = ['start = self._pos'] + sublines
+        if self._can_fail(node[2][0], True):
+            lines.extend(['if self._failed:', '    return'])
+        lines.extend(
+            [
                 'end = self._pos',
                 'self._val = self._text[start:end]',
             ]
         )
+        return lines
 
     def _ty_set(self, node) -> List[str]:
         new_node = ['regexp', '[' + node[1] + ']', []]
@@ -526,12 +559,12 @@ class PythonGenerator(Generator):
 
     def _ty_seq(self, node) -> List[str]:
         lines = self._gen(node[2][0])
-        if self._can_fail(node[2][0]):
-            lines.extend([ 'if self._failed:', '    return' ])
+        if self._can_fail(node[2][0], inline=True):
+            lines.extend(['if self._failed:', '    return'])
         for subnode in node[2][1:-1]:
             lines.extend(self._gen(subnode))
-            if self._can_fail(subnode):
-                lines.extend([ 'if self._failed:', '    return' ])
+            if self._can_fail(subnode, inline=True):
+                lines.extend(['if self._failed:', '    return'])
         lines.extend(self._gen(node[2][-1]))
         return lines
 
