@@ -60,6 +60,7 @@ class Grammar:
         self.needed_builtin_functions = set()
         self.needed_builtin_rules = set()
         self.operators = {}
+        self.leftrec_rules = set()
 
         has_starting_rule = False
         for n in self.ast[2]:
@@ -356,14 +357,16 @@ def _rewrite_recursion(grammar):
 
         operator_node = _check_operator(grammar, name, choices)
         if operator_node:
+            name = operator_node[2][0][1]
             node[2] = [operator_node]
             grammar.rules[name] = operator_node
             continue
 
         for i, choice in enumerate(choices):
             seen = set()
-            has_lr = _check_lr(name, choice, grammar.rules, seen)
+            has_lr = _check_lr(name, choice, grammar, seen)
             if has_lr:
+                grammar.leftrec_rules.update(seen)
                 choices[i] = ['leftrec', '%s#%d' % (name, i + 1), [choice]]
 
 
@@ -396,11 +399,12 @@ def _check_operator(grammar, name, choices):
     return ['choice', None, [['operator', name, operators], choices[-1]]]
 
 
-def _check_lr(name, node, rules, seen):
+def _check_lr(name, node, grammar, seen):
     # pylint: disable=too-many-branches
     ty = node[0]
     if ty == 'apply':
         if node[1] == name:
+            seen.add(name)
             return True  # Direct recursion.
         if node[1] in ('any', 'anything', 'end'):
             return False
@@ -408,17 +412,17 @@ def _check_lr(name, node, rules, seen):
             # We've hit left recursion on a different rule, so, no.
             return False
         seen.add(node[1])
-        return _check_lr(name, rules[node[1]], rules, seen)
+        return _check_lr(name, grammar.rules[node[1]], grammar, seen)
     if ty == 'seq':
         for subnode in node[2]:
             if subnode[0] == 'lit':
                 return False
-            r = _check_lr(name, subnode, rules, seen)
+            r = _check_lr(name, subnode, grammar, seen)
             if r:
                 return r
         return False
     if ty == 'choice':
-        return any(_check_lr(name, n, rules, seen) for n in node[2])
+        return any(_check_lr(name, n, grammar, seen) for n in node[2])
     if ty in (
         'count',
         'ends_in',
@@ -431,7 +435,7 @@ def _check_lr(name, node, rules, seen):
         'run',
         'star',
     ):
-        return _check_lr(name, node[2][0], rules, seen)
+        return _check_lr(name, node[2][0], grammar, seen)
 
     # If we get here, either this is an unknown AST node type, or
     # it is one we think we shouldn't be able to reach, like an

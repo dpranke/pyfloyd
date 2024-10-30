@@ -1735,12 +1735,12 @@ class _Parser:
 
     def _memoize(self, rule_name, fn):
         p = self._pos
-        r = self._cache.get((rule_name, p))
+        r = self._cache.setdefault(p, {}).get(rule_name)
         if r:
             self._val, self._failed, self._pos = r
             return
         fn()
-        self._cache[(rule_name, p)] = (self._val, self._failed, self._pos)
+        self._cache[p][rule_name] = (self._val, self._failed, self._pos)
 
     def _rewind(self, newpos):
         self._succeed(None, newpos)

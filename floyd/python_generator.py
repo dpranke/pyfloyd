@@ -262,7 +262,11 @@ class PythonGenerator(Generator):
 
     def _ty_apply(self, node) -> List[str]:
         if self._options.memoize and node[1].startswith('r_'):
-            return [f"self._memoize('{node[1]}', self._{node[1]})"]
+            name = node[1][2:]
+            if (name not in self._grammar.operators and
+                name not in self._grammar.leftrec_rules):
+                return [f"self._memoize('{node[1]}', self._{node[1]})"]
+
         return [f'self._{node[1]}()']
 
     def _ty_choice(self, node) -> List[str]:
@@ -825,12 +829,12 @@ _BUILTIN_METHODS = """\
 
     def _memoize(self, rule_name, fn):
         p = self._pos
-        r = self._cache.get((rule_name, p))
+        r = self._cache.setdefault(p, {}).get(rule_name)
         if r:
             self._val, self._failed, self._pos = r
             return
         fn()
-        self._cache[(rule_name, p)] = (self._val, self._failed, self._pos)
+        self._cache[p][rule_name] = (self._val, self._failed, self._pos)
 
     def _operator(self, rule_name):
         o = self._operators[rule_name]

@@ -53,6 +53,8 @@ class JavaScriptGenerator(Generator):
             self._needed_methods.add('range')
         if grammar.str_needed:
             self._needed_methods.add('str')
+        if self._options.memoize:
+            self._needed_methods.add('memoize')
 
     def generate(self) -> str:
         self._gen_rules()
@@ -115,11 +117,11 @@ class JavaScriptGenerator(Generator):
     def _state(self) -> str:
         text = ''
         if self._options.memoize:
-            text += '    this.cache = {}\n'
+            text += '    this.cache = new Map();\n'
         if self._grammar.leftrec_needed or self._grammar.operator_needed:
-            text += '    this.seeds = {}\n'
+            text += '    this.seeds = {};\n'
         if self._grammar.leftrec_needed:
-            text += '    this.blocked = new Set()\n'
+            text += '    this.blocked = new Set();\n'
         if self._grammar.operator_needed:
             text += self._operator_state()
         text += '  }\n'
@@ -167,8 +169,7 @@ class JavaScriptGenerator(Generator):
     def _gen_methods(self) -> str:
         text = ''
         for rule, method_body in self._methods.items():
-            memoize = self._options.memoize and rule.startswith('r_')
-            text += self._gen_method_text(rule, method_body, memoize)
+            text += self._gen_method_text(rule, method_body)
         text += '\n'
         if self._grammar.needed_builtin_rules or self._needed_methods:
             text += '\n'
@@ -193,22 +194,11 @@ class JavaScriptGenerator(Generator):
             )
         return text
 
-    def _gen_method_text(self, method_name, method_body, memoize) -> str:
+    def _gen_method_text(self, method_name, method_body) -> str:
         text = '\n\n'
         text += '  %s() {\n' % method_name
-        if memoize:
-            text += '    let r = this.cache.get(("%s", ' % method_name
-            text += 'this.pos))\n'
-            text += '    if (r) {\n'
-            text += '      [this.val, this.failed, this.pos] = r;\n'
-            text += '      return;\n'
-            text += '    }\n'
-            text += '    pos = this.pos;\n'
         for line in method_body:
             text += f'    {line}\n'
-        if memoize:
-            text += f'    this.cache[("{method_name}", pos)] = ('
-            text += 'this.val, this.failed, this.pos);\n'
         text += '  }'
         return text
 
@@ -248,6 +238,11 @@ class JavaScriptGenerator(Generator):
         return flatten(Saw('this.succeed(', obj, ');'), indent='  ')
 
     def _ty_apply(self, node) -> List[str]:
+        if self._options.memoize and node[1].startswith('r_'):
+            name = node[1][2:]
+            if (name not in self._grammar.operators and
+                name not in self._grammar.leftrec_rules):
+                return [f"this.memoize('{node[1]}', this.{node[1]})"]
         return [f'this.{node[1]}();']
 
     def _ty_choice(self, node) -> List[str]:
@@ -831,6 +826,19 @@ _BUILTIN_METHODS = """\
         return;
       }
     }
+  }
+
+  memoize(rule_name, fn) {
+    let p = this.pos;
+    if (!this.cache.has(p)) {
+      this.cache.set(p, new Map());
+    }
+    if (this.cache.get(p).has(rule_name)) {
+      [this.val, this.failed, this.pos] = this.cache.get(p).get(rule_name);
+      return;
+    }
+    fn.call(this);
+    this.cache.get(p).set(rule_name, [this.val, this.failed, this.pos]);
   }
 
   operator(rule_name) {

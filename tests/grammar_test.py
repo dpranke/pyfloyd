@@ -1048,12 +1048,11 @@ class JavaScriptGenerator(unittest.TestCase, GrammarTestsMixin):
     maxDiff = None
 
     def compile(self, grammar, path='<string>', memoize=False):
-        del memoize
         source_code, err, endpos = floyd.generate(
             textwrap.dedent(grammar),
             path=path,
             options=floyd.GeneratorOptions(
-                language='javascript', main=True, memoize=False
+                language='javascript', main=True, memoize=memoize
             ),
         )
         if err:
