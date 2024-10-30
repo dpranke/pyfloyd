@@ -1476,25 +1476,42 @@ class _Parser:
 
     def _r_int(self):
         p = self._pos
-        self._ch('0')
+        self._s_int_1()
         if not self._failed:
             return
         self._rewind(p)
         start = self._pos
-        self._s_int_1()
+        self._s_int_3()
         if self._failed:
             return
         end = self._pos
         self._val = self._text[start:end]
 
     def _s_int_1(self):
-        self._s_int_2()
-        self._s_int_3()
+        self._ch('0')
         if self._failed:
             return
-        self._s_int_4()
+        self._s_int_2()
 
     def _s_int_2(self):
+        p = self._pos
+        errpos = self._errpos
+        self._ch('x')
+        if self._failed:
+            self._succeed(None, p)
+        else:
+            self._rewind(p)
+            self._errpos = errpos
+            self._fail()
+
+    def _s_int_3(self):
+        self._s_int_4()
+        self._s_int_5()
+        if self._failed:
+            return
+        self._s_int_6()
+
+    def _s_int_4(self):
         p = self._pos
         self._ch('-')
         if self._failed:
@@ -1502,7 +1519,7 @@ class _Parser:
         else:
             self._succeed([self._val])
 
-    def _s_int_3(self):
+    def _s_int_5(self):
         p = '[1-9]'
         if p not in self._regexps:
             self._regexps[p] = re.compile(p)
@@ -1512,18 +1529,18 @@ class _Parser:
             return
         self._fail()
 
-    def _s_int_4(self):
+    def _s_int_6(self):
         vs = []
         while True:
             p = self._pos
-            self._s_int_5()
+            self._s_int_7()
             if self._failed or self._pos == p:
                 self._rewind(p)
                 break
             vs.append(self._val)
         self._succeed(vs)
 
-    def _s_int_5(self):
+    def _s_int_7(self):
         p = '[0-9]'
         if p not in self._regexps:
             self._regexps[p] = re.compile(p)

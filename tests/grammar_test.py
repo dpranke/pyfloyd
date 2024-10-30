@@ -334,16 +334,10 @@ class GrammarTestsMixin:
         self.check('grammar = -> 0x20', text='', out=32)
 
     def test_hex_digits_invalid(self):
-        # '0xtt' is an invalid hex number, so that ll_prim check fails and
-        # we go on to digits, so '0' is parsed successfully. We next parse
-        # 'xtt' as an ident as the first part of the next rule but run out
-        # of input.
-        # TODO: Reject this earlier as an invalid hex/invalid num.
         self.check(
             'grammar = -> 0xtt',
             text='',
-            # grammar_err='<string>:1 Unexpected end of input at column 18',
-            grammar_err='Errors were found:\n  Unknown rule "xtt"\n',
+            grammar_err='<string>:1 Unexpected "t" at column 16',
         )
 
     def test_inline_seq(self):
