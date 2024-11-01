@@ -7,7 +7,7 @@ grammar        = value end                            -> $1
 value          = object                               -> dict($1)
                | array                                -> $1
                | string                               -> $1
-               | number                               -> float($1)
+               | number                               -> atof($1)
                | 'true'                               -> true
                | 'false'                              -> false
                | 'null'                               -> null

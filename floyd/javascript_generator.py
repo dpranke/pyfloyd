@@ -940,8 +940,16 @@ _BUILTIN_METHODS = """\
     }
   }
 
-  fn_atoi(a) {
-    return parseInt(a, 10);
+  fn_atof(a) {
+    return parseFloat(a)
+  }
+
+  fn_atoi(a, base) {
+    return parseInt(a, base);
+  }
+
+  fn_atou(a, base) {
+    return String.fromCharCode(Number.parseInt(a, base));
   }
 
   fn_cat(ss) {
@@ -956,20 +964,16 @@ _BUILTIN_METHODS = """\
     return [hd].concat(tl)
   }
 
+  fn_dedent(s) {
+    return s
+  }
+
   fn_dict(pairs) {
     let m = new Map();
     for (let [k, v] of pairs) {
       m[k] = v;
     }
     return m;
-  }
-
-  fn_float(s) {
-    return Number.parseFloat(s)
-  }
-
-  fn_hex(s) {
-    return Number.parseInt(s, 16);
   }
 
   fn_itou(n) {

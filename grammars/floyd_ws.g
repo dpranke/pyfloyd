@@ -94,7 +94,7 @@ re_char     = bslash '/'                          -> '/'
             | ^'/'
 
 zpos        = '0'                                 -> 0
-            | <[1-9] [0-9]*>                      -> atoi($1)
+            | <[1-9] [0-9]*>                      -> atoi($1, 10)
 
 ll_exprs    = ll_expr:e (sp ',' sp ll_expr)*:es   -> concat([e], es)
             |                                     -> []

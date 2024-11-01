@@ -106,20 +106,22 @@ def analyze(ast, rewrite_filler=True):
 
 
 BUILTIN_FUNCTIONS = (
+    'atof',
     'atoi',
+    'atou',
     'cat',
     'concat',
     'cons',
+    'dedent',
     'dict',
     'float',
-    'hex',
+    'int',
     'itou',
     'join',
     'scat',
     'scons',
     'strcat',
     'utoi',
-    'xtoi',
     'xtou',
 )
 
@@ -250,7 +252,7 @@ class _Analyzer:
         self.scopes.append([])
         vs = set()
         for i, n in enumerate(node[2], start=1):
-            if n[0] in ('action', 'pred'):
+            if n[0] in ('action', 'equals', 'pred'):
                 self._vars_needed(n[2][0], i, vs)
         for i, n in enumerate(node[2], start=1):
             name = f'${i}'
@@ -443,6 +445,7 @@ def _check_lr(name, node, grammar, seen):
     assert ty in (
         'action',
         'empty',
+        'equals',
         'leftrec',
         'lit',
         'pred',

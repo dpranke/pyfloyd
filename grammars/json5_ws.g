@@ -107,8 +107,8 @@ id_continue    = ascii_id_start
 
 num_literal    = '-' num_literal:n                   -> 0 - n
                | '+' num_literal:n                   -> n
-               | dec_literal:d ~id_start             -> float(d)
-               | hex_literal:h                       -> hex(h)
+               | dec_literal:d ~id_start             -> atof(d)
+               | hex_literal:h                       -> atoi(h, 16)
                | 'Infinity'                          -> 'Infinity'
                | 'NaN'                               -> 'NaN'
 

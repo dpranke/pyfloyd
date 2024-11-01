@@ -906,8 +906,16 @@ _BUILTIN_METHODS = """\
         else:
             self._fail()
 
-    def _fn_atoi(self, a):
-        return int(a, base=10)
+    def _fn_atof(self, s):
+        if '.' in s or 'e' in s or 'E' in s:
+            return float(s)
+        return int(s)
+
+    def _fn_atoi(self, a, base):
+        return int(a, base)
+
+    def _fn_atou(self, a, base):
+        return chr(int(a, base))
 
     def _fn_cat(self, strs):
         return ''.join(strs)
@@ -918,16 +926,11 @@ _BUILTIN_METHODS = """\
     def _fn_cons(self, hd, tl):
         return [hd] + tl
 
+    def _fn_dedent(self, s):
+        return s
+
     def _fn_dict(self, pairs):
         return dict(pairs)
-
-    def _fn_float(self, s):
-        if '.' in s or 'e' in s or 'E' in s:
-            return float(s)
-        return int(s)
-
-    def _fn_hex(self, s):
-        return int(s, base=16)
 
     def _fn_itou(self, n):
         return chr(n)

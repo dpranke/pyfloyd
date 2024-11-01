@@ -106,8 +106,8 @@ id_continue    = ascii_id_start
 
 num_literal    = '-' num_literal                 -> 0 - $2
                | '+' num_literal                 -> $2
-               | dec_literal ~id_start           -> float($1)
-               | hex_literal                     -> hex($1)
+               | dec_literal ~id_start           -> atof($1)
+               | hex_literal                     -> atoi($1, 16)
                | 'Infinity'                      -> 'Infinity'
                | 'NaN'                           -> 'NaN'
 

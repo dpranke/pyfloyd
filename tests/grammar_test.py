@@ -99,7 +99,7 @@ class GrammarTestsMixin:
         self.check(
             """\
             grammar = '[' value:v (',' value)*:vs ','? ']' -> concat([v], vs)
-            value   = '2':v                                -> float(v)
+            value   = '2':v                                -> atof(v)
             """,
             text='[2]',
             out=[2],
@@ -114,7 +114,7 @@ class GrammarTestsMixin:
     def test_big_int(self):
         self.check(
             # 'grammar = { float("505874924095815700") }',
-            'grammar = -> float("505874924095815700")',
+            'grammar = -> atof("505874924095815700")',
             text='',
             out=505874924095815700,
         )
@@ -301,19 +301,35 @@ class GrammarTestsMixin:
         self.assertIsNone(err)
         self.assertEqual(out[0], 'rules')
 
+    def test_fn_atof(self):
+        self.check("g = -> atof('1.3')", text='', out=1.3)
+
+    def test_fn_atoi(self):
+        self.check("g = -> atoi('0x41', 16)", text='', out=65)
+
+    def test_fn_atou(self):
+        self.check("g = -> atou('65', 10)", text='', out='A')
+        self.check("g = -> atou('0x41', 16)", text='', out='A')
+
+    def test_fn_cat(self):
+        self.check("g = -> cat(['1', '2'])", text='', out='12')
+
     def test_fn_concat(self):
         self.check('g = -> concat([1], [2])', text='', out=[1, 2])
 
-    def test_fn_strcat(self):
-        self.check("g = -> strcat('foo', 'bar')", text='', out='foobar')
+    def test_fn_cons(self):
+        self.check('g = -> cons(1, [2, 3])', text='', out=[1, 2, 3])
+
+    def test_fn_dedent(self):
+        self.check('g = -> dedent("foo")', text='', out='foo')
 
     def test_fn_dict(self):
         self.check(
             "g = -> dict([['a', 1], ['b', 2]])", text='', out={'a': 1, 'b': 2}
         )
 
-    def test_fn_float(self):
-        self.check("g = -> float('4.3')", text='', out=4.3)
+    def disabled_test_fn_int(self):
+        self.check('g = int(4.0)', text='', out=4)
 
     def test_fn_itou(self):
         self.check('grammar = -> itou(97)', text='', out='a')
@@ -321,11 +337,16 @@ class GrammarTestsMixin:
     def test_fn_join(self):
         self.check("g = -> join('x', ['1', '2', '3'])", text='', out='1x2x3')
 
+    def test_fn_scons(self):
+        self.check(
+            "g = -> scons('a', ['b', 'c'])", text='', out=['a', 'b', 'c']
+        )
+
+    def test_fn_strcat(self):
+        self.check("g = -> strcat('foo', 'bar')", text='', out='foobar')
+
     def test_fn_utoi(self):
         self.check('grammar = -> utoi("a")', text='', out=97)
-
-    def test_fn_xtoi(self):
-        self.check("g = -> xtoi('0x41')", text='', out=65)
 
     def test_fn_xtou(self):
         self.check("g = -> xtou('0x41')", text='', out='A')

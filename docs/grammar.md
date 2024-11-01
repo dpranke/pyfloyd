@@ -390,15 +390,18 @@ Has a result of `'a'`, from the first term in the outer sequence expression.
 The host language has the following built-in functions with the
 given types (using Python's type annotation syntax):
 
-* `atoi(s:str): int`<br>
-  Returns the numeric (integral) equivalent of the string value
-  where the string is a series of decimal digits (and an optional
-  leading '-').
-
 * `atof(s:str): float`<br>
   Returns the numeric equivalent of the string value, where the
-  string matches either a floating-point number or a hexadecimal
-  number.
+  string matches either a floating-point number.
+
+* `atoi(s:str, base: int): int`<br>
+  Returns the numeric (integral) equivalent of the string value
+  where the string is a series of either decimal or hexadecimal
+  digits (and an optional leading '-' if the string is all decimals).
+
+* `atou(s:str, base: int): str`<br>
+  Returns the unicode character matching the given string in the given
+  base.
 
 * `cat(ss:[str]): str`<br>
   Returns the string produced by joining all of the elements of `ss`
@@ -412,16 +415,20 @@ given types (using Python's type annotation syntax):
   Returns an array with `head` as the first element, followed by
   the elements from `tail`. Equivalent to `concat([head], tail)`.
 
+* `dedent(s: str): str`<br>
+  Returns an unindented version of the given string. Any characters up to
+  and including the first newline are discarded. Then, looking at the
+  remaining lines, the line with the fewest number of spaces before a
+  non-space character (or the end of the string) is taken to be the
+  indentation to undo. Each line then has that many characters removed.
+  Anything after the last newline is discarded as well, and then the
+  lines are cat'ed together and returned as a string.
+
 * `dict(d:[[key:str, value:Result]]): {[str: Result]*}`<br>
   Returns the object that contains all the key/value pairs.
 
 * `float(i:int): float`<br>
   Returns the floating point equivalent of the int `i`.
-
-* `hex(s:str): int`<br>
-  Returns the numeric equivalent of the string, where the string
-  matches a hexadecimal number. The string may optionally begin with "0x",
-  or may be just a string of hex digits.
 
 * `int(f:float): int`<br>
   Returns the integer equivalent of the floating point number. values

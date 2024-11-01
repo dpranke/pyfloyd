@@ -1414,6 +1414,7 @@ class _Parser:
         self._memoize('r_ident', self._r_ident)
 
     def _s_e_prim_6(self):
+        p = self._pos
         self._s_e_prim_7()
         if self._failed:
             return
@@ -1425,6 +1426,7 @@ class _Parser:
         self._memoize('r_hex', self._r_hex)
 
     def _s_e_prim_8(self):
+        p = self._pos
         self._s_e_prim_9()
         if self._failed:
             return

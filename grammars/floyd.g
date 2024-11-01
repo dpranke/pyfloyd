@@ -22,8 +22,9 @@ choice      = seq ('|' seq)*               -> ['choice', null, cons($1, $2)]
 seq         = expr (expr)*                 -> ['seq', null, cons($1, $2)]
             |                              -> ['empty', null, []]
 
-expr        = '->' e_expr                 -> ['action', null, [$2]]
-            | '?{' e_expr '}'             -> ['pred', null, [$2]]
+expr        = '->' e_expr                  -> ['action', null, [$2]]
+            | '?{' e_expr '}'              -> ['pred', null, [$2]]
+            | '={' e_expr '}'              -> ['equals', null, [$2]]
             | post_expr ':' ident          -> ['label', $3, [$1]]
             | post_expr
 
@@ -74,12 +75,12 @@ escape      = '\\b'                        -> '\x08'
             | uni_esc
             | '\\' any                     -> $2
 
-hex_esc     = '\\x' hex_char{2}            -> xtou(cat($2))
-            | '\\x{' hex_char+ '}'         -> xtou(cat($2))
+hex_esc     = '\\x' hex_char{2}            -> atou(cat($2), 16)
+            | '\\x{' hex_char+ '}'         -> atou(cat($2), 16)
 
-uni_esc     = '\\u' hex_char{4}            -> xtou(cat($2))
-            | '\\u{' hex_char+ '}'         -> xtou(cat($2))
-            | '\\U' hex_char{8}            -> xtou(cat($2))
+uni_esc     = '\\u' hex_char{4}            -> atou(cat($2), 16)
+            | '\\u{' hex_char+ '}'         -> atou(cat($2), 16)
+            | '\\U' hex_char{8}            -> atou(cat($2), 16)
 
 set         = '[' '^' set_char+ ']'        -> cat(scons($2, $3))
             | '[' ~'^' set_char+ ']'       -> cat($3)
@@ -95,7 +96,7 @@ re_char     = bslash '/'                   -> '/'
             | [^/]
 
 zpos        = '0'                          -> 0
-            | <[1-9] [0-9]*>               -> atoi($1)
+            | <[1-9] [0-9]*>               -> atoi($1, 10)
 
 e_expr     = e_qual '+' e_expr             -> ['e_plus', null, [$1, $3]]
            | e_qual '-' e_expr             -> ['e_minus', null, [$1, $3]]

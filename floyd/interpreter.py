@@ -76,6 +76,22 @@ class Interpreter:
             self._errpos = self._pos
             self._errstr = errstr
 
+    def _str(self, s):
+        s_len = len(s)
+        pos = self._pos
+        i = 0
+        while (
+            i < s_len
+            and self._pos < self._end
+            and self._text[self._pos] == s[i]
+        ):
+            self._pos += 1
+            i += 1
+        if i == s_len:
+            self._succeed(self._text[pos : self._pos])
+        else:
+            self._fail()
+
     def _succeed(self, val=None, newpos=None):
         self._val = val
         self._failed = False
@@ -214,10 +230,14 @@ class Interpreter:
         self._succeed(v1 - v2)
 
     def _ty_e_num(self, node):
-        if node[1].startswith('0x'):
-            self._succeed(int(node[1], base=16))
-        else:
-            self._succeed(int(node[1]))
+        try:
+            if node[1].startswith('0x'):
+                self._succeed(int(node[1], base=16))
+            else:
+                self._succeed(int(node[1]))
+        except Exception as e:
+            import pdb; pdb.set_trace()
+            pass
 
     def _ty_e_paren(self, node):
         self._interpret(node[2][0])
@@ -271,6 +291,13 @@ class Interpreter:
             if self._failed:
                 return
 
+    def _ty_equals(self, node):
+        self._interpret(node[2][0])
+        if self._failed:
+            # TODO: Should this be even possible?
+            return
+        self._str(self.val)
+
     def _ty_label(self, node):
         self._interpret(node[2][0])
         if not self._failed:
@@ -311,21 +338,10 @@ class Interpreter:
                 return
 
     def _ty_lit(self, node):
-        i = 0
-        lit = node[1]
-        lit_len = len(lit)
-        pos = self._pos
-        while (
-            i < lit_len
-            and self._pos < self._end
-            and self._text[self._pos] == lit[i]
-        ):
-            self._pos += 1
-            i += 1
-        if i == lit_len:
-            self._succeed(self._text[pos : self._pos])
-        else:
-            self._fail()
+        if node[1] == None:
+            import pdb; pdb.set_trace()
+            pass
+        self._str(node[1])
 
     def _ty_not(self, node):
         pos = self._pos
@@ -487,8 +503,16 @@ class Interpreter:
         else:
             self._fail()
 
-    def _fn_atoi(self, val):
-        return int(val, base=10)
+    def _fn_atof(self, val):
+        if '.' in val or 'e' in val or 'E' in val:
+            return float(val)
+        return int(val)
+
+    def _fn_atoi(self, val, base):
+        return int(val, base=base)
+
+    def _fn_atou(self, val, base):
+        return chr(int(val, base))
 
     def _fn_cat(self, val):
         return ''.join(val)
@@ -499,16 +523,17 @@ class Interpreter:
     def _fn_cons(self, hd, tl):
         return [hd] + tl
 
+    def _fn_dedent(self, s):
+        return s
+
     def _fn_dict(self, val):
         return dict(val)
 
     def _fn_float(self, val):
-        if '.' in val or 'e' in val or 'E' in val:
-            return float(val)
-        return int(val)
+        return float(val)
 
-    def _fn_hex(self, val):
-        return int(val, base=16)
+    def _fn_int(self, val):
+        return int(val)
 
     def _fn_itou(self, val):
         return chr(val)
@@ -528,8 +553,5 @@ class Interpreter:
     def _fn_utoi(self, val):
         return ord(val)
 
-    def _fn_xtoi(self, val):
-        return int(val, base=16)
-
-    def _fn_xtou(self, val):
-        return chr(int(val, base=16))
+    def _fn_xtou(self, s):
+        return chr(int(s, base=16))
