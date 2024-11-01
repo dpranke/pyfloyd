@@ -220,6 +220,11 @@ class GrammarTestsMixin:
         )
         self.check(g, 'ba', out=True)
 
+    def test_equals(self):
+        g = "g = ={'foo'}"
+        self.check(g, 'foo', out='foo')
+        self.check(g, 'bar', err='<string>:1 Unexpected "b" at column 1')
+
     def test_error_on_second_line_of_grammar(self):
         self.check_grammar_error(
             """\

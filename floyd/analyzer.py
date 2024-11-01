@@ -684,6 +684,11 @@ class _SubRuleRewriter:
         self._grammar.needed_builtin_rules.add('any')
         return self._walkn(node)
 
+    def _ty_equals(self, node):
+        self._grammar.ch_needed = True
+        self._grammar.str_needed = True
+        return node
+
     def _ty_leftrec(self, node):
         self._grammar.leftrec_needed = True
         return self._split1(node)

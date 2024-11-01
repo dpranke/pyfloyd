@@ -211,6 +211,10 @@ class _Parser:
         if not self._failed:
             return
         self._rewind(p)
+        self._s_expr_4()
+        if not self._failed:
+            return
+        self._rewind(p)
         self._memoize('r_post_expr', self._r_post_expr)
 
     def _s_expr_1(self):
@@ -240,6 +244,21 @@ class _Parser:
         self._succeed(['pred', None, [v__2]])
 
     def _s_expr_3(self):
+        self._memoize('r__filler', self._r__filler)
+        self._str('={')
+        if self._failed:
+            return
+        self._memoize('r_e_expr', self._r_e_expr)
+        if self._failed:
+            return
+        v__2 = self._val
+        self._memoize('r__filler', self._r__filler)
+        self._ch('}')
+        if self._failed:
+            return
+        self._succeed(['equals', None, [v__2]])
+
+    def _s_expr_4(self):
         self._memoize('r_post_expr', self._r_post_expr)
         if self._failed:
             return
@@ -248,13 +267,13 @@ class _Parser:
         self._ch(':')
         if self._failed:
             return
-        self._s_expr_4()
+        self._s_expr_5()
         if self._failed:
             return
         v__3 = self._val
         self._succeed(['label', v__3, [v__1]])
 
-    def _s_expr_4(self):
+    def _s_expr_5(self):
         self._memoize('r__filler', self._r__filler)
         self._memoize('r_ident', self._r_ident)
 
@@ -818,7 +837,7 @@ class _Parser:
         if self._failed:
             return
         v__2 = self._val
-        self._succeed(self._fn_xtou(self._fn_cat(v__2)))
+        self._succeed(self._fn_atou(self._fn_cat(v__2), 16))
 
     def _s_hex_esc_2(self):
         vs = []
@@ -846,7 +865,7 @@ class _Parser:
         self._ch('}')
         if self._failed:
             return
-        self._succeed(self._fn_xtou(self._fn_cat(v__2)))
+        self._succeed(self._fn_atou(self._fn_cat(v__2), 16))
 
     def _s_hex_esc_4(self):
         vs = []
@@ -883,7 +902,7 @@ class _Parser:
         if self._failed:
             return
         v__2 = self._val
-        self._succeed(self._fn_xtou(self._fn_cat(v__2)))
+        self._succeed(self._fn_atou(self._fn_cat(v__2), 16))
 
     def _s_uni_esc_2(self):
         vs = []
@@ -911,7 +930,7 @@ class _Parser:
         self._ch('}')
         if self._failed:
             return
-        self._succeed(self._fn_xtou(self._fn_cat(v__2)))
+        self._succeed(self._fn_atou(self._fn_cat(v__2), 16))
 
     def _s_uni_esc_4(self):
         vs = []
@@ -936,7 +955,7 @@ class _Parser:
         if self._failed:
             return
         v__2 = self._val
-        self._succeed(self._fn_xtou(self._fn_cat(v__2)))
+        self._succeed(self._fn_atou(self._fn_cat(v__2), 16))
 
     def _s_uni_esc_6(self):
         vs = []
@@ -1146,7 +1165,7 @@ class _Parser:
         if self._failed:
             return
         v__1 = self._val
-        self._succeed(self._fn_atoi(v__1))
+        self._succeed(self._fn_atoi(v__1, 10))
 
     def _s_zpos_3(self):
         self._s_zpos_4()
@@ -1414,7 +1433,6 @@ class _Parser:
         self._memoize('r_ident', self._r_ident)
 
     def _s_e_prim_6(self):
-        p = self._pos
         self._s_e_prim_7()
         if self._failed:
             return
@@ -1426,7 +1444,6 @@ class _Parser:
         self._memoize('r_hex', self._r_hex)
 
     def _s_e_prim_8(self):
-        p = self._pos
         self._s_e_prim_9()
         if self._failed:
             return
@@ -1780,8 +1797,11 @@ class _Parser:
         if newpos is not None:
             self._pos = newpos
 
-    def _fn_atoi(self, a):
-        return int(a, base=10)
+    def _fn_atoi(self, a, base):
+        return int(a, base)
+
+    def _fn_atou(self, a, base):
+        return chr(int(a, base))
 
     def _fn_cat(self, strs):
         return ''.join(strs)
@@ -1791,6 +1811,3 @@ class _Parser:
 
     def _fn_scons(self, hd, tl):
         return [hd] + tl
-
-    def _fn_xtou(self, s):
-        return chr(int(s, base=16))

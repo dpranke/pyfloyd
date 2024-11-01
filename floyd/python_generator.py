@@ -263,8 +263,10 @@ class PythonGenerator(Generator):
     def _ty_apply(self, node) -> List[str]:
         if self._options.memoize and node[1].startswith('r_'):
             name = node[1][2:]
-            if (name not in self._grammar.operators and
-                name not in self._grammar.leftrec_rules):
+            if (
+                name not in self._grammar.operators
+                and name not in self._grammar.leftrec_rules
+            ):
                 return [f"self._memoize('{node[1]}', self._{node[1]})"]
 
         return [f'self._{node[1]}()']
@@ -408,6 +410,13 @@ class PythonGenerator(Generator):
             ]
         )
         return lines
+
+    def _ty_equals(self, node) -> List[str]:
+        arg = self._gen(node[2][0])
+        return [
+            'v = ' + flatten(arg)[0],
+            'self._str(v)',
+        ]
 
     def _ty_label(self, node) -> List[str]:
         lines = self._gen(node[2][0])

@@ -240,8 +240,10 @@ class JavaScriptGenerator(Generator):
     def _ty_apply(self, node) -> List[str]:
         if self._options.memoize and node[1].startswith('r_'):
             name = node[1][2:]
-            if (name not in self._grammar.operators and
-                name not in self._grammar.leftrec_rules):
+            if (
+                name not in self._grammar.operators
+                and name not in self._grammar.leftrec_rules
+            ):
                 return [f"this.memoize('{node[1]}', this.{node[1]})"]
         return [f'this.{node[1]}();']
 
@@ -384,6 +386,13 @@ class JavaScriptGenerator(Generator):
             ]
         )
         return lines
+
+    def _ty_equals(self, node) -> List[str]:
+        arg = self._gen_expr(node[2][0])
+        return [
+            'let v = ' + flatten(arg)[0] + ';',
+            'this.str(v);',
+        ]
 
     def _ty_label(self, node) -> List[str]:
         lines = self._gen(node[2][0])

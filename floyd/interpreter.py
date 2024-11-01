@@ -230,14 +230,10 @@ class Interpreter:
         self._succeed(v1 - v2)
 
     def _ty_e_num(self, node):
-        try:
-            if node[1].startswith('0x'):
-                self._succeed(int(node[1], base=16))
-            else:
-                self._succeed(int(node[1]))
-        except Exception as e:
-            import pdb; pdb.set_trace()
-            pass
+        if node[1].startswith('0x'):
+            self._succeed(int(node[1], base=16))
+        else:
+            self._succeed(int(node[1]))
 
     def _ty_e_paren(self, node):
         self._interpret(node[2][0])
@@ -296,7 +292,7 @@ class Interpreter:
         if self._failed:
             # TODO: Should this be even possible?
             return
-        self._str(self.val)
+        self._str(self._val)
 
     def _ty_label(self, node):
         self._interpret(node[2][0])
@@ -338,9 +334,6 @@ class Interpreter:
                 return
 
     def _ty_lit(self, node):
-        if node[1] == None:
-            import pdb; pdb.set_trace()
-            pass
         self._str(node[1])
 
     def _ty_not(self, node):
