@@ -120,7 +120,7 @@ e_prim     = 'false'                      -> ['e_const', 'false', []]
             | '(' e_expr ')'              -> ['e_paren', null, [$2]]
             | '[' e_exprs ']'             -> ['e_arr', null, $2]
 
-int         = '0' ~'x'
+int         = '0' ~'x'                    -> '0'
             | <'-'? [1-9] [0-9]*>
 
 hex         = <'0x' hex_char+>

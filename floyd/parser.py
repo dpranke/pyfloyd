@@ -1492,6 +1492,9 @@ class _Parser:
         if self._failed:
             return
         self._s_int_2()
+        if self._failed:
+            return
+        self._succeed('0')
 
     def _s_int_2(self):
         p = self._pos
