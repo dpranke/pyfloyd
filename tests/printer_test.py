@@ -130,15 +130,13 @@ class PrinterTest(unittest.TestCase):
         out, err = floyd.pretty_print(grammar, rewrite_filler=True)
         self.assertEqual(
             textwrap.dedent("""\
-            %token = _filler foo
-
             grammar  = _filler foo _filler end
 
             foo      = 'foo'
 
-            _comment = '//' (~'\\n' any)*
-
             _filler  = _comment*
+
+            _comment = '//' (~'\\n' any)*
             """),
             out,
         )

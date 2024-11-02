@@ -71,7 +71,9 @@ def compile(  # pylint: disable=redefined-builtin
     if result.err:
         return CompiledResult(err=result.err, pos=result.pos)
     try:
-        grammar = analyzer.analyze(result.val)
+        grammar = analyzer.analyze(
+            result.val, rewrite_filler=True, rewrite_subrules=False
+        )
         interpreter = Interpreter(grammar, memoize=memoize)
         return CompiledResult(interpreter, None)
     except analyzer.AnalysisError as e:
@@ -117,19 +119,21 @@ def generate(
     if result.err:
         return result
     try:
-        grammar_obj = analyzer.analyze(result.val)
-        analyzer.rewrite_subrules(grammar_obj)
-        options = options or GeneratorOptions()
-        gen: Generator
-        if options.language == 'python':
-            gen = PythonGenerator(grammar_obj, options)
-        else:
-            assert options.language == 'javascript'
-            gen = JavaScriptGenerator(grammar_obj, options)
-        text = gen.generate()
-        return Result(text)
+        grammar_obj = analyzer.analyze(
+            result.val, rewrite_filler=True, rewrite_subrules=True
+        )
     except analyzer.AnalysisError as e:
         return Result(err=str(e))
+
+    options = options or GeneratorOptions()
+    gen: Generator
+    if options.language == 'python':
+        gen = PythonGenerator(grammar_obj, options)
+    else:
+        assert options.language == 'javascript'
+        gen = JavaScriptGenerator(grammar_obj, options)
+    text = gen.generate()
+    return Result(text)
 
 
 def parse(
@@ -165,7 +169,10 @@ def parse(
 
 
 def pretty_print(
-    grammar: str, path: str = '<string>', rewrite_filler=False
+    grammar: str,
+    path: str = '<string>',
+    rewrite_filler: bool = False,
+    rewrite_subrules: bool = False
 ) -> Tuple[Optional[str], Optional[str]]:
     """Pretty-print a grammar.
 
@@ -177,13 +184,23 @@ def pretty_print(
     the formatting was successful. The second will be a string describing
     any errors, if it wasn't. If one of the values in the tuple is non-None,
     the other will be None.
+
+    If `rewrite_filler` is true, then the grammar will be printed with
+    the filler nodes inserted into it as appropriate. This can be used
+    to translate a grammar with filler to a grammar without filler.
+
+    If `rewrite_subrules` is true, then any complex subrules will be
+    extracted out into their own rules. You probably normally don't want
+    this, but it might be useful to debug something.
     """
     result = parser.parse(grammar, path)
     if result.err:
         return None, result.err
 
     try:
-        grammar = analyzer.analyze(result.val, rewrite_filler=rewrite_filler)
+        grammar = analyzer.analyze(
+            result.val, rewrite_filler=rewrite_filler, rewrite_subrules=False
+        )
         return Printer(grammar).dumps(), None
     except analyzer.AnalysisError as e:
         return None, str(e)
