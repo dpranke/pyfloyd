@@ -167,19 +167,8 @@ class _Analyzer:
     def __init__(self, grammar):
         self.grammar = grammar
         assert self.grammar.ast[0] == 'rules'
-
-        self.assoc = {}
-        self.comment = None
-        self.current_prec = 0
         self.errors = []
-        self.prec = {}
-        self.rule_names = set(
-            n[1]
-            for n in self.grammar.ast[2]
-            if n[0] == 'rule' and not n[1].startswith('%')
-        )
-        self.tokens = set()
-        self.whitespace = None
+        self.current_prec = 0
 
     def check_pragmas(self):
         # Initialize all the data structures from the pragmas.
@@ -187,10 +176,6 @@ class _Analyzer:
         for node in self.grammar.ast[2]:
             if node[1].startswith('%'):
                 self._check_pragma(node)
-        self.grammar.comment = self.comment
-        self.grammar.whitespace = self.whitespace
-        self.grammar.assoc = self.assoc
-        self.grammar.prec = self.prec
 
     def _check_pragma(self, node):
         rule_name = node[1]
@@ -200,25 +185,23 @@ class _Analyzer:
             for subnode in choice[2]:
                 for expr in subnode[2]:
                     token = expr[1]
-                    if token in self.rule_names:
-                        self.tokens.add(token)
-                    else:
+                    if token not in self.grammar.rules:
                         self.errors.append(f'Unknown token rule "{token}"')
         elif rule_name == '%whitespace':
-            self.whitespace = choice
+            self.grammar.whitespace = choice
         elif rule_name == '%comment':
-            self.comment = choice
+            self.grammar.comment = choice
         elif rule_name == '%prec':
             for c in choice[2]:
                 for t in c[2]:
-                    self.prec[t[1]] = self.current_prec
+                    self.grammar.prec[t[1]] = self.current_prec
                 self.current_prec += 2
         else:
             choice = node[2][0]
             seq = choice[2][0]
             operator = seq[2][0][1]
             direction = seq[2][1][1]
-            self.assoc[operator] = direction
+            self.grammar.assoc[operator] = direction
 
     def check_identifiers(self):
         # Check for unknown rules, functions, and variables. Also check
@@ -231,7 +214,7 @@ class _Analyzer:
     def _check_identifiers(self, node):
         ty = node[0]
         if ty == 'apply':
-            if node[1] not in self.rule_names and node[1] not in (
+            if node[1] not in self.grammar.rules and node[1] not in (
                 'any',
                 'end',
             ):
@@ -414,8 +397,8 @@ def _check_lr(name, node, grammar, seen):
 
 
 def _rewrite_filler(grammar):
-    """Rewrite the grammar to insert filler rules and nodes, and unset
-    %whitespace and %comment."""
+    """Rewrites the grammar to insert filler rules and nodes. Unsets
+    %whitespace, %comment, and %token(s)."""
     if not grammar.comment and not grammar.whitespace:
         return
 
@@ -578,8 +561,8 @@ def _rewrite_singles(grammar):
 
 
 def _rewrite_subrules(grammar):
-    # Extract subrules from rules as needed to be able to generate
-    # code properly.
+    """Extracts subrules from rules as needed to be able to generate
+    code properly."""
     sr = _SubRuleRewriter(grammar, 'r_{rule}', 's_{rule}_{counter}')
     sr.rewrite()
 
