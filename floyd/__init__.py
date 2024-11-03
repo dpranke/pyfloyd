@@ -53,6 +53,7 @@ compile the parser ahead of time:
 from floyd.api import (
     parse,
     compile,
+    dump_ast,
     generate,
     pretty_print,
     CompiledResult,
@@ -67,6 +68,7 @@ from floyd.version import __version__
 __all__ = [
     '__version__',
     'compile',
+    'dump_ast',
     'generate',
     'parse',
     'pretty_print',

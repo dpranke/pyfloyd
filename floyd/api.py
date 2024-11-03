@@ -204,3 +204,27 @@ def pretty_print(
         return Printer(grammar).dumps(), None
     except analyzer.AnalysisError as e:
         return None, str(e)
+
+def dump_ast(
+    grammar: str,
+    path: str = '<string>',
+    rewrite_filler: bool = False,
+    rewrite_subrules: bool = False,
+) -> Tuple[Optional[str], Optional[str]]:
+    """Returns the parsed AST from the grammar. Possibly useful for debugging.
+
+    `rewrite_filler` and `rewrite_subrules` work as in the other methods.
+    """
+    result = parser.parse(grammar, path)
+    if result.err:
+        return None, result.err
+
+    try:
+        grammar = analyzer.analyze(
+            result.val,
+            rewrite_filler=rewrite_filler,
+            rewrite_subrules=rewrite_subrules
+        )
+        return grammar.ast, None
+    except analyzer.AnalysisError as e:
+        return None, str(e)

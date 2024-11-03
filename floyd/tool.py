@@ -17,8 +17,10 @@
 
 import argparse
 import importlib.util
+import io
 import json
 import pathlib
+import pprint
 import sys
 
 # If necessary, add ../.. to sys.path so that we can run floyd even when
@@ -46,7 +48,20 @@ def main(argv=None, host=None):
             host.print(err, file=host.stderr)
             return 1
 
-        if args.pretty_print:
+        if args.ast:
+            ast, err = floyd.dump_ast(
+                grammar,
+                args.grammar,
+                rewrite_filler=args.rewrite_filler,
+                rewrite_subrules=args.rewrite_subrules,
+            )
+            if ast:
+                s = io.StringIO()
+                pprint.pprint(ast, stream=s)
+                contents = s.getvalue()
+            else:
+                contents = None
+        elif args.pretty_print:
             contents, err = floyd.pretty_print(
                 grammar, args.grammar, args.rewrite_filler
             )
@@ -78,6 +93,11 @@ def main(argv=None, host=None):
 def _parse_args(host, argv):
     ap = argparse.ArgumentParser(prog='floyd')
     ap.add_argument(
+        '--ast',
+        action='store_true',
+        help='dump the parsed AST of the grammar'
+    )
+    ap.add_argument(
         '-c',
         '--compile',
         action='store_true',
@@ -94,6 +114,11 @@ def _parse_args(host, argv):
         '--rewrite-filler',
         action='store_true',
         help='include the filler rules in the grammar',
+    )
+    ap.add_argument(
+        '--rewrite-subrules',
+        action='store_true',
+        help='Extract subnodes into their own rules as needed',
     )
     ap.add_argument(
         '-V',
