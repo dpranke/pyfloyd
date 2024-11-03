@@ -71,10 +71,10 @@ def compile(  # pylint: disable=redefined-builtin
     if result.err:
         return CompiledResult(err=result.err, pos=result.pos)
     try:
-        grammar = analyzer.analyze(
+        g = analyzer.analyze(
             result.val, rewrite_filler=True, rewrite_subrules=False
         )
-        interpreter = Interpreter(grammar, memoize=memoize)
+        interpreter = Interpreter(g, memoize=memoize)
         return CompiledResult(interpreter, None)
     except analyzer.AnalysisError as e:
         return CompiledResult(None, str(e))
@@ -172,7 +172,7 @@ def pretty_print(
     grammar: str,
     path: str = '<string>',
     rewrite_filler: bool = False,
-    rewrite_subrules: bool = False
+    rewrite_subrules: bool = False,
 ) -> Tuple[Optional[str], Optional[str]]:
     """Pretty-print a grammar.
 
@@ -198,12 +198,15 @@ def pretty_print(
         return None, result.err
 
     try:
-        grammar = analyzer.analyze(
-            result.val, rewrite_filler=rewrite_filler, rewrite_subrules=False
+        g = analyzer.analyze(
+            result.val,
+            rewrite_filler=rewrite_filler,
+            rewrite_subrules=rewrite_subrules,
         )
-        return Printer(grammar).dumps(), None
+        return Printer(g).dumps(), None
     except analyzer.AnalysisError as e:
         return None, str(e)
+
 
 def dump_ast(
     grammar: str,
@@ -220,11 +223,11 @@ def dump_ast(
         return None, result.err
 
     try:
-        grammar = analyzer.analyze(
+        g = analyzer.analyze(
             result.val,
             rewrite_filler=rewrite_filler,
-            rewrite_subrules=rewrite_subrules
+            rewrite_subrules=rewrite_subrules,
         )
-        return grammar.ast, None
+        return g.ast, None
     except analyzer.AnalysisError as e:
         return None, str(e)

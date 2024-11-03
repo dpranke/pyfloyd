@@ -66,7 +66,7 @@ class Grammar:
                 has_starting_rule = True
             self.rules[n[1]] = n[2][0]
 
-    def _update_rules(self):
+    def update_rules(self):
         # Update grammar.rules to match grammar.ast for rules in
         # grammar.ast and then append any new rules to grammar.ast.
         rules = set()
@@ -86,7 +86,7 @@ class OperatorState:
         self.choices = {}
 
 
-def analyze(ast, rewrite_filler: bool, rewrite_subrules: bool):
+def analyze(ast, rewrite_filler: bool, rewrite_subrules: bool) -> Grammar:
     """Analyze and optimize the AST.
 
     This runs any static analysis we can do over the grammars and
@@ -427,7 +427,7 @@ def _rewrite_filler(grammar):
 
     # Now rewrite all the rules to insert the filler nodes.
     grammar.ast = _add_filler_nodes(grammar, grammar.ast)
-    grammar._update_rules()
+    grammar.update_rules()
 
     # And strip out the %whitespace, %comment, and %token(s) pragmas.
     grammar.ast[2] = [
@@ -439,7 +439,8 @@ def _rewrite_filler(grammar):
     grammar.whitespace = None
     grammar.tokens = set()
     grammar.pragmas = [
-        n for n in grammar.pragmas
+        n
+        for n in grammar.pragmas
         if n[1] not in ('%whitespace', '%comment', '%token', '%tokens')
     ]
 
@@ -573,7 +574,7 @@ def _rewrite_singles(grammar):
         return [node[0], node[1], [walk(n) for n in node[2]]]
 
     grammar.ast = walk(grammar.ast)
-    grammar._update_rules()
+    grammar.update_rules()
 
 
 def _rewrite_subrules(grammar):

@@ -93,9 +93,7 @@ def main(argv=None, host=None):
 def _parse_args(host, argv):
     ap = argparse.ArgumentParser(prog='floyd')
     ap.add_argument(
-        '--ast',
-        action='store_true',
-        help='dump the parsed AST of the grammar'
+        '--ast', action='store_true', help='dump the parsed AST of the grammar'
     )
     ap.add_argument(
         '-c',
