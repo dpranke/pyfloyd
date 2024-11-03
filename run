@@ -155,6 +155,7 @@ class Runner:
         subp.add_argument(
             '-u', '--unit', action='store_true', help='Only run unit tests.'
         )
+        subp.add_argument('test', nargs='*', action='store')
 
         subp = self.add_parser('publish', help='Upload packages to PyPI.')
         subp.add_argument(
