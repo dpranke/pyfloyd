@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pylint: disable=too-many-lines
+
+import re
 from typing import Dict, List, Union
 
 from floyd.analyzer import Grammar
@@ -31,6 +34,8 @@ class PythonGenerator(Generator):
         self._methods: Dict[str, List[str]] = {}
         self._operators: Dict[str, str] = {}
         self._unicodedata_needed = grammar.unicat_needed
+        self._current_rule = None
+        self._base_rule_regex = re.compile(r's_(.+)_\d+$')
 
         # These methods are pretty much always needed.
         self._needed_methods = set(
@@ -63,7 +68,9 @@ class PythonGenerator(Generator):
 
     def _gen_rules(self) -> None:
         for rule, node in self._grammar.rules.items():
+            self._current_rule = self._base_rule_name(rule)
             self._methods[rule] = self._gen(node)
+            self._current_rule = None
 
     def _gen_text(self) -> str:
         imports = ''
@@ -120,6 +127,9 @@ class PythonGenerator(Generator):
             text += '        self._blocked = set()\n'
         if self._grammar.re_needed:
             text += '        self._regexps = {}\n'
+        if self._grammar.outer_scope_rules:
+            text += '        self._scopes = []\n'
+            self._needed_methods.add('lookup')
         if self._grammar.operator_needed:
             text += self._operator_state()
             text += '\n'
@@ -226,6 +236,8 @@ class PythonGenerator(Generator):
         if node[0] == 'choice':
             r = all(self._can_fail(n, inline) for n in node[2])
             return r
+        if node[0] == 'scope':
+            return self._can_fail(node[2][0], False)
         if node[0] == 'seq':
             r = any(self._can_fail(n, inline) for n in node[2])
             return r
@@ -251,6 +263,11 @@ class PythonGenerator(Generator):
             'unicat',
         )
         return True
+
+    def _base_rule_name(self, rule_name):
+        if rule_name.startswith('r_'):
+            return rule_name[2:]
+        return self._base_rule_regex.match(rule_name).group(1)
 
     #
     # Handlers for each non-host node in the glop AST follow.
@@ -389,6 +406,8 @@ class PythonGenerator(Generator):
         return saw
 
     def _ty_e_var(self, node) -> str:
+        if self._current_rule in self._grammar.outer_scope_rules:
+            return f"self._lookup('{node[1]}')"
         return 'v_' + node[1].replace('$', '_')
 
     def _ty_empty(self, node) -> List[str]:
@@ -413,20 +432,20 @@ class PythonGenerator(Generator):
 
     def _ty_equals(self, node) -> List[str]:
         arg = self._gen(node[2][0])
-        return [
-            'v = ' + flatten(arg)[0],
-            'self._str(v)',
-        ]
+        return [f'self._str({flatten(arg)[0]})']
 
     def _ty_label(self, node) -> List[str]:
         lines = self._gen(node[2][0])
         if self._can_fail(node[2][0], True):
             lines.extend(['if self._failed:', '    return'])
-        lines.extend(
-            [
-                f'v_{node[1].replace("$", "_")} = self._val',
-            ]
-        )
+        if self._current_rule in self._grammar.outer_scope_rules:
+            lines.extend([f"self._scopes[-1]['{node[1]}'] = self._val"])
+        else:
+            lines.extend(
+                [
+                    f'v_{node[1].replace("$", "_")} = self._val',
+                ]
+            )
         return lines
 
     def _ty_leftrec(self, node) -> List[str]:
@@ -565,6 +584,17 @@ class PythonGenerator(Generator):
             ]
         )
         return lines
+
+    def _ty_scope(self, node) -> List[str]:
+        return (
+            [
+                'self._scopes.append({})',
+            ]
+            + self._gen(node[2][0])
+            + [
+                'self._scopes.pop()',
+            ]
+        )
 
     def _ty_set(self, node) -> List[str]:
         new_node = ['regexp', '[' + node[1] + ']', []]
@@ -835,6 +865,14 @@ _BUILTIN_METHODS = """\
                 if left_assoc:
                     self._blocked.remove(rule_name)
                 return
+
+    def _lookup(self, var):
+        l = len(self._scopes) - 1
+        while l >= 0:
+            if var in self._scopes[l]:
+                return self._scopes[l][var]
+            l -= 1
+        assert False, f'unknown var {var}'
 
     def _memoize(self, rule_name, fn):
         p = self._pos

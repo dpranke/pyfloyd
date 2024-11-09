@@ -57,7 +57,7 @@ class Interpreter:
         self._end = len(self._text)
         self._errstr = None
         self._errpos = 0
-        self._scopes = []
+        self._scopes = [{}]
 
         self._interpret(self._grammar.rules[self._grammar.starting_rule])
         if self._failed:
@@ -148,15 +148,22 @@ class Interpreter:
 
         # Unknown rules should have been caught in analysis, so we don't
         # need to worry about one here and can jump straight to the rule.
+
+        # Start each rule w/ a fresh set of scopes.
+        scopes = self._scopes
+        self._scopes = [{}]
+
         pos = self._pos
         if self._memoize:
             r = self._cache.get((rule_name, pos))
             if r is not None:
                 self._val, self._failed, self._pos = r
+                self._scopes = scopes
                 return
         self._interpret(self._grammar.rules[rule_name])
         if self._memoize:
             self._cache[(rule_name, pos)] = self._val, self._failed, self._pos
+        self._scopes = scopes
 
     def _ty_choice(self, node):
         count = 1
@@ -271,8 +278,18 @@ class Interpreter:
             return
 
         # Unknown variables should have been caught in analysis.
-        assert self._scopes and (node[1] in self._scopes[-1])
-        self._succeed(self._scopes[-1][node[1]])
+        if node[1][0] == '$':
+            # Look up positional labels in the current scope.
+            self._succeed(self._scopes[-1][node[1]])
+        else:
+            # Look up named labels in any scope.
+            i = len(self._scopes) - 1
+            while i >= 0:
+                if node[1] in self._scopes[i]:
+                    self._succeed(self._scopes[i][node[1]])
+                    return
+                i -= 1
+            assert False, f'Unknown label "{node[1]}"'
 
     def _ty_empty(self, node):
         del node
@@ -462,13 +479,16 @@ class Interpreter:
         end = self._pos
         self._val = self._text[start:end]
 
-    def _ty_seq(self, node):
+    def _ty_scope(self, node):
         self._scopes.append({})
+        self._interpret(node[2][0])
+        self._scopes.pop()
+
+    def _ty_seq(self, node):
         for subnode in node[2]:
             self._interpret(subnode)
             if self._failed:
                 break
-        self._scopes.pop()
 
     def _ty_set(self, node):
         new_node = ['regexp', '[' + node[1] + ']', []]

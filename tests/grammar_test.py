@@ -255,7 +255,7 @@ class GrammarTestsMixin:
             'grammar = -> v',
             text='',
             grammar_err=(
-                'Errors were found:\n' '  Unknown variable "v" referenced\n'
+                'Errors were found:\n' '  Unknown label "v" referenced\n'
             ),
         )
 
@@ -536,7 +536,49 @@ class GrammarTestsMixin:
             "grammar = 'foobar' -> $2",
             text='foobar',
             grammar_err=(
-                'Errors were found:\n  Unknown variable "$2" referenced\n'
+                'Errors were found:\n  Unknown label "$2" referenced\n'
+            ),
+        )
+
+    def test_label_nested_works(self):
+        # Named variables defined in an outer sequence *should* be
+        # visible in an inner sequence. This shows that either dynamically
+        # or lexically scoped variables *might* work.
+        # TODO: Make this work.
+        g = "g = 'foo':f ('x'+ ={f})* -> true"
+        self.check(g, text='fooxfoo', out=True)
+
+    def test_label_inner_not_in_outer(self):
+        # Named variables defined in an inner sequence should *not* be
+        # visible in an outer sequence. This shows that there are different
+        # scopes for inner and outer sequences.
+        # TODO: Can we provide a better error here?
+        self.check(
+            "g = 'foo' ('x'+:x) -> cat(x)",
+            text='fooxxx',
+            grammar_err=(
+                'Errors were found:\n'
+                '  Label "x" never used\n'
+                '  Unknown label "x" referenced\n'
+            ),
+        )
+
+    def test_label_separate_rule_does_not_work(self):
+        # Named variables defined in an outer sequence should *not* be
+        # visible in separate rules referenced as inner terms.
+        # This shows that 'dynamically scoped' variables aren't supported.
+        g = """
+        g   = 'foo':f bar -> true
+
+        bar = 'x'+ ={f}
+        """
+        self.check(
+            g,
+            text='fooxfoo',
+            grammar_err=(
+                'Errors were found:\n'
+                '  Label "f" never used\n'
+                '  Unknown label "f" referenced\n'
             ),
         )
 
@@ -638,14 +680,21 @@ class GrammarTestsMixin:
             out=None,
         )
 
-    def disabled_test_operator_invalid(self):
+    def test_operator_invalid(self):
+        # TODO: Provide a better error message, allow rules that expand
+        # to literals.
         g = """
            %prec = a
            expr = expr 'b' expr -> [$1, 'b', $3]
                 | '0'..'9'
         """
         self.check(
-            g, text='1', grammar_err='<string>:2 Unexpected "a" at column 7'
+            g,
+            text='1',
+            grammar_err=(
+                'Errors were found:\n'
+                '  Expected literal for %prec, not a\n'
+            )
         )
 
     @skip('operators')

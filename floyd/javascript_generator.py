@@ -14,6 +14,7 @@
 
 # pylint: disable=too-many-lines
 
+import re
 from typing import Dict, List, Set, Union
 
 from floyd.analyzer import Grammar
@@ -32,6 +33,8 @@ class JavaScriptGenerator(Generator):
         self._exception_needed = False
         self._methods: Dict[str, List[str]] = {}
         self._operators: Dict[str, str] = {}
+        self._current_rule = None
+        self._base_rule_regex = re.compile(r's_(.+)_\d+$')
 
         # These methods are pretty much always needed.
         self._needed_methods = set(
@@ -63,6 +66,7 @@ class JavaScriptGenerator(Generator):
     def _gen_rules(self) -> None:
         local_vars = ('errpos', 'found', 'p', 'regexp')
         for rule, node in self._grammar.rules.items():
+            self._current_rule = self._base_rule_name(rule)
             local_vars_defined = set()
             lines = []
             original_lines = self._gen(node)
@@ -78,6 +82,7 @@ class JavaScriptGenerator(Generator):
                 if not modified:
                     lines.append(line)
             self._methods[rule] = lines
+            self._current_rule = None
 
     def _gen_text(self) -> str:
         if self._options.main:
@@ -97,13 +102,11 @@ class JavaScriptGenerator(Generator):
         text += '\n'
 
         if self._exception_needed:
-            text += _PARSE_WITH_EXCEPTION.replace(
-                '{starting_rule}', self._grammar.starting_rule
+            text += _PARSE_WITH_EXCEPTION.format(
+                starting_rule=self._grammar.starting_rule
             )
         else:
-            text += _PARSE.replace(
-                '{starting_rule}', self._grammar.starting_rule
-            )
+            text += _PARSE.format(starting_rule=self._grammar.starting_rule)
 
         text += self._gen_methods()
         text += '}\n'
@@ -124,6 +127,9 @@ class JavaScriptGenerator(Generator):
             text += '    this.blocked = new Set();\n'
         if self._grammar.operator_needed:
             text += self._operator_state()
+        if self._grammar.outer_scope_rules:
+            text += '    this.scopes = [];\n'
+            self._needed_methods.add('lookup')
         text += '  }\n'
 
         return text
@@ -228,6 +234,11 @@ class JavaScriptGenerator(Generator):
 
     def _varname(self, v):
         return f'v_{v.replace("$", "_")}'
+
+    def _base_rule_name(self, rule_name):
+        if rule_name.startswith('r_'):
+            return rule_name[2:]
+        return self._base_rule_regex.match(rule_name).group(1)
 
     #
     # Handlers for each non-host node in the glop AST follow.
@@ -361,6 +372,8 @@ class JavaScriptGenerator(Generator):
         return saw
 
     def _ty_e_var(self, node) -> str:
+        if self._current_rule in self._grammar.outer_scope_rules:
+            return f"this.lookup('{node[1]}')"
         return 'v_' + node[1].replace('$', '_')
 
     def _ty_empty(self, node) -> List[str]:
@@ -389,15 +402,27 @@ class JavaScriptGenerator(Generator):
 
     def _ty_equals(self, node) -> List[str]:
         arg = self._gen_expr(node[2][0])
-        return [
-            'let v = ' + flatten(arg)[0] + ';',
-            'this.str(v);',
-        ]
+        return [f'this.str({flatten(arg)[0]});']
 
     def _ty_label(self, node) -> List[str]:
         lines = self._gen(node[2][0])
         varname = self._varname(node[1])
-        lines.extend(['if (!this.failed) {', f'  {varname} = this.val;', '}'])
+        if self._current_rule in self._grammar.outer_scope_rules:
+            lines.extend(
+                [
+                    'if (!this.failed) {',
+                    f"  this.scopes[this.scopes.length-1].set('{node[1]}', this.val);"
+                    '}',
+                ]
+            )
+        else:
+            lines.extend(
+                [
+                    'if (!this.failed) {',
+                    f'  {varname} = this.val;',
+                    '}',
+                ]
+            )
         return lines
 
     def _ty_leftrec(self, node) -> List[str]:
@@ -552,9 +577,16 @@ class JavaScriptGenerator(Generator):
             ]
         )
 
-    def _ty_set(self, node) -> List[str]:
-        new_node = ['regexp', '[' + node[1] + ']', []]
-        return self._ty_regexp(new_node)
+    def _ty_scope(self, node) -> List[str]:
+        return (
+            [
+                'this.scopes.push(new Map());',
+            ]
+            + self._gen(node[2][0])
+            + [
+                'this.scopes.pop();',
+            ]
+        )
 
     def _ty_seq(self, node) -> List[str]:
         lines = self._gen(node[2][0])
@@ -563,6 +595,10 @@ class JavaScriptGenerator(Generator):
             lines.extend('  ' + line for line in self._gen(subnode))
             lines.append('}')
         return lines
+
+    def _ty_set(self, node) -> List[str]:
+        new_node = ['regexp', '[' + node[1] + ']', []]
+        return self._ty_regexp(new_node)
 
     def _ty_star(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
@@ -714,34 +750,34 @@ class Parser {
 """
 
 _PARSE = """\
-  parse() {
+  parse() {{
     this.r_{starting_rule}();
-    if (this.failed) {
+    if (this.failed) {{
       return new Result(null, this.error(), this.errpos);
-    } else {
+    }} else {{
       return new Result(this.val, null, this.pos);
-    }
-  }\
+    }}
+  }}\
 """
 
 _PARSE_WITH_EXCEPTION = """\
-  parse() {
-    try {
+  parse() {{
+    try {{
       this.r_{starting_rule}();
-      if (this.failed) {
+      if (this.failed) {{
         return new Result(null, this.error(), this.errpos);
-      } else {
+      }} else {{
         return new Result(this.val, null, this.pos);
-      }
-    } catch (e) {
-      if (e instanceof ParsingRuntimeError) {
+      }}
+    }} catch (e) {{
+      if (e instanceof ParsingRuntimeError) {{
         let [lineno, _] = this.errorOffsets();
         return new Result(null, this.path + ':' + lineno + ' ' + e.toString());
-      } else {
+      }} else {{
         throw e;
-      }
-    }
-  }\
+      }}
+    }}
+  }}\
 """
 
 _BUILTIN_METHODS = """\
@@ -835,6 +871,17 @@ _BUILTIN_METHODS = """\
         return;
       }
     }
+  }
+
+  lookup(v) {
+    let l = this.scopes.length - 1;
+    while (l >= 0) {
+      if (this.scopes[l].has(v)) {
+        return this.scopes[l].get(v);
+      }
+      l -= 1;
+    }
+    throw new Exception('Unknown var "' + v + '"');
   }
 
   memoize(rule_name, fn) {

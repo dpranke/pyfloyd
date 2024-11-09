@@ -59,7 +59,7 @@ class PrinterTest(unittest.TestCase):
         self.assertIsNone(out)
         self.assertEqual(
             err,
-            'Errors were found:\n  Unknown variable "foo" referenced\n',
+            'Errors were found:\n  Unknown label "foo" referenced\n',
         )
 
     def test_comment(self):

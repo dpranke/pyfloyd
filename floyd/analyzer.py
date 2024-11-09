@@ -50,6 +50,7 @@ class Grammar:
         self.needed_builtin_rules = set()
         self.operators = {}
         self.leftrec_rules = set()
+        self.outer_scope_rules = set()
 
         has_starting_rule = False
         for n in self.ast[2]:
@@ -169,6 +170,7 @@ class _Analyzer:
         assert self.grammar.ast[0] == 'rules'
         self.errors = []
         self.current_prec = 0
+        self.current_rule = None
 
     def check_pragmas(self):
         # Initialize all the data structures from the pragmas.
@@ -194,7 +196,12 @@ class _Analyzer:
         elif rule_name == '%prec':
             for c in choice[2]:
                 for t in c[2]:
-                    self.grammar.prec[t[1]] = self.current_prec
+                    if t[0] != 'lit':
+                        self.errors.append(
+                            f"Expected literal for %prec, not {t[1]}"
+                        )
+                    else:
+                        self.grammar.prec[t[1]] = self.current_prec
                 self.current_prec += 2
         else:
             choice = node[2][0]
@@ -207,35 +214,42 @@ class _Analyzer:
         # Check for unknown rules, functions, and variables. Also check
         # for variables that are declared but not used.
         for node in self.grammar.ast[2]:
+            assert node[0] == 'rule'
             if node[1].startswith('%'):
                 continue
-            self._check_identifiers(node)
+            self.current_rule = node[1]
+            assert node[2][0][0] == 'choice'
+            for sn in node[2][0][2]:
+                labelled = set()
+                referenced = set()
+                self._check_identifiers(sn, labelled, referenced)
+            if self.current_rule in self.grammar.outer_scope_rules:
+                node[2][0] = self._rewrite_scopes(node[2][0])
 
-    def _check_identifiers(self, node):
+    def _check_identifiers(self, node, labelled, referenced):
         ty = node[0]
+
         if ty == 'apply':
             if node[1] not in self.grammar.rules and node[1] not in (
                 'any',
                 'end',
             ):
                 self.errors.append(f'Unknown rule "{node[1]}"')
+
         if ty != 'seq':
             for n in node[2]:
-                self._check_identifiers(n)
+                self._check_identifiers(n, labelled, referenced)
             return
 
         # Figure out what, if any, variables are being bound in this
         # sequence so that we can ensure that only bound variables
         # are being dereferenced in e_var nodes.
-        referenced_vs = set()
-        labelled_vs = set()
-        for i, n in enumerate(node[2], start=1):
-            if n[0] in ('action', 'equals', 'pred'):
-                self._vars_needed(n[2][0], i, referenced_vs)
 
         # Check for whether any $X fields are explicitly declared
         # (which is an error), and add label nodes for all of the
         # needed positional bindings.
+        preexisting_labels = labelled.copy()
+        local_labels = set()
         for i, n in enumerate(node[2], start=1):
             name = f'${i}'
             if n[0] == 'label':
@@ -245,44 +259,80 @@ class _Analyzer:
                         'and cannot be explicitly defined'
                     )
                 else:
-                    if n[1] not in referenced_vs:
-                        self.errors.append(f'Unused variable "{n[1]}" defined')
-                    else:
-                        labelled_vs.add(n[1])
-            if name in referenced_vs:
+                    labelled.add(n[1])
+                    local_labels.add(n[1])
+
+            if n[0] in ('action', 'equals', 'pred'):
+                self._vars_needed(n[2][0], i, labelled, referenced)
+            else:
+                self._check_identifiers(n, labelled, referenced)
+
+        for i, n in enumerate(node[2], start=1):
+            name = f'${i}'
+            if name in referenced:
                 node[2][i - 1] = ['label', name, [n]]
-                labelled_vs.add(name)
-            self._check_identifiers(n)
+                labelled.add(name)
+                local_labels.add(name)
 
-        for v in referenced_vs.difference(labelled_vs):
-            if v not in BUILTIN_FUNCTIONS:
-                self.errors.append(f'Unknown variable "{v}" referenced')
+        # Check to ensure that every referenced variable was labelled.
+        for v in local_labels.difference(referenced):
+            self.errors.append(f'Label "{v}" never used')
 
-    def _vars_needed(self, node, max_num, vs):
+        # Check to see if any references were to variables in an outer scope.
+        if referenced.difference(local_labels):
+            self.grammar.outer_scope_rules.add(self.current_rule)
+
+        # Now remove the labels going out of scope.
+        for v in labelled.difference(preexisting_labels):
+            labelled.remove(v)
+
+    def _vars_needed(self, node, current_index, labelled, referenced):
+        # current_index refers to the current position in the sequence.
+        # We want to make sure that we don't refer to $5 when we're only
+        # at the third position. referenced_vs keeps track of which
+        # positions have been mentioned so that we can make sure there
+        # are labels for them.
         ty = node[0]
         if ty == 'e_var':
             if node[1][0] == '$':
                 num = int(node[1][1:])
-                if num >= max_num:
-                    self.errors.append(
-                        f'Unknown variable "{node[1]}" referenced'
-                    )
+                if num >= current_index:
+                    self.errors.append(f'Unknown label "{node[1]}" referenced')
                 else:
-                    vs.add(node[1])
+                    # We don't want to think of unknown variables as
+                    # referenced, so just keep track of the known ones.
+                    referenced.add(node[1])
             else:
-                vs.add(node[1])
+                # Check for variables defined in an outer scope.
+                if node[1] not in labelled:
+                    self.errors.append(f'Unknown label "{node[1]}" referenced')
+                else:
+                    # We don't want to think of unknown variables as
+                    # referenced, so just keep track of the known ones.
+                    referenced.add(node[1])
         if ty == 'e_qual' and node[2][1][0] == 'e_call':
+            assert node[2][0][0] == 'e_var'
             name = node[2][0][1]
             if name not in BUILTIN_FUNCTIONS:
                 self.errors.append(f'Unknown function "{name}" called')
             # Skip over the function name so we don't misinterpret it
             # as a variable.
             for n in node[2][1:]:
-                self._vars_needed(n, max_num, vs)
+                self._vars_needed(n, current_index, labelled, referenced)
             return
 
         for n in node[2]:
-            self._vars_needed(n, max_num, vs)
+            self._vars_needed(n, current_index, labelled, referenced)
+
+    def _rewrite_scopes(self, node):
+        for i in range(len(node[2])):
+            node[2][i] = self._rewrite_scopes(node[2][i])
+        if node[0] == 'seq' and self._has_labels(node):
+            return ['scope', None, [node]]
+        return node
+
+    def _has_labels(self, node):
+        return any(sn[0] == 'label' for sn in node[2])
 
 
 def _rewrite_recursion(grammar):
@@ -314,6 +364,10 @@ def _check_operator(grammar, name, choices):
         return None
     operators = []
     for choice in choices[:-1]:
+        has_scope = choice[0] == 'scope'
+        if has_scope:
+            # TODO: is this the right logic?
+            choice = choice[2][0]
         assert choice[0] == 'seq'
         if len(choice[2]) not in (3, 4):
             return None
@@ -331,6 +385,8 @@ def _check_operator(grammar, name, choices):
             return None
         if len(choice[2]) == 4 and choice[2][3][0] != 'action':
             return None
+        if has_scope:
+            choice = ['scope', None, [choice]]
         operators.append(['op', [operator, prec], [choice]])
     choice = choices[-1]
     if len(choice[2]) != 1:
@@ -372,6 +428,7 @@ def _check_lr(name, node, grammar, seen):
         'paren',
         'plus',
         'run',
+        'scope',
         'star',
     ):
         return _check_lr(name, node[2][0], grammar, seen)

@@ -66,6 +66,8 @@ class Printer:
         return cs
 
     def _split_action(self, node):
+        if node[0] == 'scope':
+            return self._split_action(node[2][0])
         if node[0] != 'seq' or node[2][-1][0] != 'action':
             return (self._proc(node), '')
         return (
@@ -198,11 +200,14 @@ class Printer:
     def _ty_run(self, node):
         return '<%s>' % self._proc(node[2][0])
 
-    def _ty_set(self, node):
-        return f"[{lit.escape(node[1], ']')}]"
+    def _ty_scope(self, node):
+        return self._proc(node[2][0])
 
     def _ty_seq(self, node):
         return ' '.join(self._proc(e) for e in node[2])
+
+    def _ty_set(self, node):
+        return f"[{lit.escape(node[1], ']')}]"
 
     def _ty_star(self, node):
         return self._proc(node[2][0]) + '*'
