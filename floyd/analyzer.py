@@ -186,20 +186,20 @@ class _Analyzer:
             self.check_named_vars(node)
 
     def check_pragma(self, node):
-        rule_name = node[1]
+        pragma = node[1]
         choice = node[2][0]
 
-        if rule_name in ('%token', '%tokens'):
+        if pragma in ('%token', '%tokens'):
             for subnode in choice[2]:
                 for expr in subnode[2]:
                     token = expr[1]
                     if token not in self.grammar.rules:
                         self.errors.append(f'Unknown token rule "{token}"')
-        elif rule_name == '%whitespace':
+        elif pragma == '%whitespace':
             self.grammar.whitespace = choice
-        elif rule_name == '%comment':
+        elif pragma == '%comment':
             self.grammar.comment = choice
-        elif rule_name == '%prec':
+        elif pragma == '%prec':
             for c in choice[2]:
                 for t in c[2]:
                     if t[0] != 'lit':
@@ -209,12 +209,14 @@ class _Analyzer:
                     else:
                         self.grammar.prec[t[1]] = self.current_prec
                 self.current_prec += 2
-        else:
+        elif pragma == '%assoc':
             choice = node[2][0]
             seq = choice[2][0]
             operator = seq[2][0][1]
             direction = seq[2][1][1]
             self.grammar.assoc[operator] = direction
+        else:
+            self.errors.append(f'Unknown pragma "{pragma}"')
 
     def check_for_unknown_rules(self, node):
         if (node[0] == 'apply' and

@@ -1054,6 +1054,12 @@ class GrammarTestsMixin:
             """
         self.check(grammar, text='foobar', out=True)
 
+    def test_unknown_pragma(self):
+        self.check('%foo = end', text='', out=None, grammar_err=(
+            'Errors were found:\n'
+            '  Unknown pragma "%foo"\n'
+        ))
+
     def test_whitespace_chars(self):
         # self.check('g = \t\n\r { true }', text='', out=True)
         self.check('g = \t\n\r -> true', text='', out=True)
