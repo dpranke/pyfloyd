@@ -255,7 +255,7 @@ class GrammarTestsMixin:
             'grammar = -> v',
             text='',
             grammar_err=(
-                'Errors were found:\n' '  Unknown label "v" referenced\n'
+                'Errors were found:\n' '  Unknown variable "v" referenced\n'
             ),
         )
 
@@ -536,7 +536,8 @@ class GrammarTestsMixin:
             "grammar = 'foobar' -> $2",
             text='foobar',
             grammar_err=(
-                'Errors were found:\n  Unknown label "$2" referenced\n'
+                'Errors were found:\n'
+                '  Variable "$2" referenced before it was available\n'
             ),
         )
 
@@ -558,8 +559,8 @@ class GrammarTestsMixin:
             text='fooxxx',
             grammar_err=(
                 'Errors were found:\n'
-                '  Label "x" never used\n'
-                '  Unknown label "x" referenced\n'
+                '  Variable "x" never used\n'
+                '  Unknown variable "x" referenced\n'
             ),
         )
 
@@ -577,8 +578,8 @@ class GrammarTestsMixin:
             text='fooxfoo',
             grammar_err=(
                 'Errors were found:\n'
-                '  Label "f" never used\n'
-                '  Unknown label "f" referenced\n'
+                '  Variable "f" never used\n'
+                '  Unknown variable "f" referenced\n'
             ),
         )
 
