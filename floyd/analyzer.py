@@ -204,7 +204,7 @@ class _Analyzer:
                 for t in c[2]:
                     if t[0] != 'lit':
                         self.errors.append(
-                            f"Expected literal for %prec, not {t[1]}"
+                            f'Expected literal for %prec, not {t[1]}'
                         )
                     else:
                         self.grammar.prec[t[1]] = self.current_prec
@@ -219,9 +219,11 @@ class _Analyzer:
             self.errors.append(f'Unknown pragma "{pragma}"')
 
     def check_for_unknown_rules(self, node):
-        if (node[0] == 'apply' and
-            node[1] not in self.grammar.rules and
-            node[1] not in ('any', 'end')):
+        if (
+            node[0] == 'apply'
+            and node[1] not in self.grammar.rules
+            and node[1] not in ('any', 'end')
+        ):
             self.errors.append(f'Unknown rule "{node[1]}"')
         for sn in node[2]:
             self.check_for_unknown_rules(sn)
@@ -256,7 +258,7 @@ class _Analyzer:
         for i, n in enumerate(node[2], start=1):
             name = f'${i}'
             if name in labels_needed:
-                node[2][i-1] = ['label', name, [n]]
+                node[2][i - 1] = ['label', name, [n]]
 
     def _check_positional_var_refs(self, node, current_index, labels_needed):
         if node[0] == 'e_var':
@@ -342,7 +344,8 @@ def _rewrite_scopes(grammar):
         if node[0] == 'seq' and any(sn[0] == 'label' for sn in node[2]):
             return ['scope', None, [node]]
         return node
-    for i, rule in enumerate(grammar.ast[2]):
+
+    for rule in grammar.ast[2]:
         if rule[1] in grammar.outer_scope_rules:
             rule[2][0] = rewrite_node(rule[2][0])
 

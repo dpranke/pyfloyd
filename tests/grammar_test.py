@@ -693,9 +693,8 @@ class GrammarTestsMixin:
             g,
             text='1',
             grammar_err=(
-                'Errors were found:\n'
-                '  Expected literal for %prec, not a\n'
-            )
+                'Errors were found:\n' '  Expected literal for %prec, not a\n'
+            ),
         )
 
     @skip('operators')
@@ -1055,10 +1054,12 @@ class GrammarTestsMixin:
         self.check(grammar, text='foobar', out=True)
 
     def test_unknown_pragma(self):
-        self.check('%foo = end', text='', out=None, grammar_err=(
-            'Errors were found:\n'
-            '  Unknown pragma "%foo"\n'
-        ))
+        self.check(
+            '%foo = end',
+            text='',
+            out=None,
+            grammar_err=('Errors were found:\n' '  Unknown pragma "%foo"\n'),
+        )
 
     def test_whitespace_chars(self):
         # self.check('g = \t\n\r { true }', text='', out=True)
