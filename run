@@ -378,6 +378,7 @@ class Runner:
                 'floyd',
                 '-o',
                 new_file,
+                '--memoize',
                 '-c',
                 self.grammar
                 ]
