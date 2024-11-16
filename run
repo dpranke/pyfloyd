@@ -1,20 +1,28 @@
 #!/usr/bin/env python3
 
 import argparse
+import glob
 import os
+import re
+import shlex
 import shutil
 import subprocess
 import sys
 
+import floyd
+
 
 class Runner:
     def __init__(self):
+        self.arg_parser = None
         self.args = None
-        self.no_execute = False
-        self.parser = None
-        self.quiet = False
+        self.grammar = 'grammars/floyd.g'
+        self.package = 'floyd'
+        self.parser_file = f'{self.package}/parser.py'
+        self.run_cmd = None
         self.subps = None
-        self.verbose = False
+        self.uv_path = None
+        self.version = floyd.__version__
 
     def add_parser(self, cmd, help):  # pylint: disable=redefined-builtin
         method = getattr(self, 'run_' + cmd.replace('-', '_'))
@@ -41,12 +49,12 @@ class Runner:
         return subp
 
     def call(self, *args, **kwargs):
-        cmd = ' '.join(*args)
-        if self.verbose:
-            print(f'`{cmd}`')
-        if self.no_execute:
+        cmd = shlex.join(*args)
+        if self.args.no_execute or self.args.verbose:
+            print(f'{cmd}')
+        if self.args.no_execute:
             return None
-        capture_output = kwargs.get('capture_output', self.quiet)
+        capture_output = kwargs.get('capture_output', self.args.quiet)
         if 'capture_output' in kwargs:
             del kwargs['capture_output']
 
@@ -54,47 +62,29 @@ class Runner:
             *args, capture_output=capture_output, check=False, **kwargs
         )
         if proc.returncode != 0:
-            if self.quiet:
+            if self.args.quiet:
                 print(proc.stdout)
                 print(proc.stderr, file=sys.stderr)
             sys.exit(proc.returncode)
         return proc
 
     def main(self, argv):
-        self.parser = argparse.ArgumentParser(prog='run')
-
-        # These flags are repeated for each command as well so that
-        # you can specify them before or after the command.
-        self.parser.add_argument(
-            '-n',
-            '--no-execute',
-            action='store_true',
-            help="Don't do anything that causes effects.",
-        )
-        self.parser.add_argument(
-            '-q',
-            '--quiet',
-            action='store_true',
-            help='Suppress output unless something fails.',
-        )
-        self.parser.add_argument(
-            '-v',
-            '--verbose',
-            action='store_true',
-            help='Echo commands as they are run.',
-        )
-        self.subps = self.parser.add_subparsers()
+        self.arg_parser = argparse.ArgumentParser(prog='run')
+        self.subps = self.arg_parser.add_subparsers(required=True)
 
         self.add_parser('build', help='Build the package.')
-        self.add_parser('check', help='Lint the source code with ruff.')
+        self.add_parser('check', help='Check the source code with ruff.')
+        self.add_parser('checks', help='Same as `run check`.')
         self.add_parser('clean', help='Remove any local files.')
-        self.add_parser(
-            'devenv',
-            help='Set up a dev venv at //.venv with all the needed packages.',
-        )
 
         subp = self.add_parser(
             'coverage', help='Run tests and report code coverage.'
+        )
+        subp.add_argument(
+            '-b',
+            '--branch',
+            action='store_true',
+            help='Report branch coverage.',
         )
         subp.add_argument(
             '--omit',
@@ -103,13 +93,12 @@ class Runner:
         subp.add_argument(
             '-u', '--unit', action='store_true', help='Only run unit tests.'
         )
-        subp.add_argument(
-            '-b',
-            '--branch',
-            action='store_true',
-            help='Report branch coverage.',
-        )
         subp.add_argument('test', nargs='*', action='store')
+
+        self.add_parser(
+            'devenv',
+            help='Set up a dev venv at //.venv with all the needed packages.',
+        )
 
         subp = self.add_parser(
             'format', help='Format the source code with ruff.'
@@ -157,7 +146,7 @@ class Runner:
         )
         subp.add_argument('test', nargs='*', action='store')
 
-        subp = self.add_parser('publish', help='Upload packages to PyPI.')
+        subp = self.add_parser('publish', help='Publish packages to PyPI.')
         subp.add_argument(
             '--test',
             action='store_true',
@@ -169,7 +158,7 @@ class Runner:
             help='Upload to the real PyPI instance.',
         )
 
-        subp = self.add_parser('regen', help='Regenerate floyd/parser.py.')
+        subp = self.add_parser('regen', help=f'Regenerate {self.parser_file}.')
         subp.add_argument(
             '--check',
             action='store_true',
@@ -195,18 +184,34 @@ class Runner:
         )
         subp.add_argument('test', nargs='*', action='store')
 
-        self.args = self.parser.parse_args(argv)
-        self.no_execute = self.args.no_execute
-        self.verbose = self.args.verbose
-        self.quiet = self.args.quiet
+        self.args = self.arg_parser.parse_args(self._shuffle_argv(argv))
+
+        self.uv_path = shutil.which('uv')
+        if self.uv_path is None:
+            print('You need to have `uv` installed to run this script.')
+            sys.exit(2)
+
+        if 'VIRTUAL_ENV' in os.environ:
+            self.run_cmd = ['python']
+        elif self.args.quiet:
+            self.run_cmd = [self.uv_path, 'run', '--quiet', 'python']
+        else:
+            self.run_cmd = [self.uv_path, 'run', 'python']
 
         self.args.func(self.args)
 
     def run_build(self):
-        self.call([sys.executable, '-m', 'build'])
+        self._check_version()
+        cmd = [self.uv_path, 'build']
+        if self.args.quiet:
+            cmd.append('--quiet')
+        self.call(cmd)
 
     def run_check(self):
-        self.call([sys.executable, '-m', 'ruff', 'check'])
+        self.call(self.run_cmd + ['-m', 'ruff', 'check'])
+
+    def run_checks(self):
+        self.run_check()
 
     def run_clean(self):
         path = shutil.which('git')
@@ -221,12 +226,7 @@ class Runner:
         if self.args.unit:
             env['SKIP'] = 'integration'
             self.args.omit = '*_test.py'
-        cmd = [
-            sys.executable,
-            '-m',
-            'coverage',
-            'run',
-        ]
+        cmd = self.run_cmd + ['-m', 'coverage', 'run']
         if self.args.branch:
             cmd.append('--branch')
         cmd.extend(
@@ -238,28 +238,32 @@ class Runner:
                 '*_test.py',
             ],
         )
-        if self.verbose:
+        if self.args.verbose:
             cmd.append('-v')
         for test in self.args.test:
             cmd.extend(['-k', self._trim_test_glob(test)])
         self.call(cmd, env=env)
-        cmd = [sys.executable, '-m', 'coverage', 'report', '--show-missing']
+        cmd = self.run_cmd + ['-m', 'coverage', 'report', '--show-missing']
         if self.args.omit:
-            cmd.append('--omit=%s' % self.args.omit)
+            cmd.append(f'--omit={self.args.omit}')
         self.call(cmd)
 
     def run_devenv(self):
-        path = shutil.which('uv')
-        if path is None:
+        if self.uv_path is None:
             print('You need to have `uv` installed to set up a dev env.')
             sys.exit(2)
 
-        self.call([path, 'venv'])
-        self.call([path, 'pip', 'install', '-e', '.[dev]'])
-        print('Run `source .venv/bin/activate` to finish devenv setup.')
+        cmd = [self.uv_path, 'sync', '--extra', 'dev']
+        if self.args.quiet:
+            cmd.append('--quiet')
+
+        in_venv = 'VIRTUAL_ENV' in os.environ
+        self.call(cmd)
+        if not in_venv:
+            print('Run `source .venv/bin/activate` to finish devenv setup.')
 
     def run_format(self):
-        cmd = [sys.executable, '-m', 'ruff', 'format']
+        cmd = self.run_cmd + ['-m', 'ruff', 'format']
         if self.args.check:
             cmd.append('--check')
         self.call(cmd)
@@ -270,10 +274,10 @@ class Runner:
         self.main(['--help'])
 
     def run_lint(self):
-        self.call(sys.executable + ' -m pylint run */*.py', shell=True)
+        self.call(self.run_cmd[:-1] + ['pylint', 'run'] + self._files())
 
     def run_mypy(self):
-        self.call(sys.executable + ' -m mypy run */*.py', shell=True)
+        self.call(self.run_cmd + ['-m', 'mypy'] + self._files())
 
     def run_presubmit(self):
         self.args.check = True
@@ -289,43 +293,52 @@ class Runner:
             print('You must specify either --test or --prod to upload.')
             sys.exit(2)
 
-        proc = self.call(
-            [sys.executable, '-m', 'floyd', '--version'],
-            capture_output=True,
-            text=True,
-        )
-        if proc:
-            version = proc.stdout.strip()
-        else:
-            version = '0.0.0'
-
-        cmd = [sys.executable, '-m', 'twine', 'upload']
+        self._check_version()
+        sep = os.path.sep
+        tgz = f'dist{sep}{self.package}-{self.version}.tar.gz'
+        wheel = f'dist{sep}{self.package}-{self.version}-py3-none-any.whl'
+        if not os.path.exists(tgz) or not os.path.exists(wheel):
+            print('Run `./run build` first')
+            return
         if self.args.test:
-            cmd.extend(['--repository', 'testpypi'])
-        cmd.append(
-            'dist' + os.sep + f'floyd_python-{version}-py3-none-any.whl'
+            test = ['--repository', 'testpypi']
+        else:
+            test = []
+        self.call(
+            self.run_cmd + ['-m', 'twine', 'upload'] + test + [tgz, wheel]
         )
-        cmd.append('dist' + os.sep + f'floyd-python-{version}.tar.gz')
-        self.call(cmd)
 
     def run_regen(self):
-        with open('floyd/parser.py', encoding='utf-8') as fp:
+        new_file = f'{self.parser_file}.new'
+        with open(self.parser_file, encoding='utf-8') as fp:
             old = fp.read()
         self._gen_parser()
-        with open('parser.py', encoding='utf-8') as fp:
+        if self.args.no_execute:
+            if self.args.check:
+                print(f'diff -q {self.parser_file} {new_file}')
+            else:
+                print(f'mv {new_file} {self.parser_file}')
+            return
+
+        with open(new_file, encoding='utf-8') as fp:
             new = fp.read()
         if self.args.check:
-            os.remove('parser.py')
+            os.remove(new_file)
             if old != new:
                 print('Need to regenerate the parser with `run regen`.')
                 sys.exit(1)
-            print('floyd/parser.py is up to date.')
+            print(f'{self.parser_file} is up to date.')
+        elif old == new:
+            print(f'{self.parser_file} is up to date.')
         else:
-            os.rename('parser.py', 'floyd/parser.py')
+            os.rename(new_file, self.parser_file)
+            print(f'{self.parser_file} regenerated.')
 
     def run_tests(self):
-        cmd = [sys.executable, '-m', 'unittest', 'discover', '-p', '*_test.py']
-        if self.verbose:
+        cmd = self.run_cmd + ['-m', 'unittest', 'discover', '-p', '*_test.py']
+        if self.args.quiet:
+            cmd.append('-q')
+        if self.args.verbose:
             cmd.append('-v')
         if self.args.failfast:
             cmd.append('-f')
@@ -339,6 +352,52 @@ class Runner:
             env['SKIP'] = 'integration'
         self.call(cmd, env=env)
 
+    def set_func(self, subp, method):
+        subp.set_defaults(func=lambda _: method())
+
+    def _shuffle_argv(self, argv):
+        # Take any flags that appear before the subcommand and append
+        # them after the subcommand but before any flags following the
+        # subcommand.
+        leading_args = []
+        argc = len(argv)
+        i = 0
+        while i < argc:
+            if argv[i][0] != '-':
+                break
+            leading_args.append(argv[i])
+            i += 1
+
+        return argv[i : i + 1] + leading_args + argv[i + 1 :]
+
+    def _gen_parser(self):
+        new_file = f'{self.parser_file}.new'
+        self.call(
+            self.run_cmd + [
+                '-m',
+                'floyd',
+                '-o',
+                new_file,
+                '-c',
+                self.grammar
+                ]
+            )
+        # TODO: Add a command line arg to set the name of the parser file.
+        if not self.args.no_execute:
+            with open(new_file, encoding='utf8') as fp:
+                orig = fp.read()
+            new = orig.replace(new_file, self.parser_file)
+            if new != orig:
+                with open(new_file, 'w', encoding='utf8') as fp:
+                    fp.write(new)
+
+    def _files(self):
+        return (
+            ['run']
+            + glob.glob(f'{self.package}/*.py')
+            + glob.glob('tests/*.py')
+        )
+
     def _trim_test_glob(self, test):
         if test.startswith('^'):
             test = test[1:]
@@ -350,23 +409,11 @@ class Runner:
             test = test + '*'
         return test
 
-    def set_func(self, subp, method):
-        subp.set_defaults(func=lambda _: method())
-
-    def _gen_parser(self):
-        self.call(
-            [
-                sys.executable,
-                '-m',
-                'floyd',
-                '-o',
-                'parser.py',
-                '-c',
-                '--no-main',
-                '--memoize',
-                'grammars/floyd.g',
-            ]
-        )
+    def _check_version(self):
+        m = re.match(r'\d+\.\d+\.\d+(\.dev\d+)?', self.version)
+        if not m:
+            print(f'Unexpected version format: "{self.version}"')
+            sys.exit(1)
 
 
 if __name__ == '__main__':
