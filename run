@@ -373,16 +373,9 @@ class Runner:
     def _gen_parser(self):
         new_file = f'{self.parser_file}.new'
         self.call(
-            self.run_cmd + [
-                '-m',
-                'floyd',
-                '-o',
-                new_file,
-                '--memoize',
-                '-c',
-                self.grammar
-                ]
-            )
+            self.run_cmd
+            + ['-m', 'floyd', '-o', new_file, '--memoize', '-c', self.grammar]
+        )
         # TODO: Add a command line arg to set the name of the parser file.
         if not self.args.no_execute:
             with open(new_file, encoding='utf8') as fp:
