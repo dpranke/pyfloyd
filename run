@@ -304,11 +304,11 @@ class Runner:
             print('Run `./run build` first')
             return
         if self.args.test:
-            test = ['--repository', 'testpypi']
+            test = ['--publish-url', 'https://test.pypi.org/legacy/']
         else:
             test = []
         self.call(
-            self.run_cmd + ['-m', 'twine', 'upload'] + test + [tgz, wheel]
+            [self.uv_path, 'publish'] + test + [tgz, wheel]
         )
 
     def run_regen(self):
