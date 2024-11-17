@@ -28,6 +28,9 @@ format the code. `./run --help` is your friend to find out more.
 
 ## Version History / Release Notes
 
+* v0.18.3 (2024-11-17)
+    * Remove dependencies on `build`, `twine`, just use `uv build` and
+      `uv publish`.
 * v0.18.2 (2024-11-17)
     * Fix .gitignore.
 * v0.18.1 (2024-11-18)
