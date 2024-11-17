@@ -12,10 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys  # pragma: no cover
+import io
+import unittest
 
-from .tool import main  # pragma: no cover
+from floyd.host import Host
 
 
-if __name__ == '__main__':  # pragma: no cover
-    sys.exit(main())
+class HostTest(unittest.TestCase):
+    maxDiff = None
+
+    def test_print(self):
+        s = io.StringIO()
+        h = Host()
+        h.print('hello, world', file=s)
+        self.assertEqual('hello, world\n', s.getvalue())
