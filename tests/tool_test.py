@@ -19,7 +19,7 @@ import unittest
 import pyfloyd
 import pyfloyd.tool
 
-from .host_fake import FakeHost
+from tests.host_fake import FakeHost
 
 
 class ToolTest(unittest.TestCase):
