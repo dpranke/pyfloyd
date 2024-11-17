@@ -28,6 +28,19 @@ format the code. `./run --help` is your friend to find out more.
 
 ## Version History / Release Notes
 
+* v0.18.1 (2024-11-18)
+    * Update README.md
+* v0.18.0 (2024-11-17)
+    * First release from `pyfloyd`. Renames everything and moves the
+      package directory under src/.
+* v0.17.4 (2024-11-17)
+    * More cleanup - hopefully final release from `floyd-python`
+* v0.17.3 (2024-11-17)
+    * More cleanup
+* v0.17.2 (2024-11-17)
+    * More cleanup
+* v0.17.0 (2024-11-17)
+    * Remove code from `floyd-python` repo.
 * v0.16.0 (2024-11-17)
     * Tons of cleanup, move to new syntax. I'm too lazy to document all of
       the changes from v0.15.0 to here. This is intended to be the last
