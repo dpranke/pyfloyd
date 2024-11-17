@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from floyd import string_literal as lit
+from pyfloyd import string_literal as lit
 
 
 class Printer:

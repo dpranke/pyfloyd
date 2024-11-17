@@ -14,13 +14,13 @@
 
 from typing import NamedTuple, Optional, Protocol, Tuple
 
-from floyd import analyzer
-from floyd.interpreter import Interpreter
-from floyd import parser
-from floyd.printer import Printer
-from floyd.generator import Generator, GeneratorOptions
-from floyd.python_generator import PythonGenerator
-from floyd.javascript_generator import JavaScriptGenerator
+from pyfloyd import analyzer
+from pyfloyd.interpreter import Interpreter
+from pyfloyd import parser
+from pyfloyd.printer import Printer
+from pyfloyd.generator import Generator, GeneratorOptions
+from pyfloyd.python_generator import PythonGenerator
+from pyfloyd.javascript_generator import JavaScriptGenerator
 
 Result = parser.Result
 

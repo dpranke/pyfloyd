@@ -17,10 +17,10 @@
 import re
 from typing import Dict, List, Set, Union
 
-from floyd.analyzer import Grammar
-from floyd.formatter import flatten, Comma, Saw, Tree
-from floyd.generator import Generator, GeneratorOptions
-from floyd import string_literal as lit
+from pyfloyd.analyzer import Grammar
+from pyfloyd.formatter import flatten, Comma, Saw, Tree
+from pyfloyd.generator import Generator, GeneratorOptions
+from pyfloyd import string_literal as lit
 
 
 _FormatObj = Union[Comma, Tree, Saw, str]

@@ -17,8 +17,8 @@ import pathlib
 import textwrap
 import unittest
 
-import floyd
-import floyd.host
+import pyfloyd
+import pyfloyd.host
 
 
 THIS_DIR = pathlib.Path(__file__).parent
@@ -49,13 +49,13 @@ class PrinterTest(unittest.TestCase):
         grammar = textwrap.dedent("""\
             grammar = 'foo' -> 'foo' | 'bar' -> 'bar'
             """)
-        out, err = floyd.pretty_print(grammar)
+        out, err = pyfloyd.pretty_print(grammar)
         self.assertEqual(grammar, out)
         self.assertIsNone(err)
 
     def test_bad_grammar(self):
         grammar = 'grammar = end -> foo'
-        out, err = floyd.pretty_print(grammar)
+        out, err = pyfloyd.pretty_print(grammar)
         self.assertIsNone(out)
         self.assertEqual(
             err,
@@ -72,7 +72,7 @@ class PrinterTest(unittest.TestCase):
 
             foo      = 'foo'
             """)
-        out, err = floyd.pretty_print(grammar)
+        out, err = pyfloyd.pretty_print(grammar)
         self.assertEqual(grammar, out)
         self.assertIsNone(err)
 
@@ -80,40 +80,40 @@ class PrinterTest(unittest.TestCase):
         grammar = textwrap.dedent("""\
             grammar = 'foo' |
             """)
-        out, err = floyd.pretty_print(grammar)
+        out, err = pyfloyd.pretty_print(grammar)
         self.assertEqual(grammar, out)
         self.assertIsNone(err)
 
     def test_floyd(self):  # pragma: no cover
         # TODO: Improve printer algorithm enough for this to work
         # without requiring all the rules to be more than 80 chars wide.
-        host = floyd.host.Host()
+        host = pyfloyd.host.Host()
         grammar = host.read_text_file(THIS_DIR / '../grammars/floyd.g')
-        _ = floyd.pretty_print(grammar)
+        _ = pyfloyd.pretty_print(grammar)
 
     @skip('integration')
     def test_json5(self):
-        host = floyd.host.Host()
+        host = pyfloyd.host.Host()
         grammar = host.read_text_file(THIS_DIR / '../grammars/json5.g')
-        out, err = floyd.pretty_print(grammar)
+        out, err = pyfloyd.pretty_print(grammar)
         self.assertMultiLineEqual(grammar, out)
         self.assertIsNone(err)
 
     def test_getitem(self):
         grammar = "grammar = 'foo'*:foos -> foos[0]\n"
-        out, err = floyd.pretty_print(grammar)
+        out, err = pyfloyd.pretty_print(grammar)
         self.assertEqual(grammar, out)
         self.assertIsNone(err)
 
     def test_leftrec(self):
         grammar = "grammar = grammar 'a' | 'a'\n"
-        out, err = floyd.pretty_print(grammar)
+        out, err = pyfloyd.pretty_print(grammar)
         self.assertEqual(grammar, out)
         self.assertIsNone(err)
 
     def test_pred(self):
         grammar = 'grammar = ?{true} -> true\n'
-        out, err = floyd.pretty_print(grammar)
+        out, err = pyfloyd.pretty_print(grammar)
         self.assertEqual(grammar, out)
         self.assertIsNone(err)
 
@@ -127,7 +127,7 @@ class PrinterTest(unittest.TestCase):
 
             foo      = 'foo'
             """)
-        out, err = floyd.pretty_print(grammar, rewrite_filler=True)
+        out, err = pyfloyd.pretty_print(grammar, rewrite_filler=True)
         self.assertEqual(
             textwrap.dedent("""\
             grammar  = _filler foo _filler end
@@ -150,7 +150,7 @@ class PrinterTest(unittest.TestCase):
 
             foo     = end
             """)
-        out, err = floyd.pretty_print(grammar)
+        out, err = pyfloyd.pretty_print(grammar)
         self.assertEqual(grammar, out)
         self.assertIsNone(err)
 
@@ -164,7 +164,7 @@ class PrinterTest(unittest.TestCase):
 
             bar     = 'bar'
             """)
-        out, err = floyd.pretty_print(grammar)
+        out, err = pyfloyd.pretty_print(grammar)
         self.assertEqual(grammar, out)
         self.assertIsNone(err)
 
@@ -176,7 +176,7 @@ class PrinterTest(unittest.TestCase):
 
             foo     = 'foo'
             """)
-        out, err = floyd.pretty_print(grammar)
+        out, err = pyfloyd.pretty_print(grammar)
         self.assertEqual(grammar.replace('%tokens', '%token'), out)
         self.assertIsNone(err)
 
@@ -190,6 +190,6 @@ class PrinterTest(unittest.TestCase):
 
             foo         = 'foo'
             """)
-        out, err = floyd.pretty_print(grammar)
+        out, err = pyfloyd.pretty_print(grammar)
         self.assertEqual(grammar, out)
         self.assertIsNone(err)

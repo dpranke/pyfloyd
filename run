@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import sys
 
-import floyd
+import pyfloyd
 
 
 class Runner:
@@ -17,13 +17,13 @@ class Runner:
         self.arg_parser = None
         self.args = None
         self.grammar = 'grammars/floyd.g'
-        self.package = 'floyd_python'
-        self.top = 'floyd'
+        self.package = 'pyfloyd'
+        self.top = f'src/{self.package}'
         self.parser_file = f'{self.top}/parser.py'
         self.run_cmd = None
         self.subps = None
         self.uv_path = None
-        self.version = floyd.__version__
+        self.version = pyfloyd.__version__
 
     def add_parser(self, cmd, help):  # pylint: disable=redefined-builtin
         method = getattr(self, 'run_' + cmd.replace('-', '_'))
@@ -235,6 +235,8 @@ class Runner:
                 '-m',
                 'unittest',
                 'discover',
+                '-s',
+                'tests',
                 '-p',
                 '*_test.py',
             ],
@@ -375,7 +377,15 @@ class Runner:
         new_file = f'{self.parser_file}.new'
         self.call(
             self.run_cmd
-            + ['-m', 'floyd', '-o', new_file, '--memoize', '-c', self.grammar]
+            + [
+                '-m',
+                'pyfloyd',
+                '-o',
+                new_file,
+                '--memoize',
+                '-c',
+                self.grammar,
+            ]
         )
         # TODO: Add a command line arg to set the name of the parser file.
         if not self.args.no_execute:

@@ -15,7 +15,7 @@
 import re
 import unicodedata
 
-from floyd import parser
+from pyfloyd import parser
 
 
 class _OperatorState:

@@ -14,7 +14,7 @@
 
 from typing import Dict, Optional
 
-from floyd.analyzer import Grammar
+from pyfloyd.analyzer import Grammar
 
 
 class GeneratorOptions:

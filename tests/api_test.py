@@ -14,14 +14,14 @@
 
 import unittest
 
-import floyd
+import pyfloyd
 
 
 class APITest(unittest.TestCase):
     maxDiff = None
 
     def test_compile(self):
-        parser, err, _ = floyd.compile('grammar = "foo" "bar"')
+        parser, err, _ = pyfloyd.compile('grammar = "foo" "bar"')
         self.assertIsNone(err)
 
         val, err, _ = parser.parse('baz')
@@ -29,12 +29,12 @@ class APITest(unittest.TestCase):
         self.assertEqual(err, '<string>:1 Unexpected "b" at column 1')
 
     def test_compile_bad_grammar(self):
-        parser, err, _ = floyd.compile('xyz')
+        parser, err, _ = pyfloyd.compile('xyz')
         self.assertIsNone(parser)
         self.assertEqual(err, '<string>:1 Unexpected end of input at column 4')
 
     def test_generate(self):
-        txt, err, _ = floyd.generate('grammar = "Hello" end -> true')
+        txt, err, _ = pyfloyd.generate('grammar = "Hello" end -> true')
         self.assertIsNone(err)
         scope = {}
         exec(txt, scope)
@@ -44,17 +44,17 @@ class APITest(unittest.TestCase):
         self.assertEqual(result.val, True)
 
     def test_generate_fails(self):
-        txt, err, _ = floyd.generate('xyz')
+        txt, err, _ = pyfloyd.generate('xyz')
         self.assertIsNone(txt)
         self.assertEqual(err, '<string>:1 Unexpected end of input at column 4')
 
     def test_parse(self):
-        result = floyd.parse('grammar = "Hello, world" end', 'Hello, world')
+        result = pyfloyd.parse('grammar = "Hello, world" end', 'Hello, world')
         self.assertEqual(result.val, None)
         self.assertEqual(result.err, None)
 
     def test_parse_grammar_err(self):
-        result = floyd.parse('grammar', '')
+        result = pyfloyd.parse('grammar', '')
         self.assertEqual(result.val, None)
         self.assertEqual(
             result.err,
@@ -62,11 +62,11 @@ class APITest(unittest.TestCase):
         )
 
     def test_pretty_print(self):
-        s, err = floyd.pretty_print('grammar = end')
+        s, err = pyfloyd.pretty_print('grammar = end')
         self.assertIsNone(err)
         self.assertEqual(s, 'grammar = end\n')
 
     def test_pretty_print_fails(self):
-        s, err = floyd.pretty_print('gram')
+        s, err = pyfloyd.pretty_print('gram')
         self.assertIsNone(s)
         self.assertEqual(err, '<string>:1 Unexpected end of input at column 5')

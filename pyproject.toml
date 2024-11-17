@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "floyd-python"
+name = "pyfloyd"
 description = "A parser generator and interpreter framework for Python."
 authors = [
     {name = "Dirk Pranke", email = "dpranke@chromium.org"},
@@ -38,26 +38,26 @@ dev = [
 ]
 
 [project.urls]
-Repository = "https://github.com/dpranke/floyd-python"
-Issues = "https://github.com/dpranke/floyd-python/issues"
-Changelog = "https://github.com/dpranke/floyd-python/blob/master/README.md"
+Repository = "https://github.com/dpranke/pyfloyd"
+Issues = "https://github.com/dpranke/pyfloyd/issues"
+Changelog = "https://github.com/dpranke/pyfloyd/blob/master/README.md"
 
 [project.scripts]
-floyd = "floyd.tool:main"
+pyfloyd = "pyfloyd.tool:main"
 
 [tool.black]
 line-length = 79
 skip-string-normalization = true
 
 [tool.ruff]
-include = [ "run", "*/*.py" ]
+include = [ "run", "src/pyfloyd/*.py", "tests/*.py" ]
 line-length = 79
 
 [tool.ruff.format]
 quote-style = "single"
 
-[tool.setuptools]
-packages = ["floyd"]
+[tool.setuptools.packages.find]
+where = [ "src" ]
 
 [tool.setuptools.dynamic]
-version = {attr = "floyd.__version__"}
+version = {attr = "pyfloyd.__version__"}

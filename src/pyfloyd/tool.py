@@ -23,16 +23,19 @@ import pathlib
 import pprint
 import sys
 
-# If necessary, add ../.. to sys.path so that we can run floyd even when
+# If necessary, add ../.. to sys.path so that we can run pyfloyd even when
 # it's not installed.
-if 'floyd' not in sys.modules and importlib.util.find_spec('floyd') is None:
+if (
+    'pyfloyd' not in sys.modules
+    and importlib.util.find_spec('pyfloyd') is None
+):
     sys.path.insert(
         0, str(pathlib.Path(__file__).parent.parent)
     )  # pragma: no cover
 
 # pylint: disable=wrong-import-position
-import floyd
-from floyd.host import Host
+import pyfloyd
+from pyfloyd.host import Host
 
 
 def main(argv=None, host=None):
@@ -49,7 +52,7 @@ def main(argv=None, host=None):
             return 1
 
         if args.ast:
-            ast, err = floyd.dump_ast(
+            ast, err = pyfloyd.dump_ast(
                 grammar,
                 args.grammar,
                 rewrite_filler=args.rewrite_filler,
@@ -62,14 +65,14 @@ def main(argv=None, host=None):
             else:
                 contents = None
         elif args.pretty_print:
-            contents, err = floyd.pretty_print(
+            contents, err = pyfloyd.pretty_print(
                 grammar, args.grammar, args.rewrite_filler
             )
         elif args.compile:
-            options = floyd.GeneratorOptions(
+            options = pyfloyd.GeneratorOptions(
                 language=args.language, main=args.main, memoize=args.memoize
             )
-            contents, err, _ = floyd.generate(
+            contents, err, _ = pyfloyd.generate(
                 grammar,
                 path=args.grammar,
                 options=options,
@@ -91,7 +94,7 @@ def main(argv=None, host=None):
 
 
 def _parse_args(host, argv):
-    ap = argparse.ArgumentParser(prog='floyd')
+    ap = argparse.ArgumentParser(prog='pyfloyd')
     ap.add_argument(
         '--ast', action='store_true', help='dump the parsed AST of the grammar'
     )
@@ -122,7 +125,7 @@ def _parse_args(host, argv):
         '-V',
         '--version',
         action='store_true',
-        help='print current version (%s)' % floyd.__version__,
+        help='print current version (%s)' % pyfloyd.__version__,
     )
     ap.add_argument(
         '-l',
@@ -160,7 +163,7 @@ def _parse_args(host, argv):
     args = ap.parse_args(argv)
 
     if args.version:
-        host.print(floyd.__version__)
+        host.print(pyfloyd.__version__)
         return None, 0
 
     if not args.grammar:
@@ -196,7 +199,7 @@ def _interpret_grammar(host, args, grammar):
     else:
         path, contents = (args.input, host.read_text_file(args.input))
 
-    out, err, endpos = floyd.parse(
+    out, err, endpos = pyfloyd.parse(
         grammar,
         contents,
         grammar_path=args.grammar,

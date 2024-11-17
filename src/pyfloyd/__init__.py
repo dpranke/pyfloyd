@@ -35,7 +35,7 @@ And the input text 'Hello world', the parser will return the string
 
 You can call the `parse` function to do this most easily:
 
-    >>> result = floyd.parse(grammar, 'Hello world')
+    >>> result = pyfloyd.parse(grammar, 'Hello world')
     >>> result.val
     'Hello, world'
     >>>
@@ -43,14 +43,14 @@ You can call the `parse` function to do this most easily:
 Following the `re` module, you can also call a `compile` function to
 compile the parser ahead of time:
 
-    >>> parser, _, _ = floyd.compile(grammar)
+    >>> parser, _, _ = pyfloyd.compile(grammar)
     >>> result = parse.parse('Hello world')
     Result(val='Hello, world', err=None, pos=11)
     >>>
 """
 
 # pylint: disable=redefined-builtin
-from floyd.api import (
+from pyfloyd.api import (
     parse,
     compile,
     dump_ast,
@@ -61,7 +61,7 @@ from floyd.api import (
     ParserInterface,
     Result,
 )
-from floyd.version import __version__
+from pyfloyd.version import __version__
 
 # pylint: enable=redefined-builtin
 

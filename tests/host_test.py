@@ -15,7 +15,7 @@
 import io
 import unittest
 
-from floyd.host import Host
+from pyfloyd.host import Host
 
 
 class HostTest(unittest.TestCase):

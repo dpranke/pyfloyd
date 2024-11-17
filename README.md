@@ -1,16 +1,13 @@
-# floyd-python
+# pyfloyd
 
 A parsing framework and parser generator for Python.
-
-**Note the Python package name is `floyd`, not `floyd-python`.
-`floyd-python` is the name on PyPI.**
 
 ## Getting set up.
 
 1. Install `uv` via whatever system-specific magic you need (e.g.,
    `brew install uv` on a Mac w/ Homebrew).
 2. Run `./run devenv` to create a virtualenv at `//.venv` with
-   all of the tools needed to do development (and with `floyd` installed
+   all of the tools needed to do development (and with `pyfloyd` installed
    as an editable Python project.
 3. Run `source ./.venv/bin/activate` to activate the environment and pick
    up the tools.

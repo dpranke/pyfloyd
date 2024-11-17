@@ -21,8 +21,8 @@ import subprocess
 import textwrap
 import unittest
 
-import floyd
-import floyd.host
+import pyfloyd
+import pyfloyd.host
 
 
 THIS_DIR = pathlib.Path(__file__).parent
@@ -280,7 +280,7 @@ class GrammarTestsMixin:
 
     @skip('integration')
     def test_floyd(self):
-        h = floyd.host.Host()
+        h = pyfloyd.host.Host()
         path = str(THIS_DIR / '../grammars/floyd.g')
         grammar = h.read_text_file(path)
         p, err, _ = self.compile(grammar, path, memoize=True)
@@ -294,7 +294,7 @@ class GrammarTestsMixin:
 
     @skip('integration')
     def test_floyd_ws(self):
-        h = floyd.host.Host()
+        h = pyfloyd.host.Host()
         path = str(THIS_DIR / '../grammars/floyd_ws.g')
         grammar = h.read_text_file(path)
         p, err, _ = self.compile(grammar, path)
@@ -386,7 +386,7 @@ class GrammarTestsMixin:
 
     @skip('integration')
     def test_json(self):
-        h = floyd.host.Host()
+        h = pyfloyd.host.Host()
         path = str(THIS_DIR / '../grammars/json.g')
         p, err, _ = self.compile(h.read_text_file(path))
         self.assertIsNone(err)
@@ -399,7 +399,7 @@ class GrammarTestsMixin:
 
     @skip('integration')
     def test_json5(self):
-        h = floyd.host.Host()
+        h = pyfloyd.host.Host()
         path = str(THIS_DIR / '../grammars/json5.g')
         p, err, _ = self.compile(h.read_text_file(path))
         self.assertIsNone(err)
@@ -408,7 +408,7 @@ class GrammarTestsMixin:
 
     @skip('integration')
     def test_json5_special_floats(self):
-        h = floyd.host.Host()
+        h = pyfloyd.host.Host()
         path = str(THIS_DIR / '../grammars/json5.g')
         p, err, _ = self.compile(h.read_text_file(path))
         self.assertIsNone(err)
@@ -459,7 +459,7 @@ class GrammarTestsMixin:
         # Check the sample file from pyjson5.
         # this skips the `'to': Infinity` pair because that can't
         # be marshalled in and out of JSON.
-        h = floyd.host.Host()
+        h = pyfloyd.host.Host()
         path = str(THIS_DIR / '../grammars/json5.g')
         p, err, _ = self.compile(h.read_text_file(path))
         self.assertIsNone(err)
@@ -512,7 +512,7 @@ class GrammarTestsMixin:
 
     @skip('integration')
     def test_json5_ws(self):
-        h = floyd.host.Host()
+        h = pyfloyd.host.Host()
         path = str(THIS_DIR / '../grammars/json5_ws.g')
         grammar = h.read_text_file(path)
         p, err, _ = self.compile(grammar)
@@ -1081,17 +1081,17 @@ class Interpreter(unittest.TestCase, GrammarTestsMixin):
     max_diff = None
 
     def compile(self, grammar, path='<string>', memoize=False):
-        return floyd.compile(textwrap.dedent(grammar), path, memoize=memoize)
+        return pyfloyd.compile(textwrap.dedent(grammar), path, memoize=memoize)
 
 
 class PythonGenerator(unittest.TestCase, GrammarTestsMixin):
     max_diff = None
 
     def compile(self, grammar, path='<string>', memoize=False):
-        source_code, err, endpos = floyd.generate(
+        source_code, err, endpos = pyfloyd.generate(
             textwrap.dedent(grammar),
             path=path,
-            options=floyd.GeneratorOptions(main=False, memoize=memoize),
+            options=pyfloyd.GeneratorOptions(main=False, memoize=memoize),
         )
         if err:
             assert source_code is None
@@ -1100,7 +1100,7 @@ class PythonGenerator(unittest.TestCase, GrammarTestsMixin):
         scope = {}
         debug = False
         if debug:  # pragma: no cover
-            h = floyd.host.Host()
+            h = pyfloyd.host.Host()
             d = h.mkdtemp()
             h.write_text_file(d + '/parser.py', source_code)
         exec(source_code, scope)
@@ -1125,10 +1125,10 @@ class JavaScriptGenerator(unittest.TestCase, GrammarTestsMixin):
     maxDiff = None
 
     def compile(self, grammar, path='<string>', memoize=False):
-        source_code, err, endpos = floyd.generate(
+        source_code, err, endpos = pyfloyd.generate(
             textwrap.dedent(grammar),
             path=path,
-            options=floyd.GeneratorOptions(
+            options=pyfloyd.GeneratorOptions(
                 language='javascript', main=True, memoize=memoize
             ),
         )
@@ -1136,7 +1136,7 @@ class JavaScriptGenerator(unittest.TestCase, GrammarTestsMixin):
             assert source_code is None
             return None, err, endpos
 
-        h = floyd.host.Host()
+        h = pyfloyd.host.Host()
         d = h.mkdtemp()
         h.write_text_file(d + '/parser.js', source_code)
         return _JavaScriptParserWrapper(h, d), None, 0

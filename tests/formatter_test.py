@@ -14,7 +14,7 @@
 
 import unittest
 
-from floyd.formatter import flatten, Comma, Saw, Tree
+from pyfloyd.formatter import flatten, Comma, Saw, Tree
 
 
 class FormatterTests(unittest.TestCase):
