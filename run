@@ -23,7 +23,7 @@ class Runner:
         self.run_cmd = None
         self.subps = None
         self.uv_path = None
-        self.version = floyd.__version__
+        self.version = '0.17.0'
 
     def add_parser(self, cmd, help):  # pylint: disable=redefined-builtin
         method = getattr(self, 'run_' + cmd.replace('-', '_'))
