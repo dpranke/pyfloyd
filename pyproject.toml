@@ -4,8 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "floyd-python"
-version = '0.17.0'
-description = "A parser generator and interpreter framework for Python."
+description = """
+    A parser generator and interpreter framework for Python. 
+    Now renamed to `pyfloyd`."""
+
 authors = [
     {name = "Dirk Pranke", email = "dpranke@chromium.org"},
 ]
@@ -59,3 +61,6 @@ quote-style = "single"
 
 [tool.setuptools]
 packages = ["floyd"]
+
+[tool.setuptools.dynamic]
+version = {attr = "floyd.__version__"}

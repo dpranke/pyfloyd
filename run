@@ -9,8 +9,6 @@ import shutil
 import subprocess
 import sys
 
-import floyd
-
 
 class Runner:
     def __init__(self):
