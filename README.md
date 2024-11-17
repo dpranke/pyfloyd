@@ -31,6 +31,11 @@ format the code. `./run --help` is your friend to find out more.
 
 ## Version History / Release Notes
 
+* v0.16.0 (2024-11-17)
+    * Tons of cleanup, move to new syntax. I'm too lazy to document all of
+      the changes from v0.15.0 to here. This is intended to be the last
+      release of this project under this name; work will continue under
+      the name `pyfloyd`.
 * v0.15.0 (2024-07-05)
     * Add a JavaScript back end. As a part of this I've changed the GitHub
       CI config to install a specific version of Node so that the new
