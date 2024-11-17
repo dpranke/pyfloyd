@@ -17,8 +17,9 @@ class Runner:
         self.arg_parser = None
         self.args = None
         self.grammar = 'grammars/floyd.g'
-        self.package = 'floyd'
-        self.parser_file = f'{self.package}/parser.py'
+        self.package = 'floyd_python'
+        self.top = 'floyd'
+        self.parser_file = f'{self.top}/parser.py'
         self.run_cmd = None
         self.subps = None
         self.uv_path = None
@@ -387,9 +388,7 @@ class Runner:
 
     def _files(self):
         return (
-            ['run']
-            + glob.glob(f'{self.package}/*.py')
-            + glob.glob('tests/*.py')
+            ['run'] + glob.glob(f'{self.top}/*.py') + glob.glob('tests/*.py')
         )
 
     def _trim_test_glob(self, test):
