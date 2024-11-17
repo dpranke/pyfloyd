@@ -9,6 +9,8 @@ import shutil
 import subprocess
 import sys
 
+import floyd
+
 
 class Runner:
     def __init__(self):
@@ -21,7 +23,7 @@ class Runner:
         self.run_cmd = None
         self.subps = None
         self.uv_path = None
-        self.version = '0.17.0'
+        self.version = floyd.__version__
 
     def add_parser(self, cmd, help):  # pylint: disable=redefined-builtin
         method = getattr(self, 'run_' + cmd.replace('-', '_'))
