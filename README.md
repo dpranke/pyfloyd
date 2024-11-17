@@ -28,8 +28,10 @@ format the code. `./run --help` is your friend to find out more.
 
 ## Version History / Release Notes
 
+* v0.18.2 (2024-11-17)
+    * Fix .gitignore.
 * v0.18.1 (2024-11-18)
-    * Update README.md
+    * Update README.md.
 * v0.18.0 (2024-11-17)
     * First release from `pyfloyd`. Renames everything and moves the
       package directory under src/.
