@@ -1155,13 +1155,6 @@ class JavaScriptGenerator(unittest.TestCase, GrammarTestsMixin):
         # we can't read them in from output that is JSON.
         pass
 
-    def test_json5(self):
-        # TODO: implement global var support in JavaScript, get this to pass.
-        pass
-
-    def test_json5_sample(self):
-        # TODO: implement global var support in JavaScript, get this to pass.
-        pass
 
 class _JavaScriptParserWrapper:
     def __init__(self, h, d):
@@ -1173,12 +1166,20 @@ class _JavaScriptParserWrapper:
         del path
         inp = self.d + '/input.txt'
         self.h.write_text_file(inp, text)
+        defines = []
+        global_vars = global_vars or {}
+        for k, v in global_vars.items():
+            defines.extend(['-D', f'{k}={json.dumps(v)}'])
         proc = subprocess.run(
-            ['node', self.source, inp], check=False, capture_output=True
+            ['node', self.source] + defines + [inp], check=False, capture_output=True
         )
+        if proc.stderr:
+            stderr = proc.stderr.decode('utf8').strip()
+        else:
+            stderr = None
         if proc.returncode == 0:
             return json.loads(proc.stdout), None, 0
-        return None, proc.stderr.decode('utf8'), 0
+        return None, stderr, 0
 
     def cleanup(self):
         self.h.rmtree(self.d)

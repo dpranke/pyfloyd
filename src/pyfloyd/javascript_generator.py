@@ -374,6 +374,8 @@ class JavaScriptGenerator(Generator):
     def _ty_e_var(self, node) -> str:
         if self._current_rule in self._grammar.outer_scope_rules:
             return f"this.lookup('{node[1]}')"
+        if node[1] in self._grammar.global_vars:
+            return f"this.global_vars.get('{node[1]}');"
         return 'v_' + node[1].replace('$', '_')
 
     def _ty_empty(self, node) -> List[str]:
@@ -652,7 +654,19 @@ async function main() {
   const fs = require("fs");
 
   let s = "";
-  if (process.argv.length == 2 || process.argv[2] == "-") {
+  let global_vars = new Map();
+  let i = 2;
+  let path = '<stdin>';
+  while (i < process.argv.length) {
+    if (process.argv[i] == '-D' || process.argv[i] == '--define') {
+      let [k, v] = process.argv[i+1].split('=', 2);
+      global_vars.set(k, JSON.parse(v))
+      i += 2;
+    } else {
+      break;
+    }
+  }
+  if (process.argv.length == i || process.argv[i] == "-") {
     function readStream(stream) {
       stream.setEncoding("utf8");
       return new Promise((resolve, reject) => {
@@ -665,10 +679,12 @@ async function main() {
     }
     s = await readStream(process.stdin);
   } else {
-    s = await fs.promises.readFile(process.argv[2]);
+    path = process.argv[i];
+    s = await fs.promises.readFile(process.argv[i]);
   }
 
-  let result = parse(s.toString());
+  path='<string>';
+  let result = parse(s.toString(), path, global_vars);
 
   let txt, stream, ret;
   if (result.err != undefined) {
@@ -681,7 +697,7 @@ async function main() {
     ret = 0;
   }
   await new Promise(function(resolve, reject) {
-    stream.write(txt, 'utf8', function(err, data) {
+    stream.write(txt + '\\n', 'utf8', function(err, data) {
       if (err != null) {
         reject(err);
       } else {
@@ -733,9 +749,10 @@ class Result {
   }
 }
 
-function parse(text, path = '<string>') {
+function parse(text, path = '<string>', global_vars = null) {
+  global_vars = global_vars || new Map();
   const p = new Parser(text, path);
-  return p.parse();
+  return p.parse(global_vars);
 }
 
 class Parser {
@@ -747,10 +764,12 @@ class Parser {
     this.path = path;
     this.pos = 0;
     this.val = undefined;
+    this.global_vars = null;
 """
 
 _PARSE = """\
-  parse() {{
+  parse(global_vars = null) {{
+    this.global_vars = global_vars || new Map();
     this.r_{starting_rule}();
     if (this.failed) {{
       return new Result(null, this.error(), this.errpos);
@@ -761,7 +780,8 @@ _PARSE = """\
 """
 
 _PARSE_WITH_EXCEPTION = """\
-  parse() {{
+  parse(global_vars = null) {{
+    this.global_vars = global_vars || new Map();
     try {{
       this.r_{starting_rule}();
       if (this.failed) {{
