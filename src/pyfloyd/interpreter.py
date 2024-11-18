@@ -63,6 +63,16 @@ class Interpreter:
         self._scopes = [{}]
         self._externs = externs or {}
 
+        errors = ''
+        for ext in self._grammar.externs:
+            if ext not in self._externs:
+                errors += f'Missing extern "{ext}"\n'
+        for ext in self._externs:
+            if ext not in self._grammar.externs:
+                errors += f'Unexpected extern "{ext}"\n'
+        if errors:
+            return parser.Result(None, errors.strip(), 0)
+
         self._interpret(self._grammar.rules[self._grammar.starting_rule])
         if self._failed:
             return self._format_error()

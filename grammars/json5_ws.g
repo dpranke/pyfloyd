@@ -1,3 +1,5 @@
+%externs       = strict
+
 grammar        = sp value:v sp end                    -> v
 
 sp             = ws*
@@ -41,10 +43,12 @@ string         = squote sqchar*:cs squote             -> cat(cs)
 sqchar         = bslash esc_char:c                    -> c
                | bslash eol                           -> ''
                | ~bslash ~squote ~eol any:c           -> c
+               | ~(?{ strict }) '\x00'..'\x1f'
 
 dqchar         = bslash esc_char:c                    -> c
                | bslash eol                           -> ''
                | ~bslash ~dquote ~eol any:c           -> c
+               | ~(?{ strict }) '\x00'..'\x1f'
 
 bslash         = '\\'
 

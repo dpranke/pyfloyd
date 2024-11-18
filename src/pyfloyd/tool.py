@@ -112,7 +112,7 @@ def _parse_args(host, argv):
         '--define',
         action='append',
         default=[],
-        help='Define a global var=value',
+        help='Define an external var=value',
     )
     ap.add_argument('-o', '--output', help='path to write output to')
     ap.add_argument(

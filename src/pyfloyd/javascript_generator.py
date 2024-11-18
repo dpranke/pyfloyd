@@ -39,6 +39,7 @@ class JavaScriptGenerator(Generator):
         # These methods are pretty much always needed.
         self._needed_methods = set(
             {
+                'checkExterns',
                 'error',
                 'errorOffsets',
                 'fail',
@@ -96,7 +97,8 @@ class JavaScriptGenerator(Generator):
         if self._grammar.operators:
             text += _OPERATOR_CLASS
 
-        text += _CLASS
+        expected_externs = sorted(self._grammar.externs)
+        text += _CLASS.format(expected_externs=expected_externs)
 
         text += self._state()
         text += '\n'
@@ -651,13 +653,26 @@ _MAIN_HEADER = """\
 _MAIN_FOOTER = """\
 
 async function main() {
-  const fs = require("fs");
+  const fs = require('fs');
+  const path = require('path');
 
   let s = "";
   let externs = new Map();
   let i = 2;
-  let path = '<stdin>';
   while (i < process.argv.length) {
+    if (process.argv[i] == '-h' || process.argv[i] == '--help') {
+      console.log(`\
+usage: ${path.basename(process.argv[1])} [-h] [-D var=val] [file]
+
+positional arguments:
+  file
+
+options:
+  -h, --help            show this help message and exit
+  -D, --define var=val  define an external var=value (may use multiple times)`);
+      process.exit(0);
+    }
+
     if (process.argv[i] == '-D' || process.argv[i] == '--define') {
       let [k, v] = process.argv[i+1].split('=', 2);
       externs.set(k, JSON.parse(v))
@@ -679,12 +694,10 @@ async function main() {
     }
     s = await readStream(process.stdin);
   } else {
-    path = process.argv[i];
     s = await fs.promises.readFile(process.argv[i]);
   }
 
-  path='<string>';
-  let result = parse(s.toString(), path, externs);
+  let result = parse(s.toString(), '<string>', externs);
 
   let txt, stream, ret;
   if (result.err != undefined) {
@@ -741,22 +754,22 @@ class OperatorState {
 """
 
 _CLASS = """\
-class Result {
-  constructor(val, err, pos) {
+class Result {{
+  constructor(val, err, pos) {{
     this.val = val;
     this.err = err;
     this.pos = pos;
-  }
-}
+  }}
+}}
 
-function parse(text, path = '<string>', externs = null) {
+function parse(text, path = '<string>', externs = null) {{
   externs = externs || new Map();
   const p = new Parser(text, path);
   return p.parse(externs);
-}
+}}
 
-class Parser {
-  constructor(text, path) {
+class Parser {{
+  constructor(text, path) {{
     this.text = text;
     this.end = text.length;
     this.errpos = 0;
@@ -764,12 +777,17 @@ class Parser {
     this.path = path;
     this.pos = 0;
     this.val = undefined;
+    this.expected_externs = new Set({expected_externs});
     this.externs = null;
 """
 
 _PARSE = """\
   parse(externs = null) {{
     this.externs = externs || new Map();
+    let errors = this.checkExterns()
+    if (errors != '') {{
+      return new Result(null, errors.trim(), 0);
+    }}
     this.r_{starting_rule}();
     if (this.failed) {{
       return new Result(null, this.error(), this.errpos);
@@ -782,6 +800,10 @@ _PARSE = """\
 _PARSE_WITH_EXCEPTION = """\
   parse(externs = null) {{
     this.externs = externs || new Map();
+    let errors = this.checkExterns()
+    if (errors != '') {{
+      return new Result(null, errors.trim(), 0);
+    }}
     try {{
       this.r_{starting_rule}();
       if (this.failed) {{
@@ -824,6 +846,21 @@ _BUILTIN_METHODS = """\
     } else {
       this.fail();
     }
+  }
+
+  checkExterns() {
+    let errors = '';
+    for (let ext of this.expected_externs) {
+      if (!this.externs.has(ext)) {
+        errors += `Missing extern "${ext}"\\n`;
+      }
+    }
+    for (let ext of this.externs.keys()) {
+      if (!this.expected_externs.has(ext)) {
+        errors += `Unexpected extern "${ext}"\\n`;
+      }
+    }
+    return errors.trim();
   }
 
   errorOffsets() {
@@ -901,7 +938,10 @@ _BUILTIN_METHODS = """\
       }
       l -= 1;
     }
-    throw new Exception('Unknown var "' + v + '"');
+    if (this.externs.has(v)) {
+      return this.externs.get(v);
+    }
+    throw new ParsingRuntimeError(`Unknown var "${v}"`);
   }
 
   memoize(rule_name, fn) {

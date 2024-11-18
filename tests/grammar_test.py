@@ -392,25 +392,26 @@ class GrammarTestsMixin:
         path = str(THIS_DIR / '../grammars/json.g')
         p, err, _ = self.compile(h.read_text_file(path))
         self.assertIsNone(err)
-        self._common_json_checks(p)
+        self._common_json_checks(p, {})
 
-        self.checkp(p, text='"foo"', out='"foo"', externs={'strict': False})
+        self.checkp(p, text='"foo"', out='"foo"', externs={})
 
         if hasattr(p, 'cleanup'):
             p.cleanup()
 
     @skip('integration')
     def test_json5(self):
+        externs = {'strict': True}
         h = pyfloyd.host.Host()
         path = str(THIS_DIR / '../grammars/json5.g')
         p, err, _ = self.compile(h.read_text_file(path))
         self.assertIsNone(err)
-        self._common_json_checks(p)
-        self._common_json5_checks(p)
+        self._common_json_checks(p, externs=externs)
+        self._common_json5_checks(p, externs=externs)
 
     @skip('integration')
     def test_json5_special_floats(self):
-        gv = {'strict': True}
+        externs = {'strict': True}
         h = pyfloyd.host.Host()
         path = str(THIS_DIR / '../grammars/json5.g')
         p, err, _ = self.compile(h.read_text_file(path))
@@ -418,19 +419,18 @@ class GrammarTestsMixin:
 
         # TODO: Figure out what to do with 'Infinity' and 'NaN'.
         # self.checkp(p, text='Infinity', out=float('inf'))
-        self.checkp(p, text='Infinity', out='Infinity', externs=gv)
+        self.checkp(p, text='Infinity', out='Infinity', externs=externs)
 
         # Can't use check() for this because NaN != NaN.
         # obj, err, _ = p.parse('NaN')
         # self.assertTrue(math.isnan(obj))
         # self.assertTrue(err is None)
-        self.checkp(p, text='NaN', out='NaN', externs=gv)
+        self.checkp(p, text='NaN', out='NaN', externs=externs)
 
         if hasattr(p, 'cleanup'):
             p.cleanup()
 
-    def _common_json_checks(self, p):
-        externs = {'strict': True}
+    def _common_json_checks(self, p, externs):
         self.checkp(p, text='123', out=123, externs=externs)
         self.checkp(p, text='1.5', out=1.5, externs=externs)
         self.checkp(p, text='-1.5', out=-1.5, externs=externs)
@@ -453,8 +453,7 @@ class GrammarTestsMixin:
         # Check that leading whitespace is allowed.
         self.checkp(p, '  {}', {}, externs=externs)
 
-    def _common_json5_checks(self, p):
-        externs = {'strict': False}
+    def _common_json5_checks(self, p, externs):
         self.checkp(p, text='+1.5', out=1.5, externs=externs)
         self.checkp(p, text='.5e-2', out=0.005, externs=externs)
         self.checkp(p, text='"foo"', out='foo', externs=externs)
@@ -524,13 +523,14 @@ class GrammarTestsMixin:
 
     @skip('integration')
     def test_json5_ws(self):
+        externs = {'strict': False}
         h = pyfloyd.host.Host()
         path = str(THIS_DIR / '../grammars/json5_ws.g')
         grammar = h.read_text_file(path)
         p, err, _ = self.compile(grammar)
         self.assertIsNone(err)
-        self._common_json_checks(p)
-        self._common_json5_checks(p)
+        self._common_json_checks(p, externs=externs)
+        self._common_json5_checks(p, externs=externs)
 
     def test_label(self):
         self.check("grammar = 'foobar':v -> v", text='foobar', out='foobar')

@@ -51,6 +51,7 @@ class _Parser:
         self._text = text
         self._end = len(self._text)
         self._errpos = 0
+        self._expected_externs = set()
         self._externs = {}
         self._failed = False
         self._path = path
@@ -61,6 +62,10 @@ class _Parser:
 
     def parse(self, externs: Externs = None):
         self._externs = externs or {}
+        errors = self._check_externs()
+        if errors:
+            return Result(None, errors, 0)
+
         self._r_grammar()
         if self._failed:
             return Result(None, self._err_str(), self._errpos)
@@ -1758,6 +1763,16 @@ class _Parser:
             self._succeed(ch, self._pos + 1)
         else:
             self._fail()
+
+    def _check_externs(self):
+        errors = ''
+        for ext in self._expected_externs:
+            if ext not in self._externs:
+                errors += f'Missing extern "{ext}"\n'
+        for ext in self._externs:
+            if ext not in self._expected_externs:
+                errors += f'Unexpected extern "{ext}"\n'
+        return errors.strip()
 
     def _err_offsets(self):
         lineno = 1

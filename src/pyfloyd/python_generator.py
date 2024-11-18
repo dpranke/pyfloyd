@@ -43,6 +43,7 @@ class PythonGenerator(Generator):
         # These methods are pretty much always needed.
         self._needed_methods = set(
             {
+                'check_externs',
                 'err_offsets',
                 'err_str',
                 'fail',
@@ -107,7 +108,8 @@ class PythonGenerator(Generator):
         if self._grammar.operators:
             text += _OPERATOR_CLASS
 
-        text += _CLASS
+        expected_externs = repr(self._grammar.externs)
+        text += _CLASS.format(expected_externs=expected_externs)
 
         text += self._state()
         text += '\n'
@@ -689,8 +691,14 @@ def main(
     opener=open,
 ) -> int:
     arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument('-D', '--define', action='append', default=[],
-                            help='Define a global var=value')
+    arg_parser.add_argument(
+        '-D',
+        '--define',
+        action='append',
+        metavar='var=val',
+        default=[],
+        help='define an external var=value (may use multiple times)'
+    )
     arg_parser.add_argument('file', nargs='?')
     args = arg_parser.parse_args(argv)
 
@@ -790,7 +798,8 @@ class _Parser:
         self._text = text
         self._end = len(self._text)
         self._errpos = 0
-        self._externs = {}
+        self._expected_externs = {expected_externs}
+        self._externs = {{}}
         self._failed = False
         self._path = path
         self._pos = 0
@@ -801,6 +810,10 @@ class _Parser:
 _PARSE = """\
     def parse(self, externs: Externs = None):
         self._externs = externs or {{}}
+        errors = self._check_externs()
+        if errors:
+            return Result(None, errors, 0)
+
         self._r_{starting_rule}()
         if self._failed:
             return Result(None, self._err_str(), self._errpos)
@@ -811,6 +824,10 @@ _PARSE = """\
 _PARSE_WITH_EXCEPTION = """\
     def parse(self, externs: Externs = None):
         self._externs = externs or {{}}
+        errors = self._check_externs()
+        if errors:
+            return Result(None, errors, 0)
+
         try:
             self._r_{starting_rule}()
             if self._failed:
@@ -845,6 +862,16 @@ _BUILTIN_METHODS = """\
             self._succeed(ch, self._pos + 1)
         else:
             self._fail()
+
+    def _check_externs(self):
+        errors = ''
+        for ext in self._expected_externs:
+            if ext not in self._externs:
+                errors += f'Missing extern "{ext}"\\n'
+        for ext in self._externs:
+            if ext not in self._expected_externs:
+                errors += f'Unexpected extern "{ext}"\\n'
+        return errors.strip()
 
     def _err_offsets(self):
         lineno = 1
