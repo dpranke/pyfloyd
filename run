@@ -9,7 +9,11 @@ import shutil
 import subprocess
 import sys
 
-import pyfloyd
+try:
+    import pyfloyd
+except ModuleNotFoundError as e:
+    pyfloyd = None
+    pass
 
 
 class Runner:
@@ -23,7 +27,10 @@ class Runner:
         self.run_cmd = None
         self.subps = None
         self.uv_path = None
-        self.version = pyfloyd.__version__
+        if pyfloyd is not None:
+            self.version = pyfloyd.__version__
+        else:
+            self.version = None
 
     def add_parser(self, cmd, help):  # pylint: disable=redefined-builtin
         method = getattr(self, 'run_' + cmd.replace('-', '_'))
@@ -202,7 +209,6 @@ class Runner:
         self.args.func(self.args)
 
     def run_build(self):
-        self._check_version()
         cmd = [self.uv_path, 'build']
         if self.args.quiet:
             cmd.append('--quiet')
@@ -296,7 +302,7 @@ class Runner:
             print('You must specify either --test or --prod to upload.')
             sys.exit(2)
 
-        self._check_version()
+        self._get_version()
         sep = os.path.sep
         tgz = f'dist{sep}{self.package}-{self.version}.tar.gz'
         wheel = f'dist{sep}{self.package}-{self.version}-py3-none-any.whl'
@@ -307,9 +313,7 @@ class Runner:
             test = ['--publish-url', 'https://test.pypi.org/legacy/']
         else:
             test = []
-        self.call(
-            [self.uv_path, 'publish'] + test + [tgz, wheel]
-        )
+        self.call([self.uv_path, 'publish'] + test + [tgz, wheel])
 
     def run_regen(self):
         new_file = f'{self.parser_file}.new'
@@ -412,7 +416,13 @@ class Runner:
             test = test + '*'
         return test
 
-    def _check_version(self):
+    def _get_version(self):
+        if self.version is None:
+            proc = self.call(
+                self.run_cmd + ['-m', 'pyfloyd', '-V'], capture_output=True
+            )
+            self.version = proc.stdout.decode('utf8').strip()
+
         m = re.match(r'\d+\.\d+\.\d+(\.dev\d+)?', self.version)
         if not m:
             print(f'Unexpected version format: "{self.version}"')

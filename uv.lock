@@ -186,7 +186,7 @@ wheels = [
 
 [[package]]
 name = "pyfloyd"
-version = "0.18.3.dev0"
+version = "0.18.4.dev0"
 source = { editable = "." }
 
 [package.optional-dependencies]
