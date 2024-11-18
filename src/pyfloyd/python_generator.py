@@ -417,8 +417,8 @@ class PythonGenerator(Generator):
     def _ty_e_var(self, node) -> str:
         if self._current_rule in self._grammar.outer_scope_rules:
             return f"self._lookup('{node[1]}')"
-        if node[1] in self._grammar.global_vars:
-            return f"self._global_vars['{node[1]}']"
+        if node[1] in self._grammar.externs:
+            return f"self._externs['{node[1]}']"
         return 'v_' + node[1].replace('$', '_')
 
     def _ty_empty(self, node) -> List[str]:
@@ -699,13 +699,13 @@ def main(
         path = args.file
         fp = opener(path)
 
-    global_vars = {{}}
+    externs = {{}}
     for d in args.define:
         k, v = d.split('=', 1)
-        global_vars[k] = json.loads(v)
+        externs[k] = json.loads(v)
 
     msg = fp.read()
-    result = parse(msg, path, global_vars)
+    result = parse(msg, path, externs)
     if result.err:
         print(result.err, file=stderr)
         return 1
@@ -760,7 +760,7 @@ class Result(NamedTuple):
     pos: Optional[int] = None
 
 
-def parse(text: str, path: str = '<string>', global_vars = None) -> Result:
+def parse(text: str, path: str = '<string>', externs = None) -> Result:
     \"\"\"Parse a given text and return the result.
 
     If the parse was successful, `result.val` will be the returned value
@@ -775,7 +775,7 @@ def parse(text: str, path: str = '<string>', global_vars = None) -> Result:
     messages to indicate the path to the filename containing the given
     text.
     \"\"\"
-    return _Parser(text, path).parse(global_vars)
+    return _Parser(text, path).parse(externs)
 
 
 class _Parser:
@@ -783,7 +783,7 @@ class _Parser:
         self._text = text
         self._end = len(self._text)
         self._errpos = 0
-        self._global_vars = {}
+        self._externs = {}
         self._failed = False
         self._path = path
         self._pos = 0
@@ -792,8 +792,8 @@ class _Parser:
 
 
 _PARSE = """\
-    def parse(self, global_vars=None):
-        self._global_vars = global_vars or {{}}
+    def parse(self, externs=None):
+        self._externs = externs or {{}}
         self._r_{starting_rule}()
         if self._failed:
             return Result(None, self._err_str(), self._errpos)
@@ -802,8 +802,8 @@ _PARSE = """\
 
 
 _PARSE_WITH_EXCEPTION = """\
-    def parse(self, global_vars=None):
-        self._global_vars = global_vars or {{}}
+    def parse(self, externs=None):
+        self._externs = externs or {{}}
         try:
             self._r_{starting_rule}()
             if self._failed:
@@ -902,8 +902,8 @@ _BUILTIN_METHODS = """\
             if var in self._scopes[l]:
                 return self._scopes[l][var]
             l -= 1
-        if var in self._global_vars:
-            return self._global_vars[var]
+        if var in self._externs:
+            return self._externs[var]
         assert False, f'unknown var {var}'
 
     def _memoize(self, rule_name, fn):

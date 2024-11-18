@@ -59,9 +59,9 @@ class GrammarTestsMixin:
         if hasattr(p, 'cleanup'):
             p.cleanup()
 
-    def checkp(self, parser, text, out=None, err=None, global_vars=None):
+    def checkp(self, parser, text, out=None, err=None, externs=None):
         actual_out, actual_err, _ = parser.parse(
-            text, path='<string>', global_vars=global_vars
+            text, path='<string>', externs=externs
         )
         # Test err before out because it's probably more helpful to display
         # an unexpected error than it is to display an unexpected output.
@@ -395,7 +395,7 @@ class GrammarTestsMixin:
         self._common_json_checks(p)
 
         self.checkp(
-            p, text='"foo"', out='"foo"', global_vars={'_strict': False}
+            p, text='"foo"', out='"foo"', externs={'strict': False}
         )
 
         if hasattr(p, 'cleanup'):
@@ -412,7 +412,7 @@ class GrammarTestsMixin:
 
     @skip('integration')
     def test_json5_special_floats(self):
-        gv = {'_strict': True}
+        gv = {'strict': True}
         h = pyfloyd.host.Host()
         path = str(THIS_DIR / '../grammars/json5.g')
         p, err, _ = self.compile(h.read_text_file(path))
@@ -420,51 +420,51 @@ class GrammarTestsMixin:
 
         # TODO: Figure out what to do with 'Infinity' and 'NaN'.
         # self.checkp(p, text='Infinity', out=float('inf'))
-        self.checkp(p, text='Infinity', out='Infinity', global_vars=gv)
+        self.checkp(p, text='Infinity', out='Infinity', externs=gv)
 
         # Can't use check() for this because NaN != NaN.
         # obj, err, _ = p.parse('NaN')
         # self.assertTrue(math.isnan(obj))
         # self.assertTrue(err is None)
-        self.checkp(p, text='NaN', out='NaN', global_vars=gv)
+        self.checkp(p, text='NaN', out='NaN', externs=gv)
 
         if hasattr(p, 'cleanup'):
             p.cleanup()
 
     def _common_json_checks(self, p):
-        gvs = {'_strict': True}
-        self.checkp(p, text='123', out=123, global_vars=gvs)
-        self.checkp(p, text='1.5', out=1.5, global_vars=gvs)
-        self.checkp(p, text='-1.5', out=-1.5, global_vars=gvs)
-        self.checkp(p, text='1.5e2', out=150, global_vars=gvs)
-        self.checkp(p, text='null', out=None, global_vars=gvs)
-        self.checkp(p, text='true', out=True, global_vars=gvs)
-        self.checkp(p, text='false', out=False, global_vars=gvs)
+        externs = {'strict': True}
+        self.checkp(p, text='123', out=123, externs=externs)
+        self.checkp(p, text='1.5', out=1.5, externs=externs)
+        self.checkp(p, text='-1.5', out=-1.5, externs=externs)
+        self.checkp(p, text='1.5e2', out=150, externs=externs)
+        self.checkp(p, text='null', out=None, externs=externs)
+        self.checkp(p, text='true', out=True, externs=externs)
+        self.checkp(p, text='false', out=False, externs=externs)
 
-        self.checkp(p, text='[]', out=[], global_vars=gvs)
-        self.checkp(p, text='[2]', out=[2], global_vars=gvs)
-        self.checkp(p, text='{}', out={}, global_vars=gvs)
+        self.checkp(p, text='[]', out=[], externs=externs)
+        self.checkp(p, text='[2]', out=[2], externs=externs)
+        self.checkp(p, text='{}', out={}, externs=externs)
 
         self.checkp(
             p,
             text='[1',
             err='<string>:1 Unexpected end of input at column 3',
-            global_vars=gvs,
+            externs=externs,
         )
 
         # Check that leading whitespace is allowed.
-        self.checkp(p, '  {}', {}, global_vars=gvs)
+        self.checkp(p, '  {}', {}, externs=externs)
 
     def _common_json5_checks(self, p):
-        gvs = {'_strict': False}
-        self.checkp(p, text='+1.5', out=1.5, global_vars=gvs)
-        self.checkp(p, text='.5e-2', out=0.005, global_vars=gvs)
-        self.checkp(p, text='"foo"', out='foo', global_vars=gvs)
+        externs = {'strict': False}
+        self.checkp(p, text='+1.5', out=1.5, externs=externs)
+        self.checkp(p, text='.5e-2', out=0.005, externs=externs)
+        self.checkp(p, text='"foo"', out='foo', externs=externs)
         self.checkp(
             p,
             text='{foo: "bar", a: "b"}',
             out={'foo': 'bar', 'a': 'b'},
-            global_vars=gvs,
+            externs=externs,
         )
 
     @skip('integration')
@@ -519,7 +519,7 @@ class GrammarTestsMixin:
                     'trailing commas too',
                 ],
             },
-            global_vars={'_strict': False},
+            externs={'strict': False},
         )
         if hasattr(p, 'cleanup'):
             p.cleanup()
@@ -1128,8 +1128,8 @@ class _PythonParserWrapper:
     def __init__(self, parse_fn):
         self.parse_fn = parse_fn
 
-    def parse(self, text, path='<string>', global_vars=None):
-        return self.parse_fn(text, path, global_vars)
+    def parse(self, text, path='<string>', externs=None):
+        return self.parse_fn(text, path, externs)
 
     def cleanup(self):
         pass
@@ -1169,13 +1169,13 @@ class _JavaScriptParserWrapper:
         self.d = d
         self.source = d + '/parser.js'
 
-    def parse(self, text, path='<string>', global_vars=None):
+    def parse(self, text, path='<string>', externs=None):
         del path
         inp = self.d + '/input.txt'
         self.h.write_text_file(inp, text)
         defines = []
-        global_vars = global_vars or {}
-        for k, v in global_vars.items():
+        externs = externs or {}
+        for k, v in externs.items():
             defines.extend(['-D', f'{k}={json.dumps(v)}'])
         proc = subprocess.run(
             ['node', self.source] + defines + [inp],

@@ -39,7 +39,7 @@ class Printer:
                         cs = [(node[0], '')]
                     else:
                         cs = [(' '.join(node), '')]
-                elif rule_name == '%globals':
+                elif rule_name in ('%extern', '%externs', '%globals'):
                     cs = [(' '.join(node), '')]
                 else:
                     assert rule_name in (

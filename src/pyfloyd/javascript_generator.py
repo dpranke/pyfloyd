@@ -374,8 +374,8 @@ class JavaScriptGenerator(Generator):
     def _ty_e_var(self, node) -> str:
         if self._current_rule in self._grammar.outer_scope_rules:
             return f"this.lookup('{node[1]}')"
-        if node[1] in self._grammar.global_vars:
-            return f"this.global_vars.get('{node[1]}');"
+        if node[1] in self._grammar.externs:
+            return f"this.externs.get('{node[1]}');"
         return 'v_' + node[1].replace('$', '_')
 
     def _ty_empty(self, node) -> List[str]:
@@ -654,13 +654,13 @@ async function main() {
   const fs = require("fs");
 
   let s = "";
-  let global_vars = new Map();
+  let externs = new Map();
   let i = 2;
   let path = '<stdin>';
   while (i < process.argv.length) {
     if (process.argv[i] == '-D' || process.argv[i] == '--define') {
       let [k, v] = process.argv[i+1].split('=', 2);
-      global_vars.set(k, JSON.parse(v))
+      externs.set(k, JSON.parse(v))
       i += 2;
     } else {
       break;
@@ -684,7 +684,7 @@ async function main() {
   }
 
   path='<string>';
-  let result = parse(s.toString(), path, global_vars);
+  let result = parse(s.toString(), path, externs);
 
   let txt, stream, ret;
   if (result.err != undefined) {
@@ -749,10 +749,10 @@ class Result {
   }
 }
 
-function parse(text, path = '<string>', global_vars = null) {
-  global_vars = global_vars || new Map();
+function parse(text, path = '<string>', externs = null) {
+  externs = externs || new Map();
   const p = new Parser(text, path);
-  return p.parse(global_vars);
+  return p.parse(externs);
 }
 
 class Parser {
@@ -764,12 +764,12 @@ class Parser {
     this.path = path;
     this.pos = 0;
     this.val = undefined;
-    this.global_vars = null;
+    this.externs = null;
 """
 
 _PARSE = """\
-  parse(global_vars = null) {{
-    this.global_vars = global_vars || new Map();
+  parse(externs = null) {{
+    this.externs = externs || new Map();
     this.r_{starting_rule}();
     if (this.failed) {{
       return new Result(null, this.error(), this.errpos);
@@ -780,8 +780,8 @@ _PARSE = """\
 """
 
 _PARSE_WITH_EXCEPTION = """\
-  parse(global_vars = null) {{
-    this.global_vars = global_vars || new Map();
+  parse(externs = null) {{
+    this.externs = externs || new Map();
     try {{
       this.r_{starting_rule}();
       if (this.failed) {{

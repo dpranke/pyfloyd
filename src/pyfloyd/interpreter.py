@@ -47,10 +47,10 @@ class Interpreter:
         self._blocked = set()
         self._operators = {}
         self._regexps = {}
-        self._global_vars = {}
+        self._externs = {}
 
     def parse(
-        self, text: str, path: str = '<string>', global_vars=None
+        self, text: str, path: str = '<string>', externs=None
     ) -> parser.Result:
         self._text = text
         self._path = path
@@ -61,7 +61,7 @@ class Interpreter:
         self._errstr = None
         self._errpos = 0
         self._scopes = [{}]
-        self._global_vars = global_vars or {}
+        self._externs = externs or {}
 
         self._interpret(self._grammar.rules[self._grammar.starting_rule])
         if self._failed:
@@ -294,8 +294,8 @@ class Interpreter:
                     self._succeed(self._scopes[i][v])
                     return
                 i -= 1
-            if v in self._global_vars:
-                self._succeed(self._global_vars[v])
+            if v in self._externs:
+                self._succeed(self._externs[v])
                 return
             assert False, f'Unknown label "{v}"'
 

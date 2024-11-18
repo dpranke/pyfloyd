@@ -51,16 +51,16 @@ class Grammar:
         self.operators = {}
         self.leftrec_rules = set()
         self.outer_scope_rules = set()
-        self.global_vars = set()
+        self.externs = set()
 
         has_starting_rule = False
         for n in self.ast[2]:
             if n[1].startswith('%'):
                 self.pragmas.append(n)
                 if n[1] in ('%token', '%tokens'):
-                    for t in n[2][0][2][0][2]:
-                        assert t[0] == 'apply'
-                        self.tokens.add(t[1])
+                    self._collect_idents(self.tokens, n)
+                if n[1] in ('%globals', '%externs', '%extern'):
+                    self._collect_idents(self.externs, n)
                 continue
 
             if not has_starting_rule:
@@ -80,6 +80,12 @@ class Grammar:
             if rule not in rules:
                 self.ast[2].append(['rule', rule, [self.rules[rule]]])
 
+    def _collect_idents(self, s, n):
+        if n[0] == 'apply':
+            s.add(n[1])
+        for sn in n[2]:
+            self._collect_idents(s, sn)
+
 
 class OperatorState:
     def __init__(self):
@@ -89,7 +95,7 @@ class OperatorState:
 
 
 def analyze(
-    ast, rewrite_filler: bool, rewrite_subrules: bool, global_vars=None
+    ast, rewrite_filler: bool, rewrite_subrules: bool, externs=None
 ) -> Grammar:
     """Analyze and optimize the AST.
 
@@ -218,10 +224,8 @@ class _Analyzer:
             operator = seq[2][0][1]
             direction = seq[2][1][1]
             self.grammar.assoc[operator] = direction
-        elif pragma == '%globals':
-            for choice in node[2][0][2]:
-                for t in choice[2]:
-                    self.grammar.global_vars.add(t[1])
+        elif pragma in ('%extern', '%externs', '%globals'):
+            pass
         else:
             self.errors.append(f'Unknown pragma "{pragma}"')
 
@@ -332,7 +336,7 @@ class _Analyzer:
         if node[0] == 'e_var':
             if node[1] in labels:
                 references.add(node[1])
-            elif node[1] in self.grammar.global_vars:
+            elif node[1] in self.grammar.externs:
                 pass
             elif not node[1][0] == '$':
                 self.errors.append(f'Unknown variable "{node[1]}" referenced')

@@ -51,10 +51,10 @@ def main(argv=None, host=None):
             host.print(err, file=host.stderr)
             return 1
 
-        global_vars = {}
+        externs = {}
         for d in args.define:
             k, v = d.split('=', 1)
-            global_vars[k] = json.loads(v)
+            externs[k] = json.loads(v)
 
         if args.ast:
             ast, err = pyfloyd.dump_ast(
@@ -82,7 +82,7 @@ def main(argv=None, host=None):
             )
         else:
             contents, err, _ = _interpret_grammar(
-                host, args, grammar, global_vars
+                host, args, grammar, externs
             )
 
         if err:
@@ -205,7 +205,7 @@ def _read_grammar(host, args):
         return None, 'Error reading "%s": %s' % (args.grammar, str(e))
 
 
-def _interpret_grammar(host, args, grammar, global_vars):
+def _interpret_grammar(host, args, grammar, externs):
     if args.input == '-':
         path, contents = ('<stdin>', host.stdin.read())
     else:
@@ -216,7 +216,7 @@ def _interpret_grammar(host, args, grammar, global_vars):
         contents,
         grammar_path=args.grammar,
         path=path,
-        global_vars=global_vars,
+        externs=externs,
         memoize=args.memoize,
     )
     if err:

@@ -24,7 +24,7 @@ class Result(NamedTuple):
     pos: Optional[int] = None
 
 
-def parse(text: str, path: str = '<string>', global_vars=None) -> Result:
+def parse(text: str, path: str = '<string>', externs = None) -> Result:
     """Parse a given text and return the result.
 
     If the parse was successful, `result.val` will be the returned value
@@ -39,7 +39,7 @@ def parse(text: str, path: str = '<string>', global_vars=None) -> Result:
     messages to indicate the path to the filename containing the given
     text.
     """
-    return _Parser(text, path).parse(global_vars)
+    return _Parser(text, path).parse(externs)
 
 
 class _Parser:
@@ -47,7 +47,7 @@ class _Parser:
         self._text = text
         self._end = len(self._text)
         self._errpos = 0
-        self._global_vars = {}
+        self._externs = {}
         self._failed = False
         self._path = path
         self._pos = 0
@@ -55,8 +55,8 @@ class _Parser:
         self._cache = {}
         self._regexps = {}
 
-    def parse(self, global_vars=None):
-        self._global_vars = global_vars or {}
+    def parse(self, externs=None):
+        self._externs = externs or {}
         self._r_grammar()
         if self._failed:
             return Result(None, self._err_str(), self._errpos)
