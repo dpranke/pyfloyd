@@ -17,6 +17,47 @@ from typing import Dict, Optional
 from pyfloyd.analyzer import Grammar
 
 
+DEFAULT_LANGUAGE = 'python'
+
+LANG_TO_EXT = {
+    'javascript': '.js',
+    'python': '.py',
+}
+
+EXT_TO_LANG = {v: k for k, v in LANG_TO_EXT.items()}
+
+SUPPORTED_LANGUAGES = LANG_TO_EXT.keys()
+
+
+def add_language_arguments(parser):
+    parser.add_argument(
+        '-l',
+        '--language',
+        action='store',
+        choices=SUPPORTED_LANGUAGES,
+        help=(
+            'Language to generate (derived from the output '
+            'file extension if necessary)'
+        ),
+    )
+    parser.add_argument(
+        '--js',
+        '--javascript',
+        dest='language',
+        action='store_const',
+        const='javascript',
+        help='Generate Javascript code',
+    )
+    parser.add_argument(
+        '--py',
+        '--python',
+        dest='language',
+        action='store_const',
+        const='python',
+        help='Generate Python code (the default)',
+    )
+
+
 class GeneratorOptions:
     """Options that control the code generation.
 
@@ -27,14 +68,9 @@ class GeneratorOptions:
     `defines`:  A dictionary of generator-specific options.
     """
 
-    language: str = 'python'
-    main: bool = False
-    memoize: bool = False
-    defines: Dict[str, str] = {}
-
     def __init__(
         self,
-        language: str = 'python',
+        language: str = DEFAULT_LANGUAGE,
         main: bool = False,
         memoize: bool = False,
         defines: Optional[Dict[str, str]] = None,

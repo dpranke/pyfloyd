@@ -384,6 +384,7 @@ class Runner:
                 new_file,
                 '--memoize',
                 '-c',
+                '--python',
                 self.grammar,
             ]
         )

@@ -19,6 +19,7 @@ import argparse
 import importlib.util
 import io
 import json
+import os
 import pathlib
 import pprint
 import sys
@@ -35,6 +36,7 @@ if (
 
 # pylint: disable=wrong-import-position
 import pyfloyd
+from pyfloyd import generator
 from pyfloyd.host import Host
 
 
@@ -74,6 +76,8 @@ def main(argv=None, host=None):
                 grammar, args.grammar, args.rewrite_filler
             )
         elif args.compile:
+            if not args.language:
+                args.language = pyfloyd.DEFAULT_LANGUAGE
             options = pyfloyd.GeneratorOptions(
                 language=args.language, main=args.main, memoize=args.memoize
             )
@@ -98,6 +102,7 @@ def main(argv=None, host=None):
 
 def _parse_args(host, argv):
     ap = argparse.ArgumentParser(prog='pyfloyd')
+    generator.add_language_arguments(ap)
     ap.add_argument(
         '--ast', action='store_true', help='dump the parsed AST of the grammar'
     )
@@ -111,10 +116,13 @@ def _parse_args(host, argv):
         '-D',
         '--define',
         action='append',
+        metavar='var=val',
         default=[],
         help='Define an external var=value',
     )
-    ap.add_argument('-o', '--output', help='path to write output to')
+    ap.add_argument(
+        '-o', '--output', metavar='path', help='path to write output to'
+    )
     ap.add_argument(
         '-p',
         '--pretty-print',
@@ -136,13 +144,6 @@ def _parse_args(host, argv):
         '--version',
         action='store_true',
         help='print current version (%s)' % pyfloyd.__version__,
-    )
-    ap.add_argument(
-        '-l',
-        '--language',
-        action='store',
-        default='python',
-        help='Language to generate( %(default)s by default)',
     )
     ap.add_argument(
         '-M',
@@ -182,12 +183,16 @@ def _parse_args(host, argv):
 
     if not args.output:
         if args.compile:
-            if args.language == 'python':
-                args.output = host.splitext(args.grammar)[0] + '.py'
-            else:
-                args.output = host.splitext(args.grammar)[0] + '.js'
+            if not args.language:
+                args.language = generator.DEFAULT_LANGUAGE
+            ext = generator.LANG_TO_EXT[args.language]
+            args.output = host.splitext(args.grammar)[0] + ext
         else:
             args.output = '-'
+    elif not args.language:
+        if not args.language:
+            ext = os.path.splitext(args.output)[1]
+            args.language = generator.EXT_TO_LANG[ext]
 
     return args, None
 

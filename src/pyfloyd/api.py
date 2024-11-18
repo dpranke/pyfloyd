@@ -18,13 +18,24 @@ from pyfloyd import analyzer
 from pyfloyd.interpreter import Interpreter
 from pyfloyd import parser
 from pyfloyd.printer import Printer
-from pyfloyd.generator import Generator, GeneratorOptions
+from pyfloyd import generator
 from pyfloyd.python_generator import PythonGenerator
 from pyfloyd.javascript_generator import JavaScriptGenerator
 
 Result = parser.Result
 
 Externs = Optional[Dict[str, Any]]
+
+Generator = generator.Generator
+GeneratorOptions = generator.GeneratorOptions
+DEFAULT_LANGUAGE = generator.DEFAULT_LANGUAGE
+SUPPORTED_LANGUAGES = generator.SUPPORTED_LANGUAGES
+
+_generators = {
+    'javascript': JavaScriptGenerator,
+    'python': PythonGenerator,
+}
+assert set(_generators.keys()) == set(generator.SUPPORTED_LANGUAGES)
 
 
 class ParserInterface(Protocol):
@@ -95,11 +106,11 @@ def generate(
 ) -> Result:
     """Generate the source code of a parser.
 
-    This generates the python text of a parser. The text will be a module
+    This generates the text of a parser. The text will be a module
     with a public `Result` type and a public `parse()` function.
 
     `options.language` specifies the language to use for the generated
-    parser.
+    parser. By default the language will be `DEFAULT_LANGUAGE`.
 
     If `options.main` is True, then the generated parser file will also have a
     `main()` function that is called if the text is invoked directly. (i.e.,
@@ -138,13 +149,18 @@ def generate(
 
     options = options or GeneratorOptions()
     gen: Generator
-    if options.language == 'python':
-        gen = PythonGenerator(grammar_obj, options)
-    else:
-        assert options.language == 'javascript'
-        gen = JavaScriptGenerator(grammar_obj, options)
-    text = gen.generate()
-    return Result(text)
+    cls = _generators.get(options.language.lower())
+    if cls:
+        gen = cls(grammar_obj, options)
+        text = gen.generate()
+        return Result(text)
+
+    supp = ' and '.join(f'"{lang}"' for lang in SUPPORTED_LANGUAGES)
+    err = (
+        f'Unsupported language "{options.language}"\n'
+        f'Only {supp} are supported.\n'
+    )
+    return Result(None, err, 0)
 
 
 def parse(

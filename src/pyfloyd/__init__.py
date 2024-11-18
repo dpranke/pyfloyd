@@ -60,6 +60,8 @@ from pyfloyd.api import (
     GeneratorOptions,
     ParserInterface,
     Result,
+    DEFAULT_LANGUAGE,
+    SUPPORTED_LANGUAGES,
 )
 from pyfloyd.version import __version__
 
@@ -76,4 +78,6 @@ __all__ = [
     'GeneratorOptions',
     'ParserInterface',
     'Result',
+    'DEFAULT_LANGUAGE',
+    'SUPPORTED_LANGUAGES',
 ]

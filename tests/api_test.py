@@ -48,6 +48,19 @@ class APITest(unittest.TestCase):
         self.assertIsNone(txt)
         self.assertEqual(err, '<string>:1 Unexpected end of input at column 4')
 
+    def test_generate_unsupported_language(self):
+        txt, err, _ = pyfloyd.generate(
+            'g =', options=pyfloyd.GeneratorOptions(language='q')
+        )
+        self.assertIsNone(txt)
+        self.assertEqual(
+            err,
+            (
+                'Unsupported language "q"\n'
+                'Only "javascript" and "python" are supported.\n'
+            ),
+        )
+
     def test_parse(self):
         result = pyfloyd.parse('grammar = "Hello, world" end', 'Hello, world')
         self.assertEqual(result.val, None)
