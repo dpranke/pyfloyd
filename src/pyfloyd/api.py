@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import NamedTuple, Optional, Protocol, Tuple
+from typing import Any, Dict, NamedTuple, Optional, Protocol, Tuple
 
 from pyfloyd import analyzer
 from pyfloyd.interpreter import Interpreter
@@ -32,7 +32,7 @@ class ParserInterface(Protocol):
     `compile()`.
     """
 
-    def parse(self, text: str, path: str = '<string>') -> Result:
+    def parse(self, text: str, path: str = '<string>', global_vars: Optional[Dict[str, Any]] = None) -> Result:
         """Parse a string and return a result.
 
         `text` is the string to parse.
@@ -84,6 +84,7 @@ def generate(
     grammar: str,
     path: str = '<string>',
     options: Optional[GeneratorOptions] = None,
+    global_vars = None
 ) -> Result:
     """Generate the source code of a parser.
 
@@ -116,11 +117,12 @@ def generate(
     """
 
     result = parser.parse(grammar, path)
+    global_vars = global_vars or {}
     if result.err:
         return result
     try:
         grammar_obj = analyzer.analyze(
-            result.val, rewrite_filler=True, rewrite_subrules=True
+            result.val, rewrite_filler=True, rewrite_subrules=True, global_vars=global_vars
         )
     except analyzer.AnalysisError as e:
         return Result(err=str(e))
@@ -141,6 +143,7 @@ def parse(
     text: str,
     grammar_path: str = '<string>',
     path: str = '<string>',
+    global_vars : Dict[str, Any] = None,
     memoize: bool = False,
 ) -> Result:
     """Match an input text against the specified grammar.
@@ -165,12 +168,13 @@ def parse(
     if result.err:
         return Result(err='Error in grammar: ' + result.err, pos=result.pos)
     assert result.parser is not None
-    return result.parser.parse(text, path)
+    return result.parser.parse(text, path, global_vars)
 
 
 def pretty_print(
     grammar: str,
     path: str = '<string>',
+    global_vars = None,
     rewrite_filler: bool = False,
     rewrite_subrules: bool = False,
 ) -> Tuple[Optional[str], Optional[str]]:
@@ -197,9 +201,11 @@ def pretty_print(
     if result.err:
         return None, result.err
 
+    global_vars = global_vars or {}
     try:
         g = analyzer.analyze(
             result.val,
+            global_vars=global_vars,
             rewrite_filler=rewrite_filler,
             rewrite_subrules=rewrite_subrules,
         )
@@ -211,6 +217,7 @@ def pretty_print(
 def dump_ast(
     grammar: str,
     path: str = '<string>',
+    global_vars = None,
     rewrite_filler: bool = False,
     rewrite_subrules: bool = False,
 ) -> Tuple[Optional[str], Optional[str]]:
@@ -225,6 +232,7 @@ def dump_ast(
     try:
         g = analyzer.analyze(
             result.val,
+            global_vars=global_vars,
             rewrite_filler=rewrite_filler,
             rewrite_subrules=rewrite_subrules,
         )

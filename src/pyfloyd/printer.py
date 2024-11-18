@@ -39,6 +39,8 @@ class Printer:
                         cs = [(node[0], '')]
                     else:
                         cs = [(' '.join(node), '')]
+                elif rule_name == '%globals':
+                    cs = [(' '.join(node), '')]
                 else:
                     assert rule_name in (
                         '%comment',
@@ -189,7 +191,7 @@ class Printer:
         return self._proc(node[2][0]) + '+'
 
     def _ty_pred(self, node):
-        return '?{%s}' % self._proc(node[2][0])
+        return '?{ %s }' % self._proc(node[2][0])
 
     def _ty_range(self, node):
         return '%s..%s' % (lit.encode(node[1][0]), lit.encode(node[1][1]))

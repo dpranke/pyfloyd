@@ -14,6 +14,8 @@
 
 %tokens = ident num_literal string
 
+%globals       = _strict
+
 grammar        = value end                        -> $1
 
 value          = 'null'                           -> null
@@ -36,10 +38,12 @@ string         = squote sqchar* squote            -> cat($2)
 sqchar         = bslash esc_char                  -> $2
                | bslash eol                       -> ''
                | ~bslash ~squote ~eol any         -> $4
+               | ~(?{ _strict }) '\x00'..'\x1f'
 
 dqchar         = bslash esc_char                  -> $2
                | bslash eol                       -> ''
                | ~bslash ~dquote ~eol any         -> $4
+               | ~(?{ _strict }) '\x00'..'\x1f'
 
 bslash         = '\\'
 

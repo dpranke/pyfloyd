@@ -47,8 +47,9 @@ class Interpreter:
         self._blocked = set()
         self._operators = {}
         self._regexps = {}
+        self._global_vars = {}
 
-    def parse(self, text: str, path: str = '<string>') -> parser.Result:
+    def parse(self, text: str, path: str = '<string>', global_vars = None) -> parser.Result:
         self._text = text
         self._path = path
         self._failed = False
@@ -58,6 +59,7 @@ class Interpreter:
         self._errstr = None
         self._errpos = 0
         self._scopes = [{}]
+        self._global_vars = global_vars or {}
 
         self._interpret(self._grammar.rules[self._grammar.starting_rule])
         if self._failed:
@@ -278,18 +280,22 @@ class Interpreter:
             return
 
         # Unknown variables should have been caught in analysis.
-        if node[1][0] == '$':
+        v = node[1]
+        if v[0] == '$':
             # Look up positional labels in the current scope.
-            self._succeed(self._scopes[-1][node[1]])
+            self._succeed(self._scopes[-1][v])
         else:
             # Look up named labels in any scope.
             i = len(self._scopes) - 1
             while i >= 0:
-                if node[1] in self._scopes[i]:
-                    self._succeed(self._scopes[i][node[1]])
+                if v in self._scopes[i]:
+                    self._succeed(self._scopes[i][v])
                     return
                 i -= 1
-            assert False, f'Unknown label "{node[1]}"'
+            if v in self._global_vars:
+                self._succeed(self._global_vars[v])
+                return
+            assert False, f'Unknown label "{v}"'
 
     def _ty_empty(self, node):
         del node

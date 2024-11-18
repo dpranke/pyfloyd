@@ -51,6 +51,11 @@ def main(argv=None, host=None):
             host.print(err, file=host.stderr)
             return 1
 
+        global_vars = {}
+        for d in args.define:
+            k, v = d.split('=', 1)
+            global_vars[k] = json.loads(v)
+
         if args.ast:
             ast, err = pyfloyd.dump_ast(
                 grammar,
@@ -75,10 +80,11 @@ def main(argv=None, host=None):
             contents, err, _ = pyfloyd.generate(
                 grammar,
                 path=args.grammar,
-                options=options,
+                options=options
             )
         else:
-            contents, err, _ = _interpret_grammar(host, args, grammar)
+            contents, err, _ = _interpret_grammar(host, args, grammar,
+                                                  global_vars)
 
         if err:
             host.print(err, file=host.stderr)
@@ -104,6 +110,8 @@ def _parse_args(host, argv):
         action='store_true',
         help='compile grammar instead of interpreting it',
     )
+    ap.add_argument('-D', '--define', action='append', default=[],
+                    help='Define a global var=value')
     ap.add_argument('-o', '--output', help='path to write output to')
     ap.add_argument(
         '-p',
@@ -193,7 +201,7 @@ def _read_grammar(host, args):
         return None, 'Error reading "%s": %s' % (args.grammar, str(e))
 
 
-def _interpret_grammar(host, args, grammar):
+def _interpret_grammar(host, args, grammar, global_vars):
     if args.input == '-':
         path, contents = ('<stdin>', host.stdin.read())
     else:
@@ -204,6 +212,7 @@ def _interpret_grammar(host, args, grammar):
         contents,
         grammar_path=args.grammar,
         path=path,
+        global_vars=global_vars,
         memoize=args.memoize,
     )
     if err:

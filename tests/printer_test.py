@@ -112,7 +112,7 @@ class PrinterTest(unittest.TestCase):
         self.assertIsNone(err)
 
     def test_pred(self):
-        grammar = 'grammar = ?{true} -> true\n'
+        grammar = 'grammar = ?{ true } -> true\n'
         out, err = pyfloyd.pretty_print(grammar)
         self.assertEqual(grammar, out)
         self.assertIsNone(err)

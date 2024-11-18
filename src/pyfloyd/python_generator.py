@@ -417,6 +417,8 @@ class PythonGenerator(Generator):
     def _ty_e_var(self, node) -> str:
         if self._current_rule in self._grammar.outer_scope_rules:
             return f"self._lookup('{node[1]}')"
+        if node[1] in self._grammar.global_vars:
+            return f"self._global_vars['{node[1]}']"
         return 'v_' + node[1].replace('$', '_')
 
     def _ty_empty(self, node) -> List[str]:
@@ -667,6 +669,7 @@ _MAIN_HEADER = """\
 #    `pyfloyd {args}`
 
 {imports}
+import json
 import re
 
 # pylint: disable=too-many-lines
@@ -681,6 +684,8 @@ def main(
     opener=open,
 ) -> int:
     arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument('-D', '--define', action='append', default=[],
+                            help='Define a global var=value')
     arg_parser.add_argument('file', nargs='?')
     args = arg_parser.parse_args(argv)
 
@@ -694,8 +699,13 @@ def main(
         path = args.file
         fp = opener(path)
 
+    global_vars = {{}}
+    for d in args.define:
+        k, v = d.split('=', 1)
+        global_vars[k] = json.loads(v)
+
     msg = fp.read()
-    result = parse(msg, path)
+    result = parse(msg, path, global_vars)
     if result.err:
         print(result.err, file=stderr)
         return 1
@@ -750,7 +760,7 @@ class Result(NamedTuple):
     pos: Optional[int] = None
 
 
-def parse(text: str, path: str = '<string>') -> Result:
+def parse(text: str, path: str = '<string>', global_vars = None) -> Result:
     \"\"\"Parse a given text and return the result.
 
     If the parse was successful, `result.val` will be the returned value
@@ -765,7 +775,7 @@ def parse(text: str, path: str = '<string>') -> Result:
     messages to indicate the path to the filename containing the given
     text.
     \"\"\"
-    return _Parser(text, path).parse()
+    return _Parser(text, path).parse(global_vars)
 
 
 class _Parser:
@@ -773,6 +783,7 @@ class _Parser:
         self._text = text
         self._end = len(self._text)
         self._errpos = 0
+        self._global_vars = {}
         self._failed = False
         self._path = path
         self._pos = 0
@@ -781,7 +792,8 @@ class _Parser:
 
 
 _PARSE = """\
-    def parse(self):
+    def parse(self, global_vars=None):
+        self._global_vars = global_vars or {{}}
         self._r_{starting_rule}()
         if self._failed:
             return Result(None, self._err_str(), self._errpos)
@@ -790,12 +802,13 @@ _PARSE = """\
 
 
 _PARSE_WITH_EXCEPTION = """\
-    def parse(self):
+    def parse(self, global_vars=None):
+        self._global_vars = global_vars or {{}}
         try:
             self._r_{starting_rule}()
             if self._failed:
-                return None, self._err_str(), self._errpos
-            return self._val, None, self._pos
+                return Result(None, self._err_str(), self._errpos)
+            return Result(self._val, None, self._pos)
         except _ParsingRuntimeError as e:  # pragma: no cover
             lineno, _ = self._err_offsets()
             return (
@@ -889,6 +902,8 @@ _BUILTIN_METHODS = """\
             if var in self._scopes[l]:
                 return self._scopes[l][var]
             l -= 1
+        if var in self._global_vars:
+            return self._global_vars[var]
         assert False, f'unknown var {var}'
 
     def _memoize(self, rule_name, fn):
