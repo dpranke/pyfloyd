@@ -835,7 +835,7 @@ _PARSE_WITH_EXCEPTION = """\
             return Result(self._val, None, self._pos)
         except _ParsingRuntimeError as e:  # pragma: no cover
             lineno, _ = self._err_offsets()
-            return (
+            return Result(
                 None,
                 self._path + ':' + str(lineno) + ' ' + str(e),
                 self._errpos,

@@ -17,7 +17,9 @@
 import json
 import os
 import pathlib
+import shutil
 import subprocess
+import sys
 import textwrap
 import unittest
 
@@ -44,6 +46,8 @@ def skip(kind):
 
 
 class GrammarTestsMixin:
+    max_diff = None
+
     def check(
         self,
         grammar,
@@ -390,7 +394,7 @@ class GrammarTestsMixin:
     def test_json(self):
         h = pyfloyd.host.Host()
         path = str(THIS_DIR / '../grammars/json.g')
-        p, err, _ = self.compile(h.read_text_file(path))
+        p, err, _ = self.compile(h.read_text_file(path), path)
         self.assertIsNone(err)
         self._common_json_checks(p, {})
 
@@ -404,7 +408,7 @@ class GrammarTestsMixin:
         externs = {'strict': True}
         h = pyfloyd.host.Host()
         path = str(THIS_DIR / '../grammars/json5.g')
-        p, err, _ = self.compile(h.read_text_file(path))
+        p, err, _ = self.compile(h.read_text_file(path), path)
         self.assertIsNone(err)
         self._common_json_checks(p, externs=externs)
         self._common_json5_checks(p, externs=externs)
@@ -414,7 +418,7 @@ class GrammarTestsMixin:
         externs = {'strict': True}
         h = pyfloyd.host.Host()
         path = str(THIS_DIR / '../grammars/json5.g')
-        p, err, _ = self.compile(h.read_text_file(path))
+        p, err, _ = self.compile(h.read_text_file(path), path)
         self.assertIsNone(err)
 
         # TODO: Figure out what to do with 'Infinity' and 'NaN'.
@@ -471,7 +475,7 @@ class GrammarTestsMixin:
         # be marshalled in and out of JSON.
         h = pyfloyd.host.Host()
         path = str(THIS_DIR / '../grammars/json5.g')
-        p, err, _ = self.compile(h.read_text_file(path))
+        p, err, _ = self.compile(h.read_text_file(path), path)
         self.assertIsNone(err)
         self.checkp(
             p,
@@ -527,7 +531,7 @@ class GrammarTestsMixin:
         h = pyfloyd.host.Host()
         path = str(THIS_DIR / '../grammars/json5_ws.g')
         grammar = h.read_text_file(path)
-        p, err, _ = self.compile(grammar)
+        p, err, _ = self.compile(grammar, path)
         self.assertIsNone(err)
         self._common_json_checks(p, externs=externs)
         self._common_json5_checks(p, externs=externs)
@@ -1106,92 +1110,33 @@ class Interpreter(unittest.TestCase, GrammarTestsMixin):
         return pyfloyd.compile(textwrap.dedent(grammar), path, memoize=memoize)
 
 
-class PythonGenerator(unittest.TestCase, GrammarTestsMixin):
-    max_diff = None
-
-    def compile(self, grammar, path='<string>', memoize=False):
-        source_code, err, endpos = pyfloyd.generate(
-            textwrap.dedent(grammar),
-            path=path,
-            options=pyfloyd.GeneratorOptions(main=False, memoize=memoize),
-        )
-        if err:
-            assert source_code is None
-            return None, err, endpos
-
-        scope = {}
-        debug = False
-        if debug:  # pragma: no cover
-            h = pyfloyd.host.Host()
-            d = h.mkdtemp()
-            h.write_text_file(d + '/parser.py', source_code)
-        exec(source_code, scope)
-        parse_fn = scope['parse']
-        if debug:  # pragma: no cover
-            h.rmtree(d)
-        return _PythonParserWrapper(parse_fn), None, 0
-
-
-class _PythonParserWrapper:
-    def __init__(self, parse_fn):
-        self.parse_fn = parse_fn
+class _GeneratedParserWrapper:
+    def __init__(self, cmd, ext, source_code):
+        self.cmd = cmd
+        self.ext = ext
+        self.source_code = source_code
+        self.host = pyfloyd.host.Host()
+        self.tempdir = self.host.mkdtemp()
+        self.source_code = source_code
+        self.source = os.path.join(self.tempdir, f'parser{self.ext}')
+        self.host.write_text_file(self.source, self.source_code)
 
     def parse(self, text, path='<string>', externs=None):
-        return self.parse_fn(text, path, externs)
-
-    def cleanup(self):
-        pass
-
-
-class JavaScriptGenerator(unittest.TestCase, GrammarTestsMixin):
-    maxDiff = None
-
-    def compile(self, grammar, path='<string>', memoize=False):
-        source_code, err, endpos = pyfloyd.generate(
-            textwrap.dedent(grammar),
-            path=path,
-            options=pyfloyd.GeneratorOptions(
-                language='javascript', main=True, memoize=memoize
-            ),
-        )
-        if err:
-            assert source_code is None
-            return None, err, endpos
-
-        h = pyfloyd.host.Host()
-        d = h.mkdtemp()
-        h.write_text_file(d + '/parser.js', source_code)
-        return _JavaScriptParserWrapper(h, d), None, 0
-
-    @skip('integration')
-    def test_json5_special_floats(self):
-        # TODO: `Infinity` and `NaN` are legal Python values and legal
-        # JavaScript values, but they are not legal JSON values, and so
-        # we can't read them in from output that is JSON.
-        pass
-
-
-class _JavaScriptParserWrapper:
-    def __init__(self, h, d):
-        self.h = h
-        self.d = d
-        self.source = d + '/parser.js'
-
-    def parse(self, text, path='<string>', externs=None):
-        del path
-        inp = self.d + '/input.txt'
-        self.h.write_text_file(inp, text)
+        inp = os.path.join(self.tempdir, 'input.txt')
+        self.host.write_text_file(inp, text)
         defines = []
         externs = externs or {}
         for k, v in externs.items():
             defines.extend(['-D', f'{k}={json.dumps(v)}'])
         proc = subprocess.run(
-            ['node', self.source] + defines + [inp],
+            self.cmd + [self.source] + defines + [inp],
             check=False,
             capture_output=True,
         )
         if proc.stderr:
             stderr = proc.stderr.decode('utf8').strip()
+            assert inp in stderr
+            stderr = stderr.replace(inp, path)
         else:
             stderr = None
         if proc.returncode == 0:
@@ -1199,4 +1144,45 @@ class _JavaScriptParserWrapper:
         return None, stderr, 0
 
     def cleanup(self):
-        self.h.rmtree(self.d)
+        self.host.rmtree(self.tempdir)
+
+
+class GeneratorMixin:
+    def compile(self, grammar, path='<string>', memoize=False):
+        source_code, err, endpos = pyfloyd.generate(
+            textwrap.dedent(grammar),
+            path=path,
+            options=pyfloyd.GeneratorOptions(
+                language=self.language, main=True, memoize=memoize
+            ),
+        )
+        if err:
+            assert source_code is None
+            return None, err, endpos
+
+        return (
+            _GeneratedParserWrapper(self.cmd, self.ext, source_code),
+            None,
+            0,
+        )
+
+
+class PythonGenerator(unittest.TestCase, GeneratorMixin, GrammarTestsMixin):
+    cmd = [sys.executable]
+    language = 'python'
+    ext = '.py'
+
+
+class JavaScriptGenerator(
+    unittest.TestCase, GeneratorMixin, GrammarTestsMixin
+):
+    cmd = [shutil.which('node')]
+    language = 'javascript'
+    ext = '.js'
+
+    @skip('integration')
+    def test_json5_special_floats(self):
+        # TODO: `Infinity` and `NaN` are legal Python values and legal
+        # JavaScript values, but they are not legal JSON values, and so
+        # we can't read them in from output that is JSON.
+        pass

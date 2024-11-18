@@ -681,7 +681,9 @@ options:
       break;
     }
   }
+  let filename;
   if (process.argv.length == i || process.argv[i] == "-") {
+    filename = '<stdin>';
     function readStream(stream) {
       stream.setEncoding("utf8");
       return new Promise((resolve, reject) => {
@@ -694,10 +696,11 @@ options:
     }
     s = await readStream(process.stdin);
   } else {
-    s = await fs.promises.readFile(process.argv[i]);
+    filename = process.argv[i];
+    s = await fs.promises.readFile(filename);
   }
 
-  let result = parse(s.toString(), '<string>', externs);
+  let result = parse(s.toString(), filename, externs);
 
   let txt, stream, ret;
   if (result.err != undefined) {
