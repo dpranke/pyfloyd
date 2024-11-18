@@ -24,6 +24,8 @@ from pyfloyd.javascript_generator import JavaScriptGenerator
 
 Result = parser.Result
 
+Externs = Optional[Dict[str, Any]]
+
 
 class ParserInterface(Protocol):
     """The interface to a compiled parser.
@@ -36,7 +38,7 @@ class ParserInterface(Protocol):
         self,
         text: str,
         path: str = '<string>',
-        externs: Optional[Dict[str, Any]] = None,
+        externs: Externs = None,
     ) -> Result:
         """Parse a string and return a result.
 
@@ -89,7 +91,7 @@ def generate(
     grammar: str,
     path: str = '<string>',
     options: Optional[GeneratorOptions] = None,
-    externs=None,
+    externs: Externs = None,
 ) -> Result:
     """Generate the source code of a parser.
 
@@ -130,7 +132,6 @@ def generate(
             result.val,
             rewrite_filler=True,
             rewrite_subrules=True,
-            externs=externs,
         )
     except analyzer.AnalysisError as e:
         return Result(err=str(e))
@@ -151,7 +152,7 @@ def parse(
     text: str,
     grammar_path: str = '<string>',
     path: str = '<string>',
-    externs: Dict[str, Any] = None,
+    externs: Externs = None,
     memoize: bool = False,
 ) -> Result:
     """Match an input text against the specified grammar.
@@ -213,7 +214,6 @@ def pretty_print(
     try:
         g = analyzer.analyze(
             result.val,
-            externs=externs,
             rewrite_filler=rewrite_filler,
             rewrite_subrules=rewrite_subrules,
         )
@@ -225,7 +225,6 @@ def pretty_print(
 def dump_ast(
     grammar: str,
     path: str = '<string>',
-    externs=None,
     rewrite_filler: bool = False,
     rewrite_subrules: bool = False,
 ) -> Tuple[Optional[str], Optional[str]]:
@@ -240,7 +239,6 @@ def dump_ast(
     try:
         g = analyzer.analyze(
             result.val,
-            externs=externs,
             rewrite_filler=rewrite_filler,
             rewrite_subrules=rewrite_subrules,
         )

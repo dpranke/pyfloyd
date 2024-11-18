@@ -86,7 +86,7 @@ class PythonGenerator(Generator):
             imports += 'import re\n'
         if self._options.main:
             imports += 'import sys\n'
-        imports += 'from typing import Any, NamedTuple, Optional\n'
+        imports += 'from typing import Any, Dict, NamedTuple, Optional\n'
         if self._unicodedata_needed:
             imports += 'import unicodedata\n'
 
@@ -652,6 +652,8 @@ _DEFAULT_HEADER = """\
 
 {imports}
 
+Externs = Optional[Dict[str, Any]]
+
 # pylint: disable=too-many-lines
 
 
@@ -671,6 +673,9 @@ _MAIN_HEADER = """\
 {imports}
 import json
 import re
+from typing import Any, Optional, Dict
+
+Externs = Optional[Dict[str, Any]]
 
 # pylint: disable=too-many-lines
 
@@ -760,7 +765,9 @@ class Result(NamedTuple):
     pos: Optional[int] = None
 
 
-def parse(text: str, path: str = '<string>', externs = None) -> Result:
+def parse(
+    text: str, path: str = '<string>', externs: Externs = None
+) -> Result:
     \"\"\"Parse a given text and return the result.
 
     If the parse was successful, `result.val` will be the returned value
@@ -792,7 +799,7 @@ class _Parser:
 
 
 _PARSE = """\
-    def parse(self, externs=None):
+    def parse(self, externs: Externs = None):
         self._externs = externs or {{}}
         self._r_{starting_rule}()
         if self._failed:
@@ -802,7 +809,7 @@ _PARSE = """\
 
 
 _PARSE_WITH_EXCEPTION = """\
-    def parse(self, externs=None):
+    def parse(self, externs: Externs = None):
         self._externs = externs or {{}}
         try:
             self._r_{starting_rule}()

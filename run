@@ -11,8 +11,7 @@ import sys
 
 try:
     import pyfloyd
-except ModuleNotFoundError as e:
-    pyfloyd = None
+except ModuleNotFoundError:
     pass
 
 
@@ -27,10 +26,7 @@ class Runner:
         self.run_cmd = None
         self.subps = None
         self.uv_path = None
-        if pyfloyd is not None:
-            self.version = pyfloyd.__version__
-        else:
-            self.version = None
+        self.version = None
 
     def add_parser(self, cmd, help):  # pylint: disable=redefined-builtin
         method = getattr(self, 'run_' + cmd.replace('-', '_'))
@@ -417,11 +413,16 @@ class Runner:
         return test
 
     def _get_version(self):
-        if self.version is None:
-            proc = self.call(
-                self.run_cmd + ['-m', 'pyfloyd', '-V'], capture_output=True
-            )
-            self.version = proc.stdout.decode('utf8').strip()
+        if self.version is not None:
+            return
+        if 'pyfloyd' in sys.modules:
+            self.version = pyfloyd.__version__
+            return
+
+        proc = self.call(
+            self.run_cmd + ['-m', 'pyfloyd', '-V'], capture_output=True
+        )
+        self.version = proc.stdout.decode('utf8').strip()
 
         m = re.match(r'\d+\.\d+\.\d+(\.dev\d+)?', self.version)
         if not m:

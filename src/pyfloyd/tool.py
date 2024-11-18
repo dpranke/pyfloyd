@@ -81,9 +81,7 @@ def main(argv=None, host=None):
                 grammar, path=args.grammar, options=options
             )
         else:
-            contents, err, _ = _interpret_grammar(
-                host, args, grammar, externs
-            )
+            contents, err, _ = _interpret_grammar(host, args, grammar, externs)
 
         if err:
             host.print(err, file=host.stderr)

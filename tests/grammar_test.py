@@ -394,9 +394,7 @@ class GrammarTestsMixin:
         self.assertIsNone(err)
         self._common_json_checks(p)
 
-        self.checkp(
-            p, text='"foo"', out='"foo"', externs={'strict': False}
-        )
+        self.checkp(p, text='"foo"', out='"foo"', externs={'strict': False})
 
         if hasattr(p, 'cleanup'):
             p.cleanup()
@@ -718,9 +716,7 @@ class GrammarTestsMixin:
         self.check(
             g,
             text='1',
-            grammar_err=(
-                'Errors were found:\n  Unknown rule "a"\n'
-            ),
+            grammar_err=('Errors were found:\n  Unknown rule "a"\n'),
         )
 
     @skip('operators')

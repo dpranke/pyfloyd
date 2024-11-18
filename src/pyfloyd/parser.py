@@ -3,8 +3,10 @@
 #    `pyfloyd -o src/pyfloyd/parser.py --memoize -c grammars/floyd.g`
 
 import re
-from typing import Any, NamedTuple, Optional
+from typing import Any, Dict, NamedTuple, Optional
 
+
+Externs = Optional[Dict[str, Any]]
 
 # pylint: disable=too-many-lines
 
@@ -24,7 +26,9 @@ class Result(NamedTuple):
     pos: Optional[int] = None
 
 
-def parse(text: str, path: str = '<string>', externs = None) -> Result:
+def parse(
+    text: str, path: str = '<string>', externs: Externs = None
+) -> Result:
     """Parse a given text and return the result.
 
     If the parse was successful, `result.val` will be the returned value
@@ -55,7 +59,7 @@ class _Parser:
         self._cache = {}
         self._regexps = {}
 
-    def parse(self, externs=None):
+    def parse(self, externs: Externs = None):
         self._externs = externs or {}
         self._r_grammar()
         if self._failed:
