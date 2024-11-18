@@ -31,15 +31,7 @@ class Printer:
             if ty == 'pragma':
                 rule_name = '%' + rule_name
                 self._max_rule_len = max(len(rule_name), self._max_rule_len)
-                if rule_name == '%token':
-                    cs = [(node[0], '')]
-                elif rule_name == '%tokens':
-                    if len(node) == 1:
-                        rule_name = '%token'
-                        cs = [(node[0], '')]
-                    else:
-                        cs = [(' '.join(node), '')]
-                elif rule_name in ('%extern', '%externs', '%globals'):
+                if rule_name in ('%externs', '%tokens'):
                     cs = [(' '.join(node), '')]
                 else:
                     assert rule_name in (

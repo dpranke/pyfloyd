@@ -57,9 +57,9 @@ class Grammar:
         for n in self.ast[2]:
             if n[1].startswith('%'):
                 self.pragmas.append(n)
-                if n[1] in ('%token', '%tokens'):
+                if n[1] == '%tokens':
                     self._collect_idents(self.tokens, n)
-                if n[1] in ('%globals', '%externs', '%extern'):
+                if n[1] == '%externs':
                     self._collect_idents(self.externs, n)
                 continue
 
@@ -198,7 +198,7 @@ class _Analyzer:
         pragma = node[1]
         choice = node[2][0]
 
-        if pragma in ('%token', '%tokens'):
+        if pragma == '%tokens':
             for subnode in choice[2]:
                 for expr in subnode[2]:
                     token = expr[1]
@@ -224,7 +224,7 @@ class _Analyzer:
             operator = seq[2][0][1]
             direction = seq[2][1][1]
             self.grammar.assoc[operator] = direction
-        elif pragma in ('%extern', '%externs', '%globals'):
+        elif pragma == '%externs':
             pass
         else:
             self.errors.append(f'Unknown pragma "{pragma}"')
@@ -484,7 +484,7 @@ def _check_lr(name, node, grammar, seen):
 
 def _rewrite_filler(grammar):
     """Rewrites the grammar to insert filler rules and nodes. Unsets
-    %whitespace, %comment, and %token(s)."""
+    %whitespace, %comment, and %tokens."""
     if not grammar.comment and not grammar.whitespace:
         return
 
@@ -503,7 +503,7 @@ def _rewrite_filler(grammar):
         rule
         for rule in grammar.ast[2]
         if rule[1]
-        not in ('%whitespace', '%comment', '%globals', '%token', '%tokens')
+        not in ('%whitespace', '%comment', '%externs', '%tokens')
     ]
     grammar.comment = None
     grammar.whitespace = None
@@ -512,7 +512,7 @@ def _rewrite_filler(grammar):
         n
         for n in grammar.pragmas
         if n[1]
-        not in ('%whitespace', '%comment', '%globals', '%token', '%tokens')
+        not in ('%whitespace', '%comment', '%externs', '%tokens')
     ]
 
 

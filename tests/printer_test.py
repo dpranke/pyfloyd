@@ -66,7 +66,7 @@ class PrinterTest(unittest.TestCase):
         grammar = textwrap.dedent("""\
             %comment = '//' (~'\\n' any)*
 
-            %token = foo
+            %tokens = foo
 
             grammar  = foo end
 
@@ -121,7 +121,7 @@ class PrinterTest(unittest.TestCase):
         grammar = textwrap.dedent("""\
             %comment = '//' (~'\\n' any)*
 
-            %token = foo
+            %tokens = foo
 
             grammar  = foo end
 
@@ -144,7 +144,7 @@ class PrinterTest(unittest.TestCase):
 
     def test_token(self):
         grammar = textwrap.dedent("""\
-            %token = foo
+            %tokens = foo
 
             grammar = foo
 
@@ -168,23 +168,11 @@ class PrinterTest(unittest.TestCase):
         self.assertEqual(grammar, out)
         self.assertIsNone(err)
 
-    def test_tokens_only_one_token(self):
-        grammar = textwrap.dedent("""\
-            %token = foo
-
-            grammar = foo
-
-            foo     = 'foo'
-            """)
-        out, err = pyfloyd.pretty_print(grammar)
-        self.assertEqual(grammar.replace('%tokens', '%token'), out)
-        self.assertIsNone(err)
-
     def test_whitespace(self):
         grammar = textwrap.dedent("""\
             %whitespace = ' '*
 
-            %token = foo
+            %tokens = foo
 
             grammar     = foo end
 

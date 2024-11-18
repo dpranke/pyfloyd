@@ -162,7 +162,7 @@ class GrammarTestsMixin:
 
     def test_comment_pragma(self):
         grammar = """\
-            %token = foo
+            %tokens = foo
             %comment = '//' (~'\n' any)*
             grammar = (foo ' '* '\n')+  end -> true
 
@@ -1037,7 +1037,7 @@ class GrammarTestsMixin:
     def test_token_pragma(self):
         self.check(
             """\
-            %token = foo
+            %tokens = foo
             grammar = foo -> true
             foo     = bar
             bar     = 'baz'
@@ -1049,7 +1049,7 @@ class GrammarTestsMixin:
     def test_token_pragma_token_is_unknown(self):
         self.check(
             """\
-            %token = quux
+            %tokens = quux
             grammar = foo -> true
             foo     = bar
             bar     = 'baz'
@@ -1081,7 +1081,7 @@ class GrammarTestsMixin:
 
     def test_whitespace_pragma(self):
         grammar = """\
-            %token = foo
+            %tokens = foo
             %whitespace = ' '
 
             grammar = foo foo end -> true
