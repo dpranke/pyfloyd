@@ -78,13 +78,12 @@ def main(argv=None, host=None):
                 language=args.language, main=args.main, memoize=args.memoize
             )
             contents, err, _ = pyfloyd.generate(
-                grammar,
-                path=args.grammar,
-                options=options
+                grammar, path=args.grammar, options=options
             )
         else:
-            contents, err, _ = _interpret_grammar(host, args, grammar,
-                                                  global_vars)
+            contents, err, _ = _interpret_grammar(
+                host, args, grammar, global_vars
+            )
 
         if err:
             host.print(err, file=host.stderr)
@@ -110,8 +109,13 @@ def _parse_args(host, argv):
         action='store_true',
         help='compile grammar instead of interpreting it',
     )
-    ap.add_argument('-D', '--define', action='append', default=[],
-                    help='Define a global var=value')
+    ap.add_argument(
+        '-D',
+        '--define',
+        action='append',
+        default=[],
+        help='Define a global var=value',
+    )
     ap.add_argument('-o', '--output', help='path to write output to')
     ap.add_argument(
         '-p',

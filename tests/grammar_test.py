@@ -60,8 +60,9 @@ class GrammarTestsMixin:
             p.cleanup()
 
     def checkp(self, parser, text, out=None, err=None, global_vars=None):
-        actual_out, actual_err, _ = parser.parse(text, path='<string>', 
-                                                 global_vars=global_vars)
+        actual_out, actual_err, _ = parser.parse(
+            text, path='<string>', global_vars=global_vars
+        )
         # Test err before out because it's probably more helpful to display
         # an unexpected error than it is to display an unexpected output.
         self.assertMultiLineEqual(err or '', actual_err or '')
@@ -393,7 +394,9 @@ class GrammarTestsMixin:
         self.assertIsNone(err)
         self._common_json_checks(p)
 
-        self.checkp(p, text='"foo"', out='"foo"', global_vars={'_strict': False})
+        self.checkp(
+            p, text='"foo"', out='"foo"', global_vars={'_strict': False}
+        )
 
         if hasattr(p, 'cleanup'):
             p.cleanup()
@@ -409,7 +412,7 @@ class GrammarTestsMixin:
 
     @skip('integration')
     def test_json5_special_floats(self):
-        gv = { '_strict': True }
+        gv = {'_strict': True}
         h = pyfloyd.host.Host()
         path = str(THIS_DIR / '../grammars/json5.g')
         p, err, _ = self.compile(h.read_text_file(path))
@@ -429,7 +432,7 @@ class GrammarTestsMixin:
             p.cleanup()
 
     def _common_json_checks(self, p):
-        gvs = { '_strict': True }
+        gvs = {'_strict': True}
         self.checkp(p, text='123', out=123, global_vars=gvs)
         self.checkp(p, text='1.5', out=1.5, global_vars=gvs)
         self.checkp(p, text='-1.5', out=-1.5, global_vars=gvs)
@@ -443,21 +446,25 @@ class GrammarTestsMixin:
         self.checkp(p, text='{}', out={}, global_vars=gvs)
 
         self.checkp(
-            p, text='[1', err='<string>:1 Unexpected end of input at column 3',
-            global_vars=gvs
+            p,
+            text='[1',
+            err='<string>:1 Unexpected end of input at column 3',
+            global_vars=gvs,
         )
 
         # Check that leading whitespace is allowed.
         self.checkp(p, '  {}', {}, global_vars=gvs)
 
     def _common_json5_checks(self, p):
-        gvs = { '_strict': False }
+        gvs = {'_strict': False}
         self.checkp(p, text='+1.5', out=1.5, global_vars=gvs)
         self.checkp(p, text='.5e-2', out=0.005, global_vars=gvs)
         self.checkp(p, text='"foo"', out='foo', global_vars=gvs)
         self.checkp(
-            p, text='{foo: "bar", a: "b"}', out={'foo': 'bar', 'a': 'b'},
-            global_vars=gvs
+            p,
+            text='{foo: "bar", a: "b"}',
+            out={'foo': 'bar', 'a': 'b'},
+            global_vars=gvs,
         )
 
     @skip('integration')
@@ -512,7 +519,7 @@ class GrammarTestsMixin:
                     'trailing commas too',
                 ],
             },
-            global_vars={ '_strict': False }
+            global_vars={'_strict': False},
         )
         if hasattr(p, 'cleanup'):
             p.cleanup()
@@ -1171,7 +1178,9 @@ class _JavaScriptParserWrapper:
         for k, v in global_vars.items():
             defines.extend(['-D', f'{k}={json.dumps(v)}'])
         proc = subprocess.run(
-            ['node', self.source] + defines + [inp], check=False, capture_output=True
+            ['node', self.source] + defines + [inp],
+            check=False,
+            capture_output=True,
         )
         if proc.stderr:
             stderr = proc.stderr.decode('utf8').strip()

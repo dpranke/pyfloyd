@@ -88,7 +88,9 @@ class OperatorState:
         self.choices = {}
 
 
-def analyze(ast, rewrite_filler: bool, rewrite_subrules: bool, global_vars=None) -> Grammar:
+def analyze(
+    ast, rewrite_filler: bool, rewrite_subrules: bool, global_vars=None
+) -> Grammar:
     """Analyze and optimize the AST.
 
     This runs any static analysis we can do over the grammars and
@@ -496,7 +498,8 @@ def _rewrite_filler(grammar):
     grammar.ast[2] = [
         rule
         for rule in grammar.ast[2]
-        if rule[1] not in ('%whitespace', '%comment', '%globals', '%token', '%tokens')
+        if rule[1]
+        not in ('%whitespace', '%comment', '%globals', '%token', '%tokens')
     ]
     grammar.comment = None
     grammar.whitespace = None
@@ -504,7 +507,8 @@ def _rewrite_filler(grammar):
     grammar.pragmas = [
         n
         for n in grammar.pragmas
-        if n[1] not in ('%whitespace', '%comment', '%globals', '%token', '%tokens')
+        if n[1]
+        not in ('%whitespace', '%comment', '%globals', '%token', '%tokens')
     ]
 
 

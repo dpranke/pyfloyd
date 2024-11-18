@@ -32,7 +32,12 @@ class ParserInterface(Protocol):
     `compile()`.
     """
 
-    def parse(self, text: str, path: str = '<string>', global_vars: Optional[Dict[str, Any]] = None) -> Result:
+    def parse(
+        self,
+        text: str,
+        path: str = '<string>',
+        global_vars: Optional[Dict[str, Any]] = None,
+    ) -> Result:
         """Parse a string and return a result.
 
         `text` is the string to parse.
@@ -84,7 +89,7 @@ def generate(
     grammar: str,
     path: str = '<string>',
     options: Optional[GeneratorOptions] = None,
-    global_vars = None
+    global_vars=None,
 ) -> Result:
     """Generate the source code of a parser.
 
@@ -122,7 +127,10 @@ def generate(
         return result
     try:
         grammar_obj = analyzer.analyze(
-            result.val, rewrite_filler=True, rewrite_subrules=True, global_vars=global_vars
+            result.val,
+            rewrite_filler=True,
+            rewrite_subrules=True,
+            global_vars=global_vars,
         )
     except analyzer.AnalysisError as e:
         return Result(err=str(e))
@@ -143,7 +151,7 @@ def parse(
     text: str,
     grammar_path: str = '<string>',
     path: str = '<string>',
-    global_vars : Dict[str, Any] = None,
+    global_vars: Dict[str, Any] = None,
     memoize: bool = False,
 ) -> Result:
     """Match an input text against the specified grammar.
@@ -174,7 +182,7 @@ def parse(
 def pretty_print(
     grammar: str,
     path: str = '<string>',
-    global_vars = None,
+    global_vars=None,
     rewrite_filler: bool = False,
     rewrite_subrules: bool = False,
 ) -> Tuple[Optional[str], Optional[str]]:
@@ -217,7 +225,7 @@ def pretty_print(
 def dump_ast(
     grammar: str,
     path: str = '<string>',
-    global_vars = None,
+    global_vars=None,
     rewrite_filler: bool = False,
     rewrite_subrules: bool = False,
 ) -> Tuple[Optional[str], Optional[str]]:

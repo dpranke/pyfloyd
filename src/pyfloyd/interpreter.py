@@ -49,7 +49,9 @@ class Interpreter:
         self._regexps = {}
         self._global_vars = {}
 
-    def parse(self, text: str, path: str = '<string>', global_vars = None) -> parser.Result:
+    def parse(
+        self, text: str, path: str = '<string>', global_vars=None
+    ) -> parser.Result:
         self._text = text
         self._path = path
         self._failed = False

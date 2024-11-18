@@ -24,7 +24,7 @@ class Result(NamedTuple):
     pos: Optional[int] = None
 
 
-def parse(text: str, path: str = '<string>', global_vars = None) -> Result:
+def parse(text: str, path: str = '<string>', global_vars=None) -> Result:
     """Parse a given text and return the result.
 
     If the parse was successful, `result.val` will be the returned value
