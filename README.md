@@ -28,6 +28,11 @@ format the code. `./run --help` is your friend to find out more.
 
 ## Version History / Release Notes
 
+* v0.19.0 (2024-11-18)
+    * Clean up handling of external values in grammars and add more
+      error checking.
+    * Clean up the way the language to use when generating code is
+      selected.
 * v0.18.3 (2024-11-17)
     * Remove dependencies on `build`, `twine`, just use `uv build` and
       `uv publish`.
