@@ -57,10 +57,6 @@ class Grammar:
         for n in self.ast[2]:
             if n[1].startswith('%'):
                 self.pragmas.append(n)
-                if n[1] == '%tokens':
-                    self._collect_idents(self.tokens, n)
-                if n[1] == '%externs':
-                    self._collect_idents(self.externs, n)
                 continue
 
             if not has_starting_rule:
@@ -79,12 +75,6 @@ class Grammar:
         for rule in self.rules:
             if rule not in rules:
                 self.ast[2].append(['rule', rule, [self.rules[rule]]])
-
-    def _collect_idents(self, s, n):
-        if n[0] == 'apply':
-            s.add(n[1])
-        for sn in n[2]:
-            self._collect_idents(s, sn)
 
 
 class OperatorState:
@@ -198,25 +188,23 @@ class _Analyzer:
         pragma = node[1]
         choice = node[2][0]
 
-        if pragma == '%tokens':
-            for subnode in choice[2]:
-                for expr in subnode[2]:
-                    token = expr[1]
-                    if token not in self.grammar.rules:
-                        self.errors.append(f'Unknown token rule "{token}"')
+        if pragma == '%externs':
+            self._collect_idents(self.grammar.externs, node)
+        elif pragma == '%tokens':
+            self._collect_idents(self.grammar.tokens, node)
+            for t in self.grammar.tokens:
+                if t not in self.grammar.rules:
+                    self.errors.append(f'Unknown token rule "{t}"')
         elif pragma == '%whitespace':
             self.grammar.whitespace = choice
         elif pragma == '%comment':
             self.grammar.comment = choice
         elif pragma == '%prec':
+            operators = set()
             for c in choice[2]:
-                for t in c[2]:
-                    if t[0] != 'lit':
-                        self.errors.append(
-                            f'Expected literal for %prec, not {t[1]}'
-                        )
-                    else:
-                        self.grammar.prec[t[1]] = self.current_prec
+                self._collect_operators(operators, c)
+                for op in operators:
+                    self.grammar.prec[op] = self.current_prec
                 self.current_prec += 2
         elif pragma == '%assoc':
             choice = node[2][0]
@@ -224,10 +212,30 @@ class _Analyzer:
             operator = seq[2][0][1]
             direction = seq[2][1][1]
             self.grammar.assoc[operator] = direction
-        elif pragma == '%externs':
-            pass
         else:
             self.errors.append(f'Unknown pragma "{pragma}"')
+
+    def _collect_idents(self, s, n):
+        if n[0] == 'apply':
+            s.add(n[1])
+        for sn in n[2]:
+            self._collect_idents(s, sn)
+
+    def _collect_operators(self, operators, node):
+        if node[0] == 'lit':
+            operators.add(node[1])
+            return
+        if node[0] == 'apply':
+            if node[1] not in self.grammar.rules:
+                self.errors.append(f'Unknown rule "{node[1]}"')
+                return
+            self._collect_operators(operators, self.grammar.rules[node[1]])
+            return
+        if node[0] in ('rule', 'choice', 'seq'):
+            for sn in node[2]:
+                self._collect_operators(operators, sn)
+            return
+        self.errors.append(f'Unexpected AST node type {node[0]} in %prec')
 
     def check_for_unknown_rules(self, node):
         if (

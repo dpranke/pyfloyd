@@ -695,6 +695,18 @@ class GrammarTestsMixin:
             out=None,
         )
 
+    def test_operator_indirect(self):
+        # Tests that you can specify the list of operators in a rule
+        # separate from the actual pragma.
+        g = """
+            %prec = op
+            expr  = expr op expr -> [$1, $2, $3]
+                  | '0'..'9'
+            op    = '+' | '-'
+        """
+        self.check(g, '1+2', out=['1', '+', '2'])
+
+    @skip('operators')
     def test_operator_invalid(self):
         # TODO: Provide a better error message, allow rules that expand
         # to literals.
@@ -707,7 +719,7 @@ class GrammarTestsMixin:
             g,
             text='1',
             grammar_err=(
-                'Errors were found:\n' '  Expected literal for %prec, not a\n'
+                'Errors were found:\n  Unknown rule "a"\n'
             ),
         )
 
