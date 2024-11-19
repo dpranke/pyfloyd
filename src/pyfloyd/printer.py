@@ -135,6 +135,9 @@ class Printer:
     def _ty_e_minus(self, node):
         return '%s - %s' % (self._proc(node[2][0]), self._proc(node[2][1]))
 
+    def _ty_e_not(self, node):
+        return '!' + self._proc(node[2][0])
+
     def _ty_e_num(self, node):
         return str(node[1])
 

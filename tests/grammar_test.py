@@ -95,6 +95,11 @@ class GrammarTestsMixin:
             err='<string>:1 Unexpected end of input at column 12',
         )
 
+    def test_e_not(self):
+        self.check('g = -> !false', text='', out=True)
+        self.check('g = -> !true', text='', out=False)
+        self.check('g = (?{true}):x -> !x', text='', out=False)
+
     def test_quals(self):
         self.check("g = -> utoi(' ')", text='', out=32)
         self.check("g = 'x'*:l -> l[0]", text='xx', out='x')

@@ -369,6 +369,9 @@ class PythonGenerator(Generator):
             self._gen_expr(node[2][0]), '-', self._gen_expr(node[2][1])
         )
 
+    def _ty_e_not(self, node) -> Tree:
+        return Tree(None, 'not ', self._gen_expr(node[2][0]))
+
     def _ty_e_num(self, node) -> str:
         return node[1]
 

@@ -250,6 +250,15 @@ class Interpreter:
         v2 = self._val
         self._succeed(v1 - v2)
 
+    def _ty_e_not(self, node):
+        self._interpret(node[2][0])
+        # TODO: Should we be stricter about node[2][0] needing to result
+        # in a boolean?
+        if self._val:
+            self._succeed(False)
+        else:
+            self._succeed(True)
+
     def _ty_e_num(self, node):
         if node[1].startswith('0x'):
             self._succeed(int(node[1], base=16))

@@ -100,6 +100,7 @@ zpos        = '0'                          -> 0
 
 e_expr     = e_qual '+' e_expr             -> ['e_plus', null, [$1, $3]]
            | e_qual '-' e_expr             -> ['e_minus', null, [$1, $3]]
+           | '!' e_qual                    -> ['e_not', null, [$2]]
            | e_qual
 
 e_exprs    = e_expr (',' e_expr)* ','?     -> cons($1, $2)

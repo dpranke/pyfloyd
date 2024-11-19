@@ -125,7 +125,10 @@ class Tree(Formatter):
         1
         + 2
         - 3
-    This requires some surgery when walking the tree."""
+    This requires some surgery when walking the tree.
+
+    `left` and `right` may be `None` to handle prefix and postfix operators.
+    """
 
     def __init__(self, left, op, right):
         self.left = left
@@ -141,13 +144,33 @@ class Tree(Formatter):
 
     def fmt(self, current_depth, max_depth, indent):
         if current_depth == max_depth:
-            s = fmt(self.left, current_depth, max_depth, indent)[0]
-            s += ' ' + self.op + ' '
-            s += fmt(self.right, current_depth, max_depth, indent)[0]
+            if self.left is None:
+                s = self.op
+                s += fmt(self.right, current_depth, max_depth, indent)[0]
+            else:
+                s = fmt(self.left, current_depth, max_depth, indent)[0]
+                if self.right is None:
+                    s += self.op
+                else:
+                    s += ' ' + self.op + ' '
+                    s += fmt(self.right, current_depth, max_depth, indent)[0]
             return [s]
-        lines = fmt(self.left, current_depth, max_depth, indent)
-        right = fmt(self.right, current_depth, max_depth, indent)
-        lines.append(self.op + ' ' + right[0])
-        if right[1:]:
-            lines += right[1:]
+        
+        if self.right is None:
+            right = ['']
+        else:
+            right = fmt(self.right, current_depth, max_depth, indent)
+
+        if self.left is None:
+            s = self.op + fmt(self.right, current_depth, max_depth, indent)[0]
+            lines = [s]
+        else:
+            lines = fmt(self.left, current_depth, max_depth, indent)
+        if self.right is None:
+            lines[-1] += self.op
+        else:
+            right = fmt(self.right, current_depth, max_depth, indent)
+            lines.append(self.op + ' ' + right[0])
+            if right[1:]:
+                lines += right[1:]
         return lines
