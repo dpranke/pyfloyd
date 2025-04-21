@@ -1071,11 +1071,11 @@ class _Parser:
 
     def _r_set_char(self):
         p = self._pos
-        self._memoize('r_escape', self._r_escape)
+        self._s_set_char_1()
         if not self._failed:
             return
         self._rewind(p)
-        self._s_set_char_1()
+        self._memoize('r_escape', self._r_escape)
         if not self._failed:
             return
         self._rewind(p)
