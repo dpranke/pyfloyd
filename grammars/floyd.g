@@ -73,7 +73,7 @@ escape      = '\\b'                        -> '\x08'
             | '\\\\'                       -> '\x5C'
             | hex_esc
             | uni_esc
-            | '\\' any                     -> $2
+            | '\\' any                     -> strcat('\\', $2)
 
 hex_esc     = '\\x' hex_char{2}            -> atou(cat($2), 16)
             | '\\x{' hex_char+ '}'         -> atou(cat($2), 16)

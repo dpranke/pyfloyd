@@ -149,6 +149,7 @@ BUILTIN_FUNCTIONS = (
     'int',
     'itou',
     'join',
+    'otou',
     'scat',
     'scons',
     'strcat',

@@ -834,7 +834,7 @@ class _Parser:
         if self._failed:
             return
         v__2 = self._val
-        self._succeed(v__2)
+        self._succeed(self._fn_strcat('\\', v__2))
 
     def _r_hex_esc(self):
         p = self._pos
@@ -1857,3 +1857,6 @@ class _Parser:
 
     def _fn_scons(self, hd, tl):
         return [hd] + tl
+
+    def _fn_strcat(self, a, b):
+        return a + b

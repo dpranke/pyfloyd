@@ -263,6 +263,7 @@ class PythonGenerator(Generator):
         # do yet.
         assert node[0] in (
             'ends_in',
+            'equals',
             'lit',
             'not',
             'not_one',
@@ -1054,8 +1055,11 @@ _BUILTIN_METHODS = """\
     def _fn_join(self, s, vs):
         return s.join(vs)
 
-    def _fn_scat(self, ss):
-        return ''.join(ss)
+    def _fn_otou(self, s):
+        return chr(int(s, base=8))
+
+    def _fn_scat(self, hd, tl):
+        return self._fn_cat(self._fn_cons(hd, tl))
 
     def _fn_scons(self, hd, tl):
         return [hd] + tl
