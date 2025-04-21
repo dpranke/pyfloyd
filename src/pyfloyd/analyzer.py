@@ -443,26 +443,30 @@ def _check_lr(name, node, grammar, seen):
             return False
         seen.add(node[1])
         return _check_lr(name, grammar.rules[node[1]], grammar, seen)
-
+    if ty in ('lit', 'ends_in', 'not_one', 'plus', 'unicat'):
+        return False
     if ty == 'seq':
         for subnode in node[2]:
             if subnode[0] == 'lit':
                 return False
             r = _check_lr(name, subnode, grammar, seen)
-            if r:
+            if r is not None:
                 return r
         return False
     if ty == 'choice':
-        return any(_check_lr(name, n, grammar, seen) for n in node[2])
+        for n in node[2]:
+            r = _check_lr(name, n, grammar, seen)
+            if r is not None:
+                return r
+        return None
+    if ty in ('opt', 'star'):
+        return None
     if ty in (
         'count',
-        'ends_in',
         'label',
         'not',
-        'not_one',
         'opt',
         'paren',
-        'plus',
         'run',
         'scope',
         'star',
@@ -477,12 +481,10 @@ def _check_lr(name, node, grammar, seen):
         'empty',
         'equals',
         'leftrec',
-        'lit',
         'pred',
         'range',
         'regexp',
         'set',
-        'unicat',
     ), (
         'unexpected AST node type %s' % ty  # pragma: no cover
     )
