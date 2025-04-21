@@ -110,6 +110,12 @@ def analyze(ast, rewrite_filler: bool, rewrite_subrules: bool) -> Grammar:
 
     # Find whatever errors we can.
     a = _Analyzer(g)
+    a.add_pragmas()
+
+    # Add in the _whitespace, _comment, and _filler rules.
+    if rewrite_filler:
+        _add_filler_rules(g)
+
     a.run_checks()
     if a.errors:
         raise AnalysisError(a.errors)
@@ -120,8 +126,8 @@ def analyze(ast, rewrite_filler: bool, rewrite_subrules: bool) -> Grammar:
     # Rewrite the AST to insert leftrec and operator nodes as needed.
     _rewrite_recursion(g)
 
+    # Insert filler nodes.
     if rewrite_filler:
-        # Insert filler rules and filler nodes.
         _rewrite_filler(g)
 
     # Rewrite any choice or seq nodes that only have one child.
@@ -172,11 +178,17 @@ class _Analyzer:
         self.current_prec = 0
         self.current_rule = None
 
-    def run_checks(self):
+    def add_pragmas(self):
         for node in self.grammar.ast[2]:
             self.current_rule = node[1]
             if node[1][0] == '%':
                 self.check_pragma(node)
+                continue
+
+    def run_checks(self):
+        for node in self.grammar.ast[2]:
+            self.current_rule = node[1]
+            if node[1][0] == '%':
                 continue
             self.check_for_unknown_rules(node)
             self.check_for_unknown_functions(node)
@@ -500,9 +512,6 @@ def _rewrite_filler(grammar):
     # Compute the transitive closure of all the token rules.
     _collect_tokens(grammar, grammar.ast)
 
-    # Add in the _whitespace, _comment, and _filler rules.
-    _add_filler_rules(grammar)
-
     # Now rewrite all the rules to insert the filler nodes.
     grammar.ast = _add_filler_nodes(grammar, grammar.ast)
     grammar.update_rules()
@@ -542,20 +551,23 @@ def _collect_tokens(grammar, node):
 def _add_filler_rules(grammar):
     if grammar.whitespace:
         grammar.rules['_whitespace'] = grammar.whitespace
+        grammar.tokens.add('_whitespace')
     if grammar.comment:
         grammar.rules['_comment'] = grammar.comment
+        grammar.tokens.add('_comment')
+    filler = None
     if grammar.whitespace and grammar.comment:
         if (
             grammar.whitespace[0] == 'regexp'
             and grammar.comment[0] == 'regexp'
         ):
-            grammar.rules['_filler'] = [
+            filler = [
                 'regexp',
                 f'(({grammar.whitespace[1]})|({grammar.comment[1]}))*',
                 [],
             ]
         else:
-            grammar.rules['_filler'] = [
+            filler = [
                 'star',
                 None,
                 [
@@ -571,32 +583,17 @@ def _add_filler_rules(grammar):
             ]
     elif grammar.comment:
         if grammar.comment[0] == 'regexp':
-            grammar.rules['_filler'] = [
-                'regexp',
-                f'({grammar.comment[1]})*',
-                [],
-            ]
+            filler = ['regexp', f'({grammar.comment[1]})*', []]
         else:
-            grammar.rules['_filler'] = [
-                'star',
-                None,
-                [['apply', '_comment', []]],
-            ]
-    else:
-        assert grammar.whitespace
+            filler = ['star', None, [['apply', '_comment', []]]]
+    elif grammar.whitespace:
         if grammar.whitespace[0] == 'regexp':
-            grammar.rules['_filler'] = [
-                'regexp',
-                f'({grammar.whitespace[1]})*',
-                [],
-            ]
+            filler = ['regexp', f'({grammar.whitespace[1]})*', []]
         else:
-            grammar.rules['_filler'] = [
-                'star',
-                None,
-                [['apply', '_whitespace', []]],
-            ]
-    grammar.ast[2].append(['rule', '_filler', [grammar.rules['_filler']]])
+            filler = ['star', None, [['apply', '_whitespace', []]]]
+    if filler:
+        grammar.rules['_filler'] = ['choice', None, [filler]]
+        grammar.ast[2].append(['rule', '_filler', [grammar.rules['_filler']]])
     if grammar.whitespace:
         grammar.ast[2].append(['rule', '_whitespace', [grammar.whitespace]])
     if grammar.comment:
@@ -607,13 +604,16 @@ def _add_filler_nodes(grammar, node):
     def should_fill(node):
         if node[0] in ('escape', 'lit', 'range', 'regexp', 'set'):
             return True
+        if node[0] == 'apply' and node[1] == '_filler':
+            return False
         if node[0] == 'apply' and (
             node[1] == 'end' or node[1] in grammar.tokens
         ):
             return True
         return False
 
-    if node[0] == 'pragma':
+    if node[0] == 'rule' and node[1].startswith('%'):
+        # Don't mess with the pragmas.
         return node
     if node[0] == 'rule' and node[1] in grammar.tokens:
         # By definition we don't want to insert filler into token rules.
@@ -639,7 +639,8 @@ def _add_filler_nodes(grammar, node):
             [['seq', None, [['apply', '_filler', []], node]]],
         ]
 
-    return [node[0], node[1], [_add_filler_nodes(grammar, n) for n in node[2]]]
+    r = [node[0], node[1], [_add_filler_nodes(grammar, n) for n in node[2]]]
+    return r
 
 
 def _rewrite_singles(grammar):
