@@ -604,7 +604,9 @@ def _add_filler_nodes(grammar, node):
     def should_fill(node):
         if node[0] in ('escape', 'lit', 'range', 'regexp', 'set'):
             return True
-        if node[0] == 'apply' and node[1] == '_filler':
+        if node[0] == 'apply' and node[1] in (
+            '_comment', '_filler', '_whitespace'
+        ):
             return False
         if node[0] == 'apply' and (
             node[1] == 'end' or node[1] in grammar.tokens
