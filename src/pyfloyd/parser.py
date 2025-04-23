@@ -1095,7 +1095,7 @@ class _Parser:
         self._str('\\]')
         if self._failed:
             return
-        self._succeed(']')
+        self._succeed('\\]')
 
     def _r_regexp(self):
         self._ch('/')

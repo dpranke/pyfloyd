@@ -1026,7 +1026,7 @@ class GrammarTestsMixin:
         )
 
     def test_set_escaped_right_bracket(self):
-        g = r'g = [xa-e\\\]] -> true'
+        g = r'g = [xa-e\]] -> true'
         self.check(g, text=']', out=True)
 
     def test_star(self):

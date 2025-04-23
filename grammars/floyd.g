@@ -85,7 +85,7 @@ uni_esc     = '\\u' hex_char{4}            -> atou(cat($2), 16)
 set         = '[' '^' set_char+ ']'        -> cat(scons($2, $3))
             | '[' ~'^' set_char+ ']'       -> cat($3)
 
-set_char    = '\\]'                        -> ']'
+set_char    = '\\]'                        -> '\\]'
             | escape
             | ^']'
 
