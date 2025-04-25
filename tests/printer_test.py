@@ -47,26 +47,27 @@ class PrinterTest(unittest.TestCase):
         # TODO: Improve printer algorithm so that choices with actions
         # are not printed on the same line.
         grammar = textwrap.dedent("""\
-            grammar = 'foo' -> 'foo' | 'bar' -> 'bar'
+            grammar = 'foo' -> 'foo'
+                    | 'bar' -> 'bar'
             """)
         out, err = pyfloyd.pretty_print(grammar)
         self.assertEqual(grammar, out)
         self.assertIsNone(err)
 
     def test_bad_grammar(self):
-        grammar = 'grammar = end -> foo'
+        grammar = 'grammar'
         out, err = pyfloyd.pretty_print(grammar)
         self.assertIsNone(out)
         self.assertEqual(
             err,
-            'Errors were found:\n  Unknown variable "foo" referenced\n',
+            '<string>:1 Unexpected end of input at column 8',
         )
 
     def test_comment(self):
         grammar = textwrap.dedent("""\
             %comment = '//' (~'\\n' any)*
 
-            %tokens = foo
+            %tokens  = foo
 
             grammar  = foo end
 
@@ -78,7 +79,8 @@ class PrinterTest(unittest.TestCase):
 
     def test_empty(self):
         grammar = textwrap.dedent("""\
-            grammar = 'foo' |
+            grammar = 'foo'
+                    |
             """)
         out, err = pyfloyd.pretty_print(grammar)
         self.assertEqual(grammar, out)
@@ -106,7 +108,10 @@ class PrinterTest(unittest.TestCase):
         self.assertIsNone(err)
 
     def test_leftrec(self):
-        grammar = "grammar = grammar 'a' | 'a'\n"
+        grammar = textwrap.dedent("""\
+            grammar = grammar 'a'
+                    | 'a'
+            """)
         out, err = pyfloyd.pretty_print(grammar)
         self.assertEqual(grammar, out)
         self.assertIsNone(err)
@@ -115,31 +120,6 @@ class PrinterTest(unittest.TestCase):
         grammar = 'grammar = ?{ true } -> true\n'
         out, err = pyfloyd.pretty_print(grammar)
         self.assertEqual(grammar, out)
-        self.assertIsNone(err)
-
-    def test_rewrite_filler(self):
-        grammar = textwrap.dedent("""\
-            %comment = '//' (~'\\n' any)*
-
-            %tokens = foo
-
-            grammar  = foo end
-
-            foo      = 'foo'
-            """)
-        out, err = pyfloyd.pretty_print(grammar, rewrite_filler=True)
-        self.assertEqual(
-            textwrap.dedent("""\
-            grammar  = _filler foo _filler end
-
-            foo      = 'foo'
-
-            _filler  = _comment*
-
-            _comment = '//' (~'\\n' any)*
-            """),
-            out,
-        )
         self.assertIsNone(err)
 
     def test_token(self):
@@ -172,7 +152,7 @@ class PrinterTest(unittest.TestCase):
         grammar = textwrap.dedent("""\
             %whitespace = ' '*
 
-            %tokens = foo
+            %tokens     = foo
 
             grammar     = foo end
 

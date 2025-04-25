@@ -199,9 +199,6 @@ def parse(
 def pretty_print(
     grammar: str,
     path: str = '<string>',
-    externs=None,
-    rewrite_filler: bool = False,
-    rewrite_subrules: bool = False,
 ) -> Tuple[Optional[str], Optional[str]]:
     """Pretty-print a grammar.
 
@@ -213,29 +210,11 @@ def pretty_print(
     the formatting was successful. The second will be a string describing
     any errors, if it wasn't. If one of the values in the tuple is non-None,
     the other will be None.
-
-    If `rewrite_filler` is true, then the grammar will be printed with
-    the filler nodes inserted into it as appropriate. This can be used
-    to translate a grammar with filler to a grammar without filler.
-
-    If `rewrite_subrules` is true, then any complex subrules will be
-    extracted out into their own rules. You probably normally don't want
-    this, but it might be useful to debug something.
     """
     result = parser.parse(grammar, path)
     if result.err:
         return None, result.err
-
-    externs = externs or {}
-    try:
-        g = analyzer.analyze(
-            result.val,
-            rewrite_filler=rewrite_filler,
-            rewrite_subrules=rewrite_subrules,
-        )
-        return Printer(g).dumps(), None
-    except analyzer.AnalysisError as e:
-        return None, str(e)
+    return Printer(result.val).dumps(), None
 
 
 def dump_ast(

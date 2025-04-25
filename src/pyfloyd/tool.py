@@ -72,9 +72,7 @@ def main(argv=None, host=None):
             else:
                 contents = None
         elif args.pretty_print:
-            contents, err = pyfloyd.pretty_print(
-                grammar, args.grammar, args.rewrite_filler
-            )
+            contents, err = pyfloyd.pretty_print(grammar, args.grammar)
         elif args.compile:
             if not args.language:
                 args.language = pyfloyd.DEFAULT_LANGUAGE

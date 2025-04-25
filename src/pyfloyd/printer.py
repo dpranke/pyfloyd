@@ -16,8 +16,8 @@ from pyfloyd import string_literal as lit
 
 
 class Printer:
-    def __init__(self, grammar):
-        self._grammar = grammar
+    def __init__(self, ast):
+        self._ast = ast
         self._max_rule_len = 0
         self._max_choice_len = 0
 
@@ -27,28 +27,16 @@ class Printer:
 
     def _build_rules(self):
         rules = []
-        for ty, rule_name, node in self._grammar.ast[2]:
-            if ty == 'pragma':
-                rule_name = '%' + rule_name
-                self._max_rule_len = max(len(rule_name), self._max_rule_len)
-                if rule_name in ('%externs', '%tokens'):
-                    cs = [(' '.join(node), '')]
-                else:
-                    assert rule_name in (
-                        '%comment',
-                        '%whitespace',
-                    )
-                    cs = self._fmt_rule(node[0])
-            else:
-                self._max_rule_len = max(len(rule_name), self._max_rule_len)
-                cs = self._fmt_rule(node[0])
+        for ty, rule_name, node in self._ast[2]:
+            self._max_rule_len = max(len(rule_name), self._max_rule_len)
+            cs = self._fmt_rule(node[0])
             rules.append((rule_name, cs))
         return rules
 
     def _fmt_rule(self, node):
         single_line_str = self._proc(node)
-        if len(single_line_str) > 36 and node[0] == 'choice':
-            cs = []
+        cs = []
+        if node[0] == 'choice':
             for choice_node in node[2]:
                 choice, action = self._split_action(choice_node)
                 self._max_choice_len = max(len(choice), self._max_choice_len)
@@ -78,20 +66,12 @@ class Printer:
         )
         lines = []
         for rule_name, choices in rules:
-            if rule_name in (
-                '%token',
-                '%tokens',
-            ):
-                lines.append(
-                    rule_name + ' = ' + ' '.join(c[0] for c in choices)
-                )
-            else:
-                choice, act = choices[0]
-                lines.append(
-                    (line_fmt % (rule_name, '=', choice, act)).rstrip()
-                )
-                for choice, act in choices[1:]:
-                    lines.append((line_fmt % ('', '|', choice, act)).rstrip())
+            choice, act = choices[0]
+            lines.append(
+                (line_fmt % (rule_name, '=', choice, act)).rstrip()
+            )
+            for choice, act in choices[1:]:
+                lines.append((line_fmt % ('', '|', choice, act)).rstrip())
             lines.append('')
         return '\n'.join(lines).strip() + '\n'
 
