@@ -78,8 +78,10 @@ class CompiledResult(NamedTuple):
 
 
 def compile(  # pylint: disable=redefined-builtin
-    grammar: str, path: str = '<string>', memoize: bool = False,
-    externs: Externs = None 
+    grammar: str,
+    path: str = '<string>',
+    memoize: bool = False,
+    externs: Externs = None,
 ) -> CompiledResult:
     """Compile the grammar into an object that can parse strings.
 

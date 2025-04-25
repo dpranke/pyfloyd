@@ -155,7 +155,7 @@ class Tree(Formatter):
                     s += ' ' + self.op + ' '
                     s += fmt(self.right, current_depth, max_depth, indent)[0]
             return [s]
-        
+
         if self.right is None:
             right = ['']
         else:

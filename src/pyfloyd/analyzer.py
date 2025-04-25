@@ -119,8 +119,8 @@ def analyze(ast, rewrite_subrules: bool) -> Grammar:
 
     # Extract subnodes into their own rules to make codegen easier.
     if rewrite_subrules:
-       # Extract subnodes into their own rules to make codegen easier.
-       # Not needed when just interpreting the grammar.
+        # Extract subnodes into their own rules to make codegen easier.
+        # Not needed when just interpreting the grammar.
         _rewrite_subrules(g)
 
     return g
@@ -229,7 +229,9 @@ class _Analyzer:
                 value = True if choice[2][1][2][0][1] == 'true' else False
                 self.grammar.externs[key] = value
             except Exception as e:
-                import pdb; pdb.set_trace()
+                import pdb
+
+                pdb.set_trace()
                 raise
 
     def _collect_idents(self, s, n):
@@ -588,7 +590,9 @@ def _add_filler_nodes(grammar, node):
         if node[0] in ('escape', 'lit', 'range', 'regexp', 'set'):
             return True
         if node[0] == 'apply' and node[1] in (
-            '%comment', '%filler', '%whitespace'
+            '%comment',
+            '%filler',
+            '%whitespace',
         ):
             return False
         if node[0] == 'apply' and (
@@ -802,7 +806,7 @@ def _rewrite_pragma_rules(grammar):
         if rule[1].startswith('%'):
             if rule[1] in ('%comment', '%whitespace', '%filler'):
                 new_rule = [
-                    rule[0], 
+                    rule[0],
                     rule[1].replace('%', '_'),
                     [_rewrite(sn) for sn in rule[2]],
                 ]

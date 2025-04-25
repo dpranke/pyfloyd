@@ -37,8 +37,8 @@ class PythonGenerator(Generator):
         self._methods: Dict[str, List[str]] = {}
         self._operators: Dict[str, str] = {}
         self._unicodedata_needed = (
-            grammar.unicat_needed or
-            'unicode_lookup' in self._grammar.needed_builtin_functions
+            grammar.unicat_needed
+            or 'unicode_lookup' in self._grammar.needed_builtin_functions
         )
 
         self._current_rule = None
@@ -114,8 +114,7 @@ class PythonGenerator(Generator):
         if self._grammar.externs:
             externs = '{\n            '
             externs += '\n            '.join(
-                f"'{k}': {v},"
-                for k, v in self._grammar.externs.items()
+                f"'{k}': {v}," for k, v in self._grammar.externs.items()
             )
             externs += '\n        }'
         else:

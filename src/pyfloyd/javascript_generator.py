@@ -97,10 +97,10 @@ class JavaScriptGenerator(Generator):
         if self._grammar.operators:
             text += _OPERATOR_CLASS
 
-        externs = '';
+        externs = ''
         if self._grammar.externs:
             for k, v in self._grammar.externs.items():
-                v = 'true' if v else 'false';
+                v = 'true' if v else 'false'
                 externs += f"    this.externs.set('{k}', {v});\n"
         else:
             externs = '\n'

@@ -67,9 +67,7 @@ class Printer:
         lines = []
         for rule_name, choices in rules:
             choice, act = choices[0]
-            lines.append(
-                (line_fmt % (rule_name, '=', choice, act)).rstrip()
-            )
+            lines.append((line_fmt % (rule_name, '=', choice, act)).rstrip())
             for choice, act in choices[1:]:
                 lines.append((line_fmt % ('', '|', choice, act)).rstrip())
             lines.append('')
@@ -172,7 +170,7 @@ class Printer:
         return '%s..%s' % (lit.encode(node[1][0]), lit.encode(node[1][1]))
 
     def _ty_regexp(self, node):
-        return f"/{lit.escape(node[1], '/')}/"
+        return f'/{lit.escape(node[1], "/")}/'
 
     def _ty_run(self, node):
         return '<%s>' % self._proc(node[2][0])
@@ -184,7 +182,7 @@ class Printer:
         return ' '.join(self._proc(e) for e in node[2])
 
     def _ty_set(self, node):
-        return f"[{lit.escape(node[1], ']')}]"
+        return f'[{lit.escape(node[1], "]")}]'
 
     def _ty_star(self, node):
         return self._proc(node[2][0]) + '*'

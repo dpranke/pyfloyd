@@ -258,7 +258,7 @@ class GrammarTestsMixin:
             'grammar = -> foo()',
             text='',
             grammar_err=(
-                'Errors were found:\n' '  Unknown function "foo" called\n'
+                'Errors were found:\n  Unknown function "foo" called\n'
             ),
         )
 
@@ -267,7 +267,7 @@ class GrammarTestsMixin:
             'grammar = -> v',
             text='',
             grammar_err=(
-                'Errors were found:\n' '  Unknown variable "v" referenced\n'
+                'Errors were found:\n  Unknown variable "v" referenced\n'
             ),
         )
 
@@ -275,28 +275,28 @@ class GrammarTestsMixin:
         self.check(
             'grammar = foo',
             text='',
-            grammar_err=('Errors were found:\n' '  Unknown rule "foo"\n'),
+            grammar_err=('Errors were found:\n  Unknown rule "foo"\n'),
         )
 
         # Check that referring to a reserved rule is caught when the rule
         # isn't defined.
-        self.check(textwrap.dedent("""\
+        self.check(
+            textwrap.dedent("""\
             grammar = _whitespace
             """),
             text='',
-            grammar_err=('Errors were found:\n'
-                         '  Unknown rule "_whitespace"\n'),
+            grammar_err=('Errors were found:\n  Unknown rule "_whitespace"\n'),
         )
 
         # Check that referring to a reserved rule is caught when the rule
         # is defined.
-        self.check(textwrap.dedent("""\
+        self.check(
+            textwrap.dedent("""\
             %whitespace = ' '
             grammar = _whitespace
             """),
             text='',
-            grammar_err=('Errors were found:\n'
-                         '  Unknown rule "_whitespace"\n'),
+            grammar_err=('Errors were found:\n  Unknown rule "_whitespace"\n'),
         )
 
     def test_error_unexpected_thing(self):
@@ -316,8 +316,9 @@ class GrammarTestsMixin:
         h = pyfloyd.host.Host()
         path = str(THIS_DIR / '../grammars/floyd.g')
         grammar = h.read_text_file(path)
-        p, err, _ = self.compile(grammar, path, memoize=True,
-                                 externs=self.floyd_externs)
+        p, err, _ = self.compile(
+            grammar, path, memoize=True, externs=self.floyd_externs
+        )
         self.assertIsNone(err)
         out, err, _ = p.parse(grammar, '../grammars/floyd.g')
         # We don't check the actual output here because it is too long
@@ -401,10 +402,15 @@ class GrammarTestsMixin:
         )
 
     def test_illegal_rule_names(self):
-        self.check('_foo = end', '', grammar_err=(
-            'Errors were found:\n'
-            '  Illegal rule name "_foo": names starting with '
-            'an "_" are reserved\n'))
+        self.check(
+            '_foo = end',
+            '',
+            grammar_err=(
+                'Errors were found:\n'
+                '  Illegal rule name "_foo": names starting with '
+                'an "_" are reserved\n'
+            ),
+        )
 
     def test_inline_seq(self):
         # This checks that we correctly include the builtin `end` rule
@@ -1118,7 +1124,7 @@ class GrammarTestsMixin:
             '%foo = end',
             text='',
             out=None,
-            grammar_err=('Errors were found:\n' '  Unknown pragma "%foo"\n'),
+            grammar_err=('Errors were found:\n  Unknown pragma "%foo"\n'),
         )
 
     def test_whitespace_chars(self):
@@ -1141,8 +1147,9 @@ class Interpreter(unittest.TestCase, GrammarTestsMixin):
     max_diff = None
 
     def compile(self, grammar, path='<string>', memoize=False, externs=None):
-        return pyfloyd.compile(textwrap.dedent(grammar), path, memoize=memoize,
-                               externs=externs)
+        return pyfloyd.compile(
+            textwrap.dedent(grammar), path, memoize=memoize, externs=externs
+        )
 
 
 class _GeneratedParserWrapper:
@@ -1173,7 +1180,9 @@ class _GeneratedParserWrapper:
             try:
                 assert inp in stderr
             except Exception as e:
-                import pdb; pdb.set_trace()
+                import pdb
+
+                pdb.set_trace()
                 raise
             stderr = stderr.replace(inp, path)
         else:
@@ -1192,9 +1201,11 @@ class GeneratorMixin:
             textwrap.dedent(grammar),
             path=path,
             options=pyfloyd.GeneratorOptions(
-                language=self.language, main=True, memoize=memoize,
+                language=self.language,
+                main=True,
+                memoize=memoize,
             ),
-            externs=externs
+            externs=externs,
         )
         if err:
             assert source_code is None
