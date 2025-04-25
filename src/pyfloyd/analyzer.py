@@ -57,9 +57,7 @@ class Grammar:
         for n in self.ast[2]:
             if n[1].startswith('%'):
                 self.pragmas.append(n)
-                continue
-
-            if not has_starting_rule:
+            elif not has_starting_rule:
                 self.starting_rule = n[1]
                 has_starting_rule = True
             self.rules[n[1]] = n[2][0]
@@ -219,20 +217,14 @@ class _Analyzer:
     def _collect_externs(self, n):
         assert n[2][0][0] == 'choice'
         for choice in n[2][0][2]:
-            try:
-                assert choice[0] == 'seq'
-                assert choice[2][0][0] == 'apply'
-                key = choice[2][0][1]
-                assert choice[2][1][0] == 'action'
-                assert choice[2][1][2][0][0] == 'e_const'
-                assert choice[2][1][2][0][1] in ('true', 'false')
-                value = True if choice[2][1][2][0][1] == 'true' else False
-                self.grammar.externs[key] = value
-            except Exception as e:
-                import pdb
-
-                pdb.set_trace()
-                raise
+            assert choice[0] == 'seq'
+            assert choice[2][0][0] == 'apply'
+            key = choice[2][0][1]
+            assert choice[2][1][0] == 'action'
+            assert choice[2][1][2][0][0] == 'e_const'
+            assert choice[2][1][2][0][1] in ('true', 'false')
+            value = True if choice[2][1][2][0][1] == 'true' else False
+            self.grammar.externs[key] = value
 
     def _collect_idents(self, s, n):
         if n[0] == 'apply':

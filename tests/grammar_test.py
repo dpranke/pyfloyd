@@ -1132,15 +1132,27 @@ class GrammarTestsMixin:
         self.check('g = \t\n\r -> true', text='', out=True)
 
     def test_whitespace_pragma(self):
-        grammar = """\
+        grammar = textwrap.dedent("""\
             %tokens = foo
             %whitespace = ' '
 
             grammar = foo foo end -> true
 
             foo     = 'foo'
-            """
+            """)
         self.check(grammar, text='foofoo', out=True)
+
+    def test_whitespace_can_be_referenced(self):
+        grammar = textwrap.dedent("""\
+            %whitespace = ' '
+
+            %tokens     = foo
+
+            grammar     = foo  -> true
+
+            foo         = '"' %whitespace '"'
+            """)
+        self.check(grammar, '" "', out=True)
 
 
 class Interpreter(unittest.TestCase, GrammarTestsMixin):
