@@ -7,6 +7,12 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 
+[manifest]
+members = [
+    "pyfloyd",
+    "typ",
+]
+
 [[package]]
 name = "astroid"
 version = "3.3.9"
@@ -336,7 +342,7 @@ name = "importlib-metadata"
 version = "8.6.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "zipp" },
+    { name = "zipp", marker = "python_full_version < '3.12'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/33/08/c1395a292bb23fd03bdf572a1357c5a733d3eecbab877641ceacab23db6e/importlib_metadata-8.6.1.tar.gz", hash = "sha256:310b41d755445d74569f993ccfc22838295d9fe005425094fad953d7f15c8580", size = 55767 }
 wheels = [
@@ -587,6 +593,7 @@ dev = [
     { name = "pylint" },
     { name = "ruff" },
     { name = "twine" },
+    { name = "typ" },
     { name = "uv" },
 ]
 
@@ -599,6 +606,7 @@ requires-dist = [
     { name = "pylint", marker = "extra == 'dev'", specifier = "==3.3.6" },
     { name = "ruff", marker = "extra == 'dev'", specifier = "==0.11.2" },
     { name = "twine", marker = "extra == 'dev'", specifier = "==6.1.0" },
+    { name = "typ", marker = "extra == 'dev'", editable = "subpackages/typ-dev" },
     { name = "uv", marker = "extra == 'dev'", specifier = "==0.6.11" },
 ]
 provides-extras = ["dev"]
@@ -666,7 +674,7 @@ wheels = [
 
 [[package]]
 name = "requests"
-version = "2.32.3"
+version = "2.31.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -674,9 +682,9 @@ dependencies = [
     { name = "idna" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/63/70/2bf7780ad2d390a8d301ad0b550f1581eadbd9a20f896afe06353c2a2913/requests-2.32.3.tar.gz", hash = "sha256:55365417734eb18255590a9ff9eb97e9e1da868d4ccd6402399eaf68af20a760", size = 131218 }
+sdist = { url = "https://files.pythonhosted.org/packages/9d/be/10918a2eac4ae9f02f6cfe6414b7a155ccd8f7f9d4380d62fd5b955065c3/requests-2.31.0.tar.gz", hash = "sha256:942c5a758f98d790eaed1a29cb6eefc7ffb0d1cf7af05c3d2791656dbd6ad1e1", size = 110794 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f9/9b/335f9764261e915ed497fcdeb11df5dfd6f7bf257d4a6a2a686d80da4d54/requests-2.32.3-py3-none-any.whl", hash = "sha256:70761cfe03c773ceb22aa2f671b4757976145175cdfca038c02654d061d6dcc6", size = 64928 },
+    { url = "https://files.pythonhosted.org/packages/70/8e/0e2d847013cb52cd35b38c009bb167a1a26b2ce6cd6965bf26b47bc0bf44/requests-2.31.0-py3-none-any.whl", hash = "sha256:58cd2187c01e70e6e26505bca751777aa9f2ee0b7f4300988b709f44e013003f", size = 62574 },
 ]
 
 [[package]]
@@ -790,6 +798,40 @@ sdist = { url = "https://files.pythonhosted.org/packages/c8/a2/6df94fc5c8e2170d2
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7c/b6/74e927715a285743351233f33ea3c684528a0d374d2e43ff9ce9585b73fe/twine-6.1.0-py3-none-any.whl", hash = "sha256:a47f973caf122930bf0fbbf17f80b83bc1602c9ce393c7845f289a3001dc5384", size = 40791 },
 ]
+
+[[package]]
+name = "typ"
+source = { editable = "subpackages/typ-dev" }
+
+[package.optional-dependencies]
+dev = [
+    { name = "build" },
+    { name = "coverage" },
+    { name = "mypy" },
+    { name = "pip" },
+    { name = "pylint" },
+    { name = "requests" },
+    { name = "ruff" },
+    { name = "twine" },
+    { name = "uv" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "build", marker = "extra == 'dev'", specifier = "==1.2.2.post1" },
+    { name = "coverage", marker = "python_full_version >= '3.9.0' and extra == 'dev'", specifier = "==7.8.0" },
+    { name = "coverage", marker = "python_full_version < '3.9.0' and extra == 'dev'", specifier = "==7.5.4" },
+    { name = "mypy", marker = "python_full_version >= '3.9.0' and extra == 'dev'", specifier = "==1.15.0" },
+    { name = "mypy", marker = "python_full_version < '3.9.0' and extra == 'dev'", specifier = "==1.14.1" },
+    { name = "pip", marker = "extra == 'dev'", specifier = "==25.0.1" },
+    { name = "pylint", marker = "python_full_version >= '3.9.0' and extra == 'dev'", specifier = "==3.3.6" },
+    { name = "pylint", marker = "python_full_version < '3.9.0' and extra == 'dev'", specifier = "==3.2.7" },
+    { name = "requests", marker = "extra == 'dev'", specifier = "==2.31.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = "==0.11.2" },
+    { name = "twine", marker = "extra == 'dev'", specifier = "==6.1.0" },
+    { name = "uv", marker = "extra == 'dev'", specifier = "==0.6.11" },
+]
+provides-extras = ["dev"]
 
 [[package]]
 name = "typing-extensions"

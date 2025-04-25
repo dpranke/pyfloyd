@@ -32,6 +32,7 @@ dev = [
     'pylint==3.3.6',
     'ruff==0.11.2',
     'twine==6.1.0',
+    'typ @ file:///${PROJECT_ROOT}/subpackages/typ-dev',
     'uv==0.6.11',
 ]
 
@@ -59,3 +60,9 @@ where = [ "src" ]
 
 [tool.setuptools.dynamic]
 version = {attr = "pyfloyd.__version__"}
+
+[tool.uv.sources]
+typ = { workspace = true }
+
+[tool.uv.workspace]
+members = [ "subpackages/*" ]

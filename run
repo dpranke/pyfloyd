@@ -97,6 +97,9 @@ class Runner:
         subp.add_argument(
             '-u', '--unit', action='store_true', help='Only run unit tests.'
         )
+        subp.add_argument(
+            '-t', '--typ', action='store_true', help='Run tests with typ.'
+        )
         subp.add_argument('test', nargs='*', action='store')
 
         self.add_parser(
@@ -148,6 +151,9 @@ class Runner:
         subp.add_argument(
             '-u', '--unit', action='store_true', help='Only run unit tests.'
         )
+        subp.add_argument(
+            '-t', '--typ', action='store_true', help='Run tests with typ.'
+        )
         subp.add_argument('test', nargs='*', action='store')
 
         subp = self.add_parser('publish', help='Publish packages to PyPI.')
@@ -186,9 +192,14 @@ class Runner:
         subp.add_argument(
             '-u', '--unit', action='store_true', help='Only run unit tests.'
         )
+        subp.add_argument(
+            '-t', '--typ', action='store_true', help='Run tests with typ.'
+        )
         subp.add_argument('test', nargs='*', action='store')
 
-        self.args = self.arg_parser.parse_args(self._shuffle_argv(argv))
+        self.args, self.remaining_args = self.arg_parser.parse_known_args(
+            self._shuffle_argv(argv)
+        )
 
         self.uv_path = shutil.which('uv')
         if self.uv_path is None:
@@ -227,31 +238,36 @@ class Runner:
     def run_coverage(self):
         env = os.environ.copy()
         if self.args.unit:
-            env['SKIP'] = 'integration'
+            env['TYP_SKIP'] = 'integration'
             self.args.omit = '*_test.py'
-        cmd = self.run_cmd + ['-m', 'coverage', 'run']
-        if self.args.branch:
-            cmd.append('--branch')
-        cmd.extend(
-            [
-                '-m',
-                'unittest',
-                'discover',
-                '-s',
-                'tests',
-                '-p',
-                '*_test.py',
-            ],
-        )
-        if self.args.verbose:
-            cmd.append('-v')
-        for test in self.args.test:
-            cmd.extend(['-k', self._trim_test_glob(test)])
+        if self.args.typ:
+            cmd = self.run_cmd + ['-m', 'typ', '-c']
+            cmd.extend(self.args.test)
+        else:
+            cmd = self.run_cmd + ['-m', 'coverage', 'run']
+            if self.args.branch:
+                cmd.append('--branch')
+            cmd.extend(
+                [
+                    '-m',
+                    'unittest',
+                    'discover',
+                    '-s',
+                    'tests',
+                    '-p',
+                    '*_test.py',
+                ],
+            )
+            for test in self.args.test:
+                cmd.extend(['-k', self._trim_test_glob(test)])
+        if self.args.verbose > 1:
+            cmd.append('-' + 'v' * (self.args.verbose - 1))
         self.call(cmd, env=env)
-        cmd = self.run_cmd + ['-m', 'coverage', 'report', '--show-missing']
-        if self.args.omit:
-            cmd.append(f'--omit={self.args.omit}')
-        self.call(cmd)
+        if not self.args.typ:
+            cmd = self.run_cmd + ['-m', 'coverage', 'report', '--show-missing']
+            if self.args.omit:
+                cmd.append(f'--omit={self.args.omit}')
+            self.call(cmd)
 
     def run_devenv(self):
         if self.uv_path is None:
@@ -338,21 +354,38 @@ class Runner:
             print(f'{self.parser_file} regenerated.')
 
     def run_tests(self):
-        cmd = self.run_cmd + ['-m', 'unittest', 'discover', '-p', '*_test.py']
+        if self.args.typ:
+            cmd = self.run_cmd + [
+                '-m',
+                'typ',
+            ]
+        else:
+            cmd = self.run_cmd + [
+                '-m',
+                'unittest',
+                'discover',
+                '-p',
+                '*_test.py',
+                'tests',
+            ]
         if self.args.quiet:
             cmd.append('-q')
-        if self.args.verbose:
-            cmd.append('-v')
+        if self.args.verbose > 1:
+            cmd.append('-' + 'v' * (self.args.verbose - 1))
         if self.args.failfast:
             cmd.append('-f')
-        if self.args.durations:
+        if not self.args.typ and self.args.durations:
             cmd.extend(['--durations', self.args.durations])
 
-        for test in self.args.test:
-            cmd.extend(['-k', self._trim_test_glob(test)])
+        if self.args.typ:
+            cmd.extend(test for test in self.args.test)
+        else:
+            for test in self.args.test:
+                cmd.extend(['-k', self._trim_test_glob(test)])
+        cmd.extend(self.remaining_args)
         env = os.environ.copy()
         if self.args.unit:
-            env['SKIP'] = 'integration'
+            env['TYP_SKIP'] = 'integration'
         self.call(cmd, env=env)
 
     def set_func(self, subp, method):
