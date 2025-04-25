@@ -84,26 +84,11 @@ class OperatorState:
         self.choices = {}
 
 
-def analyze(ast, rewrite_filler: bool, rewrite_subrules: bool) -> Grammar:
+def analyze(ast, rewrite_subrules: bool) -> Grammar:
     """Analyze and optimize the AST.
 
     This runs any static analysis we can do over the grammars and
     optimizes what we can. Raises AnalysisError if there are any errors.
-
-    If `rewrite_filler` is True, and the grammar has %whitespace or
-    %comment pragmas, the grammar will be rewritten to insert the
-    filler rules and insert the filler nodes where appropriate.
-    You want this when either interpreting or compiling the grammar, but
-    (usually) not when pretty-printing it. You might want this if you
-    wanted to rewrite the grammar to expand out the filler rules when
-    pretty-printing.
-
-    If `rewrite_subrules` is True, any rule subnodes that can't really be
-    inlined when generating code will be extracted out into their own rules.
-    You want this when generating code, but not when pretty-printing the
-    grammar. Do not set this when interpreting the grammar, because
-    the built-in rules for 'any' and 'end' will be renamed and interpreting
-    likely won't work as a result.
     """
 
     g = Grammar(ast)
@@ -113,8 +98,7 @@ def analyze(ast, rewrite_filler: bool, rewrite_subrules: bool) -> Grammar:
     a.add_pragmas()
 
     # Add in the _whitespace, _comment, and _filler rules.
-    if rewrite_filler:
-        _add_filler_rules(g)
+    _add_filler_rules(g)
 
     a.run_checks()
     if a.errors:
@@ -127,16 +111,15 @@ def analyze(ast, rewrite_filler: bool, rewrite_subrules: bool) -> Grammar:
     _rewrite_recursion(g)
 
     # Insert filler nodes.
-    if rewrite_filler:
-        _rewrite_filler(g)
+    _rewrite_filler(g)
 
     # Rewrite any choice or seq nodes that only have one child.
     _rewrite_singles(g)
 
+    # Extract subnodes into their own rules to make codegen easier.
     if rewrite_subrules:
-        # Extract subnodes into their own rules to make codegen easier.
-        # Not needed when just interpreting the grammar, and not wanted
-        # when printing the grammar.
+       # Extract subnodes into their own rules to make codegen easier.
+       # Not needed when just interpreting the grammar.
         _rewrite_subrules(g)
 
     return g

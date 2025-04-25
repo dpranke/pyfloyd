@@ -90,9 +90,7 @@ def compile(  # pylint: disable=redefined-builtin
     if result.err:
         return CompiledResult(err=result.err, pos=result.pos)
     try:
-        g = analyzer.analyze(
-            result.val, rewrite_filler=True, rewrite_subrules=False
-        )
+        g = analyzer.analyze(result.val, rewrite_subrules=False)
         interpreter = Interpreter(g, memoize=memoize)
         return CompiledResult(interpreter, None)
     except analyzer.AnalysisError as e:
@@ -141,7 +139,6 @@ def generate(
     try:
         grammar_obj = analyzer.analyze(
             result.val,
-            rewrite_filler=True,
             rewrite_subrules=True,
         )
     except analyzer.AnalysisError as e:
@@ -220,12 +217,11 @@ def pretty_print(
 def dump_ast(
     grammar: str,
     path: str = '<string>',
-    rewrite_filler: bool = False,
     rewrite_subrules: bool = False,
 ) -> Tuple[Optional[str], Optional[str]]:
     """Returns the parsed AST from the grammar. Possibly useful for debugging.
 
-    `rewrite_filler` and `rewrite_subrules` work as in the other methods.
+    `rewrite_subrules` works as in the other methods.
     """
     result = parser.parse(grammar, path)
     if result.err:
@@ -234,7 +230,6 @@ def dump_ast(
     try:
         g = analyzer.analyze(
             result.val,
-            rewrite_filler=rewrite_filler,
             rewrite_subrules=rewrite_subrules,
         )
         return g.ast, None
