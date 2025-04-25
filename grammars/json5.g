@@ -14,7 +14,7 @@
 
 %tokens = ident num_literal string
 
-%externs       = strict
+%externs       = strict                           -> true
 
 grammar        = value end                        -> $1
 

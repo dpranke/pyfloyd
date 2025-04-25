@@ -1,4 +1,4 @@
-%externs       = strict
+%externs       = strict  -> true
 
 grammar        = sp value:v sp end                    -> v
 

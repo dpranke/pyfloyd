@@ -1,5 +1,9 @@
 // This is the primary description of the Floyd parser grammar.
 
+%externs    = unicode                      -> true
+            | unicode_categories           -> true
+            | unicode_names                -> true
+
 %whitespace = (' ' | '\f' | '\n' | '\r' | '\t' | '\v')+
 
 %comment    = ('//' | '#') [^\r\n]*
@@ -39,7 +43,8 @@ count       = '{' zpos ',' zpos '}'        -> [$2, $4]
 
 prim_expr   = lit '..' lit                 -> ['range', [$1, $3], []]
             | lit                          -> ['lit', $1, []]
-            | '\\p{' ident '}'             -> ['unicat', $2, []]
+            | ?{ unicode_categories } '\\p{' ident '}'
+                                           -> ['unicat', $3, []]
             | set                          -> ['set', $1, []]
             | regexp                       -> ['regexp', $1, []]
             | '~' prim_expr                -> ['not', null, [$2]]
@@ -72,7 +77,7 @@ escape      = '\\b'                        -> '\x08'
             | '\\' dquote                  -> '\x22'
             | '\\\\'                       -> '\x5C'
             | hex_esc
-            | uni_esc
+            | ?{ unicode } uni_esc
             | '\\' any                     -> strcat('\\', $2)
 
 hex_esc     = '\\x' hex_char{2}            -> atou(cat($2), 16)
@@ -81,6 +86,10 @@ hex_esc     = '\\x' hex_char{2}            -> atou(cat($2), 16)
 uni_esc     = '\\u' hex_char{4}            -> atou(cat($2), 16)
             | '\\u{' hex_char+ '}'         -> atou(cat($2), 16)
             | '\\U' hex_char{8}            -> atou(cat($2), 16)
+            | ?{ unicode_names } uni_name
+
+uni_name    = 'N{' /[A-Z][A-Z0-9]*(( [A-Z][A-Z0-9]*|(-[A-Z0-9]*)))*/ '}'
+                                           -> unicode_lookup($2)
 
 set         = '[' '^' set_char+ ']'        -> cat(scons($2, $3))
             | '[' ~'^' set_char+ ']'       -> cat($3)

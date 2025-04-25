@@ -51,7 +51,7 @@ class Grammar:
         self.operators = {}
         self.leftrec_rules = set()
         self.outer_scope_rules = set()
-        self.externs = set()
+        self.externs = {}
 
         has_starting_rule = False
         for n in self.ast[2]:
@@ -159,6 +159,7 @@ BUILTIN_FUNCTIONS = (
     'scat',
     'scons',
     'strcat',
+    'unicode_lookup',
     'utoi',
     'xtou',
 )
@@ -200,7 +201,7 @@ class _Analyzer:
         choice = node[2][0]
 
         if pragma == '%externs':
-            self._collect_idents(self.grammar.externs, node)
+            self._collect_externs(node)
         elif pragma == '%tokens':
             self._collect_idents(self.grammar.tokens, node)
             for t in self.grammar.tokens:
@@ -225,6 +226,22 @@ class _Analyzer:
             self.grammar.assoc[operator] = direction
         else:
             self.errors.append(f'Unknown pragma "{pragma}"')
+
+    def _collect_externs(self, n):
+        assert n[2][0][0] == 'choice'
+        for choice in n[2][0][2]:
+            try:
+                assert choice[0] == 'seq'
+                assert choice[2][0][0] == 'apply'
+                key = choice[2][0][1]
+                assert choice[2][1][0] == 'action'
+                assert choice[2][1][2][0][0] == 'e_const'
+                assert choice[2][1][2][0][1] in ('true', 'false')
+                value = True if choice[2][1][2][0][1] == 'true' else False
+                self.grammar.externs[key] = value
+            except Exception as e:
+                import pdb; pdb.set_trace()
+                raise
 
     def _collect_idents(self, s, n):
         if n[0] == 'apply':

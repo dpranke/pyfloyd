@@ -47,7 +47,7 @@ class Interpreter:
         self._blocked = set()
         self._operators = {}
         self._regexps = {}
-        self._externs = {}
+        self._externs = grammar.externs
 
     def parse(
         self, text: str, path: str = '<string>', externs=None
@@ -61,15 +61,14 @@ class Interpreter:
         self._errstr = None
         self._errpos = 0
         self._scopes = [{}]
-        self._externs = externs or {}
 
         errors = ''
-        for ext in self._grammar.externs:
-            if ext not in self._externs:
-                errors += f'Missing extern "{ext}"\n'
-        for ext in self._externs:
-            if ext not in self._grammar.externs:
-                errors += f'Unexpected extern "{ext}"\n'
+        if externs:
+            for k, v in externs.items():
+                if k in self._externs:
+                    self._externs[k] = v
+                else:
+                    errors += f'Missing extern "{k}"\n'
         if errors:
             return parser.Result(None, errors.strip(), 0)
 

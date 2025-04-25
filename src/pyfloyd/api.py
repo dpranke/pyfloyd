@@ -78,14 +78,15 @@ class CompiledResult(NamedTuple):
 
 
 def compile(  # pylint: disable=redefined-builtin
-    grammar: str, path: str = '<string>', memoize: bool = False
+    grammar: str, path: str = '<string>', memoize: bool = False,
+    externs: Externs = None 
 ) -> CompiledResult:
     """Compile the grammar into an object that can parse strings.
 
     This routine parses the provided grammar and returns an object
     that can parse strings according to the grammar.
     """
-    result = parser.parse(grammar, path)
+    result = parser.parse(grammar, path, externs)
     if result.err:
         return CompiledResult(err=result.err, pos=result.pos)
     try:
@@ -134,8 +135,7 @@ def generate(
     the result will describe the errors.
     """
 
-    result = parser.parse(grammar, path)
-    externs = externs or {}
+    result = parser.parse(grammar, path, externs)
     if result.err:
         return result
     try:

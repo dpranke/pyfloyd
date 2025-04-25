@@ -4,11 +4,16 @@
 
 import re
 from typing import Any, Dict, NamedTuple, Optional
+import unicodedata
 
 
 Externs = Optional[Dict[str, Any]]
 
 # pylint: disable=too-many-lines
+
+
+class _ParsingRuntimeError(Exception):
+    pass
 
 
 class Result(NamedTuple):
@@ -51,8 +56,11 @@ class _Parser:
         self._text = text
         self._end = len(self._text)
         self._errpos = 0
-        self._expected_externs = set()
-        self._externs = {}
+        self._externs = {
+            'unicode': True,
+            'unicode_categories': True,
+            'unicode_names': True,
+        }
         self._failed = False
         self._path = path
         self._pos = 0
@@ -61,15 +69,27 @@ class _Parser:
         self._regexps = {}
 
     def parse(self, externs: Externs = None):
-        self._externs = externs or {}
-        errors = self._check_externs()
+        errors = ''
+        if externs:
+            for k, v in externs.items():
+                if k in self._externs:
+                    self._externs[k] = v
+                else:
+                    errors += f'Unexpected extern "{k}"\n'
         if errors:
             return Result(None, errors, 0)
-
-        self._r_grammar()
-        if self._failed:
-            return Result(None, self._err_str(), self._errpos)
-        return Result(self._val, None, self._pos)
+        try:
+            self._r_grammar()
+            if self._failed:
+                return Result(None, self._err_str(), self._errpos)
+            return Result(self._val, None, self._pos)
+        except _ParsingRuntimeError as e:  # pragma: no cover
+            lineno, _ = self._err_offsets()
+            return Result(
+                None,
+                self._path + ':' + str(lineno) + ' ' + str(e),
+                self._errpos,
+            )
 
     def _r_grammar(self):
         self._s_grammar_1()
@@ -493,6 +513,15 @@ class _Parser:
         self._memoize('r_lit', self._r_lit)
 
     def _s_prim_expr_6(self):
+        v = self._externs['unicode_categories']
+        if v is True:
+            self._succeed(v)
+        elif v is False:
+            self._fail()
+        else:
+            raise _ParsingRuntimeError('Bad predicate value')
+        if self._failed:
+            return
         self._memoize('r__filler', self._r__filler)
         self._str('\\p{')
         if self._failed:
@@ -500,12 +529,12 @@ class _Parser:
         self._s_prim_expr_7()
         if self._failed:
             return
-        v__2 = self._val
+        v__3 = self._val
         self._memoize('r__filler', self._r__filler)
         self._ch('}')
         if self._failed:
             return
-        self._succeed(['unicat', v__2, []])
+        self._succeed(['unicat', v__3, []])
 
     def _s_prim_expr_7(self):
         self._memoize('r__filler', self._r__filler)
@@ -760,11 +789,11 @@ class _Parser:
         if not self._failed:
             return
         self._rewind(p)
-        self._memoize('r_uni_esc', self._r_uni_esc)
+        self._s_escape_10()
         if not self._failed:
             return
         self._rewind(p)
-        self._s_escape_10()
+        self._s_escape_11()
 
     def _s_escape_1(self):
         self._str('\\b')
@@ -827,6 +856,18 @@ class _Parser:
         self._succeed('\\')
 
     def _s_escape_10(self):
+        v = self._externs['unicode']
+        if v is True:
+            self._succeed(v)
+        elif v is False:
+            self._fail()
+        else:
+            raise _ParsingRuntimeError('Bad predicate value')
+        if self._failed:
+            return
+        self._memoize('r_uni_esc', self._r_uni_esc)
+
+    def _s_escape_11(self):
         self._ch('\\')
         if self._failed:
             return
@@ -908,6 +949,10 @@ class _Parser:
             return
         self._rewind(p)
         self._s_uni_esc_5()
+        if not self._failed:
+            return
+        self._rewind(p)
+        self._s_uni_esc_7()
 
     def _s_uni_esc_1(self):
         self._str('\\u')
@@ -986,6 +1031,41 @@ class _Parser:
             vs.append(self._val)
             i += 1
         self._succeed(vs)
+
+    def _s_uni_esc_7(self):
+        v = self._externs['unicode_names']
+        if v is True:
+            self._succeed(v)
+        elif v is False:
+            self._fail()
+        else:
+            raise _ParsingRuntimeError('Bad predicate value')
+        if self._failed:
+            return
+        self._memoize('r_uni_name', self._r_uni_name)
+
+    def _r_uni_name(self):
+        self._str('N{')
+        if self._failed:
+            return
+        self._s_uni_name_1()
+        if self._failed:
+            return
+        v__2 = self._val
+        self._ch('}')
+        if self._failed:
+            return
+        self._succeed(self._fn_unicode_lookup(v__2))
+
+    def _s_uni_name_1(self):
+        p = '[A-Z][A-Z0-9]*(( [A-Z][A-Z0-9]*|(-[A-Z0-9]*)))*'
+        if p not in self._regexps:
+            self._regexps[p] = re.compile(p)
+        m = self._regexps[p].match(self._text, self._pos)
+        if m:
+            self._succeed(m.group(0), m.end())
+            return
+        self._fail()
 
     def _r_set(self):
         p = self._pos
@@ -1860,3 +1940,6 @@ class _Parser:
 
     def _fn_strcat(self, a, b):
         return a + b
+
+    def _fn_unicode_lookup(self, s):
+        return unicodedata.unicode_lookup(s)

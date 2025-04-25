@@ -47,6 +47,7 @@ def skip(kind):
 
 class GrammarTestsMixin:
     max_diff = None
+    floyd_externs = None
 
     def check(
         self,
@@ -294,7 +295,8 @@ class GrammarTestsMixin:
         h = pyfloyd.host.Host()
         path = str(THIS_DIR / '../grammars/floyd.g')
         grammar = h.read_text_file(path)
-        p, err, _ = self.compile(grammar, path, memoize=True)
+        p, err, _ = self.compile(grammar, path, memoize=True,
+                                 externs=self.floyd_externs)
         self.assertIsNone(err)
         out, err, _ = p.parse(grammar, '../grammars/floyd.g')
         # We don't check the actual output here because it is too long
@@ -308,7 +310,7 @@ class GrammarTestsMixin:
         h = pyfloyd.host.Host()
         path = str(THIS_DIR / '../grammars/floyd_ws.g')
         grammar = h.read_text_file(path)
-        p, err, _ = self.compile(grammar, path)
+        p, err, _ = self.compile(grammar, path, externs=self.floyd_externs)
         self.assertIsNone(err)
         out, err, _ = p.parse(grammar, '../grammars/floyd.g')
         # We don't check the actual output here because it is too long
@@ -1111,8 +1113,9 @@ class GrammarTestsMixin:
 class Interpreter(unittest.TestCase, GrammarTestsMixin):
     max_diff = None
 
-    def compile(self, grammar, path='<string>', memoize=False):
-        return pyfloyd.compile(textwrap.dedent(grammar), path, memoize=memoize)
+    def compile(self, grammar, path='<string>', memoize=False, externs=None):
+        return pyfloyd.compile(textwrap.dedent(grammar), path, memoize=memoize,
+                               externs=externs)
 
 
 class _GeneratedParserWrapper:
@@ -1140,7 +1143,11 @@ class _GeneratedParserWrapper:
         )
         if proc.stderr:
             stderr = proc.stderr.decode('utf8').strip()
-            assert inp in stderr
+            try:
+                assert inp in stderr
+            except Exception as e:
+                import pdb; pdb.set_trace()
+                raise
             stderr = stderr.replace(inp, path)
         else:
             stderr = None
@@ -1153,13 +1160,14 @@ class _GeneratedParserWrapper:
 
 
 class GeneratorMixin:
-    def compile(self, grammar, path='<string>', memoize=False):
+    def compile(self, grammar, path='<string>', memoize=False, externs=None):
         source_code, err, endpos = pyfloyd.generate(
             textwrap.dedent(grammar),
             path=path,
             options=pyfloyd.GeneratorOptions(
-                language=self.language, main=True, memoize=memoize
+                language=self.language, main=True, memoize=memoize,
             ),
+            externs=externs
         )
         if err:
             assert source_code is None
@@ -1184,6 +1192,7 @@ class JavaScriptGenerator(
     cmd = [shutil.which('node')]
     language = 'javascript'
     ext = '.js'
+    floyd_externs = {'unicode_names': False}
 
     @skip('integration')
     def test_json5_special_floats(self):

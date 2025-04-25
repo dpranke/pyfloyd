@@ -36,7 +36,11 @@ class PythonGenerator(Generator):
         self._exception_needed = False
         self._methods: Dict[str, List[str]] = {}
         self._operators: Dict[str, str] = {}
-        self._unicodedata_needed = grammar.unicat_needed
+        self._unicodedata_needed = (
+            grammar.unicat_needed or
+            'unicode_lookup' in self._grammar.needed_builtin_functions
+        )
+
         self._current_rule = None
         self._base_rule_regex = re.compile(r's_(.+)_\d+$')
 
@@ -107,9 +111,16 @@ class PythonGenerator(Generator):
 
         if self._grammar.operators:
             text += _OPERATOR_CLASS
-
-        expected_externs = repr(self._grammar.externs)
-        text += _CLASS.format(expected_externs=expected_externs)
+        if self._grammar.externs:
+            externs = '{\n            '
+            externs += '\n            '.join(
+                f"'{k}': {v},"
+                for k, v in self._grammar.externs.items()
+            )
+            externs += '\n        }'
+        else:
+            externs = '{}'
+        text += _CLASS.format(externs=externs)
 
         text += self._state()
         text += '\n'
@@ -802,8 +813,7 @@ class _Parser:
         self._text = text
         self._end = len(self._text)
         self._errpos = 0
-        self._expected_externs = {expected_externs}
-        self._externs = {{}}
+        self._externs = {externs}
         self._failed = False
         self._path = path
         self._pos = 0
@@ -813,10 +823,9 @@ class _Parser:
 
 _PARSE = """\
     def parse(self, externs: Externs = None):
-        self._externs = externs or {{}}
-        errors = self._check_externs()
-        if errors:
-            return Result(None, errors, 0)
+        if externs:
+            for k, v in externs.items():
+                self._externs[k] = v
 
         self._r_{starting_rule}()
         if self._failed:
@@ -827,11 +836,15 @@ _PARSE = """\
 
 _PARSE_WITH_EXCEPTION = """\
     def parse(self, externs: Externs = None):
-        self._externs = externs or {{}}
-        errors = self._check_externs()
+        errors = ''
+        if externs:
+            for k, v in externs.items():
+                if k in self._externs:
+                    self._externs[k] = v
+                else:
+                    errors += f'Unexpected extern "{{k}}"\\n'
         if errors:
             return Result(None, errors, 0)
-
         try:
             self._r_{starting_rule}()
             if self._failed:
@@ -1066,6 +1079,9 @@ _BUILTIN_METHODS = """\
 
     def _fn_strcat(self, a, b):
         return a + b
+
+    def _fn_unicode_lookup(self, s):
+        return unicodedata.unicode_lookup(s)
 
     def _fn_utoi(self, s):
         return ord(s)

@@ -97,8 +97,14 @@ class JavaScriptGenerator(Generator):
         if self._grammar.operators:
             text += _OPERATOR_CLASS
 
-        expected_externs = sorted(self._grammar.externs)
-        text += _CLASS.format(expected_externs=expected_externs)
+        externs = '';
+        if self._grammar.externs:
+            for k, v in self._grammar.externs.items():
+                v = 'true' if v else 'false';
+                externs += f"    this.externs.set('{k}', {v});\n"
+        else:
+            externs = '\n'
+        text += _CLASS.format(externs=externs)
 
         text += self._state()
         text += '\n'
@@ -783,14 +789,22 @@ class Parser {{
     this.path = path;
     this.pos = 0;
     this.val = undefined;
-    this.expected_externs = new Set({expected_externs});
-    this.externs = null;
+    this.externs = new Map();
+    {externs}
 """
 
 _PARSE = """\
   parse(externs = null) {{
-    this.externs = externs || new Map();
-    let errors = this.checkExterns()
+    externs = externs || new Map();
+    let errors = '';
+    for (let key of externs.keys()) {{
+      if (!this.externs.has(key)) {{
+        errors += `Unexpected extern "${{key}}"\\n`;
+      }} else {{
+        this.externs[key] = externs[key];
+      }}
+    }}
+      
     if (errors != '') {{
       return new Result(null, errors.trim(), 0);
     }}
@@ -805,8 +819,15 @@ _PARSE = """\
 
 _PARSE_WITH_EXCEPTION = """\
   parse(externs = null) {{
-    this.externs = externs || new Map();
-    let errors = this.checkExterns()
+    externs = externs || new Map();
+    let errors = '';
+    for (let key of externs.keys()) {{
+      if (!this.externs.has(key)) {{
+        errors += `Unexpected extern "${{key}}"\\n`;
+      }} else {{
+        this.externs[key] = externs[key];
+      }}
+    }}
     if (errors != '') {{
       return new Result(null, errors.trim(), 0);
     }}
@@ -1116,6 +1137,10 @@ _BUILTIN_METHODS = """\
 
   fn_strcat(a, b) {
     return a.concat(b);
+  }
+
+  fn_unicode_lookup(s) {
+    throw new ParsingRuntimeError('Unsupported function "unicode_lookup"');
   }
 
   fn_utoi(s) {
