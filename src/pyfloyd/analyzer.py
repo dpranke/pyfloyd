@@ -69,9 +69,8 @@ class Grammar:
         # grammar.ast and then append any new rules to grammar.ast.
         rules = set()
         for rule in self.ast[2]:
-            if rule[0] == 'rule' and not rule[1].startswith('%'):
-                self.rules[rule[1]] = rule[2][0]
-                rules.add(rule[1])
+            self.rules[rule[1]] = rule[2][0]
+            rules.add(rule[1])
         for rule in self.rules:
             if rule not in rules:
                 self.ast[2].append(['rule', rule, [self.rules[rule]]])
@@ -112,6 +111,8 @@ def analyze(ast, rewrite_subrules: bool) -> Grammar:
 
     # Insert filler nodes.
     _rewrite_filler(g)
+
+    _rewrite_pragma_rules(g)
 
     # Rewrite any choice or seq nodes that only have one child.
     _rewrite_singles(g)
@@ -171,6 +172,11 @@ class _Analyzer:
 
     def run_checks(self):
         for node in self.grammar.ast[2]:
+            if node[1].startswith('_'):
+                self.errors.append(
+                    f'Illegal rule name "{node[1]}": '
+                    'names starting with an "_" are reserved'
+                )
             self.current_rule = node[1]
             if node[1][0] == '%':
                 continue
@@ -504,8 +510,7 @@ def _check_lr(name, node, grammar, seen):
 
 
 def _rewrite_filler(grammar):
-    """Rewrites the grammar to insert filler rules and nodes. Unsets
-    %whitespace, %comment, and %tokens."""
+    """Rewrites the grammar to insert filler rules and nodes."""
     if not grammar.comment and not grammar.whitespace:
         return
 
@@ -515,21 +520,6 @@ def _rewrite_filler(grammar):
     # Now rewrite all the rules to insert the filler nodes.
     grammar.ast = _add_filler_nodes(grammar, grammar.ast)
     grammar.update_rules()
-
-    # And strip out the %whitespace, %comment, and %token(s) pragmas.
-    grammar.ast[2] = [
-        rule
-        for rule in grammar.ast[2]
-        if rule[1] not in ('%whitespace', '%comment', '%externs', '%tokens')
-    ]
-    grammar.comment = None
-    grammar.whitespace = None
-    grammar.tokens = set()
-    grammar.pragmas = [
-        n
-        for n in grammar.pragmas
-        if n[1] not in ('%whitespace', '%comment', '%externs', '%tokens')
-    ]
 
 
 def _collect_tokens(grammar, node):
@@ -550,11 +540,9 @@ def _collect_tokens(grammar, node):
 
 def _add_filler_rules(grammar):
     if grammar.whitespace:
-        grammar.rules['_whitespace'] = grammar.whitespace
-        grammar.tokens.add('_whitespace')
+        grammar.tokens.add('%whitespace')
     if grammar.comment:
-        grammar.rules['_comment'] = grammar.comment
-        grammar.tokens.add('_comment')
+        grammar.tokens.add('%comment')
     filler = None
     if grammar.whitespace and grammar.comment:
         if (
@@ -575,8 +563,8 @@ def _add_filler_rules(grammar):
                         'choice',
                         None,
                         [
-                            ['apply', '_whitespace', []],
-                            ['apply', '_comment', []],
+                            ['apply', '%whitespace', []],
+                            ['apply', '%comment', []],
                         ],
                     ],
                 ],
@@ -585,19 +573,14 @@ def _add_filler_rules(grammar):
         if grammar.comment[0] == 'regexp':
             filler = ['regexp', f'({grammar.comment[1]})*', []]
         else:
-            filler = ['star', None, [['apply', '_comment', []]]]
+            filler = ['star', None, [['apply', '%comment', []]]]
     elif grammar.whitespace:
         if grammar.whitespace[0] == 'regexp':
             filler = ['regexp', f'({grammar.whitespace[1]})*', []]
         else:
-            filler = ['star', None, [['apply', '_whitespace', []]]]
+            filler = ['star', None, [['apply', '%whitespace', []]]]
     if filler:
-        grammar.rules['_filler'] = ['choice', None, [filler]]
-        grammar.ast[2].append(['rule', '_filler', [grammar.rules['_filler']]])
-    if grammar.whitespace:
-        grammar.ast[2].append(['rule', '_whitespace', [grammar.whitespace]])
-    if grammar.comment:
-        grammar.ast[2].append(['rule', '_comment', [grammar.comment]])
+        grammar.rules['%filler'] = ['choice', None, [filler]]
 
 
 def _add_filler_nodes(grammar, node):
@@ -605,7 +588,7 @@ def _add_filler_nodes(grammar, node):
         if node[0] in ('escape', 'lit', 'range', 'regexp', 'set'):
             return True
         if node[0] == 'apply' and node[1] in (
-            '_comment', '_filler', '_whitespace'
+            '%comment', '%filler', '%whitespace'
         ):
             return False
         if node[0] == 'apply' and (
@@ -620,7 +603,7 @@ def _add_filler_nodes(grammar, node):
     if node[0] == 'rule' and node[1] in grammar.tokens:
         # By definition we don't want to insert filler into token rules.
         return node
-    if node[0] == 'rule' and node[1] in ('_comment', '_filler', '_whitespace'):
+    if node[0] == 'rule' and node[1] in ('%comment', '%filler', '%whitespace'):
         # These *are* the filler rules, so we don't want to insert filler
         # into them.
         return node
@@ -628,7 +611,7 @@ def _add_filler_nodes(grammar, node):
         children = []
         for child in node[2]:
             if should_fill(child):
-                children.append(['apply', '_filler', []])
+                children.append(['apply', '%filler', []])
                 children.append(child)
             else:
                 sn = _add_filler_nodes(grammar, child)
@@ -638,7 +621,7 @@ def _add_filler_nodes(grammar, node):
         return [
             'paren',
             None,
-            [['seq', None, [['apply', '_filler', []], node]]],
+            [['seq', None, [['apply', '%filler', []], node]]],
         ]
 
     r = [node[0], node[1], [_add_filler_nodes(grammar, n) for n in node[2]]]
@@ -803,3 +786,33 @@ class _SubRuleRewriter:
     def _ty_unicat(self, node):
         self._grammar.unicat_needed = True
         return node
+
+
+def _rewrite_pragma_rules(grammar):
+    # '%' is not a legal character to be in an identifier in most programming
+    # languages, so we need to rewrite rule names containing '%' to something
+    # else.
+    def _rewrite(node):
+        if node[0] == 'apply' and node[1].startswith('%'):
+            return [node[0], node[1].replace('%', '_'), []]
+        return [node[0], node[1], [_rewrite(sn) for sn in node[2]]]
+
+    new_rules = []
+    for rule in grammar.ast[2]:
+        if rule[1].startswith('%'):
+            if rule[1] in ('%comment', '%whitespace', '%filler'):
+                new_rule = [
+                    rule[0], 
+                    rule[1].replace('%', '_'),
+                    [_rewrite(sn) for sn in rule[2]],
+                ]
+                new_rules.append(new_rule)
+                assert new_rule[1] not in grammar.rules, (
+                    f'Collision with existing rule {new_rule[1]}'
+                )
+                grammar.rules[new_rule[1]] = new_rule[2][0]
+            if rule[1] in grammar.rules:
+                del grammar.rules[rule[1]]
+        else:
+            new_rules.append(_rewrite(rule))
+    grammar.ast = ['rules', None, new_rules]

@@ -278,6 +278,27 @@ class GrammarTestsMixin:
             grammar_err=('Errors were found:\n' '  Unknown rule "foo"\n'),
         )
 
+        # Check that referring to a reserved rule is caught when the rule
+        # isn't defined.
+        self.check(textwrap.dedent("""\
+            grammar = _whitespace
+            """),
+            text='',
+            grammar_err=('Errors were found:\n'
+                         '  Unknown rule "_whitespace"\n'),
+        )
+
+        # Check that referring to a reserved rule is caught when the rule
+        # is defined.
+        self.check(textwrap.dedent("""\
+            %whitespace = ' '
+            grammar = _whitespace
+            """),
+            text='',
+            grammar_err=('Errors were found:\n'
+                         '  Unknown rule "_whitespace"\n'),
+        )
+
     def test_error_unexpected_thing(self):
         self.check_grammar_error(
             'grammar = 1 2 3', err='<string>:1 Unexpected "1" at column 11'
@@ -378,6 +399,12 @@ class GrammarTestsMixin:
             text='',
             grammar_err='<string>:1 Unexpected "t" at column 16',
         )
+
+    def test_illegal_rule_names(self):
+        self.check('_foo = end', '', grammar_err=(
+            'Errors were found:\n'
+            '  Illegal rule name "_foo": names starting with '
+            'an "_" are reserved\n'))
 
     def test_inline_seq(self):
         # This checks that we correctly include the builtin `end` rule
