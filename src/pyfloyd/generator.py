@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import re
+import textwrap
 from typing import Dict, List, Optional, Set, Union
 
 from pyfloyd.analyzer import Grammar
@@ -103,6 +104,11 @@ class Generator:
     def _gen_expr(self, node) -> List[str]:
         fn = getattr(self, f'_ty_{node[0]}')
         return fn(node)
+
+    def _dedent(self, s, level=0):
+        s = textwrap.dedent(s)
+        return '\n'.join(((self._indent * level) + line)
+                         for line in s.splitlines()) + '\n'
 
     def _varname(self, v):
         r = f'v_{v.replace("$", "_")}'

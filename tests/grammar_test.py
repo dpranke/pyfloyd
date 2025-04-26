@@ -1198,7 +1198,11 @@ class _GeneratedParserWrapper:
         else:
             stderr = None
         if proc.returncode == 0:
-            return json.loads(proc.stdout), None, 0
+            try:
+                return json.loads(proc.stdout), None, 0
+            except Exception as e:
+                import pdb; pdb.set_trace()
+
         return None, stderr, 0
 
     def cleanup(self):
