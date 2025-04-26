@@ -51,19 +51,7 @@ class PythonGenerator(Generator):
             self._current_rule = None
 
     def _gen_text(self) -> str:
-        imports = ''
-        if self._options.main:
-            imports += 'import argparse\n'
-        if self._options.main:
-            imports += 'import json\n'
-            imports += 'import os\n'
-        if self._grammar.re_needed:
-            imports += 'import re\n'
-        if self._options.main:
-            imports += 'import sys\n'
-        imports += 'from typing import Any, Dict, NamedTuple, Optional\n'
-        if self._unicodedata_needed:
-            imports += 'import unicodedata\n'
+        imports = self._imports()
 
         version = __version__
         args = shlex.join(sys.argv[1:])
@@ -81,18 +69,11 @@ class PythonGenerator(Generator):
 
         if self._grammar.operators:
             text += _OPERATOR_CLASS
-        if self._grammar.externs:
-            externs = '{\n            '
-            externs += '\n            '.join(
-                f"'{k}': {v}," for k, v in self._grammar.externs.items()
-            )
-            externs += '\n        }'
-        else:
-            externs = '{}'
+
+        externs = self._externs()
         text += _CLASS.format(externs=externs)
 
         text += self._state()
-        text += '\n'
 
         if self._exception_needed:
             text += _PARSE_WITH_EXCEPTION.format(
@@ -102,11 +83,40 @@ class PythonGenerator(Generator):
             text += _PARSE.format(starting_rule=self._grammar.starting_rule)
 
         text += self._gen_methods()
+        text += self._endclass()
+
         if self._options.main:
             text += _MAIN_FOOTER
         else:
             text += _DEFAULT_FOOTER
         return text
+
+    def _imports(self):
+        imports = ''
+        if self._options.main:
+            imports += 'import argparse\n'
+        if self._options.main:
+            imports += 'import json\n'
+            imports += 'import os\n'
+        if self._grammar.re_needed:
+            imports += 'import re\n'
+        if self._options.main:
+            imports += 'import sys\n'
+        imports += 'from typing import Any, Dict, NamedTuple, Optional\n'
+        if self._unicodedata_needed:
+            imports += 'import unicodedata\n'
+        return imports
+
+    def _externs(self):
+        if self._grammar.externs:
+            externs = '{\n            '
+            externs += '\n            '.join(
+                f"'{k}': {v}," for k, v in self._grammar.externs.items()
+            )
+            externs += '\n        }'
+        else:
+            externs = '{}'
+        return externs
 
     def _state(self) -> str:
         text = ''
@@ -124,6 +134,7 @@ class PythonGenerator(Generator):
         if self._grammar.operator_needed:
             text += self._operator_state()
             text += '\n'
+        text += '\n'
 
         return text
 
@@ -147,6 +158,9 @@ class PythonGenerator(Generator):
             text += '        }\n'
             text += "        self._operators['%s'] = o\n" % rule
         return text
+
+    def _endclass(self):
+        return ''
 
     def _load_builtin_methods(self) -> Dict[str, str]:
         blocks = _BUILTIN_METHODS.split('\n    def ')
