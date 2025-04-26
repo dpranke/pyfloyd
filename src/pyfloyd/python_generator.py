@@ -35,15 +35,14 @@ class PythonGenerator(Generator):
         self._map = {
             'end': '',
             'false': 'False',
+            'indent': '    ',
             'Infinity': "float('inf')",
             'NaN': "float('NaN')",
             'not': 'not ',
             'null': 'None',
             'true': 'True',
         }
-
-        self._end_stmt = ''
-
+        self._indent = '    '
 
     def _gen_rules(self) -> None:
         for rule, node in self._grammar.rules.items():
@@ -208,24 +207,6 @@ class PythonGenerator(Generator):
     # Handlers for each non-host node in the glop AST follow.
     #
 
-    def _ty_action(self, node) -> List[str]:
-        obj = self._gen_expr(node[2][0])
-        return flatten(Saw('self._succeed(', obj, ')'))
-
-    def _ty_apply(self, node) -> List[str]:
-        if self._options.memoize and node[1].startswith('r_'):
-            name = node[1][2:]
-            if (
-                name not in self._grammar.operators
-                and name not in self._grammar.leftrec_rules
-            ):
-                return [
-                    self._invoke('memoize', f"'{node[1]}'",
-                                 self._rulename(node[1]))
-                ]
-
-        return [self._invoke(node[1])]
-
     def _ty_choice(self, node) -> List[str]:
         lines = ['p = self._pos']
         for subnode in node[2][:-1]:
@@ -258,10 +239,6 @@ class PythonGenerator(Generator):
         )
         return lines
 
-    def _ty_empty(self, node) -> List[str]:
-        del node
-        return [self._invoke('succeed', self._map['null']) + self._map['end']]
-
     def _ty_ends_in(self, node) -> List[str]:
         sublines = self._gen_expr(node[2][0])
         lines = [
@@ -278,10 +255,6 @@ class PythonGenerator(Generator):
         )
         return lines
 
-    def _ty_equals(self, node) -> List[str]:
-        arg = self._gen_expr(node[2][0])
-        return [f'self._str({flatten(arg)[0]})']
-
     def _ty_label(self, node) -> List[str]:
         lines = self._gen_expr(node[2][0])
         if self._can_fail(node[2][0], True):
@@ -295,22 +268,6 @@ class PythonGenerator(Generator):
                 ]
             )
         return lines
-
-    def _ty_leftrec(self, node) -> List[str]:
-        left_assoc = self._grammar.assoc.get(node[1], 'left') == 'left'
-        lines = [
-            f'self._leftrec(self._{node[2][0][1]}, '
-            + f"'{node[1]}', {str(left_assoc)})"
-        ]
-        return lines
-
-    def _ty_lit(self, node) -> List[str]:
-        expr = lit.encode(node[1])
-        if len(node[1]) == 1:
-            method = 'ch'
-        else:
-            method = 'str'
-        return [f'self._{method}({expr})']
 
     def _ty_not(self, node) -> List[str]:
         sublines = self._gen_expr(node[2][0])
@@ -334,14 +291,6 @@ class PythonGenerator(Generator):
     def _ty_not_one(self, node) -> List[str]:
         sublines = self._gen_expr(['not', None, node[2]])
         return sublines + ['if not self._failed:', '    self._r_any()']
-
-    def _ty_operator(self, node) -> List[str]:
-        self._needed_methods.add('operator')
-        # Operator nodes have no children, but subrules for each arm
-        # of the expression cluster have been defined and are referenced
-        # from self._grammar.operators[node[1]].choices.
-        assert node[2] == []
-        return [f"self._operator(f'{node[1]}')"]
 
     def _ty_opt(self, node) -> List[str]:
         sublines = self._gen_expr(node[2][0])
@@ -393,19 +342,13 @@ class PythonGenerator(Generator):
         # the _ParsingRuntimeError exception
         self._exception_needed = True
         return [
-            'v = ' + flatten(arg)[0],
+            'v = ' + flatten(arg, indent=self._map['indent'])[0],
             'if v is True:',
             '    self._succeed(v)',
             'elif v is False:',
             '    self._fail()',
             'else:',
             "    raise _ParsingRuntimeError('Bad predicate value')",
-        ]
-
-    def _ty_range(self, node) -> List[str]:
-        return [
-            'self._range(%s, %s)'
-            % (lit.encode(node[1][0]), lit.encode(node[1][1]))
         ]
 
     def _ty_regexp(self, node) -> List[str]:
@@ -444,18 +387,14 @@ class PythonGenerator(Generator):
             ]
         )
 
-    def _ty_set(self, node) -> List[str]:
-        new_node = ['regexp', '[' + node[1] + ']', []]
-        return self._ty_regexp(new_node)
-
     def _ty_seq(self, node) -> List[str]:
         lines = self._gen_expr(node[2][0])
         if self._can_fail(node[2][0], inline=True):
-            lines.extend(['if self._failed:', '    return'])
+            lines.extend(['if self._failed: return'])
         for subnode in node[2][1:-1]:
             lines.extend(self._gen_expr(subnode))
             if self._can_fail(subnode, inline=True):
-                lines.extend(['if self._failed:', '    return'])
+                lines.extend(['if self._failed: return'])
         lines.extend(self._gen_expr(node[2][-1]))
         return lines
 
@@ -477,9 +416,6 @@ class PythonGenerator(Generator):
             ]
         )
         return lines
-
-    def _ty_unicat(self, node) -> List[str]:
-        return ['self._unicat(%s)' % lit.encode(node[1])]
 
 
 _DEFAULT_HEADER = """\

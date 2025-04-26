@@ -127,8 +127,7 @@ class Generator:
         self._gen_rules()
         return self._gen_text()
 
-    def _gen_expr(self, node) -> FormatObj:
-        # All of the host methods return a formatter object.
+    def _gen_expr(self, node) -> List[str]:
         fn = getattr(self, f'_ty_{node[0]}')
         return fn(node)
 
@@ -136,7 +135,7 @@ class Generator:
         r = f'v_{v.replace("$", "_")}'
         return r
 
-    def _find_vars(self, node) -> Set[str]: 
+    def _find_vars(self, node) -> Set[str]:
         vs = set()
         if node[0] == 'label':
             vs.add(self._varname(node[1]))
@@ -203,6 +202,32 @@ class Generator:
             'unicat',
         )
         return True
+
+    #
+    # Handlers for each non-host node in the glop AST follow.
+    #
+
+    def _ty_action(self, node) -> List[str]:
+        obj = self._gen_expr(node[2][0])
+        return flatten(
+            Saw(self._rulename('succeed') + '(', obj, ')' + self._map['end']),
+            indent=self._map['indent'],
+        )
+
+    def _ty_apply(self, node) -> List[str]:
+        if self._options.memoize and node[1].startswith('r_'):
+            name = node[1][2:]
+            if (
+                name not in self._grammar.operators
+                and name not in self._grammar.leftrec_rules
+            ):
+                return [
+                    self._invoke(
+                        'memoize', f"'{node[1]}'", self._rulename(node[1])
+                    )
+                ]
+
+        return [self._invoke(node[1]) + self._map['end']]
 
     def _ty_e_arr(self, node) -> FormatObj:
         if len(node[2]) == 0:
@@ -294,3 +319,52 @@ class Generator:
         del node
         return [self._invoke('succeed', self._map['null']) + self._map['end']]
 
+    def _ty_equals(self, node) -> List[str]:
+        arg = self._gen_expr(node[2][0])
+        return [self._invoke('str', flatten(arg)[0]) + self._map['end']]
+
+    def _ty_leftrec(self, node) -> List[str]:
+        if self._grammar.assoc.get(node[1], 'left') == 'left':
+            left_assoc = self._map['true']
+        else:
+            left_assoc = self._map['false']
+
+        lines = [
+            self._invoke(
+                'leftrec',
+                self._rulename(node[2][0][1]),
+                "'" + node[1] + "'",
+                left_assoc,
+            )
+        ]
+        return lines
+
+    def _ty_lit(self, node) -> List[str]:
+        expr = lit.encode(node[1])
+        if len(node[1]) == 1:
+            method = 'ch'
+        else:
+            method = 'str'
+        return [self._invoke(method, expr)]
+
+    def _ty_operator(self, node) -> List[str]:
+        self._needed_methods.add('operator')
+        # Operator nodes have no children, but subrules for each arm
+        # of the expression cluster have been defined and are referenced
+        # from self._grammar.operators[node[1]].choices.
+        assert node[2] == []
+        return [self._invoke('operator', "'" + node[1] + "'")]
+
+    def _ty_range(self, node) -> List[str]:
+        return [
+            self._invoke(
+                'range', lit.encode(node[1][0]), lit.encode(node[1][1])
+            )
+        ]
+
+    def _ty_set(self, node) -> List[str]:
+        new_node = ['regexp', '[' + node[1] + ']', []]
+        return self._ty_regexp(new_node)
+
+    def _ty_unicat(self, node) -> List[str]:
+        return [self._invoke('unicat', lit.encode(node[1])) + self._map['end']]

@@ -33,6 +33,7 @@ class JavaScriptGenerator(Generator):
         self._map = {
             'end': ';',
             'false': 'false',
+            'indent': '  ',
             'Infinity': 'Infinity',
             'NaN': 'NaN',
             'not': '!',
@@ -220,23 +221,6 @@ class JavaScriptGenerator(Generator):
     # Handlers for each non-host node in the glop AST follow.
     #
 
-    def _ty_action(self, node) -> List[str]:
-        obj = self._gen_expr(node[2][0])
-        return flatten(Saw('this.succeed(', obj, ');'), indent='  ')
-
-    def _ty_apply(self, node) -> List[str]:
-        if self._options.memoize and node[1].startswith('r_'):
-            name = node[1][2:]
-            if (
-                name not in self._grammar.operators
-                and name not in self._grammar.leftrec_rules
-            ):
-                return [
-                    self._invoke('memoize', f"'{node[1]}'",
-                                 self._rulename(node[1]))
-                ]
-        return [self._invoke(node[1]) + ';']
-
     def _ty_choice(self, node) -> List[str]:
         lines = ['let p = this.pos;']
         for subnode in node[2][:-1]:
@@ -294,10 +278,6 @@ class JavaScriptGenerator(Generator):
         )
         return lines
 
-    def _ty_equals(self, node) -> List[str]:
-        arg = self._gen_expr(node[2][0])
-        return [f'this.str({flatten(arg)[0]});']
-
     def _ty_label(self, node) -> List[str]:
         lines = self._gen(node[2][0])
         varname = self._varname(node[1])
@@ -318,25 +298,6 @@ class JavaScriptGenerator(Generator):
                 ]
             )
         return lines
-
-    def _ty_leftrec(self, node) -> List[str]:
-        if self._grammar.assoc.get(node[1], 'true') == 'true':
-            left_assoc = 'true'
-        else:
-            left_assoc = 'false'
-        lines = [
-            f'this.leftrec(this.{node[2][0][1]}, '
-            + f"'{node[1]}', {left_assoc});"
-        ]
-        return lines
-
-    def _ty_lit(self, node) -> List[str]:
-        expr = lit.encode(node[1])
-        if len(node[1]) == 1:
-            method = 'ch'
-        else:
-            method = 'str'
-        return [f'this.{method}({expr});']
 
     def _ty_not(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
@@ -365,14 +326,6 @@ class JavaScriptGenerator(Generator):
             '    this.r_any(p);',
             '}',
         ]
-
-    def _ty_operator(self, node) -> List[str]:
-        self._needed_methods.add('operator')
-        # Operator nodes have no children, but subrules for each arm
-        # of the expression cluster have been defined and are referenced
-        # from self._grammar.operators[node[1]].choices.
-        assert node[2] == []
-        return [f"this.operator('{node[1]}')"]
 
     def _ty_opt(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
@@ -427,7 +380,7 @@ class JavaScriptGenerator(Generator):
         # the _ParsingRuntimeError exception
         self._exception_needed = True
         return [
-            'let v = ' + flatten(arg, indent='  ')[0],
+            'let v = ' + flatten(arg, indent=self._map['indent'])[0],
             'if (v === true) {',
             '  this.succeed(v);',
             '} else if (v === false) {',
@@ -435,12 +388,6 @@ class JavaScriptGenerator(Generator):
             '} else {',
             "  throw new ParsingRuntimeError('Bad predicate value');",
             '}',
-        ]
-
-    def _ty_range(self, node) -> List[str]:
-        return [
-            'this.range(%s, %s);'
-            % (lit.encode(node[1][0]), lit.encode(node[1][1]))
         ]
 
     def _ty_regexp(self, node) -> List[str]:
@@ -490,10 +437,6 @@ class JavaScriptGenerator(Generator):
             lines.append('}')
         return lines
 
-    def _ty_set(self, node) -> List[str]:
-        new_node = ['regexp', '[' + node[1] + ']', []]
-        return self._ty_regexp(new_node)
-
     def _ty_star(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
         lines = (
@@ -514,18 +457,6 @@ class JavaScriptGenerator(Generator):
             ]
         )
         return lines
-
-    def _ty_unicat(self, node) -> List[str]:
-        return [
-            rf'let regexp = /\p{{{node[1]}}}/guy;',
-            'regexp.lastIndex = this.pos;',
-            'let found = regexp.exec(this.text);',
-            'if (!found) {',
-            '    this.fail();',
-            '    return;',
-            '}',
-            'this.succeed(found[0], this.pos + found[0].length);',
-        ]
 
 
 _DEFAULT_HEADER = """\
