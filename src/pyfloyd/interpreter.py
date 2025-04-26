@@ -15,6 +15,7 @@
 import re
 import unicodedata
 
+from pyfloyd.ast import Apply, Not, Regexp
 from pyfloyd import parser
 
 
@@ -78,8 +79,8 @@ class Interpreter:
         return parser.Result(self._val, None, self._pos)
 
     def _interpret(self, node):
-        node_handler = getattr(self, f'_ty_{node[0]}', None)
-        assert node_handler, f"Unimplemented node type '{node[0]}'"
+        node_handler = getattr(self, f'_ty_{node.t}', None)
+        assert node_handler, f"Unimplemented node type '{node.t}'"
         node_handler(node)
 
     def _fail(self, errstr=None):
@@ -147,10 +148,10 @@ class Interpreter:
         self._succeed()
 
     def _ty_action(self, node):
-        self._interpret(node[2][0])
+        self._interpret(node.child)
 
     def _ty_apply(self, node):
-        rule_name = node[1]
+        rule_name = node.rule_name
         if rule_name == 'any':
             self._r_any()
             return
@@ -181,21 +182,21 @@ class Interpreter:
     def _ty_choice(self, node):
         count = 1
         pos = self._pos
-        for rule in node[2][:-1]:
+        for rule in node.ch[:-1]:
             self._interpret(rule)
             if not self._failed:
                 return
             self._rewind(pos)
             count += 1
-        self._interpret(node[2][-1])
+        self._interpret(node.ch[-1])
         return
 
     def _ty_count(self, node):
         vs = []
         i = 0
-        cmin, cmax = node[1]
+        cmin, cmax = node.start, node.stop
         while i < cmax:
-            self._interpret(node[2][0])
+            self._interpret(node.child)
             if self._failed:
                 if i >= cmin:
                     self._succeed(vs)
@@ -207,51 +208,51 @@ class Interpreter:
 
     def _ty_e_arr(self, node):
         vals = []
-        for subnode in node[2]:
+        for subnode in node.ch:
             self._interpret(subnode)
             vals.append(self._val)
         self._succeed(vals)
 
     def _ty_e_call(self, node):
         vals = []
-        for subnode in node[2]:
+        for subnode in node.ch:
             self._interpret(subnode)
             vals.append(self._val)
         # Return 'e_call' as a tag here so we can check it in e_qual.
         self._succeed(['e_call', vals])
 
     def _ty_e_const(self, node):
-        if node[1] == 'true':
+        if node.v == 'true':
             self._succeed(True)
-        elif node[1] == 'false':
+        elif node.v == 'false':
             self._succeed(False)
-        elif node[1] == 'null':
+        elif node.v == 'null':
             self._succeed(None)
-        elif node[1] == 'Infinity':
+        elif node.v == 'Infinity':
             self._succeed(float('inf'))
         else:
-            assert node[1] == 'NaN'
+            assert node.v == 'NaN'
             self._succeed(float('NaN'))
 
     def _ty_e_getitem(self, node):
-        self._interpret(node[2][0])
+        self._interpret(node.child)
         assert not self._failed
         # Return 'e_getitem' as a tag here so we can check it in e_qual.
         self._succeed(['e_getitem', self._val])
 
     def _ty_e_lit(self, node):
-        self._succeed(node[1])
+        self._succeed(node.v)
 
     def _ty_e_minus(self, node):
-        self._interpret(node[2][0])
+        self._interpret(node.ch[0])
         v1 = self._val
-        self._interpret(node[2][1])
+        self._interpret(node.ch[1])
         v2 = self._val
         self._succeed(v1 - v2)
 
     def _ty_e_not(self, node):
-        self._interpret(node[2][0])
-        # TODO: Should we be stricter about node[2][0] needing to result
+        self._interpret(node.child)
+        # TODO: Should we be stricter about node.child needing to result
         # in a boolean?
         if self._val:
             self._succeed(False)
@@ -259,26 +260,26 @@ class Interpreter:
             self._succeed(True)
 
     def _ty_e_num(self, node):
-        if node[1].startswith('0x'):
-            self._succeed(int(node[1], base=16))
+        if node.v.startswith('0x'):
+            self._succeed(int(node.v, base=16))
         else:
-            self._succeed(int(node[1]))
+            self._succeed(int(node.v))
 
     def _ty_e_paren(self, node):
-        self._interpret(node[2][0])
+        self._interpret(node.child)
 
     def _ty_e_plus(self, node):
-        self._interpret(node[2][0])
+        self._interpret(node.ch[0])
         v1 = self._val
-        self._interpret(node[2][1])
+        self._interpret(node.ch[1])
         v2 = self._val
         self._succeed(v1 + v2)
 
     def _ty_e_qual(self, node):
         # TODO: is it possible for this to fail?
-        self._interpret(node[2][0])
+        self._interpret(node.ch[0])
         assert not self._failed
-        for n in node[2][1:]:
+        for n in node.ch[1:]:
             lhs = self._val
             # TODO: is it possible for this to fail?
             self._interpret(n)
@@ -294,13 +295,13 @@ class Interpreter:
                 self._val = fn(*rhs)
 
     def _ty_e_var(self, node):
-        v = getattr(self, '_fn_' + node[1], None)
+        v = getattr(self, '_fn_' + node.v, None)
         if v:
-            self._succeed(node[1])
+            self._succeed(node.v)
             return
 
         # Unknown variables should have been caught in analysis.
-        v = node[1]
+        v = node.v
         if v[0] == '$':
             # Look up positional labels in the current scope.
             self._succeed(self._scopes[-1][v])
@@ -323,24 +324,24 @@ class Interpreter:
 
     def _ty_ends_in(self, node):
         while True:
-            self._interpret(node[2][0])
+            self._interpret(node.child)
             if not self._failed:
                 return
-            self._ty_apply(['apply', 'any', []])
+            self._ty_apply(Apply('any'))
             if self._failed:
                 return
 
     def _ty_equals(self, node):
-        self._interpret(node[2][0])
+        self._interpret(node.child)
         if self._failed:
             # TODO: Should this be even possible?
             return
         self._str(self._val)
 
     def _ty_label(self, node):
-        self._interpret(node[2][0])
+        self._interpret(node.child)
         if not self._failed:
-            self._scopes[-1][node[1]] = self._val
+            self._scopes[-1][node.v] = self._val
             self._succeed()
 
     def _ty_leftrec(self, node):
@@ -348,7 +349,7 @@ class Interpreter:
         # described in "Parsing Expression Grammars Made Practical" by
         # Laurent and Mens, 2016.
         pos = self._pos
-        rule_name = node[1]
+        rule_name = node.name
         assoc = self._grammar.assoc.get(rule_name, 'left')
         key = (rule_name, pos)
         seed = self._seeds.get(key)
@@ -364,7 +365,7 @@ class Interpreter:
         if assoc == 'left':
             self._blocked.add(rule_name)
         while True:
-            self._interpret(node[2][0])
+            self._interpret(node.child)
             if self._pos > current[2]:
                 current = (self._val, self._failed, self._pos)
                 self._seeds[key] = current
@@ -377,12 +378,12 @@ class Interpreter:
                 return
 
     def _ty_lit(self, node):
-        self._str(node[1])
+        self._str(node.v)
 
     def _ty_not(self, node):
         pos = self._pos
         val = self._val
-        self._interpret(node[2][0])
+        self._interpret(node.child)
         if self._failed:
             self._succeed(val, newpos=pos)
         else:
@@ -390,30 +391,29 @@ class Interpreter:
             self._fail(val)
 
     def _ty_not_one(self, node):
-        self._ty_not(['not', None, node[2]])
+        self._ty_not(Not(node.child))
         if not self._failed:
-            self._ty_apply(['apply', 'any', []])
+            self._ty_apply(Apply('any'))
 
     def _ty_operator(self, node):
         pos = self._pos
-        rule_name = node[1]
+        rule_name = node.name
         key = (rule_name, self._pos)
         seed = self._seeds.get(key)
         if seed:
             self._val, self._failed, self._pos = seed
             return
 
-        o = self._operators.get(node[1])
+        o = self._operators.get(node.name)
         if o is None:
             o = _OperatorState()
-            for op_node in node[2]:
-                op, prec = op_node[1]
-                o.prec_ops.setdefault(prec, []).append(op)
-                if self._grammar.assoc.get(op) == 'right':
-                    o.rassoc.add(op)
-                o.choices[op] = op_node[2]
+            for op_node in node.ch:
+                o.prec_ops.setdefault(op_node.prec, []).append(op_node.op)
+                if self._grammar.assoc.get(op_node.op) == 'right':
+                    o.rassoc.add(op_node.op)
+                o.choices[op_node.op] = op_node.ch
             o.precs = sorted(o.prec_ops, reverse=True)
-            self._operators[node[1]] = o
+            self._operators[node.name] = o
 
         o.current_depth += 1
         current = (None, True, self._pos)
@@ -448,7 +448,7 @@ class Interpreter:
 
     def _ty_opt(self, node):
         pos = self._pos
-        self._interpret(node[2][0])
+        self._interpret(node.child)
         if self._failed:
             self._failed = False
             self._val = []
@@ -457,17 +457,17 @@ class Interpreter:
             self._val = [self._val]
 
     def _ty_paren(self, node):
-        self._interpret(node[2][0])
+        self._interpret(node.child)
 
     def _ty_plus(self, node):
-        self._interpret(node[2][0])
+        self._interpret(node.child)
         hd = self._val
         if not self._failed:
             self._ty_star(node)
             self._val = [hd] + self._val
 
     def _ty_pred(self, node):
-        self._interpret(node[2][0])
+        self._interpret(node.child)
         if self._val is True:
             self._succeed(True)
         elif self._val is False:
@@ -482,16 +482,16 @@ class Interpreter:
     def _ty_range(self, node):
         if (
             self._pos != self._end
-            and node[1][0] <= self._text[self._pos] <= node[1][1]
+            and node.start <= self._text[self._pos] <= node.stop
         ):
             self._succeed(self._text[self._pos], self._pos + 1)
             return
         self._fail()
 
     def _ty_regexp(self, node):
-        if node[1] not in self._regexps:
-            self._regexps[node[1]] = re.compile(node[1])
-        m = self._regexps[node[1]].match(self._text, self._pos)
+        if node.v not in self._regexps:
+            self._regexps[node.v] = re.compile(node.v)
+        m = self._regexps[node.v].match(self._text, self._pos)
         if m:
             self._succeed(m.group(0), m.end())
             return
@@ -499,7 +499,7 @@ class Interpreter:
 
     def _ty_run(self, node):
         start = self._pos
-        self._interpret(node[2][0])
+        self._interpret(node.child)
         if self._failed:
             return
         end = self._pos
@@ -507,24 +507,24 @@ class Interpreter:
 
     def _ty_scope(self, node):
         self._scopes.append({})
-        self._interpret(node[2][0])
+        self._interpret(node.child)
         self._scopes.pop()
 
     def _ty_seq(self, node):
-        for subnode in node[2]:
+        for subnode in node.ch:
             self._interpret(subnode)
             if self._failed:
                 break
 
     def _ty_set(self, node):
-        new_node = ['regexp', '[' + node[1] + ']', []]
+        new_node = Regexp('[' + node.v + ']')
         self._interpret(new_node)
 
     def _ty_star(self, node):
         vs = []
         while not self._failed and self._pos < self._end:
             p = self._pos
-            self._interpret(node[2][0])
+            self._interpret(node.child)
             if self._failed:
                 self._rewind(p)
                 break
@@ -537,7 +537,7 @@ class Interpreter:
 
     def _ty_unicat(self, node):
         p = self._pos
-        if p < self._end and unicodedata.category(self._text[p]) == node[1]:
+        if p < self._end and unicodedata.category(self._text[p]) == node.v:
             self._succeed(self._text[p], newpos=p + 1)
         else:
             self._fail()

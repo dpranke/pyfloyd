@@ -19,6 +19,7 @@ import shlex
 import sys
 from typing import Dict, List, Set
 
+from pyfloyd.ast import Not
 from pyfloyd.analyzer import Grammar
 from pyfloyd.formatter import flatten, Comma, Saw, Tree
 from pyfloyd.generator import Generator, GeneratorOptions, FormatObj
@@ -213,13 +214,13 @@ class JavaScriptGenerator(Generator):
     def _gen(self, node) -> List[str]:
         # All of the rule methods return a list of lines.
         lines: List[str] = []
-        if node[0] == 'seq':
+        if node.t == 'seq':
             vs: Set[str] = self._find_vars(node)
             lines = []
             for v in sorted(vs):
                 lines.append(f'let {v};')
 
-        fn = getattr(self, f'_ty_{node[0]}')
+        fn = getattr(self, f'_ty_{node.t}')
         return lines + fn(node)
 
     def _thisvar(self, v):
@@ -240,13 +241,13 @@ class JavaScriptGenerator(Generator):
 
     def _ty_choice(self, node) -> List[str]:
         lines = ['let p = this.pos;']
-        for subnode in node[2][:-1]:
+        for subnode in node.ch[:-1]:
             lines.extend(self._gen(subnode))
             lines.append('if (!this.failed) {')
             lines.append('  return;')
             lines.append('}')
             lines.append('this.rewind(p);')
-        lines.extend(self._gen(node[2][-1]))
+        lines.extend(self._gen(node.ch[-1]))
         return lines
 
     def _ty_count(self, node) -> List[str]:
@@ -257,7 +258,7 @@ class JavaScriptGenerator(Generator):
             f'let cmax = {node[1][1]};',
             'while (i < cmax) {',
         ]
-        lines.extend(['    ' + line for line in self._gen(node[2][0])])
+        lines.extend(['    ' + line for line in self._gen(node.child)])
         lines.extend(
             [
                 '    if (this.failed) {',
@@ -276,7 +277,7 @@ class JavaScriptGenerator(Generator):
         return lines
 
     def _ty_ends_in(self, node) -> List[str]:
-        sublines = self._gen(node[2][0])
+        sublines = self._gen(node.child)
         lines = (
             [
                 'while (true) {',
@@ -296,7 +297,7 @@ class JavaScriptGenerator(Generator):
         return lines
 
     def _ty_label(self, node) -> List[str]:
-        lines = self._gen(node[2][0])
+        lines = self._gen(node.child)
         varname = self._varname(node[1])
         if self._current_rule in self._grammar.outer_scope_rules:
             lines.extend(
@@ -317,7 +318,7 @@ class JavaScriptGenerator(Generator):
         return lines
 
     def _ty_not(self, node) -> List[str]:
-        sublines = self._gen(node[2][0])
+        sublines = self._gen(node.child)
         lines = (
             [
                 'let p = this.pos;',
@@ -337,7 +338,7 @@ class JavaScriptGenerator(Generator):
         return lines
 
     def _ty_not_one(self, node) -> List[str]:
-        sublines = self._gen(['not', None, node[2]])
+        sublines = self._gen(Not(node.child))
         return sublines + [
             'if (!this.failed) {',
             '    this.r_any(p);',
@@ -345,7 +346,7 @@ class JavaScriptGenerator(Generator):
         ]
 
     def _ty_opt(self, node) -> List[str]:
-        sublines = self._gen(node[2][0])
+        sublines = self._gen(node.child)
         lines = (
             [
                 'let p = this.pos;',
@@ -362,10 +363,10 @@ class JavaScriptGenerator(Generator):
         return lines
 
     def _ty_paren(self, node) -> List[str]:
-        return self._gen(node[2][0])
+        return self._gen(node.child)
 
     def _ty_plus(self, node) -> List[str]:
-        sublines = self._gen(node[2][0])
+        sublines = self._gen(node.child)
         lines = (
             ['let vs = [];']
             + sublines
@@ -391,7 +392,7 @@ class JavaScriptGenerator(Generator):
         return lines
 
     def _ty_pred(self, node) -> List[str]:
-        arg = self._gen_expr(node[2][0])
+        arg = self._gen_expr(node.child)
         return [
             'let v = ' + flatten(arg, indent=self._map['indent'])[0],
             'if (v === true) {',
@@ -418,7 +419,7 @@ class JavaScriptGenerator(Generator):
         ]
 
     def _ty_run(self, node) -> List[str]:
-        lines = self._gen(node[2][0])
+        lines = self._gen(node.child)
         return (
             ['let start = this.pos;']
             + lines
@@ -436,22 +437,22 @@ class JavaScriptGenerator(Generator):
             [
                 'this.scopes.push(new Map());',
             ]
-            + self._gen(node[2][0])
+            + self._gen(node.child)
             + [
                 'this.scopes.pop();',
             ]
         )
 
     def _ty_seq(self, node) -> List[str]:
-        lines = self._gen(node[2][0])
-        for subnode in node[2][1:]:
+        lines = self._gen(node.ch[0])
+        for subnode in node.ch[1:]:
             lines.append('if (!this.failed) {')
             lines.extend('  ' + line for line in self._gen(subnode))
             lines.append('}')
         return lines
 
     def _ty_star(self, node) -> List[str]:
-        sublines = self._gen(node[2][0])
+        sublines = self._gen(node.child)
         lines = (
             [
                 'let vs = [];',

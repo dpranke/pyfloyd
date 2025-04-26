@@ -17,11 +17,12 @@
 import re
 import shlex
 import sys
-from typing import Dict, List
+from typing import Dict, Iterable, List
 
-from pyfloyd.analyzer import Grammar
-from pyfloyd.formatter import flatten, Comma, Saw, Tree
-from pyfloyd.generator import Generator, GeneratorOptions, FormatObj
+from pyfloyd.analyzer import Grammar, Node
+from pyfloyd.ast import Not
+from pyfloyd.formatter import flatten, Comma, FormatObj, Saw, Tree
+from pyfloyd.generator import Generator, GeneratorOptions
 from pyfloyd.version import __version__
 from pyfloyd import string_literal as lit
 
@@ -49,7 +50,7 @@ class PythonGenerator(Generator):
             self._builtin_methods[k] = self._dedent(v, 1)
 
     def _gen_text(self) -> str:
-        imports = self._imports()
+        imports = self._gen_imports()
 
         version = __version__
         args = shlex.join(sys.argv[1:])
@@ -64,10 +65,10 @@ class PythonGenerator(Generator):
         if self._grammar.operators:
             text += self._gen_operator_state_class()
 
-        externs = self._externs()
+        externs = self._gen_externs()
         text += self._gen_parser_class(externs=externs)
 
-        text += self._state()
+        text += self._gen_state()
 
         text += self._gen_methods()
         text += self._gen_endclass()
@@ -177,7 +178,7 @@ class PythonGenerator(Generator):
                     self.choices = {}
         """)
 
-    def _gen_parser_class(self, externs):
+    def _gen_parser_class(self, externs: str) -> str:
         return self._dedent("""\
             class Result(NamedTuple):
                 \"\"\"The result returned from a `parse()` call.
@@ -226,10 +227,10 @@ class PythonGenerator(Generator):
                     self._val = None
             """).format(externs=externs)
 
-    def _gen_default_footer(self):
+    def _gen_default_footer(self) -> str:
         return ''
 
-    def _gen_parse_method(self, exception_needed, starting_rule):
+    def _gen_parse_method(self, exception_needed, starting_rule) -> str:
         if exception_needed:
             return self._dedent(
                 f"""\
@@ -275,7 +276,7 @@ class PythonGenerator(Generator):
                 level=1,
             )
 
-    def _gen_main_footer(self):
+    def _gen_main_footer(self) -> str:
         return self._dedent("""\
             
             
@@ -283,7 +284,7 @@ class PythonGenerator(Generator):
                 sys.exit(main())
         """)
 
-    def _imports(self):
+    def _gen_imports(self) -> str:
         imports = ''
         if self._options.main:
             imports += 'import argparse\n'
@@ -299,7 +300,7 @@ class PythonGenerator(Generator):
             imports += 'import unicodedata\n'
         return imports
 
-    def _externs(self):
+    def _gen_externs(self) -> str:
         if self._grammar.externs:
             externs = '{\n            '
             externs += '\n            '.join(
@@ -310,7 +311,7 @@ class PythonGenerator(Generator):
             externs = '{}'
         return externs
 
-    def _state(self) -> str:
+    def _gen_state(self) -> str:
         text = ''
         if self._options.memoize:
             text += '        self._cache = {}\n'
@@ -323,13 +324,13 @@ class PythonGenerator(Generator):
         if self._grammar.outer_scope_rules:
             text += '        self._scopes = []\n'
         if self._grammar.operator_needed:
-            text += self._operator_state()
+            text += self._gen_operator_state()
             text += '\n'
         text += '\n'
 
         return text
 
-    def _operator_state(self) -> str:
+    def _gen_operator_state(self) -> str:
         text = '        self._operators = {}\n'
         for rule, o in self._grammar.operators.items():
             text += '        o = _OperatorState()\n'
@@ -350,7 +351,7 @@ class PythonGenerator(Generator):
             text += "        self._operators['%s'] = o\n" % rule
         return text
 
-    def _gen_endclass(self):
+    def _gen_endclass(self) -> str:
         return ''
 
     def _gen_methods(self) -> str:
@@ -370,12 +371,12 @@ class PythonGenerator(Generator):
             )
         return text
 
-    def _gen_rule_methods(self):
+    def _gen_rule_methods(self) -> str:
         text = ''
         for rule, node in self._grammar.rules.items():
             self._current_rule = self._base_rule_name(rule)
-            text += self._gen_method_text(rule, self._gen_expr(node))
-            self._current_rule = None
+            text += self._gen_method_text(rule, self._gen_stmts(node))
+            self._current_rule = ''
         text += '\n'
 
         if self._grammar.needed_builtin_rules:
@@ -387,47 +388,49 @@ class PythonGenerator(Generator):
 
         return text
 
-    def _gen_method_text(self, method_name, method_body) -> str:
+    def _gen_method_text(
+        self, method_name: str, method_body: List[str]
+    ) -> str:
         text = '\n'
         text += '    def _%s(self):\n' % method_name
         for line in method_body:
             text += f'        {line}\n'
         return text
 
-    def _thisvar(self, v):
-        return 'self._' + v
+    def _thisvar(self, varname: str) -> str:
+        return 'self._' + varname
 
-    def _rulename(self, r):
-        return 'self._' + r
+    def _rulename(self, rule: str) -> str:
+        return 'self._' + rule
 
-    def _extern(self, v):
-        return "self._externs['" + v + "']"
+    def _extern(self, varname: str) -> str:
+        return "self._externs['" + varname + "']"
 
-    def _invoke(self, fn, *args):
+    def _invoke(self, fn, *args) -> str:
         return 'self._' + fn + '(' + ', '.join(args) + ')'
 
     #
     # Handlers for each non-host node in the glop AST follow.
     #
 
-    def _ty_choice(self, node) -> List[str]:
+    def _ty_choice(self, node: Node) -> List[str]:
         lines = ['p = self._pos']
-        for subnode in node[2][:-1]:
-            lines.extend(self._gen_expr(subnode))
+        for subnode in node.ch[:-1]:
+            lines.extend(self._gen_stmts(subnode))
             lines.append('if not self._failed:')
             lines.append('    return')
             lines.append('self._rewind(p)')
-        lines.extend(self._gen_expr(node[2][-1]))
+        lines.extend(self._gen_stmts(node.ch[-1]))
         return lines
 
-    def _ty_count(self, node) -> List[str]:
+    def _ty_count(self, node: Node) -> List[str]:
         lines = [
             'vs = []',
             'i = 0',
-            f'cmin, cmax = {node[1]}',
+            f'cmin, cmax = {node.v}',
             'while i < cmax:',
         ]
-        lines.extend(['    ' + line for line in self._gen_expr(node[2][0])])
+        lines.extend(['    ' + line for line in self._gen_stmts(node.child)])
         lines.extend(
             [
                 '    if self._failed:',
@@ -442,12 +445,12 @@ class PythonGenerator(Generator):
         )
         return lines
 
-    def _ty_ends_in(self, node) -> List[str]:
-        sublines = self._gen_expr(node[2][0])
+    def _ty_ends_in(self, node: Node) -> List[str]:
+        sublines = self._gen_stmts(node.child)
         lines = [
             'while True:',
         ] + ['    ' + line for line in sublines]
-        if self._can_fail(node[2][0], True):
+        if self._can_fail(node.child, True):
             lines.extend(['    if not self._failed:', '        break'])
         lines.extend(
             [
@@ -458,22 +461,22 @@ class PythonGenerator(Generator):
         )
         return lines
 
-    def _ty_label(self, node) -> List[str]:
-        lines = self._gen_expr(node[2][0])
-        if self._can_fail(node[2][0], True):
+    def _ty_label(self, node: Node) -> List[str]:
+        lines = self._gen_stmts(node.child)
+        if self._can_fail(node.child, True):
             lines.extend(['if self._failed:', '    return'])
         if self._current_rule in self._grammar.outer_scope_rules:
-            lines.extend([f"self._scopes[-1]['{node[1]}'] = self._val"])
+            lines.extend([f"self._scopes[-1]['{node.name}'] = self._val"])
         else:
             lines.extend(
                 [
-                    f'{self._varname(node[1])} = self._val',
+                    f'{self._varname(node.name)} = self._val',
                 ]
             )
         return lines
 
-    def _ty_not(self, node) -> List[str]:
-        sublines = self._gen_expr(node[2][0])
+    def _ty_not(self, node: Node) -> List[str]:
+        sublines = self._gen_stmts(node.child)
         lines = (
             [
                 'p = self._pos',
@@ -491,12 +494,12 @@ class PythonGenerator(Generator):
         )
         return lines
 
-    def _ty_not_one(self, node) -> List[str]:
-        sublines = self._gen_expr(['not', None, node[2]])
+    def _ty_not_one(self, node: Node) -> List[str]:
+        sublines = self._gen_stmts(Not(node.child))
         return sublines + ['if not self._failed:', '    self._r_any()']
 
-    def _ty_opt(self, node) -> List[str]:
-        sublines = self._gen_expr(node[2][0])
+    def _ty_opt(self, node: Node) -> List[str]:
+        sublines = self._gen_stmts(node.child)
         lines = (
             [
                 'p = self._pos',
@@ -511,11 +514,11 @@ class PythonGenerator(Generator):
         )
         return lines
 
-    def _ty_paren(self, node) -> List[str]:
-        return self._gen_expr(node[2][0])
+    def _ty_paren(self, node: Node) -> List[str]:
+        return self._gen_stmts(node.child)
 
-    def _ty_plus(self, node) -> List[str]:
-        sublines = self._gen_expr(node[2][0])
+    def _ty_plus(self, node: Node) -> List[str]:
+        sublines = self._gen_stmts(node.child)
         lines = (
             ['vs = []']
             + sublines
@@ -538,8 +541,8 @@ class PythonGenerator(Generator):
 
         return lines
 
-    def _ty_pred(self, node) -> List[str]:
-        arg = self._gen_expr(node[2][0])
+    def _ty_pred(self, node: Node) -> List[str]:
+        arg = self._gen_expr(node.child)
         return [
             'v = ' + flatten(arg, indent=self._map['indent'])[0],
             'if v is True:',
@@ -550,9 +553,9 @@ class PythonGenerator(Generator):
             "    raise _ParsingRuntimeError('Bad predicate value')",
         ]
 
-    def _ty_regexp(self, node) -> List[str]:
+    def _ty_regexp(self, node: Node) -> List[str]:
         return [
-            f'p = {lit.encode(node[1])}',
+            f'p = {lit.encode(node.v)}',
             'if p not in self._regexps:',
             '    self._regexps[p] = re.compile(p)',
             'm = self._regexps[p].match(self._text, self._pos)',
@@ -562,10 +565,10 @@ class PythonGenerator(Generator):
             'self._fail()',
         ]
 
-    def _ty_run(self, node) -> List[str]:
-        sublines = self._gen_expr(node[2][0])
+    def _ty_run(self, node: Node) -> List[str]:
+        sublines = self._gen_stmts(node.child)
         lines = ['start = self._pos'] + sublines
-        if self._can_fail(node[2][0], True):
+        if self._can_fail(node.child, True):
             lines.extend(['if self._failed:', '    return'])
         lines.extend(
             [
@@ -575,30 +578,30 @@ class PythonGenerator(Generator):
         )
         return lines
 
-    def _ty_scope(self, node) -> List[str]:
+    def _ty_scope(self, node: Node) -> List[str]:
         return (
             [
                 'self._scopes.append({})',
             ]
-            + self._gen_expr(node[2][0])
+            + self._gen_stmts(node.child)
             + [
                 'self._scopes.pop()',
             ]
         )
 
-    def _ty_seq(self, node) -> List[str]:
-        lines = self._gen_expr(node[2][0])
-        if self._can_fail(node[2][0], inline=True):
+    def _ty_seq(self, node: Node) -> List[str]:
+        lines = self._gen_stmts(node.ch[0])
+        if self._can_fail(node.ch[0], inline=True):
             lines.extend(['if self._failed:', '    return'])
-        for subnode in node[2][1:-1]:
-            lines.extend(self._gen_expr(subnode))
+        for subnode in node.ch[1:-1]:
+            lines.extend(self._gen_stmts(subnode))
             if self._can_fail(subnode, inline=True):
                 lines.extend(['if self._failed:', '    return'])
-        lines.extend(self._gen_expr(node[2][-1]))
+        lines.extend(self._gen_stmts(node.ch[-1]))
         return lines
 
-    def _ty_star(self, node) -> List[str]:
-        sublines = self._gen_expr(node[2][0])
+    def _ty_star(self, node: Node) -> List[str]:
+        sublines = self._gen_stmts(node.child)
         lines = (
             [
                 'vs = []',
