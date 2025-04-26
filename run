@@ -359,6 +359,8 @@ class Runner:
                 '-m',
                 'typ',
             ]
+            if self.args.failfast:
+                cmd.extend(['--typ-max-failures', '1'])
         else:
             cmd = self.run_cmd + [
                 '-m',
@@ -368,12 +370,12 @@ class Runner:
                 '*_test.py',
                 'tests',
             ]
+            if self.args.failfast:
+                cmd.append('-f')
         if self.args.quiet:
             cmd.append('-q')
         if self.args.verbose > 1:
             cmd.append('-' + 'v' * (self.args.verbose - 1))
-        if self.args.failfast:
-            cmd.append('-f')
         if not self.args.typ and self.args.durations:
             cmd.extend(['--durations', self.args.durations])
 
