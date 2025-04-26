@@ -15,101 +15,60 @@
 # pylint: disable=too-many-lines
 
 import re
-from typing import Dict, List, Set, Union
+import shlex
+import sys
+from typing import Dict, List, Set
 
 from pyfloyd.analyzer import Grammar
 from pyfloyd.formatter import flatten, Comma, Saw, Tree
-from pyfloyd.generator import Generator, GeneratorOptions
+from pyfloyd.generator import Generator, GeneratorOptions, FormatObj
+from pyfloyd.version import __version__
 from pyfloyd import string_literal as lit
-
-
-_FormatObj = Union[Comma, Tree, Saw, str]
 
 
 class JavaScriptGenerator(Generator):
     def __init__(self, grammar: Grammar, options: GeneratorOptions):
         super().__init__(grammar, options)
         self._builtin_methods = self._load_builtin_methods()
-        self._exception_needed = False
         self._methods: Dict[str, List[str]] = {}
         self._operators: Dict[str, str] = {}
-        self._current_rule = None
-        self._base_rule_regex = re.compile(r's_(.+)_\d+$')
-
-        # These methods are pretty much always needed.
-        self._needed_methods = set(
-            {
-                'checkExterns',
-                'error',
-                'errorOffsets',
-                'fail',
-                'rewind',
-                'succeed',
-            }
-        )
-        if grammar.ch_needed:
-            self._needed_methods.add('ch')
-        if grammar.leftrec_needed:
-            self._needed_methods.add('leftrec')
-        if grammar.operator_needed:
-            self._needed_methods.add('operator')
-        if grammar.range_needed:
-            self._needed_methods.add('range')
-        if grammar.str_needed:
-            self._needed_methods.add('str')
-        if self._options.memoize:
-            self._needed_methods.add('memoize')
-
-    def generate(self) -> str:
-        self._gen_rules()
-        return self._gen_text()
-
-    def _gen_rules(self) -> None:
-        local_vars = ('errpos', 'found', 'p', 'regexp')
-        for rule, node in self._grammar.rules.items():
-            self._current_rule = self._base_rule_name(rule)
-            local_vars_defined = set()
-            lines = []
-            original_lines = self._gen(node)
-            for line in original_lines:
-                modified = False
-                for v in local_vars:
-                    if f'let {v} =' in line:
-                        if v in local_vars_defined:
-                            lines.append(line.replace(f'let {v}', v))
-                            modified = True
-                            break
-                        local_vars_defined.add(v)
-                if not modified:
-                    lines.append(line)
-            self._methods[rule] = lines
-            self._current_rule = None
+        self._map = {
+            'end': ';',
+            'false': 'false',
+            'indent': '  ',
+            'Infinity': 'Infinity',
+            'NaN': 'NaN',
+            'not': '!',
+            'null': 'null',
+            'true': 'true',
+        }
 
     def _gen_text(self) -> str:
-        if self._options.main:
-            text = _MAIN_HEADER
-        else:
-            text = _DEFAULT_HEADER
+        imports = self._imports()
+        version = __version__
+        args = shlex.join(sys.argv[1:])
 
-        if self._exception_needed:
+        if self._options.main:
+            text = _MAIN_HEADER.format(
+                version=version, args=args, imports=imports
+            )
+        else:
+            text = _DEFAULT_HEADER.format(
+                version=version, args=args, imports=imports
+            )
+
+        if self._grammar.exception_needed:
             text += _PARSING_RUNTIME_EXCEPTION
 
         if self._grammar.operators:
             text += _OPERATOR_CLASS
 
-        externs = ''
-        if self._grammar.externs:
-            for k, v in self._grammar.externs.items():
-                v = 'true' if v else 'false'
-                externs += f"    this.externs.set('{k}', {v});\n"
-        else:
-            externs = '\n'
+        externs = self._externs()
         text += _CLASS.format(externs=externs)
 
         text += self._state()
-        text += '\n'
 
-        if self._exception_needed:
+        if self._grammar.exception_needed:
             text += _PARSE_WITH_EXCEPTION.format(
                 starting_rule=self._grammar.starting_rule
             )
@@ -117,13 +76,26 @@ class JavaScriptGenerator(Generator):
             text += _PARSE.format(starting_rule=self._grammar.starting_rule)
 
         text += self._gen_methods()
-        text += '}\n'
+        text += self._endclass()
 
         if self._options.main:
             text += _MAIN_FOOTER
         else:
             text += _DEFAULT_FOOTER
         return text
+
+    def _imports(self) -> str:
+        return ''
+
+    def _externs(self) -> str:
+        externs = ''
+        if self._grammar.externs:
+            for k, v in self._grammar.externs.items():
+                v = 'true' if v else 'false'
+                externs += f"    this.externs.set('{k}', {v});\n"
+        else:
+            externs = '\n'
+        return externs
 
     def _state(self) -> str:
         text = ''
@@ -137,8 +109,8 @@ class JavaScriptGenerator(Generator):
             text += self._operator_state()
         if self._grammar.outer_scope_rules:
             text += '    this.scopes = [];\n'
-            self._needed_methods.add('lookup')
         text += '  }\n'
+        text += '\n'
 
         return text
 
@@ -166,6 +138,9 @@ class JavaScriptGenerator(Generator):
             text += "    this.operators['%s'] = o;\n" % rule
         return text
 
+    def _endclass(self):
+        return '}\n'
+
     def _load_builtin_methods(self) -> Dict[str, str]:
         blocks = _BUILTIN_METHODS.split('\n  }\n\n  ')
         blocks[0] = blocks[0][2:]
@@ -181,12 +156,7 @@ class JavaScriptGenerator(Generator):
         return builtins
 
     def _gen_methods(self) -> str:
-        text = ''
-        for rule, method_body in self._methods.items():
-            text += self._gen_method_text(rule, method_body)
-        text += '\n'
-        if self._grammar.needed_builtin_rules or self._needed_methods:
-            text += '\n'
+        text = self._gen_rule_methods()
 
         if self._grammar.needed_builtin_rules:
             for name in sorted(self._grammar.needed_builtin_rules):
@@ -194,11 +164,7 @@ class JavaScriptGenerator(Generator):
                 text += '  ' + method_txt
                 text += '\n'
 
-        if self._needed_methods:
-            text += '  ' + '\n  '.join(
-                self._builtin_methods[name]
-                for name in sorted(self._needed_methods)
-            )
+        text += self._needed_methods()
 
         if self._grammar.needed_builtin_functions:
             text += '\n'
@@ -206,6 +172,34 @@ class JavaScriptGenerator(Generator):
                 self._builtin_methods[f'fn_{name}']
                 for name in sorted(self._grammar.needed_builtin_functions)
             )
+        return text
+
+    def _gen_rule_methods(self):
+        text = ''
+        local_vars = ('errpos', 'found', 'p', 'regexp')
+        for rule, node in self._grammar.rules.items():
+            self._current_rule = self._base_rule_name(rule)
+            local_vars_defined = set()
+            lines = []
+            original_lines = self._gen(node)
+            for line in original_lines:
+                modified = False
+                for v in local_vars:
+                    if f'let {v} =' in line:
+                        if v in local_vars_defined:
+                            lines.append(line.replace(f'let {v}', v))
+                            modified = True
+                            break
+                        local_vars_defined.add(v)
+                if not modified:
+                    lines.append(line)
+
+            text += self._gen_method_text(rule, lines)
+            self._methods[rule] = lines
+            self._current_rule = None
+
+        text += '\n'
+        text += '\n'
         return text
 
     def _gen_method_text(self, method_name, method_body) -> str:
@@ -220,8 +214,7 @@ class JavaScriptGenerator(Generator):
         # All of the rule methods return a list of lines.
         lines: List[str] = []
         if node[0] == 'seq':
-            vs: Set[str] = set()
-            self._find_vars(node, vs)
+            vs: Set[str] = self._find_vars(node)
             lines = []
             for v in sorted(vs):
                 lines.append(f'let {v};')
@@ -229,42 +222,21 @@ class JavaScriptGenerator(Generator):
         fn = getattr(self, f'_ty_{node[0]}')
         return lines + fn(node)
 
-    def _gen_expr(self, node) -> _FormatObj:
-        # All of the host methods return a formatter object.
-        fn = getattr(self, f'_ty_{node[0]}')
-        return fn(node)
+    def _thisvar(self, v):
+        return 'this.' + v
 
-    def _find_vars(self, node, vs):
-        if node[0] == 'label':
-            vs.add(self._varname(node[1]))
-        for c in node[2]:
-            self._find_vars(c, vs)
+    def _rulename(self, fn):
+        return 'this.' + fn
 
-    def _varname(self, v):
-        return f'v_{v.replace("$", "_")}'
+    def _extern(self, v):
+        return "this.externs.get('" + v + "');"
 
-    def _base_rule_name(self, rule_name):
-        if rule_name.startswith('r_'):
-            return rule_name[2:]
-        return self._base_rule_regex.match(rule_name).group(1)
+    def _invoke(self, fn, *args):
+        return 'this.' + fn + '(' + ', '.join(args) + ')'
 
     #
     # Handlers for each non-host node in the glop AST follow.
     #
-
-    def _ty_action(self, node) -> List[str]:
-        obj = self._gen_expr(node[2][0])
-        return flatten(Saw('this.succeed(', obj, ');'), indent='  ')
-
-    def _ty_apply(self, node) -> List[str]:
-        if self._options.memoize and node[1].startswith('r_'):
-            name = node[1][2:]
-            if (
-                name not in self._grammar.operators
-                and name not in self._grammar.leftrec_rules
-            ):
-                return [f"this.memoize('{node[1]}', this.{node[1]})"]
-        return [f'this.{node[1]}();']
 
     def _ty_choice(self, node) -> List[str]:
         lines = ['let p = this.pos;']
@@ -303,96 +275,6 @@ class JavaScriptGenerator(Generator):
         )
         return lines
 
-    def _ty_e_arr(self, node) -> _FormatObj:
-        if len(node[2]) == 0:
-            return '[]'
-        args = [self._gen_expr(n) for n in node[2]]
-        return Saw('[', Comma(args), ']')
-
-    def _ty_e_call(self, node) -> Saw:
-        # There are no built-in functions that take no arguments, so make
-        # sure we're not being called that way.
-        # TODO: Figure out if we need this routine or not when we also
-        # fix the quals.
-        assert len(node[2]) != 0
-        args = [self._gen_expr(n) for n in node[2]]
-        return Saw('(', Comma(args), ')')
-
-    def _ty_e_const(self, node) -> str:
-        return node[1]
-
-    def _ty_e_getitem(self, node) -> Saw:
-        return Saw('[', self._gen_expr(node[2][0]), ']')
-
-    def _ty_e_lit(self, node) -> str:
-        return lit.encode(node[1])
-
-    def _ty_e_minus(self, node) -> Tree:
-        return Tree(
-            self._gen_expr(node[2][0]), '-', self._gen_expr(node[2][1])
-        )
-
-    def _ty_e_not(self, node) -> Tree:
-        return Tree(None, '!', self._gen_expr(node[2][0]))
-
-    def _ty_e_num(self, node) -> str:
-        return node[1]
-
-    def _ty_e_paren(self, node) -> _FormatObj:
-        return self._gen_expr(node[2][0])
-
-    def _ty_e_plus(self, node) -> Tree:
-        return Tree(
-            self._gen_expr(node[2][0]), '+', self._gen_expr(node[2][1])
-        )
-
-    def _ty_e_qual(self, node) -> Saw:
-        first = node[2][0]
-        second = node[2][1]
-        if first[0] == 'e_var':
-            if second[0] == 'e_call':
-                # first is an identifier, but it must refer to a
-                # built-in function if second is a call.
-                fn = first[1]
-                # Note that unknown functions were caught during analysis
-                # so we don't have to worry about that here.
-                start = f'this.fn_{fn}'
-            else:
-                # If second isn't a call, then first refers to a variable.
-                start = self._ty_e_var(first)
-            saw = self._gen_expr(second)
-            if not isinstance(saw, Saw):  # pragma: no cover
-                raise TypeError(second)
-            saw.start = start + saw.start
-            i = 2
-        else:
-            # TODO: We need to do typechecking, and figure out a better
-            # strategy for propagating errors/exceptions.
-            saw = self._gen_expr(first)
-            if not isinstance(saw, Saw):  # pragma: no cover
-                raise TypeError(first)
-            i = 1
-        next_saw = saw
-        for n in node[2][i:]:
-            new_saw = self._gen_expr(n)
-            if not isinstance(new_saw, Saw):  # pragma: no cover
-                raise TypeError(n)
-            new_saw.start = next_saw.end + new_saw.start
-            next_saw.end = new_saw
-            next_saw = new_saw
-        return saw
-
-    def _ty_e_var(self, node) -> str:
-        if self._current_rule in self._grammar.outer_scope_rules:
-            return f"this.lookup('{node[1]}')"
-        if node[1] in self._grammar.externs:
-            return f"this.externs.get('{node[1]}');"
-        return 'v_' + node[1].replace('$', '_')
-
-    def _ty_empty(self, node) -> List[str]:
-        del node
-        return ['this.succeed(null);']
-
     def _ty_ends_in(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
         lines = (
@@ -412,10 +294,6 @@ class JavaScriptGenerator(Generator):
             ]
         )
         return lines
-
-    def _ty_equals(self, node) -> List[str]:
-        arg = self._gen_expr(node[2][0])
-        return [f'this.str({flatten(arg)[0]});']
 
     def _ty_label(self, node) -> List[str]:
         lines = self._gen(node[2][0])
@@ -437,25 +315,6 @@ class JavaScriptGenerator(Generator):
                 ]
             )
         return lines
-
-    def _ty_leftrec(self, node) -> List[str]:
-        if self._grammar.assoc.get(node[1], 'true') == 'true':
-            left_assoc = 'true'
-        else:
-            left_assoc = 'false'
-        lines = [
-            f'this.leftrec(this.{node[2][0][1]}, '
-            + f"'{node[1]}', {left_assoc});"
-        ]
-        return lines
-
-    def _ty_lit(self, node) -> List[str]:
-        expr = lit.encode(node[1])
-        if len(node[1]) == 1:
-            method = 'ch'
-        else:
-            method = 'str'
-        return [f'this.{method}({expr});']
 
     def _ty_not(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
@@ -484,14 +343,6 @@ class JavaScriptGenerator(Generator):
             '    this.r_any(p);',
             '}',
         ]
-
-    def _ty_operator(self, node) -> List[str]:
-        self._needed_methods.add('operator')
-        # Operator nodes have no children, but subrules for each arm
-        # of the expression cluster have been defined and are referenced
-        # from self._grammar.operators[node[1]].choices.
-        assert node[2] == []
-        return [f"this.operator('{node[1]}')"]
 
     def _ty_opt(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
@@ -541,12 +392,8 @@ class JavaScriptGenerator(Generator):
 
     def _ty_pred(self, node) -> List[str]:
         arg = self._gen_expr(node[2][0])
-        # TODO: Figure out how to statically analyze predicates to
-        # catch ones that don't return booleans, so that we don't need
-        # the _ParsingRuntimeError exception
-        self._exception_needed = True
         return [
-            'let v = ' + flatten(arg, indent='  ')[0],
+            'let v = ' + flatten(arg, indent=self._map['indent'])[0],
             'if (v === true) {',
             '  this.succeed(v);',
             '} else if (v === false) {',
@@ -554,12 +401,6 @@ class JavaScriptGenerator(Generator):
             '} else {',
             "  throw new ParsingRuntimeError('Bad predicate value');",
             '}',
-        ]
-
-    def _ty_range(self, node) -> List[str]:
-        return [
-            'this.range(%s, %s);'
-            % (lit.encode(node[1][0]), lit.encode(node[1][1]))
         ]
 
     def _ty_regexp(self, node) -> List[str]:
@@ -609,10 +450,6 @@ class JavaScriptGenerator(Generator):
             lines.append('}')
         return lines
 
-    def _ty_set(self, node) -> List[str]:
-        new_node = ['regexp', '[' + node[1] + ']', []]
-        return self._ty_regexp(new_node)
-
     def _ty_star(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
         lines = (
@@ -634,18 +471,6 @@ class JavaScriptGenerator(Generator):
         )
         return lines
 
-    def _ty_unicat(self, node) -> List[str]:
-        return [
-            rf'let regexp = /\p{{{node[1]}}}/guy;',
-            'regexp.lastIndex = this.pos;',
-            'let found = regexp.exec(this.text);',
-            'if (!found) {',
-            '    this.fail();',
-            '    return;',
-            '}',
-            'this.succeed(found[0], this.pos + found[0].length);',
-        ]
-
 
 _DEFAULT_HEADER = """\
 """
@@ -656,6 +481,11 @@ _DEFAULT_FOOTER = ''
 
 _MAIN_HEADER = """\
 #!/usr/bin/env node
+//
+// Generated by pyfloyd version {version}
+//    https://github.com/dpranke/pyfloyd
+//    `pyfloyd {args}`
+
 """
 
 
@@ -840,7 +670,7 @@ _PARSE_WITH_EXCEPTION = """\
       }}
     }} catch (e) {{
       if (e instanceof ParsingRuntimeError) {{
-        let [lineno, _] = this.errorOffsets();
+        let [lineno, _] = this.offsets(this.errpos);
         return new Result(null, this.path + ':' + lineno + ' ' + e.toString());
       }} else {{
         throw e;
@@ -875,25 +705,10 @@ _BUILTIN_METHODS = """\
     }
   }
 
-  checkExterns() {
-    let errors = '';
-    for (let ext of this.expected_externs) {
-      if (!this.externs.has(ext)) {
-        errors += `Missing extern "${ext}"\\n`;
-      }
-    }
-    for (let ext of this.externs.keys()) {
-      if (!this.expected_externs.has(ext)) {
-        errors += `Unexpected extern "${ext}"\\n`;
-      }
-    }
-    return errors.trim();
-  }
-
-  errorOffsets() {
+  offsets(pos) {
     let lineno = 1;
     let colno = 1;
-    for (let i = 0; i < this.errpos; i++) {
+    for (let i = 0; i < pos; i++) {
       if (this.text[i] === '\\n') {
         lineno += 1;
         colno = 1;
@@ -905,7 +720,7 @@ _BUILTIN_METHODS = """\
   }
 
   error() {
-    let [lineno, colno] = this.errorOffsets();
+    let [lineno, colno] = this.offsets(this.errpos);
     let thing;
     if (this.errpos === this.end) {
       thing = 'end of input';

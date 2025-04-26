@@ -39,6 +39,7 @@ class Grammar:
         self.whitespace = None
         self.assoc = {}
         self.prec = {}
+        self.exception_needed = False
         self.leftrec_needed = False
         self.operator_needed = False
         self.unicat_needed = False
@@ -120,6 +121,16 @@ def analyze(ast, rewrite_subrules: bool) -> Grammar:
         # Extract subnodes into their own rules to make codegen easier.
         # Not needed when just interpreting the grammar.
         _rewrite_subrules(g)
+
+    # TODO: Figure out how to statically analyze predicates to
+    # catch ones that don't return booleans, so that we don't need
+    # to worry about runtime exceptions where possible.
+    def _exception_needed(node):
+        if node[0] == 'pred':
+            return True
+        return any(_exception_needed(sn) for sn in node[2])
+
+    g.exception_needed = _exception_needed(g.ast)
 
     return g
 

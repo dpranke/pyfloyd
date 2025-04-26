@@ -81,10 +81,10 @@ class _Parser:
         try:
             self._r_grammar()
             if self._failed:
-                return Result(None, self._err_str(), self._errpos)
+                return Result(None, self._error(), self._errpos)
             return Result(self._val, None, self._pos)
         except _ParsingRuntimeError as e:  # pragma: no cover
-            lineno, _ = self._err_offsets()
+            lineno, _ = self._offsets(self._errpos)
             return Result(
                 None,
                 self._path + ':' + str(lineno) + ' ' + str(e),
@@ -1859,29 +1859,8 @@ class _Parser:
         else:
             self._fail()
 
-    def _check_externs(self):
-        errors = ''
-        for ext in self._expected_externs:
-            if ext not in self._externs:
-                errors += f'Missing extern "{ext}"\n'
-        for ext in self._externs:
-            if ext not in self._expected_externs:
-                errors += f'Unexpected extern "{ext}"\n'
-        return errors.strip()
-
-    def _err_offsets(self):
-        lineno = 1
-        colno = 1
-        for i in range(self._errpos):
-            if self._text[i] == '\n':
-                lineno += 1
-                colno = 1
-            else:
-                colno += 1
-        return lineno, colno
-
-    def _err_str(self):
-        lineno, colno = self._err_offsets()
+    def _error(self):
+        lineno, colno = self._offsets(self._errpos)
         if self._errpos == len(self._text):
             thing = 'end of input'
         else:
@@ -1897,6 +1876,17 @@ class _Parser:
         self._val = None
         self._failed = True
         self._errpos = max(self._errpos, self._pos)
+
+    def _offsets(self, pos):
+        lineno = 1
+        colno = 1
+        for i in range(pos):
+            if self._text[i] == '\n':
+                lineno += 1
+                colno = 1
+            else:
+                colno += 1
+        return lineno, colno
 
     def _memoize(self, rule_name, fn):
         p = self._pos

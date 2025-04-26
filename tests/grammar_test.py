@@ -1190,17 +1190,23 @@ class _GeneratedParserWrapper:
         if proc.stderr:
             stderr = proc.stderr.decode('utf8').strip()
             try:
-                assert inp in stderr
+                assert inp in stderr, f'"{inp}" not in "{stderr}"'
             except Exception as e:
                 import pdb
 
                 pdb.set_trace()
-                raise
+
             stderr = stderr.replace(inp, path)
         else:
             stderr = None
         if proc.returncode == 0:
-            return json.loads(proc.stdout), None, 0
+            try:
+                return json.loads(proc.stdout), None, 0
+            except Exception as e:
+                import pdb
+
+                pdb.set_trace()
+
         return None, stderr, 0
 
     def cleanup(self):
