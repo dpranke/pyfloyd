@@ -17,67 +17,38 @@
 import re
 import shlex
 import sys
-from typing import Dict, List, Union
+from typing import Dict, List
 
 from pyfloyd.analyzer import Grammar
 from pyfloyd.formatter import flatten, Comma, Saw, Tree
-from pyfloyd.generator import Generator, GeneratorOptions
+from pyfloyd.generator import Generator, GeneratorOptions, FormatObj
 from pyfloyd.version import __version__
 from pyfloyd import string_literal as lit
-
-
-_FormatObj = Union[Comma, Tree, Saw, str]
 
 
 class PythonGenerator(Generator):
     def __init__(self, grammar: Grammar, options: GeneratorOptions):
         super().__init__(grammar, options)
         self._builtin_methods = self._load_builtin_methods()
-        self._exception_needed = False
         self._methods: Dict[str, List[str]] = {}
         self._operators: Dict[str, str] = {}
-        self._unicodedata_needed = (
-            grammar.unicat_needed
-            or 'unicode_lookup' in self._grammar.needed_builtin_functions
-        )
+        self._map = {
+            'end': '',
+            'false': 'False',
+            'Infinity': "float('inf')",
+            'NaN': "float('NaN')",
+            'not': 'not ',
+            'null': 'None',
+            'true': 'True',
+        }
 
-        self._current_rule = None
-        self._base_rule_regex = re.compile(r's_(.+)_\d+$')
+        self._end_stmt = ''
 
-        # These methods are pretty much always needed.
-        self._needed_methods = set(
-            {
-                'check_externs',
-                'err_offsets',
-                'err_str',
-                'fail',
-                'rewind',
-                'succeed',
-            }
-        )
-        if grammar.ch_needed:
-            self._needed_methods.add('ch')
-        if grammar.leftrec_needed:
-            self._needed_methods.add('leftrec')
-        if grammar.operator_needed:
-            self._needed_methods.add('operator')
-        if grammar.range_needed:
-            self._needed_methods.add('range')
-        if grammar.str_needed:
-            self._needed_methods.add('str')
-        if grammar.unicat_needed:
-            self._needed_methods.add('unicat')
-        if self._options.memoize:
-            self._needed_methods.add('memoize')
-
-    def generate(self) -> str:
-        self._gen_rules()
-        return self._gen_text()
 
     def _gen_rules(self) -> None:
         for rule, node in self._grammar.rules.items():
             self._current_rule = self._base_rule_name(rule)
-            self._methods[rule] = self._gen(node)
+            self._methods[rule] = self._gen_expr(node)
             self._current_rule = None
 
     def _gen_text(self) -> str:
@@ -221,75 +192,17 @@ class PythonGenerator(Generator):
             text += f'        {line}\n'
         return text
 
-    def _gen(self, node) -> List[str]:
-        # All of the rule methods return a list of lines.
-        fn = getattr(self, f'_ty_{node[0]}')
-        return fn(node)
+    def _thisvar(self, v):
+        return 'self._' + v
 
-    def _gen_expr(self, node) -> _FormatObj:
-        # All of the host methods return a formatter object.
-        fn = getattr(self, f'_ty_{node[0]}')
-        return fn(node)
+    def _rulename(self, r):
+        return 'self._' + r
 
-    def _can_fail(self, node, inline):
-        if node[0] in ('action', 'empty', 'opt', 'star'):
-            return False
-        if node[0] == 'apply':
-            if node[1] in ('r_any', 'r_end'):
-                return True
-            return self._can_fail(self._grammar.rules[node[1]], inline=False)
-        if node[0] == 'label':
-            # When the code for a label is being inlined, if the child
-            # node can fail, its return will exit the outer method as well,
-            # so we don't have to worry about it. At that point, then
-            # we just have the label code itself, which can't fail.
-            # When the code isn't being inlined into the outer method,
-            # we do have to include the failure of the child node.
-            # TODO: This same reasoning may be true for other types of nodes.
-            return False if inline else self._can_fail(node[2][0], inline)
-        if node[0] in ('label', 'paren', 'run'):
-            return self._can_fail(node[2][0], inline)
-        if node[0] == 'count':
-            return node[1][0] != 0
-        if node[0] in ('leftrec', 'operator'):
-            # TODO: Figure out if there's a way to tell if these can not fail.
-            return True
-        if node[0] == 'choice':
-            r = all(self._can_fail(n, inline) for n in node[2])
-            return r
-        if node[0] == 'scope':
-            return self._can_fail(node[2][0], False)
-        if node[0] == 'seq':
-            r = any(self._can_fail(n, inline) for n in node[2])
-            return r
+    def _extern(self, v):
+        return "self._externs['" + v + "']"
 
-        # You might think that if a not's child node can fail, then
-        # the not can't fail, but it doesn't work that way. If the
-        # child == ['lit', 'foo'], then it'll fail if foo isn't next,
-        # so it can fail, but ['not', [child]] can fail also (if
-        # foo is next).
-        # Note that some regexps might not fail, but to figure that
-        # out we'd have to analyze the regexp itself, which I don't want to
-        # do yet.
-        assert node[0] in (
-            'ends_in',
-            'equals',
-            'lit',
-            'not',
-            'not_one',
-            'plus',
-            'pred',
-            'range',
-            'regexp',
-            'set',
-            'unicat',
-        )
-        return True
-
-    def _base_rule_name(self, rule_name):
-        if rule_name.startswith('r_'):
-            return rule_name[2:]
-        return self._base_rule_regex.match(rule_name).group(1)
+    def _invoke(self, fn, *args):
+        return 'self._' + fn + '(' + ', '.join(args) + ')'
 
     #
     # Handlers for each non-host node in the glop AST follow.
@@ -306,18 +219,21 @@ class PythonGenerator(Generator):
                 name not in self._grammar.operators
                 and name not in self._grammar.leftrec_rules
             ):
-                return [f"self._memoize('{node[1]}', self._{node[1]})"]
+                return [
+                    self._invoke('memoize', f"'{node[1]}'",
+                                 self._rulename(node[1]))
+                ]
 
-        return [f'self._{node[1]}()']
+        return [self._invoke(node[1])]
 
     def _ty_choice(self, node) -> List[str]:
         lines = ['p = self._pos']
         for subnode in node[2][:-1]:
-            lines.extend(self._gen(subnode))
+            lines.extend(self._gen_expr(subnode))
             lines.append('if not self._failed:')
             lines.append('    return')
             lines.append('self._rewind(p)')
-        lines.extend(self._gen(node[2][-1]))
+        lines.extend(self._gen_expr(node[2][-1]))
         return lines
 
     def _ty_count(self, node) -> List[str]:
@@ -327,7 +243,7 @@ class PythonGenerator(Generator):
             f'cmin, cmax = {node[1]}',
             'while i < cmax:',
         ]
-        lines.extend(['    ' + line for line in self._gen(node[2][0])])
+        lines.extend(['    ' + line for line in self._gen_expr(node[2][0])])
         lines.extend(
             [
                 '    if self._failed:',
@@ -342,107 +258,12 @@ class PythonGenerator(Generator):
         )
         return lines
 
-    def _ty_e_arr(self, node) -> _FormatObj:
-        if len(node[2]) == 0:
-            return '[]'
-        args = [self._gen(n) for n in node[2]]
-        return Saw('[', Comma(args), ']')
-
-    def _ty_e_call(self, node) -> Saw:
-        # There are no built-in functions that take no arguments, so make
-        # sure we're not being called that way.
-        # TODO: Figure out if we need this routine or not when we also
-        # fix the quals.
-        assert len(node[2]) != 0
-        args = [self._gen(n) for n in node[2]]
-        return Saw('(', Comma(args), ')')
-
-    def _ty_e_const(self, node) -> str:
-        if node[1] == 'false':
-            return 'False'
-        if node[1] == 'null':
-            return 'None'
-        if node[1] == 'true':
-            return 'True'
-        if node[1] == 'Infinity':
-            return "float('inf')"
-        assert node[1] == 'NaN'
-        return "float('NaN')"
-
-    def _ty_e_getitem(self, node) -> Saw:
-        return Saw('[', self._gen(node[2][0]), ']')
-
-    def _ty_e_lit(self, node) -> str:
-        return lit.encode(node[1])
-
-    def _ty_e_minus(self, node) -> Tree:
-        return Tree(
-            self._gen_expr(node[2][0]), '-', self._gen_expr(node[2][1])
-        )
-
-    def _ty_e_not(self, node) -> Tree:
-        return Tree(None, 'not ', self._gen_expr(node[2][0]))
-
-    def _ty_e_num(self, node) -> str:
-        return node[1]
-
-    def _ty_e_paren(self, node) -> _FormatObj:
-        return self._gen_expr(node[2][0])
-
-    def _ty_e_plus(self, node) -> Tree:
-        return Tree(
-            self._gen_expr(node[2][0]), '+', self._gen_expr(node[2][1])
-        )
-
-    def _ty_e_qual(self, node) -> Saw:
-        first = node[2][0]
-        second = node[2][1]
-        if first[0] == 'e_var':
-            if second[0] == 'e_call':
-                # first is an identifier, but it must refer to a
-                # built-in function if second is a call.
-                fn = first[1]
-                # Note that unknown functions were caught during analysis
-                # so we don't have to worry about that here.
-                start = f'self._fn_{fn}'
-            else:
-                # If second isn't a call, then first refers to a variable.
-                start = self._ty_e_var(first)
-            saw = self._gen_expr(second)
-            if not isinstance(saw, Saw):  # pragma: no cover
-                raise TypeError(second)
-            saw.start = start + saw.start
-            i = 2
-        else:
-            # TODO: We need to do typechecking, and figure out a better
-            # strategy for propagating errors/exceptions.
-            saw = self._gen_expr(first)
-            if not isinstance(saw, Saw):  # pragma: no cover
-                raise TypeError(first)
-            i = 1
-        next_saw = saw
-        for n in node[2][i:]:
-            new_saw = self._gen_expr(n)
-            if not isinstance(new_saw, Saw):  # pragma: no cover
-                raise TypeError(n)
-            new_saw.start = next_saw.end + new_saw.start
-            next_saw.end = new_saw
-            next_saw = new_saw
-        return saw
-
-    def _ty_e_var(self, node) -> str:
-        if self._current_rule in self._grammar.outer_scope_rules:
-            return f"self._lookup('{node[1]}')"
-        if node[1] in self._grammar.externs:
-            return f"self._externs['{node[1]}']"
-        return 'v_' + node[1].replace('$', '_')
-
     def _ty_empty(self, node) -> List[str]:
         del node
-        return ['self._succeed(None)']
+        return [self._invoke('succeed', self._map['null']) + self._map['end']]
 
     def _ty_ends_in(self, node) -> List[str]:
-        sublines = self._gen(node[2][0])
+        sublines = self._gen_expr(node[2][0])
         lines = [
             'while True:',
         ] + ['    ' + line for line in sublines]
@@ -458,11 +279,11 @@ class PythonGenerator(Generator):
         return lines
 
     def _ty_equals(self, node) -> List[str]:
-        arg = self._gen(node[2][0])
+        arg = self._gen_expr(node[2][0])
         return [f'self._str({flatten(arg)[0]})']
 
     def _ty_label(self, node) -> List[str]:
-        lines = self._gen(node[2][0])
+        lines = self._gen_expr(node[2][0])
         if self._can_fail(node[2][0], True):
             lines.extend(['if self._failed:', '    return'])
         if self._current_rule in self._grammar.outer_scope_rules:
@@ -470,7 +291,7 @@ class PythonGenerator(Generator):
         else:
             lines.extend(
                 [
-                    f'v_{node[1].replace("$", "_")} = self._val',
+                    f'{self._varname(node[1])} = self._val',
                 ]
             )
         return lines
@@ -492,7 +313,7 @@ class PythonGenerator(Generator):
         return [f'self._{method}({expr})']
 
     def _ty_not(self, node) -> List[str]:
-        sublines = self._gen(node[2][0])
+        sublines = self._gen_expr(node[2][0])
         lines = (
             [
                 'p = self._pos',
@@ -511,7 +332,7 @@ class PythonGenerator(Generator):
         return lines
 
     def _ty_not_one(self, node) -> List[str]:
-        sublines = self._gen(['not', None, node[2]])
+        sublines = self._gen_expr(['not', None, node[2]])
         return sublines + ['if not self._failed:', '    self._r_any()']
 
     def _ty_operator(self, node) -> List[str]:
@@ -523,7 +344,7 @@ class PythonGenerator(Generator):
         return [f"self._operator(f'{node[1]}')"]
 
     def _ty_opt(self, node) -> List[str]:
-        sublines = self._gen(node[2][0])
+        sublines = self._gen_expr(node[2][0])
         lines = (
             [
                 'p = self._pos',
@@ -539,10 +360,10 @@ class PythonGenerator(Generator):
         return lines
 
     def _ty_paren(self, node) -> List[str]:
-        return self._gen(node[2][0])
+        return self._gen_expr(node[2][0])
 
     def _ty_plus(self, node) -> List[str]:
-        sublines = self._gen(node[2][0])
+        sublines = self._gen_expr(node[2][0])
         lines = (
             ['vs = []']
             + sublines
@@ -600,7 +421,7 @@ class PythonGenerator(Generator):
         ]
 
     def _ty_run(self, node) -> List[str]:
-        sublines = self._gen(node[2][0])
+        sublines = self._gen_expr(node[2][0])
         lines = ['start = self._pos'] + sublines
         if self._can_fail(node[2][0], True):
             lines.extend(['if self._failed:', '    return'])
@@ -617,7 +438,7 @@ class PythonGenerator(Generator):
             [
                 'self._scopes.append({})',
             ]
-            + self._gen(node[2][0])
+            + self._gen_expr(node[2][0])
             + [
                 'self._scopes.pop()',
             ]
@@ -628,18 +449,18 @@ class PythonGenerator(Generator):
         return self._ty_regexp(new_node)
 
     def _ty_seq(self, node) -> List[str]:
-        lines = self._gen(node[2][0])
+        lines = self._gen_expr(node[2][0])
         if self._can_fail(node[2][0], inline=True):
             lines.extend(['if self._failed:', '    return'])
         for subnode in node[2][1:-1]:
-            lines.extend(self._gen(subnode))
+            lines.extend(self._gen_expr(subnode))
             if self._can_fail(subnode, inline=True):
                 lines.extend(['if self._failed:', '    return'])
-        lines.extend(self._gen(node[2][-1]))
+        lines.extend(self._gen_expr(node[2][-1]))
         return lines
 
     def _ty_star(self, node) -> List[str]:
-        sublines = self._gen(node[2][0])
+        sublines = self._gen_expr(node[2][0])
         lines = (
             [
                 'vs = []',
@@ -828,7 +649,7 @@ _PARSE = """\
 
         self._r_{starting_rule}()
         if self._failed:
-            return Result(None, self._err_str(), self._errpos)
+            return Result(None, self._error(), self._errpos)
         return Result(self._val, None, self._pos)
 """
 
@@ -847,10 +668,10 @@ _PARSE_WITH_EXCEPTION = """\
         try:
             self._r_{starting_rule}()
             if self._failed:
-                return Result(None, self._err_str(), self._errpos)
+                return Result(None, self._error(), self._errpos)
             return Result(self._val, None, self._pos)
         except _ParsingRuntimeError as e:  # pragma: no cover
-            lineno, _ = self._err_offsets()
+            lineno, _ = self._offsets(self._errpos)
             return Result(
                 None,
                 self._path + ':' + str(lineno) + ' ' + str(e),
@@ -879,20 +700,10 @@ _BUILTIN_METHODS = """\
         else:
             self._fail()
 
-    def _check_externs(self):
-        errors = ''
-        for ext in self._expected_externs:
-            if ext not in self._externs:
-                errors += f'Missing extern "{ext}"\\n'
-        for ext in self._externs:
-            if ext not in self._expected_externs:
-                errors += f'Unexpected extern "{ext}"\\n'
-        return errors.strip()
-
-    def _err_offsets(self):
+    def _offsets(self, pos):
         lineno = 1
         colno = 1
-        for i in range(self._errpos):
+        for i in range(pos):
             if self._text[i] == '\\n':
                 lineno += 1
                 colno = 1
@@ -900,8 +711,8 @@ _BUILTIN_METHODS = """\
                 colno += 1
         return lineno, colno
 
-    def _err_str(self):
-        lineno, colno = self._err_offsets()
+    def _error(self):
+        lineno, colno = self._offsets(self._errpos)
         if self._errpos == len(self._text):
             thing = 'end of input'
         else:

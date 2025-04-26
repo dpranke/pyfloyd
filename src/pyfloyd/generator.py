@@ -12,9 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Optional
+import re
+from typing import Dict, List, Optional, Set, Union
 
 from pyfloyd.analyzer import Grammar
+from pyfloyd.formatter import flatten, Comma, Saw, Tree
+from pyfloyd import string_literal as lit
+
+FormatObj = Union[Comma, Tree, Saw, str]
 
 
 DEFAULT_LANGUAGE = 'python'
@@ -85,6 +90,207 @@ class Generator:
     def __init__(self, grammar: Grammar, options: GeneratorOptions):
         self._grammar = grammar
         self._options = options
+        self._exception_needed = False
+        self._unicodedata_needed = (
+            grammar.unicat_needed
+            or 'unicode_lookup' in self._grammar.needed_builtin_functions
+        )
+        self._current_rule = None
+        self._base_rule_regex = re.compile(r's_(.+)_\d+$')
 
-    def generate(self) -> str:  # pragma: no cover
-        return ''
+        # These methods are pretty much always needed.
+        self._needed_methods = set(
+            {
+                'error',
+                'fail',
+                'offsets',
+                'rewind',
+                'succeed',
+            }
+        )
+        if grammar.ch_needed:
+            self._needed_methods.add('ch')
+        if grammar.leftrec_needed:
+            self._needed_methods.add('leftrec')
+        if grammar.operator_needed:
+            self._needed_methods.add('operator')
+        if grammar.range_needed:
+            self._needed_methods.add('range')
+        if grammar.str_needed:
+            self._needed_methods.add('str')
+        if grammar.unicat_needed:
+            self._needed_methods.add('unicat')
+        if self._options.memoize:
+            self._needed_methods.add('memoize')
+
+    def generate(self) -> str:
+        self._gen_rules()
+        return self._gen_text()
+
+    def _gen_expr(self, node) -> FormatObj:
+        # All of the host methods return a formatter object.
+        fn = getattr(self, f'_ty_{node[0]}')
+        return fn(node)
+
+    def _varname(self, v):
+        r = f'v_{v.replace("$", "_")}'
+        return r
+
+    def _find_vars(self, node) -> Set[str]: 
+        vs = set()
+        if node[0] == 'label':
+            vs.add(self._varname(node[1]))
+        for c in node[2]:
+            vs = vs.union(self._find_vars(c))
+        return vs
+
+    def _base_rule_name(self, rule_name):
+        if rule_name.startswith('r_'):
+            return rule_name[2:]
+        return self._base_rule_regex.match(rule_name).group(1)
+
+    def _can_fail(self, node, inline):
+        if node[0] in ('action', 'empty', 'opt', 'star'):
+            return False
+        if node[0] == 'apply':
+            if node[1] in ('r_any', 'r_end'):
+                return True
+            return self._can_fail(self._grammar.rules[node[1]], inline=False)
+        if node[0] == 'label':
+            # When the code for a label is being inlined, if the child
+            # node can fail, its return will exit the outer method as well,
+            # so we don't have to worry about it. At that point, then
+            # we just have the label code itself, which can't fail.
+            # When the code isn't being inlined into the outer method,
+            # we do have to include the failure of the child node.
+            # TODO: This same reasoning may be true for other types of nodes.
+            return False if inline else self._can_fail(node[2][0], inline)
+        if node[0] in ('label', 'paren', 'run'):
+            return self._can_fail(node[2][0], inline)
+        if node[0] == 'count':
+            return node[1][0] != 0
+        if node[0] in ('leftrec', 'operator'):
+            # TODO: Figure out if there's a way to tell if these can not fail.
+            return True
+        if node[0] == 'choice':
+            r = all(self._can_fail(n, inline) for n in node[2])
+            return r
+        if node[0] == 'scope':
+            return self._can_fail(node[2][0], False)
+        if node[0] == 'seq':
+            r = any(self._can_fail(n, inline) for n in node[2])
+            return r
+
+        # You might think that if a not's child node can fail, then
+        # the not can't fail, but it doesn't work that way. If the
+        # child == ['lit', 'foo'], then it'll fail if foo isn't next,
+        # so it can fail, but ['not', [child]] can fail also (if
+        # foo is next).
+        # Note that some regexps might not fail, but to figure that
+        # out we'd have to analyze the regexp itself, which I don't want to
+        # do yet.
+        assert node[0] in (
+            'ends_in',
+            'equals',
+            'lit',
+            'not',
+            'not_one',
+            'plus',
+            'pred',
+            'range',
+            'regexp',
+            'set',
+            'unicat',
+        )
+        return True
+
+    def _ty_e_arr(self, node) -> FormatObj:
+        if len(node[2]) == 0:
+            return '[]'
+        args = [self._gen_expr(n) for n in node[2]]
+        return Saw('[', Comma(args), ']')
+
+    def _ty_e_call(self, node) -> Saw:
+        # There are no built-in functions that take no arguments, so make
+        # sure we're not being called that way.
+        # TODO: Figure out if we need this routine or not when we also
+        # fix the quals.
+        assert len(node[2]) != 0
+        args = [self._gen_expr(n) for n in node[2]]
+        return Saw('(', Comma(args), ')')
+
+    def _ty_e_const(self, node) -> str:
+        return self._map[node[1]]
+
+    def _ty_e_getitem(self, node) -> Saw:
+        return Saw('[', self._gen_expr(node[2][0]), ']')
+
+    def _ty_e_lit(self, node) -> str:
+        return lit.encode(node[1])
+
+    def _ty_e_minus(self, node) -> Tree:
+        return Tree(
+            self._gen_expr(node[2][0]), '-', self._gen_expr(node[2][1])
+        )
+
+    def _ty_e_not(self, node) -> Tree:
+        return Tree(None, self._map['not'], self._gen_expr(node[2][0]))
+
+    def _ty_e_num(self, node) -> str:
+        return node[1]
+
+    def _ty_e_paren(self, node) -> FormatObj:
+        return self._gen_expr(node[2][0])
+
+    def _ty_e_plus(self, node) -> Tree:
+        return Tree(
+            self._gen_expr(node[2][0]), '+', self._gen_expr(node[2][1])
+        )
+
+    def _ty_e_qual(self, node) -> Saw:
+        first = node[2][0]
+        second = node[2][1]
+        if first[0] == 'e_var':
+            if second[0] == 'e_call':
+                # first is an identifier, but it must refer to a
+                # built-in function if second is a call.
+                fn = first[1]
+                # Note that unknown functions were caught during analysis
+                # so we don't have to worry about that here.
+                start = self._thisvar(f'fn_{fn}')
+            else:
+                # If second isn't a call, then first refers to a variable.
+                start = self._ty_e_var(first)
+            saw = self._gen_expr(second)
+            if not isinstance(saw, Saw):  # pragma: no cover
+                raise TypeError(second)
+            saw.start = start + saw.start
+            i = 2
+        else:
+            # TODO: We need to do typechecking, and figure out a better
+            # strategy for propagating errors/exceptions.
+            saw = self._gen_expr(first)
+            if not isinstance(saw, Saw):  # pragma: no cover
+                raise TypeError(first)
+            i = 1
+        next_saw = saw
+        for n in node[2][i:]:
+            new_saw = self._gen_expr(n)
+            if not isinstance(new_saw, Saw):  # pragma: no cover
+                raise TypeError(n)
+            new_saw.start = next_saw.end + new_saw.start
+            next_saw.end = new_saw
+            next_saw = new_saw
+        return saw
+
+    def _ty_e_var(self, node) -> str:
+        if self._current_rule in self._grammar.outer_scope_rules:
+            return self._invoke('lookup', "'" + node[1] + "'")
+        if node[1] in self._grammar.externs:
+            return self._extern(node[1])
+        return self._varname(node[1])
+
+    def _ty_empty(self, node) -> List[str]:
+        del node
+        return [self._invoke('succeed', self._map['null']) + self._map['end']]
+

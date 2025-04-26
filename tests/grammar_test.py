@@ -1189,13 +1189,7 @@ class _GeneratedParserWrapper:
         )
         if proc.stderr:
             stderr = proc.stderr.decode('utf8').strip()
-            try:
-                assert inp in stderr
-            except Exception as e:
-                import pdb
-
-                pdb.set_trace()
-                raise
+            assert inp in stderr, f'"{inp}" not in "{stderr}"'
             stderr = stderr.replace(inp, path)
         else:
             stderr = None

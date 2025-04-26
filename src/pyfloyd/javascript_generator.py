@@ -15,15 +15,12 @@
 # pylint: disable=too-many-lines
 
 import re
-from typing import Dict, List, Set, Union
+from typing import Dict, List, Set
 
 from pyfloyd.analyzer import Grammar
 from pyfloyd.formatter import flatten, Comma, Saw, Tree
-from pyfloyd.generator import Generator, GeneratorOptions
+from pyfloyd.generator import Generator, GeneratorOptions, FormatObj
 from pyfloyd import string_literal as lit
-
-
-_FormatObj = Union[Comma, Tree, Saw, str]
 
 
 class JavaScriptGenerator(Generator):
@@ -33,36 +30,15 @@ class JavaScriptGenerator(Generator):
         self._exception_needed = False
         self._methods: Dict[str, List[str]] = {}
         self._operators: Dict[str, str] = {}
-        self._current_rule = None
-        self._base_rule_regex = re.compile(r's_(.+)_\d+$')
-
-        # These methods are pretty much always needed.
-        self._needed_methods = set(
-            {
-                'checkExterns',
-                'error',
-                'errorOffsets',
-                'fail',
-                'rewind',
-                'succeed',
-            }
-        )
-        if grammar.ch_needed:
-            self._needed_methods.add('ch')
-        if grammar.leftrec_needed:
-            self._needed_methods.add('leftrec')
-        if grammar.operator_needed:
-            self._needed_methods.add('operator')
-        if grammar.range_needed:
-            self._needed_methods.add('range')
-        if grammar.str_needed:
-            self._needed_methods.add('str')
-        if self._options.memoize:
-            self._needed_methods.add('memoize')
-
-    def generate(self) -> str:
-        self._gen_rules()
-        return self._gen_text()
+        self._map = {
+            'end': ';',
+            'false': 'false',
+            'Infinity': 'Infinity',
+            'NaN': 'NaN',
+            'not': '!',
+            'null': 'null',
+            'true': 'true',
+        }
 
     def _gen_rules(self) -> None:
         local_vars = ('errpos', 'found', 'p', 'regexp')
@@ -220,8 +196,7 @@ class JavaScriptGenerator(Generator):
         # All of the rule methods return a list of lines.
         lines: List[str] = []
         if node[0] == 'seq':
-            vs: Set[str] = set()
-            self._find_vars(node, vs)
+            vs: Set[str] = self._find_vars(node)
             lines = []
             for v in sorted(vs):
                 lines.append(f'let {v};')
@@ -229,24 +204,17 @@ class JavaScriptGenerator(Generator):
         fn = getattr(self, f'_ty_{node[0]}')
         return lines + fn(node)
 
-    def _gen_expr(self, node) -> _FormatObj:
-        # All of the host methods return a formatter object.
-        fn = getattr(self, f'_ty_{node[0]}')
-        return fn(node)
+    def _thisvar(self, v):
+        return 'this.' + v
 
-    def _find_vars(self, node, vs):
-        if node[0] == 'label':
-            vs.add(self._varname(node[1]))
-        for c in node[2]:
-            self._find_vars(c, vs)
+    def _rulename(self, fn):
+        return 'this.' + fn
 
-    def _varname(self, v):
-        return f'v_{v.replace("$", "_")}'
+    def _extern(self, v):
+        return "this.externs.get('" + v + "');"
 
-    def _base_rule_name(self, rule_name):
-        if rule_name.startswith('r_'):
-            return rule_name[2:]
-        return self._base_rule_regex.match(rule_name).group(1)
+    def _invoke(self, fn, *args):
+        return 'this.' + fn + '(' + ', '.join(args) + ')'
 
     #
     # Handlers for each non-host node in the glop AST follow.
@@ -263,8 +231,11 @@ class JavaScriptGenerator(Generator):
                 name not in self._grammar.operators
                 and name not in self._grammar.leftrec_rules
             ):
-                return [f"this.memoize('{node[1]}', this.{node[1]})"]
-        return [f'this.{node[1]}();']
+                return [
+                    self._invoke('memoize', f"'{node[1]}'",
+                                 self._rulename(node[1]))
+                ]
+        return [self._invoke(node[1]) + ';']
 
     def _ty_choice(self, node) -> List[str]:
         lines = ['let p = this.pos;']
@@ -302,96 +273,6 @@ class JavaScriptGenerator(Generator):
             ]
         )
         return lines
-
-    def _ty_e_arr(self, node) -> _FormatObj:
-        if len(node[2]) == 0:
-            return '[]'
-        args = [self._gen_expr(n) for n in node[2]]
-        return Saw('[', Comma(args), ']')
-
-    def _ty_e_call(self, node) -> Saw:
-        # There are no built-in functions that take no arguments, so make
-        # sure we're not being called that way.
-        # TODO: Figure out if we need this routine or not when we also
-        # fix the quals.
-        assert len(node[2]) != 0
-        args = [self._gen_expr(n) for n in node[2]]
-        return Saw('(', Comma(args), ')')
-
-    def _ty_e_const(self, node) -> str:
-        return node[1]
-
-    def _ty_e_getitem(self, node) -> Saw:
-        return Saw('[', self._gen_expr(node[2][0]), ']')
-
-    def _ty_e_lit(self, node) -> str:
-        return lit.encode(node[1])
-
-    def _ty_e_minus(self, node) -> Tree:
-        return Tree(
-            self._gen_expr(node[2][0]), '-', self._gen_expr(node[2][1])
-        )
-
-    def _ty_e_not(self, node) -> Tree:
-        return Tree(None, '!', self._gen_expr(node[2][0]))
-
-    def _ty_e_num(self, node) -> str:
-        return node[1]
-
-    def _ty_e_paren(self, node) -> _FormatObj:
-        return self._gen_expr(node[2][0])
-
-    def _ty_e_plus(self, node) -> Tree:
-        return Tree(
-            self._gen_expr(node[2][0]), '+', self._gen_expr(node[2][1])
-        )
-
-    def _ty_e_qual(self, node) -> Saw:
-        first = node[2][0]
-        second = node[2][1]
-        if first[0] == 'e_var':
-            if second[0] == 'e_call':
-                # first is an identifier, but it must refer to a
-                # built-in function if second is a call.
-                fn = first[1]
-                # Note that unknown functions were caught during analysis
-                # so we don't have to worry about that here.
-                start = f'this.fn_{fn}'
-            else:
-                # If second isn't a call, then first refers to a variable.
-                start = self._ty_e_var(first)
-            saw = self._gen_expr(second)
-            if not isinstance(saw, Saw):  # pragma: no cover
-                raise TypeError(second)
-            saw.start = start + saw.start
-            i = 2
-        else:
-            # TODO: We need to do typechecking, and figure out a better
-            # strategy for propagating errors/exceptions.
-            saw = self._gen_expr(first)
-            if not isinstance(saw, Saw):  # pragma: no cover
-                raise TypeError(first)
-            i = 1
-        next_saw = saw
-        for n in node[2][i:]:
-            new_saw = self._gen_expr(n)
-            if not isinstance(new_saw, Saw):  # pragma: no cover
-                raise TypeError(n)
-            new_saw.start = next_saw.end + new_saw.start
-            next_saw.end = new_saw
-            next_saw = new_saw
-        return saw
-
-    def _ty_e_var(self, node) -> str:
-        if self._current_rule in self._grammar.outer_scope_rules:
-            return f"this.lookup('{node[1]}')"
-        if node[1] in self._grammar.externs:
-            return f"this.externs.get('{node[1]}');"
-        return 'v_' + node[1].replace('$', '_')
-
-    def _ty_empty(self, node) -> List[str]:
-        del node
-        return ['this.succeed(null);']
 
     def _ty_ends_in(self, node) -> List[str]:
         sublines = self._gen(node[2][0])
@@ -840,7 +721,7 @@ _PARSE_WITH_EXCEPTION = """\
       }}
     }} catch (e) {{
       if (e instanceof ParsingRuntimeError) {{
-        let [lineno, _] = this.errorOffsets();
+        let [lineno, _] = this.offsets(this.errpos);
         return new Result(null, this.path + ':' + lineno + ' ' + e.toString());
       }} else {{
         throw e;
@@ -875,25 +756,10 @@ _BUILTIN_METHODS = """\
     }
   }
 
-  checkExterns() {
-    let errors = '';
-    for (let ext of this.expected_externs) {
-      if (!this.externs.has(ext)) {
-        errors += `Missing extern "${ext}"\\n`;
-      }
-    }
-    for (let ext of this.externs.keys()) {
-      if (!this.expected_externs.has(ext)) {
-        errors += `Unexpected extern "${ext}"\\n`;
-      }
-    }
-    return errors.trim();
-  }
-
-  errorOffsets() {
+  offsets(pos) {
     let lineno = 1;
     let colno = 1;
-    for (let i = 0; i < this.errpos; i++) {
+    for (let i = 0; i < pos; i++) {
       if (this.text[i] === '\\n') {
         lineno += 1;
         colno = 1;
@@ -905,7 +771,7 @@ _BUILTIN_METHODS = """\
   }
 
   error() {
-    let [lineno, colno] = this.errorOffsets();
+    let [lineno, colno] = this.offsets(this.errpos);
     let thing;
     if (this.errpos === this.end) {
       thing = 'end of input';
