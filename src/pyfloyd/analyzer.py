@@ -13,11 +13,72 @@
 # limitations under the License.
 
 import collections
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Union
 
 
-# TODO: Refine this.
-Node = List[Any]
+class Node:
+    @classmethod
+    def to(cls, val: List[Any]) -> 'Node':
+        assert len(val) == 3
+        assert isinstance(val[0], str)
+        assert isinstance(val[2], list)
+        match val[0]:
+            case 'apply':
+                return Apply(val[1])
+            case _:
+                return Node(val[0], val[1], [Node.to(sn) for sn in val[2]])
+
+    def __init__(
+        self, ty: str, val: Any = None, children: Optional[List['Node']] = None
+    ):
+        self.t: str = ty
+        self.v: Any = val
+        self.ch: List['Node'] = children or []
+
+    def __getitem__(self, i: int) -> Union[str | Any | List['Node']]:
+        assert 0 <= i <= 2
+        if i == 0:
+            return self.t
+        if i == 1:
+            return self.v
+        return self.ch
+
+    def __setitem__(self, i: int, v: Any) -> None:
+        assert 0 <= i <= 2
+        if i == 0:
+            self.t = v
+        elif i == 1:
+            self.v = v
+        else:
+            self.ch = v
+
+    def __eq__(self, other):
+        if isinstance(other, Node):
+            return (
+                self.t == other.t and
+                self.v == other.v and
+                self.ch == other.ch
+            )
+        return (
+            self.t == other[0] and
+            self.v == other[1] and
+            self.ch == other[2]
+        )
+
+    def __len__(self):
+        return 3
+
+
+N = lambda t, v, ch: Node.to([t, v, ch])
+
+
+class Apply(Node):
+    def __init__(self, rule):
+        super().__init__('apply', rule, [])
+
+    @property
+    def rule(self):
+        return self.v
 
 
 class AnalysisError(Exception):
@@ -35,7 +96,7 @@ class AnalysisError(Exception):
 
 class Grammar:
     def __init__(self, ast):
-        self.ast = ast
+        self.ast = Node.to(ast)
         self.comment = None
         self.rules = collections.OrderedDict()
         self.pragmas = []
@@ -77,7 +138,7 @@ class Grammar:
             rules.add(rule[1])
         for rule in self.rules:
             if rule not in rules:
-                self.ast[2].append(['rule', rule, [self.rules[rule]]])
+                self.ast[2].append(N('rule', rule, [self.rules[rule]]))
 
 
 class OperatorState:
@@ -390,7 +451,7 @@ def _rewrite_scopes(grammar):
         for i in range(len(node[2])):
             node[2][i] = rewrite_node(node[2][i])
         if node[0] == 'seq' and any(sn[0] == 'label' for sn in node[2]):
-            return ['scope', None, [node]]
+            return N('scope', None, [node])
         return node
 
     for rule in grammar.ast[2]:
@@ -419,7 +480,7 @@ def _rewrite_recursion(grammar):
             has_lr = _check_lr(name, choice, grammar, seen)
             if has_lr:
                 grammar.leftrec_rules.update(seen)
-                choices[i] = ['leftrec', '%s#%d' % (name, i + 1), [choice]]
+                choices[i] = N('leftrec', '%s#%d' % (name, i + 1), [choice])
 
 
 def _check_operator(grammar, name, choices):
@@ -434,17 +495,15 @@ def _check_operator(grammar, name, choices):
         assert choice[0] == 'seq'
         if len(choice[2]) not in (3, 4):
             return None
-        if choice[2][0] != ['label', '$1', [['apply', name, []]]] and choice[
-            2
-        ][0] != ['apply', name, []]:
+        if (choice[2][0] != N('label', '$1', [N('apply', name, [])]) and
+            choice[2][0] != N('apply', name, [])):
             return None
         if choice[2][1][0] != 'lit' or choice[2][1][1] not in grammar.prec:
             return None
         operator = choice[2][1][1]
         prec = grammar.prec[operator]
-        if choice[2][2] != ['label', '$3', [['apply', name, []]]] and choice[
-            2
-        ][2] != ['apply', name, []]:
+        if (choice[2][2] != N('label', '$3', [N('apply', name, [])]) and
+            choice[2][2] != N('apply', name, [])):
             return None
         if len(choice[2]) == 4 and choice[2][3][0] != 'action':
             return None
@@ -454,7 +513,7 @@ def _check_operator(grammar, name, choices):
     choice = choices[-1]
     if len(choice[2]) != 1:
         return None
-    return ['choice', None, [['operator', name, operators], choices[-1]]]
+    return N('choice', None, [N('operator', name, operators), choices[-1]])
 
 
 def _check_lr(name, node, grammar, seen):
@@ -559,38 +618,38 @@ def _add_filler_rules(grammar):
             grammar.whitespace[0] == 'regexp'
             and grammar.comment[0] == 'regexp'
         ):
-            filler = [
+            filler = N( 
                 'regexp',
                 f'(({grammar.whitespace[1]})|({grammar.comment[1]}))*',
                 [],
-            ]
+            )
         else:
-            filler = [
+            filler = N( 
                 'star',
                 None,
                 [
-                    [
+                    N( 
                         'choice',
                         None,
                         [
-                            ['apply', '%whitespace', []],
-                            ['apply', '%comment', []],
+                            N('apply', '%whitespace', []),
+                            N('apply', '%comment', []),
                         ],
-                    ],
+                    ),
                 ],
-            ]
+            )
     elif grammar.comment:
         if grammar.comment[0] == 'regexp':
-            filler = ['regexp', f'({grammar.comment[1]})*', []]
+            filler = N('regexp', f'({grammar.comment[1]})*', [])
         else:
-            filler = ['star', None, [['apply', '%comment', []]]]
+            filler = N('star', None, [N('apply', '%comment', [])])
     elif grammar.whitespace:
         if grammar.whitespace[0] == 'regexp':
-            filler = ['regexp', f'({grammar.whitespace[1]})*', []]
+            filler = N('regexp', f'({grammar.whitespace[1]})*', [])
         else:
-            filler = ['star', None, [['apply', '%whitespace', []]]]
+            filler = N('star', None, [N('apply', '%whitespace', [])])
     if filler:
-        grammar.rules['%filler'] = ['choice', None, [filler]]
+        grammar.rules['%filler'] = N('choice', None, [filler])
 
 
 def _add_filler_nodes(grammar, node):
@@ -628,15 +687,15 @@ def _add_filler_nodes(grammar, node):
             else:
                 sn = _add_filler_nodes(grammar, child)
                 children.append(sn)
-        return ['seq', None, children]
+        return N('seq', None, children)
     if should_fill(node):
-        return [
+        return N( 
             'paren',
             None,
-            [['seq', None, [['apply', '%filler', []], node]]],
-        ]
+            [N('seq', None, [N('apply', '%filler', []), node])],
+        )
 
-    r = [node[0], node[1], [_add_filler_nodes(grammar, n) for n in node[2]]]
+    r = N(node[0], node[1], [_add_filler_nodes(grammar, n) for n in node[2]])
     return r
 
 
@@ -647,7 +706,7 @@ def _rewrite_singles(grammar):
     def walk(node):
         if node[0] in ('choice', 'seq') and len(node[2]) == 1:
             return walk(node[2][0])
-        return [node[0], node[1], [walk(n) for n in node[2]]]
+        return N(node[0], node[1], [walk(n) for n in node[2]])
 
     grammar.ast = walk(grammar.ast)
     grammar.update_rules()
@@ -683,8 +742,8 @@ class _SubRuleRewriter:
         self._grammar.rules = self._methods
         rules = []
         for rule in self._grammar.rules:
-            rules.append(['rule', rule, [self._grammar.rules[rule]]])
-        self._grammar.ast = ['rules', None, rules]
+            rules.append(N('rule', rule, [self._grammar.rules[rule]]))
+        self._grammar.ast = N('rules', None, rules)
 
     def _subrule(self) -> str:
         self._counter += 1
@@ -708,10 +767,10 @@ class _SubRuleRewriter:
                 subnodes.append(self._walk(child))
             else:
                 subnodes.append(self._make_subrule(child))
-        return [node[0], node[1], subnodes]
+        return N(node[0], node[1], subnodes)
 
     def _split1(self, node):
-        return [node[0], node[1], [self._make_subrule(node[2][0])]]
+        return N(node[0], node[1], [self._make_subrule(node[2][0])])
 
     def _can_inline(self, node) -> bool:
         return node[0] not in (
@@ -730,12 +789,12 @@ class _SubRuleRewriter:
     def _make_subrule(self, child):
         subnode_rule = self._subrule()
         self._subrules[subnode_rule] = self._walk(child)
-        return ['apply', subnode_rule, []]
+        return N('apply', subnode_rule, [])
 
     def _ty_apply(self, node):
         if node[1] in ('any', 'end'):
             self._grammar.needed_builtin_rules.add(node[1])
-        return [node[0], self._rule_fmt.format(rule=node[1]), node[2]]
+        return N(node[0], self._rule_fmt.format(rule=node[1]), node[2])
 
     def _ty_ends_in(self, node):
         self._grammar.needed_builtin_rules.add('any')
@@ -778,7 +837,7 @@ class _SubRuleRewriter:
             o.choices[op] = subnode_rule
             self._subrules[subnode_rule] = self._walk(subnode)
         self._grammar.operators[node[1]] = o
-        return [node[0], node[1], []]
+        return N(node[0], node[1], [])
 
     def _ty_paren(self, node):
         return self._split1(node)
@@ -806,18 +865,18 @@ def _rewrite_pragma_rules(grammar):
     # else.
     def _rewrite(node):
         if node[0] == 'apply' and node[1].startswith('%'):
-            return [node[0], node[1].replace('%', '_'), []]
-        return [node[0], node[1], [_rewrite(sn) for sn in node[2]]]
+            return N(node[0], node[1].replace('%', '_'), [])
+        return N(node[0], node[1], [_rewrite(sn) for sn in node[2]])
 
     new_rules = []
     for rule in grammar.ast[2]:
         if rule[1].startswith('%'):
             if rule[1] in ('%comment', '%whitespace', '%filler'):
-                new_rule = [
+                new_rule = N(
                     rule[0],
                     rule[1].replace('%', '_'),
                     [_rewrite(sn) for sn in rule[2]],
-                ]
+                )
                 new_rules.append(new_rule)
                 assert new_rule[1] not in grammar.rules, (
                     f'Collision with existing rule {new_rule[1]}'
