@@ -90,7 +90,6 @@ class Generator:
     def __init__(self, grammar: Grammar, options: GeneratorOptions):
         self._grammar = grammar
         self._options = options
-        self._exception_needed = False
         self._unicodedata_needed = (
             grammar.unicat_needed
             or 'unicode_lookup' in self._grammar.needed_builtin_functions
@@ -99,7 +98,6 @@ class Generator:
         self._base_rule_regex = re.compile(r's_(.+)_\d+$')
 
     def generate(self) -> str:
-        self._gen_rules()
         return self._gen_text()
 
     def _gen_expr(self, node) -> List[str]:

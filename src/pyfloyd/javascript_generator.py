@@ -43,27 +43,6 @@ class JavaScriptGenerator(Generator):
             'true': 'true',
         }
 
-    def _gen_rules(self) -> None:
-        local_vars = ('errpos', 'found', 'p', 'regexp')
-        for rule, node in self._grammar.rules.items():
-            self._current_rule = self._base_rule_name(rule)
-            local_vars_defined = set()
-            lines = []
-            original_lines = self._gen(node)
-            for line in original_lines:
-                modified = False
-                for v in local_vars:
-                    if f'let {v} =' in line:
-                        if v in local_vars_defined:
-                            lines.append(line.replace(f'let {v}', v))
-                            modified = True
-                            break
-                        local_vars_defined.add(v)
-                if not modified:
-                    lines.append(line)
-            self._methods[rule] = lines
-            self._current_rule = None
-
     def _gen_text(self) -> str:
         imports = self._imports()
         version = __version__
@@ -177,11 +156,7 @@ class JavaScriptGenerator(Generator):
         return builtins
 
     def _gen_methods(self) -> str:
-        text = ''
-        for rule, method_body in self._methods.items():
-            text += self._gen_method_text(rule, method_body)
-        text += '\n'
-        text += '\n'
+        text = self._gen_rule_methods()
 
         if self._grammar.needed_builtin_rules:
             for name in sorted(self._grammar.needed_builtin_rules):
@@ -197,6 +172,34 @@ class JavaScriptGenerator(Generator):
                 self._builtin_methods[f'fn_{name}']
                 for name in sorted(self._grammar.needed_builtin_functions)
             )
+        return text
+
+    def _gen_rule_methods(self):
+        text = ''
+        local_vars = ('errpos', 'found', 'p', 'regexp')
+        for rule, node in self._grammar.rules.items():
+            self._current_rule = self._base_rule_name(rule)
+            local_vars_defined = set()
+            lines = []
+            original_lines = self._gen(node)
+            for line in original_lines:
+                modified = False
+                for v in local_vars:
+                    if f'let {v} =' in line:
+                        if v in local_vars_defined:
+                            lines.append(line.replace(f'let {v}', v))
+                            modified = True
+                            break
+                        local_vars_defined.add(v)
+                if not modified:
+                    lines.append(line)
+
+            text += self._gen_method_text(rule, lines)
+            self._methods[rule] = lines
+            self._current_rule = None
+
+        text += '\n'
+        text += '\n'
         return text
 
     def _gen_method_text(self, method_name, method_body) -> str:
