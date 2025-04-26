@@ -64,7 +64,7 @@ class PythonGenerator(Generator):
                 version=version, args=args, imports=imports
             )
 
-        if self._exception_needed:
+        if self._grammar.exception_needed:
             text += _PARSING_RUNTIME_EXCEPTION
 
         if self._grammar.operators:
@@ -75,7 +75,7 @@ class PythonGenerator(Generator):
 
         text += self._state()
 
-        if self._exception_needed:
+        if self._grammar.exception_needed:
             text += _PARSE_WITH_EXCEPTION.format(
                 starting_rule=self._grammar.starting_rule
             )
@@ -130,7 +130,6 @@ class PythonGenerator(Generator):
             text += '        self._regexps = {}\n'
         if self._grammar.outer_scope_rules:
             text += '        self._scopes = []\n'
-            self._needed_methods.add('lookup')
         if self._grammar.operator_needed:
             text += self._operator_state()
             text += '\n'
@@ -185,10 +184,7 @@ class PythonGenerator(Generator):
             )
             text += '\n'
 
-        text += '\n'.join(
-            self._builtin_methods[name]
-            for name in sorted(self._needed_methods)
-        )
+        text += self._needed_methods()
 
         if self._grammar.needed_builtin_functions:
             text += '\n'
@@ -351,10 +347,6 @@ class PythonGenerator(Generator):
 
     def _ty_pred(self, node) -> List[str]:
         arg = self._gen_expr(node[2][0])
-        # TODO: Figure out how to statically analyze predicates to
-        # catch ones that don't return booleans, so that we don't need
-        # the _ParsingRuntimeError exception
-        self._exception_needed = True
         return [
             'v = ' + flatten(arg, indent=self._map['indent'])[0],
             'if v is True:',

@@ -30,7 +30,6 @@ class JavaScriptGenerator(Generator):
     def __init__(self, grammar: Grammar, options: GeneratorOptions):
         super().__init__(grammar, options)
         self._builtin_methods = self._load_builtin_methods()
-        self._exception_needed = False
         self._methods: Dict[str, List[str]] = {}
         self._operators: Dict[str, str] = {}
         self._map = {
@@ -79,7 +78,7 @@ class JavaScriptGenerator(Generator):
                version=version, args=args, imports=imports
             )
 
-        if self._exception_needed:
+        if self._grammar.exception_needed:
             text += _PARSING_RUNTIME_EXCEPTION
 
         if self._grammar.operators:
@@ -90,7 +89,7 @@ class JavaScriptGenerator(Generator):
 
         text += self._state()
 
-        if self._exception_needed:
+        if self._grammar.exception_needed:
             text += _PARSE_WITH_EXCEPTION.format(
                 starting_rule=self._grammar.starting_rule
             )
@@ -131,7 +130,6 @@ class JavaScriptGenerator(Generator):
             text += self._operator_state()
         if self._grammar.outer_scope_rules:
             text += '    this.scopes = [];\n'
-            self._needed_methods.add('lookup')
         text += '  }\n'
         text += '\n'
 
@@ -183,8 +181,7 @@ class JavaScriptGenerator(Generator):
         for rule, method_body in self._methods.items():
             text += self._gen_method_text(rule, method_body)
         text += '\n'
-        if self._grammar.needed_builtin_rules or self._needed_methods:
-            text += '\n'
+        text += '\n'
 
         if self._grammar.needed_builtin_rules:
             for name in sorted(self._grammar.needed_builtin_rules):
@@ -192,11 +189,7 @@ class JavaScriptGenerator(Generator):
                 text += '  ' + method_txt
                 text += '\n'
 
-        if self._needed_methods:
-            text += '  ' + '\n  '.join(
-                self._builtin_methods[name]
-                for name in sorted(self._needed_methods)
-            )
+        text += self._needed_methods()
 
         if self._grammar.needed_builtin_functions:
             text += '\n'
@@ -396,10 +389,6 @@ class JavaScriptGenerator(Generator):
 
     def _ty_pred(self, node) -> List[str]:
         arg = self._gen_expr(node[2][0])
-        # TODO: Figure out how to statically analyze predicates to
-        # catch ones that don't return booleans, so that we don't need
-        # the _ParsingRuntimeError exception
-        self._exception_needed = True
         return [
             'let v = ' + flatten(arg, indent=self._map['indent'])[0],
             'if (v === true) {',

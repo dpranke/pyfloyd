@@ -98,31 +98,6 @@ class Generator:
         self._current_rule = None
         self._base_rule_regex = re.compile(r's_(.+)_\d+$')
 
-        # These methods are pretty much always needed.
-        self._needed_methods = set(
-            {
-                'error',
-                'fail',
-                'offsets',
-                'rewind',
-                'succeed',
-            }
-        )
-        if grammar.ch_needed:
-            self._needed_methods.add('ch')
-        if grammar.leftrec_needed:
-            self._needed_methods.add('leftrec')
-        if grammar.operator_needed:
-            self._needed_methods.add('operator')
-        if grammar.range_needed:
-            self._needed_methods.add('range')
-        if grammar.str_needed:
-            self._needed_methods.add('str')
-        if grammar.unicat_needed:
-            self._needed_methods.add('unicat')
-        if self._options.memoize:
-            self._needed_methods.add('memoize')
-
     def generate(self) -> str:
         self._gen_rules()
         return self._gen_text()
@@ -202,6 +177,32 @@ class Generator:
             'unicat',
         )
         return True
+
+    def _needed_methods(self):
+        text = ''
+        if self._grammar.ch_needed:
+            text += self._builtin_methods['ch'] + '\n'
+        text += self._builtin_methods['error'] + '\n'
+        text += self._builtin_methods['fail']  + '\n'
+        if self._grammar.leftrec_needed:
+            text += self._builtin_methods['leftrec']  + '\n'
+        if self._grammar.outer_scope_rules:
+            text += self._builtin_methods['lookup'] + '\n'
+        text += self._builtin_methods['offsets']  + '\n'
+        if self._options.memoize:
+            text += self._builtin_methods['memoize'] + '\n'
+        if self._grammar.operator_needed:
+            text += self._builtin_methods['operator']  + '\n'
+        if self._grammar.range_needed:
+            text += self._builtin_methods['range'] + '\n'
+        text += self._builtin_methods['rewind']  + '\n'
+        if self._grammar.str_needed:
+            text += self._builtin_methods['str'] + '\n'
+        text += self._builtin_methods['succeed']  + '\n'
+        if self._grammar.unicat_needed:
+            text += self._builtin_methods['unicat']  + '\n'
+        text += '\n'
+        return text
 
     #
     # Handlers for each non-host node in the glop AST follow.
@@ -348,7 +349,6 @@ class Generator:
         return [self._invoke(method, expr)]
 
     def _ty_operator(self, node) -> List[str]:
-        self._needed_methods.add('operator')
         # Operator nodes have no children, but subrules for each arm
         # of the expression cluster have been defined and are referenced
         # from self._grammar.operators[node[1]].choices.
