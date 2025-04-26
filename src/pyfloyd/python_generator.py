@@ -29,7 +29,7 @@ from pyfloyd import string_literal as lit
 class PythonGenerator(Generator):
     def __init__(self, grammar: Grammar, options: GeneratorOptions):
         super().__init__(grammar, options)
-        self._builtin_methods = self._load_builtin_methods()
+        self._indent = '    '
         self._methods: Dict[str, List[str]] = {}
         self._operators: Dict[str, str] = {}
         self._map = {
@@ -42,17 +42,11 @@ class PythonGenerator(Generator):
             'null': 'None',
             'true': 'True',
         }
-        self._indent = '    '
 
-    def _load_builtin_methods(self) -> Dict[str, str]:
-        blocks = _BUILTIN_METHODS.split('\n    def ')
-        blocks[0] = blocks[0][8:]
-        builtins = {}
-        for block in blocks:
-            name = block[1 : block.find('(')]
-            text = '    def ' + block
-            builtins[name] = text
-        return builtins
+        self._builtin_methods = {}
+        more_builtins = self._load_more_builtins()
+        for k, v in more_builtins.items():
+            self._builtin_methods[k] = self._dedent(v, 1)
 
     def _gen_text(self) -> str:
         imports = self._imports()
@@ -616,226 +610,263 @@ class PythonGenerator(Generator):
         )
         return lines
 
-
-_BUILTIN_METHODS = """\
-    def _r_any(self):
-        if self._pos < self._end:
-            self._succeed(self._text[self._pos], self._pos + 1)
-        else:
-            self._fail()
-
-    def _r_end(self):
-        if self._pos == self._end:
-            self._succeed(None)
-        else:
-            self._fail()
-
-    def _ch(self, ch):
-        p = self._pos
-        if p < self._end and self._text[p] == ch:
-            self._succeed(ch, self._pos + 1)
-        else:
-            self._fail()
-
-    def _offsets(self, pos):
-        lineno = 1
-        colno = 1
-        for i in range(pos):
-            if self._text[i] == '\\n':
-                lineno += 1
-                colno = 1
-            else:
-                colno += 1
-        return lineno, colno
-
-    def _error(self):
-        lineno, colno = self._offsets(self._errpos)
-        if self._errpos == len(self._text):
-            thing = 'end of input'
-        else:
-            thing = repr(self._text[self._errpos]).replace("'", '"')
-        return '%s:%d Unexpected %s at column %d' % (
-            self._path,
-            lineno,
-            thing,
-            colno,
-        )
-
-    def _fail(self):
-        self._val = None
-        self._failed = True
-        self._errpos = max(self._errpos, self._pos)
-
-    def _leftrec(self, rule, rule_name, left_assoc):
-        pos = self._pos
-        key = (rule_name, pos)
-        seed = self._seeds.get(key)
-        if seed:
-            self._val, self._failed, self._pos = seed
-            return
-        if rule_name in self._blocked:
-            self._val = None
-            self._failed = True
-            return
-        current = (None, True, self._pos)
-        self._seeds[key] = current
-        if left_assoc:
-            self._blocked.add(rule_name)
-        while True:
-            rule()
-            if self._pos > current[2]:
-                current = (self._val, self._failed, self._pos)
-                self._seeds[key] = current
-                self._pos = pos
-            else:
-                del self._seeds[key]
-                self._val, self._failed, self._pos = current
-                if left_assoc:
-                    self._blocked.remove(rule_name)
-                return
-
-    def _lookup(self, var):
-        l = len(self._scopes) - 1
-        while l >= 0:
-            if var in self._scopes[l]:
-                return self._scopes[l][var]
-            l -= 1
-        if var in self._externs:
-            return self._externs[var]
-        assert False, f'unknown var {var}'
-
-    def _memoize(self, rule_name, fn):
-        p = self._pos
-        r = self._cache.setdefault(p, {}).get(rule_name)
-        if r:
-            self._val, self._failed, self._pos = r
-            return
-        fn()
-        self._cache[p][rule_name] = (self._val, self._failed, self._pos)
-
-    def _operator(self, rule_name):
-        o = self._operators[rule_name]
-        pos = self._pos
-        key = (rule_name, self._pos)
-        seed = self._seeds.get(key)
-        if seed:
-            self._val, self._failed, self._pos = seed
-            return
-        o.current_depth += 1
-        current = (None, True, self._pos)
-        self._seeds[key] = current
-        min_prec = o.current_prec
-        i = 0
-        while i < len(o.precs):
-            repeat = False
-            prec = o.precs[i]
-            prec_ops = o.prec_ops[prec]
-            if prec < min_prec:
-                break
-            o.current_prec = prec
-            if prec_ops[0] not in o.rassoc:
-                o.current_prec += 1
-            for j, _ in enumerate(prec_ops):
-                op = prec_ops[j]
-                o.choices[op]()
-                if not self._failed and self._pos > pos:
-                    current = (self._val, self._failed, self._pos)
+    def _load_builtins(self):
+        return {
+            'r_any': """\
+                def _r_any(self):
+                    if self._pos < self._end:
+                        self._succeed(self._text[self._pos], self._pos + 1)
+                    else:
+                        self._fail()
+                """,
+            'r_end': """\
+                def _r_end(self):
+                    if self._pos == self._end:
+                        self._succeed(None)
+                    else:
+                        self._fail()
+                """,
+            'ch': """\
+                def _ch(self, ch):
+                    p = self._pos
+                    if p < self._end and self._text[p] == ch:
+                        self._succeed(ch, self._pos + 1)
+                    else:
+                        self._fail()
+                """,
+            'offsets': """\
+                def _offsets(self, pos):
+                    lineno = 1
+                    colno = 1
+                    for i in range(pos):
+                        if self._text[i] == '\\n':
+                            lineno += 1
+                            colno = 1
+                        else:
+                            colno += 1
+                    return lineno, colno
+                """,
+            'error': """\
+                def _error(self):
+                    lineno, colno = self._offsets(self._errpos)
+                    if self._errpos == len(self._text):
+                        thing = 'end of input'
+                    else:
+                        thing = repr(self._text[self._errpos]).replace("'", '"')
+                    return '%s:%d Unexpected %s at column %d' % (
+                        self._path,
+                        lineno,
+                        thing,
+                        colno,
+                    )
+                """,
+            'fail': """\
+                def _fail(self):
+                    self._val = None
+                    self._failed = True
+                    self._errpos = max(self._errpos, self._pos)
+                """,
+            'leftrec': """\
+                def _leftrec(self, rule, rule_name, left_assoc):
+                    pos = self._pos
+                    key = (rule_name, pos)
+                    seed = self._seeds.get(key)
+                    if seed:
+                        self._val, self._failed, self._pos = seed
+                        return
+                    if rule_name in self._blocked:
+                        self._val = None
+                        self._failed = True
+                        return
+                    current = (None, True, self._pos)
                     self._seeds[key] = current
-                    repeat = True
-                    break
-                self._rewind(pos)
-            if not repeat:
-                i += 1
+                    if left_assoc:
+                        self._blocked.add(rule_name)
+                    while True:
+                        rule()
+                        if self._pos > current[2]:
+                            current = (self._val, self._failed, self._pos)
+                            self._seeds[key] = current
+                            self._pos = pos
+                        else:
+                            del self._seeds[key]
+                            self._val, self._failed, self._pos = current
+                            if left_assoc:
+                                self._blocked.remove(rule_name)
+                            return
+                """,
 
-        del self._seeds[key]
-        o.current_depth -= 1
-        if o.current_depth == 0:
-            o.current_prec = 0
-        self._val, self._failed, self._pos = current
+            'lookup': """\
+                def _lookup(self, var):
+                    l = len(self._scopes) - 1
+                    while l >= 0:
+                        if var in self._scopes[l]:
+                            return self._scopes[l][var]
+                        l -= 1
+                    if var in self._externs:
+                        return self._externs[var]
+                    assert False, f'unknown var {var}'
+                """,
+            'memoize': """\
+                def _memoize(self, rule_name, fn):
+                    p = self._pos
+                    r = self._cache.setdefault(p, {}).get(rule_name)
+                    if r:
+                        self._val, self._failed, self._pos = r
+                        return
+                    fn()
+                    self._cache[p][rule_name] = (self._val, self._failed, self._pos)
+                """,
 
-    def _range(self, i, j):
-        p = self._pos
-        if p != self._end and ord(i) <= ord(self._text[p]) <= ord(j):
-            self._succeed(self._text[p], self._pos + 1)
-        else:
-            self._fail()
+            'operator': """\
+                def _operator(self, rule_name):
+                    o = self._operators[rule_name]
+                    pos = self._pos
+                    key = (rule_name, self._pos)
+                    seed = self._seeds.get(key)
+                    if seed:
+                        self._val, self._failed, self._pos = seed
+                        return
+                    o.current_depth += 1
+                    current = (None, True, self._pos)
+                    self._seeds[key] = current
+                    min_prec = o.current_prec
+                    i = 0
+                    while i < len(o.precs):
+                        repeat = False
+                        prec = o.precs[i]
+                        prec_ops = o.prec_ops[prec]
+                        if prec < min_prec:
+                            break
+                        o.current_prec = prec
+                        if prec_ops[0] not in o.rassoc:
+                            o.current_prec += 1
+                        for j, _ in enumerate(prec_ops):
+                            op = prec_ops[j]
+                            o.choices[op]()
+                            if not self._failed and self._pos > pos:
+                                current = (self._val, self._failed, self._pos)
+                                self._seeds[key] = current
+                                repeat = True
+                                break
+                            self._rewind(pos)
+                        if not repeat:
+                            i += 1
+            
+                    del self._seeds[key]
+                    o.current_depth -= 1
+                    if o.current_depth == 0:
+                        o.current_prec = 0
+                    self._val, self._failed, self._pos = current
+                """,
 
-    def _rewind(self, newpos):
-        self._succeed(None, newpos)
-
-    def _str(self, s):
-        for ch in s:
-            self._ch(ch)
-            if self._failed:
-                return
-        self._val = s
-
-    def _succeed(self, v, newpos=None):
-        self._val = v
-        self._failed = False
-        if newpos is not None:
-            self._pos = newpos
-
-    def _unicat(self, cat):
-        p = self._pos
-        if p < self._end and unicodedata.category(self._text[p]) == cat:
-            self._succeed(self._text[p], self._pos + 1)
-        else:
-            self._fail()
-
-    def _fn_atof(self, s):
-        if '.' in s or 'e' in s or 'E' in s:
-            return float(s)
-        return int(s)
-
-    def _fn_atoi(self, a, base):
-        return int(a, base)
-
-    def _fn_atou(self, a, base):
-        return chr(int(a, base))
-
-    def _fn_cat(self, strs):
-        return ''.join(strs)
-
-    def _fn_concat(self, xs, ys):
-        return xs + ys
-
-    def _fn_cons(self, hd, tl):
-        return [hd] + tl
-
-    def _fn_dedent(self, s):
-        return s
-
-    def _fn_dict(self, pairs):
-        return dict(pairs)
-
-    def _fn_itou(self, n):
-        return chr(n)
-
-    def _fn_join(self, s, vs):
-        return s.join(vs)
-
-    def _fn_otou(self, s):
-        return chr(int(s, base=8))
-
-    def _fn_scat(self, hd, tl):
-        return self._fn_cat(self._fn_cons(hd, tl))
-
-    def _fn_scons(self, hd, tl):
-        return [hd] + tl
-
-    def _fn_strcat(self, a, b):
-        return a + b
-
-    def _fn_unicode_lookup(self, s):
-        return unicodedata.unicode_lookup(s)
-
-    def _fn_utoi(self, s):
-        return ord(s)
-
-    def _fn_xtoi(self, s):
-        return int(s, base=16)
-
-    def _fn_xtou(self, s):
-        return chr(int(s, base=16))
-"""
+            'range': """\
+                def _range(self, i, j):
+                    p = self._pos
+                    if p != self._end and ord(i) <= ord(self._text[p]) <= ord(j):
+                        self._succeed(self._text[p], self._pos + 1)
+                    else:
+                        self._fail()
+            """,
+            'rewind': """\
+                def _rewind(self, newpos):
+                    self._succeed(None, newpos)
+            """,
+            'str': """\
+                def _str(self, s):
+                    for ch in s:
+                        self._ch(ch)
+                        if self._failed:
+                            return
+                    self._val = s
+            """,
+            'succeed': """\
+                def _succeed(self, v, newpos=None):
+                    self._val = v
+                    self._failed = False
+                    if newpos is not None:
+                        self._pos = newpos
+            """,
+            'unicat': """\
+                def _unicat(self, cat):
+                    p = self._pos
+                    if p < self._end and unicodedata.category(self._text[p]) == cat:
+                        self._succeed(self._text[p], self._pos + 1)
+                    else:
+                        self._fail()
+            """,
+            'fn_atof': """\
+                def _fn_atof(self, s):
+                    if '.' in s or 'e' in s or 'E' in s:
+                        return float(s)
+                    return int(s)
+            """,
+            'fn_atoi': """\
+                def _fn_atoi(self, a, base):
+                    return int(a, base)
+            """,
+            'fn_atou': """\
+                def _fn_atou(self, a, base):
+                    return chr(int(a, base))
+            """,
+            'fn_cat': """\
+                def _fn_cat(self, strs):
+                    return ''.join(strs)
+            """,
+            'fn_concat': """\
+                def _fn_concat(self, xs, ys):
+                    return xs + ys
+            """,
+            'fn_cons': """\
+                def _fn_cons(self, hd, tl):
+                    return [hd] + tl
+            """,
+            'fn_dedent': """\
+                def _fn_dedent(self, s):
+                    return s
+            """,
+            'fn_dict': """\
+                def _fn_dict(self, pairs):
+                    return dict(pairs)
+            """,
+            'fn_itou': """\
+                def _fn_itou(self, n):
+                    return chr(n)
+            """,
+            'fn_join': """\
+                def _fn_join(self, s, vs):
+                    return s.join(vs)
+            """,
+            'fn_otou': """\
+                def _fn_otou(self, s):
+                    return chr(int(s, base=8))
+            """,
+            'fn_scat': """\
+                def _fn_scat(self, hd, tl):
+                    return self._fn_cat(self._fn_cons(hd, tl))
+            """,
+            'fn_scons': """\
+                def _fn_scons(self, hd, tl):
+                    return [hd] + tl
+            """,
+            'fn_strcat': """\
+                def _fn_strcat(self, a, b):
+                    return a + b
+            """,
+            'fn_unicode_lookup': """\
+                def _fn_unicode_lookup(self, s):
+                    return unicodedata.unicode_lookup(s)
+            """,
+            'fn_utoi': """\
+                def _fn_utoi(self, s):
+                    return ord(s)
+            """,
+            'fn_xtoi': """\
+                def _fn_xtoi(self, s):
+                    return int(s, base=16)
+            """,
+            'fn_xtou': """\
+                def _fn_xtou(self, s):
+                    return chr(int(s, base=16))
+            """,
+        }
