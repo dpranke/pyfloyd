@@ -16,11 +16,9 @@ import re
 import textwrap
 from typing import Dict, List, Optional, Set, Union
 
-from pyfloyd.analyzer import Grammar
-from pyfloyd.formatter import flatten, Comma, Saw, Tree
+from pyfloyd.analyzer import Grammar, Node
+from pyfloyd.formatter import flatten, Comma, FormatObj, Saw, Tree
 from pyfloyd import string_literal as lit
-
-FormatObj = Union[Comma, Tree, Saw, str]
 
 
 DEFAULT_LANGUAGE = 'python'
@@ -95,17 +93,38 @@ class Generator:
             grammar.unicat_needed
             or 'unicode_lookup' in self._grammar.needed_builtin_functions
         )
-        self._current_rule = None
+        self._current_rule: str = ''
         self._base_rule_regex = re.compile(r's_(.+)_\d+$')
+
+        # Expected to be overridden in subclasses
+        self._indent : str = '  '
+        self._map : Dict[str, str] = {}
+        self._builtin_methods : Dict[str, str] = {}
 
     def generate(self) -> str:
         return self._gen_text()
 
-    def _gen_expr(self, node) -> List[str]:
+    def _extern(self, varname: str) -> str:
+        raise NotImplementedError
+
+    def _invoke(self, method: str, *args) -> str:
+        raise NotImplementedError
+
+    def _thisvar(self, varname: str) -> str:
+        raise NotImplementedError
+
+    def _gen_text(self) -> str:
+        raise NotImplementedError
+
+    def _gen_expr(self, node: Node) -> FormatObj:
         fn = getattr(self, f'_ty_{node[0]}')
         return fn(node)
 
-    def _dedent(self, s, level=0):
+    def _gen_stmts(self, node: Node) -> List[str]:
+        fn = getattr(self, f'_ty_{node[0]}')
+        return fn(node)
+
+    def _dedent(self, s: str, level=0) -> str:
         s = textwrap.dedent(s)
         return (
             '\n'.join(
@@ -114,7 +133,10 @@ class Generator:
             + '\n'
         )
 
-    def _varname(self, v):
+    def _rulename(self, v: str) -> str:
+        raise NotImplementedError
+
+    def _varname(self, v: str) -> str:
         r = f'v_{v.replace("$", "_")}'
         return r
 
@@ -126,12 +148,14 @@ class Generator:
             vs = vs.union(self._find_vars(c))
         return vs
 
-    def _base_rule_name(self, rule_name):
+    def _base_rule_name(self, rule_name: str) -> str:
         if rule_name.startswith('r_'):
             return rule_name[2:]
-        return self._base_rule_regex.match(rule_name).group(1)
+        m = self._base_rule_regex.match(rule_name)
+        assert m is not None
+        return m.group(1)
 
-    def _can_fail(self, node, inline):
+    def _can_fail(self, node: Node, inline: bool) -> bool:
         if node[0] in ('action', 'empty', 'opt', 'star'):
             return False
         if node[0] == 'apply':
@@ -186,7 +210,7 @@ class Generator:
         )
         return True
 
-    def _needed_methods(self):
+    def _needed_methods(self) -> str:
         text = ''
         if self._grammar.ch_needed:
             text += self._builtin_methods['ch'] + '\n'
@@ -215,14 +239,14 @@ class Generator:
     # Handlers for each non-host node in the glop AST follow.
     #
 
-    def _ty_action(self, node) -> List[str]:
+    def _ty_action(self, node: Node) -> List[str]:
         obj = self._gen_expr(node[2][0])
         return flatten(
             Saw(self._rulename('succeed') + '(', obj, ')' + self._map['end']),
             indent=self._map['indent'],
         )
 
-    def _ty_apply(self, node) -> List[str]:
+    def _ty_apply(self, node: Node) -> List[str]:
         if self._options.memoize and node[1].startswith('r_'):
             name = node[1][2:]
             if (
@@ -237,13 +261,13 @@ class Generator:
 
         return [self._invoke(node[1]) + self._map['end']]
 
-    def _ty_e_arr(self, node) -> FormatObj:
+    def _ty_e_arr(self, node: Node) -> str | Saw:
         if len(node[2]) == 0:
             return '[]'
         args = [self._gen_expr(n) for n in node[2]]
         return Saw('[', Comma(args), ']')
 
-    def _ty_e_call(self, node) -> Saw:
+    def _ty_e_call(self, node: Node) -> Saw:
         # There are no built-in functions that take no arguments, so make
         # sure we're not being called that way.
         # TODO: Figure out if we need this routine or not when we also
@@ -252,37 +276,38 @@ class Generator:
         args = [self._gen_expr(n) for n in node[2]]
         return Saw('(', Comma(args), ')')
 
-    def _ty_e_const(self, node) -> str:
+    def _ty_e_const(self, node: Node) -> str:
         return self._map[node[1]]
 
-    def _ty_e_getitem(self, node) -> Saw:
+    def _ty_e_getitem(self, node: Node) -> Saw:
         return Saw('[', self._gen_expr(node[2][0]), ']')
 
-    def _ty_e_lit(self, node) -> str:
+    def _ty_e_lit(self, node: Node) -> str:
         return lit.encode(node[1])
 
-    def _ty_e_minus(self, node) -> Tree:
+    def _ty_e_minus(self, node: Node) -> Tree:
         return Tree(
             self._gen_expr(node[2][0]), '-', self._gen_expr(node[2][1])
         )
 
-    def _ty_e_not(self, node) -> Tree:
+    def _ty_e_not(self, node: Node) -> Tree:
         return Tree(None, self._map['not'], self._gen_expr(node[2][0]))
 
-    def _ty_e_num(self, node) -> str:
+    def _ty_e_num(self, node: Node) -> str:
         return node[1]
 
-    def _ty_e_paren(self, node) -> FormatObj:
+    def _ty_e_paren(self, node: Node) -> FormatObj:
         return self._gen_expr(node[2][0])
 
-    def _ty_e_plus(self, node) -> Tree:
+    def _ty_e_plus(self, node: Node) -> Tree:
         return Tree(
             self._gen_expr(node[2][0]), '+', self._gen_expr(node[2][1])
         )
 
-    def _ty_e_qual(self, node) -> Saw:
+    def _ty_e_qual(self, node: Node) -> Saw:
         first = node[2][0]
         second = node[2][1]
+        start : str
         if first[0] == 'e_var':
             if second[0] == 'e_call':
                 # first is an identifier, but it must refer to a
@@ -295,28 +320,25 @@ class Generator:
                 # If second isn't a call, then first refers to a variable.
                 start = self._ty_e_var(first)
             saw = self._gen_expr(second)
-            if not isinstance(saw, Saw):  # pragma: no cover
-                raise TypeError(second)
+            assert isinstance(saw, Saw), f'{second} did not return a Saw'
             saw.start = start + saw.start
             i = 2
         else:
             # TODO: We need to do typechecking, and figure out a better
             # strategy for propagating errors/exceptions.
             saw = self._gen_expr(first)
-            if not isinstance(saw, Saw):  # pragma: no cover
-                raise TypeError(first)
+            assert isinstance(saw, Saw), f'{first} did not return a Saw'
             i = 1
-        next_saw = saw
+        next_saw: Saw = saw
         for n in node[2][i:]:
             new_saw = self._gen_expr(n)
-            if not isinstance(new_saw, Saw):  # pragma: no cover
-                raise TypeError(n)
+            assert isinstance(new_saw, Saw), f'{n} did not return a Saw'
             new_saw.start = next_saw.end + new_saw.start
             next_saw.end = new_saw
             next_saw = new_saw
         return saw
 
-    def _ty_e_var(self, node) -> str:
+    def _ty_e_var(self, node: Node) -> str:
         if self._current_rule in self._grammar.outer_scope_rules:
             return self._invoke('lookup', "'" + node[1] + "'")
         if node[1] in self._grammar.externs:
@@ -368,6 +390,9 @@ class Generator:
                 'range', lit.encode(node[1][0]), lit.encode(node[1][1])
             )
         ]
+
+    def _ty_regexp(self, node) -> List[str]:
+        raise NotImplementedError
 
     def _ty_set(self, node) -> List[str]:
         new_node = ['regexp', '[' + node[1] + ']', []]

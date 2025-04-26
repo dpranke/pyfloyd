@@ -13,6 +13,11 @@
 # limitations under the License.
 
 import collections
+from typing import Any, List, Optional
+
+
+# TODO: Refine this.
+Node = List[Any]
 
 
 class AnalysisError(Exception):
