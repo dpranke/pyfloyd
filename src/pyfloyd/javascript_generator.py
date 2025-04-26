@@ -54,7 +54,7 @@ class JavaScriptGenerator(Generator):
             )
         else:
             text = _DEFAULT_HEADER.format(
-               version=version, args=args, imports=imports
+                version=version, args=args, imports=imports
             )
 
         if self._grammar.exception_needed:

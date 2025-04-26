@@ -1192,7 +1192,9 @@ class _GeneratedParserWrapper:
             try:
                 assert inp in stderr, f'"{inp}" not in "{stderr}"'
             except Exception as e:
-                import pdb; pdb.set_trace()
+                import pdb
+
+                pdb.set_trace()
 
             stderr = stderr.replace(inp, path)
         else:
@@ -1201,7 +1203,9 @@ class _GeneratedParserWrapper:
             try:
                 return json.loads(proc.stdout), None, 0
             except Exception as e:
-                import pdb; pdb.set_trace()
+                import pdb
+
+                pdb.set_trace()
 
         return None, stderr, 0
 

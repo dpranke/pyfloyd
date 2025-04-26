@@ -44,7 +44,7 @@ class PythonGenerator(Generator):
         }
 
         self._builtin_methods = {}
-        more_builtins = self._load_more_builtins()
+        more_builtins = self._load_builtins()
         for k, v in more_builtins.items():
             self._builtin_methods[k] = self._dedent(v, 1)
 
@@ -158,6 +158,7 @@ class PythonGenerator(Generator):
 
     def _gen_parsing_runtime_exception_class(self):
         return self._dedent("""\
+
             class _ParsingRuntimeError(Exception):
                 pass
                 
@@ -230,7 +231,8 @@ class PythonGenerator(Generator):
 
     def _gen_parse_method(self, exception_needed, starting_rule):
         if exception_needed:
-            return self._dedent(f"""\
+            return self._dedent(
+                f"""\
                 def parse(self, externs: Externs = None):
                     errors = ''
                     if externs:
@@ -253,10 +255,12 @@ class PythonGenerator(Generator):
                             self._path + ':' + str(lineno) + ' ' + str(e),
                             self._errpos,
                         )
-
-                """, level=1)
+                """,
+                level=1,
+            )
         else:
-            return self._dedent(f"""\
+            return self._dedent(
+                f"""\
                 def parse(self, externs: Externs = None):
                     if externs:
                         for k, v in externs.items():
@@ -266,7 +270,10 @@ class PythonGenerator(Generator):
                     if self._failed:
                         return Result(None, self._error(), self._errpos)
                     return Result(self._val, None, self._pos)
-            """, level=1)
+
+                """,
+                level=1,
+            )
 
     def _gen_main_footer(self):
         return self._dedent("""\
@@ -349,7 +356,7 @@ class PythonGenerator(Generator):
     def _gen_methods(self) -> str:
         text = self._gen_parse_method(
             exception_needed=self._grammar.exception_needed,
-            starting_rule=self._grammar.starting_rule
+            starting_rule=self._grammar.starting_rule,
         )
 
         text += self._gen_rule_methods()
@@ -357,7 +364,6 @@ class PythonGenerator(Generator):
         text += self._needed_methods()
 
         if self._grammar.needed_builtin_functions:
-            text += '\n'
             text += '\n'.join(
                 self._builtin_methods[f'fn_{name}']
                 for name in sorted(self._grammar.needed_builtin_functions)
@@ -583,11 +589,11 @@ class PythonGenerator(Generator):
     def _ty_seq(self, node) -> List[str]:
         lines = self._gen_expr(node[2][0])
         if self._can_fail(node[2][0], inline=True):
-            lines.extend(['if self._failed: return'])
+            lines.extend(['if self._failed:', '    return'])
         for subnode in node[2][1:-1]:
             lines.extend(self._gen_expr(subnode))
             if self._can_fail(subnode, inline=True):
-                lines.extend(['if self._failed: return'])
+                lines.extend(['if self._failed:', '    return'])
         lines.extend(self._gen_expr(node[2][-1]))
         return lines
 
@@ -695,7 +701,6 @@ class PythonGenerator(Generator):
                                 self._blocked.remove(rule_name)
                             return
                 """,
-
             'lookup': """\
                 def _lookup(self, var):
                     l = len(self._scopes) - 1
@@ -717,7 +722,6 @@ class PythonGenerator(Generator):
                     fn()
                     self._cache[p][rule_name] = (self._val, self._failed, self._pos)
                 """,
-
             'operator': """\
                 def _operator(self, rule_name):
                     o = self._operators[rule_name]
@@ -759,7 +763,6 @@ class PythonGenerator(Generator):
                         o.current_prec = 0
                     self._val, self._failed, self._pos = current
                 """,
-
             'range': """\
                 def _range(self, i, j):
                     p = self._pos

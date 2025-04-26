@@ -129,6 +129,7 @@ def analyze(ast, rewrite_subrules: bool) -> Grammar:
         if node[0] == 'pred':
             return True
         return any(_exception_needed(sn) for sn in node[2])
+
     g.exception_needed = _exception_needed(g.ast)
 
     return g

@@ -107,8 +107,12 @@ class Generator:
 
     def _dedent(self, s, level=0):
         s = textwrap.dedent(s)
-        return '\n'.join(((self._indent * level) + line)
-                         for line in s.splitlines()) + '\n'
+        return (
+            '\n'.join(
+                ((self._indent * level) + line) for line in s.splitlines()
+            )
+            + '\n'
+        )
 
     def _varname(self, v):
         r = f'v_{v.replace("$", "_")}'
@@ -187,25 +191,24 @@ class Generator:
         if self._grammar.ch_needed:
             text += self._builtin_methods['ch'] + '\n'
         text += self._builtin_methods['error'] + '\n'
-        text += self._builtin_methods['fail']  + '\n'
+        text += self._builtin_methods['fail'] + '\n'
         if self._grammar.leftrec_needed:
-            text += self._builtin_methods['leftrec']  + '\n'
+            text += self._builtin_methods['leftrec'] + '\n'
         if self._grammar.outer_scope_rules:
             text += self._builtin_methods['lookup'] + '\n'
-        text += self._builtin_methods['offsets']  + '\n'
+        text += self._builtin_methods['offsets'] + '\n'
         if self._options.memoize:
             text += self._builtin_methods['memoize'] + '\n'
         if self._grammar.operator_needed:
-            text += self._builtin_methods['operator']  + '\n'
+            text += self._builtin_methods['operator'] + '\n'
         if self._grammar.range_needed:
             text += self._builtin_methods['range'] + '\n'
-        text += self._builtin_methods['rewind']  + '\n'
+        text += self._builtin_methods['rewind'] + '\n'
         if self._grammar.str_needed:
             text += self._builtin_methods['str'] + '\n'
-        text += self._builtin_methods['succeed']  + '\n'
+        text += self._builtin_methods['succeed'] + '\n'
         if self._grammar.unicat_needed:
-            text += self._builtin_methods['unicat']  + '\n'
-        text += '\n'
+            text += self._builtin_methods['unicat'] + '\n'
         return text
 
     #
