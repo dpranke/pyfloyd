@@ -20,7 +20,7 @@ import sys
 from typing import Dict, Iterable, List
 
 from pyfloyd.analyzer import Grammar, Node
-from pyfloyd.ast import Not
+from pyfloyd.ast import Not, Label
 from pyfloyd.formatter import flatten, Comma, FormatObj, Saw, Tree
 from pyfloyd.generator import Generator, GeneratorOptions
 from pyfloyd.version import __version__
@@ -462,6 +462,7 @@ class PythonGenerator(Generator):
         return lines
 
     def _ty_label(self, node: Node) -> List[str]:
+        assert isinstance(node, Label)
         lines = self._gen_stmts(node.child)
         if node.child.can_fail:
             lines.extend(['if self._failed:', '    return'])

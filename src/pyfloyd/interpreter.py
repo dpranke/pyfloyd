@@ -15,7 +15,7 @@
 import re
 import unicodedata
 
-from pyfloyd.ast import Apply, Not, Regexp
+from pyfloyd.ast import Apply, BinExpr, Not, Regexp
 from pyfloyd import parser
 
 
@@ -244,9 +244,10 @@ class Interpreter:
         self._succeed(node.v)
 
     def _ty_e_minus(self, node):
-        self._interpret(node.ch[0])
+        assert isinstance(node, BinExpr)
+        self._interpret(node.left)
         v1 = self._val
-        self._interpret(node.ch[1])
+        self._interpret(node.right)
         v2 = self._val
         self._succeed(v1 - v2)
 
@@ -269,9 +270,10 @@ class Interpreter:
         self._interpret(node.child)
 
     def _ty_e_plus(self, node):
-        self._interpret(node.ch[0])
+        assert isinstance(node, BinExpr)
+        self._interpret(node.left)
         v1 = self._val
-        self._interpret(node.ch[1])
+        self._interpret(node.right)
         v2 = self._val
         self._succeed(v1 + v2)
 

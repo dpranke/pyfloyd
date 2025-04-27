@@ -101,6 +101,7 @@ class Grammar:
         if node.t in ('action', 'empty', 'opt', 'star'):
             return False
         if node.t == 'apply':
+            assert isinstance(node, Apply)
             if node.rule_name in ('any', 'r_any', 'end', 'r_end'):
                 return True
             # return self._can_fail(self.rules[node.rule_name], inline=False)
@@ -118,6 +119,7 @@ class Grammar:
         if node.t in ('label', 'paren', 'rule', 'run'):
             return self._can_fail(node.child, inline)
         if node.t == 'count':
+            assert isinstance(node, Count)
             return node.start != 0
         if node.t in ('leftrec', 'operator', 'op'):
             # TODO: Figure out if there's a way to tell if these can not fail.
@@ -214,7 +216,7 @@ def analyze(ast, rewrite_subrules: bool) -> Grammar:
     # catch ones that don't return booleans, so that we don't need
     # to worry about runtime exceptions where possible.
     def _exception_needed(node):
-        if node[0] == 'pred':
+        if node.t == 'pred':
             return True
         return any(_exception_needed(c) for c in node.ch)
 
@@ -392,7 +394,7 @@ class _Analyzer:
         for i, c in enumerate(node.ch, start=1):
             name = f'${i}'
             if name in labels_needed:
-                node[2][i - 1] = Label(name, c)
+                node.ch[i - 1] = Label(name, c)
 
     def _check_positional_var_refs(self, node, current_index, labels_needed):
         if node.t == 'e_var':

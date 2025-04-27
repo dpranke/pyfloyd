@@ -37,21 +37,18 @@ class Node:
                 return EndsIn(Node.to(val[2][0]))
             case 'equals':
                 return Equals(Node.to(val[2][0]))
-            case (
-                'e_arr'
-                | 'e_call'
-                | 'e_const'
-                | 'e_getitem'
-                | 'e_lit'
-                | 'e_minus'
-                | 'e_num'
-                | 'e_not'
-                | 'e_paren'
-                | 'e_plus'
-                | 'e_qual'
-                | 'e_var'
-            ):
-                return Expr(val[0], val[1], [Node.to(sn) for sn in val[2]])
+            case 'e_const':
+                return Const(val[1])
+            case 'e_lit' | 'e_num':
+                return Val(val[0], val[1])
+            case 'e_var':
+                return Var(val[1])
+            case 'e_getitem' | 'e_paren' | 'e_not':
+                return UnaryExpr(val[0], Node.to(val[2][0]))
+            case 'e_plus' | 'e_minus':
+                return BinExpr(val[0], Node.to(val[2][0]), Node.to(val[2][1]))
+            case 'e_arr' | 'e_call' | 'e_qual':
+                return ListExpr(val[0], [Node.to(sn) for sn in val[2]])
             case 'label':
                 return Label(val[1], Node.to(val[2][0]))
             case 'leftrec':
@@ -127,7 +124,7 @@ class Node:
         else:
             self.ch = v
 
-    def __eq__(self, other: 'Node') -> bool:
+    def __eq__(self, other) -> bool:
         assert isinstance(other, Node)
         return (
             self.t == other.t
@@ -181,6 +178,24 @@ class Apply(Node):
         return self.v
 
 
+class BinExpr(Node):
+    def __init__(self, ty, left, right):
+        super().__init__(ty, None, [left, right])
+
+    def __repr__(self):
+        return (
+            f'BinExpr({repr(self.t)}, {repr(self.left)}, {repr(self.right)})'
+        )
+
+    @property
+    def left(self):
+        return self.ch[0]
+
+    @property
+    def right(self):
+        return self.ch[1]
+
+
 class Choice(Node):
     def __init__(self, ch):
         super().__init__('choice', None, ch)
@@ -231,12 +246,20 @@ class Equals(Node):
         return f'Equals(ch={repr(self.ch)})'
 
 
-class Expr(Node):
-    def __init__(self, ty, val, ch):
-        super().__init__(ty, val, ch)
+class Const(Node):
+    def __init__(self, val):
+        return super().__init__('e_const', val, [])
 
     def __repr__(self):
-        return f'Expr({repr(self.t)}, {repr(self.v)}, {repr(self.ch)})'
+        return f'Const({repr(self.v)})'
+
+
+class ListExpr(Node):
+    def __init__(self, ty, ch):
+        super().__init__(ty, None, ch)
+
+    def __repr__(self):
+        return f'ListExpr({repr(self.t)}, {repr(self.ch)})'
 
 
 class Label(Node):
@@ -435,9 +458,37 @@ class Star(Node):
         return f'Star({repr(self.child)})'
 
 
+class UnaryExpr(Node):
+    def __init__(self, ty, child):
+        super().__init__(ty, None, [child])
+
+    def __repr__(self):
+        return f'UnaryExpr({repr(self.t)}, {repr(self.child)})'
+
+
 class Unicat(Node):
     def __init__(self, v):
         super().__init__('unicat', v, [])
 
     def __repr__(self):
         return f'Unicat({repr(self.v)})'
+
+
+class Val(Node):
+    def __init__(self, ty, val):
+        return super().__init__(ty, val, [])
+
+    def __repr(self):
+        return f'Val({repr(self.t)}, {repr(self.v)})'
+
+
+class Var(Node):
+    def __init__(self, val):
+        return super().__init__('e_var', val, [])
+
+    def __repr__(self):
+        return f'Var({repr(self.v)})'
+
+    @property
+    def name(self):
+        return self.v

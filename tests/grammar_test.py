@@ -21,6 +21,7 @@ import shutil
 import subprocess
 import sys
 import textwrap
+from typing import Optional, Dict
 import unittest
 
 import pyfloyd
@@ -47,7 +48,7 @@ def skip(kind):
 
 class GrammarTestsMixin:
     max_diff = None
-    floyd_externs = None
+    floyd_externs: Optional[Dict[str, bool]] = None
 
     def check(
         self,

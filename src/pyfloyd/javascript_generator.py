@@ -19,7 +19,7 @@ import shlex
 import sys
 from typing import Dict, List, Set
 
-from pyfloyd.ast import Not
+from pyfloyd.ast import Not, Count
 from pyfloyd.analyzer import Grammar
 from pyfloyd.formatter import flatten, Comma, Saw, Tree
 from pyfloyd.generator import Generator, GeneratorOptions, FormatObj
@@ -251,11 +251,12 @@ class JavaScriptGenerator(Generator):
         return lines
 
     def _ty_count(self, node) -> List[str]:
+        assert isinstance(node, Count)
         lines = [
             'let vs = [];',
             'let i = 0;',
-            f'let cmin = {node[1][0]};',
-            f'let cmax = {node[1][1]};',
+            f'let cmin = {node.start};',
+            f'let cmax = {node.stop};',
             'while (i < cmax) {',
         ]
         lines.extend(['    ' + line for line in self._gen(node.child)])
@@ -298,12 +299,12 @@ class JavaScriptGenerator(Generator):
 
     def _ty_label(self, node) -> List[str]:
         lines = self._gen(node.child)
-        varname = self._varname(node[1])
+        varname = self._varname(node.v)
         if self._current_rule in self._grammar.outer_scope_rules:
             lines.extend(
                 [
                     'if (!this.failed) {',
-                    f"  this.scopes[this.scopes.length-1].set('{node[1]}', this.val);"
+                    f"  this.scopes[this.scopes.length-1].set('{node.v}', this.val);"
                     '}',
                 ]
             )
@@ -406,7 +407,7 @@ class JavaScriptGenerator(Generator):
 
     def _ty_regexp(self, node) -> List[str]:
         # TODO: Explain why this is correct.
-        s = lit.escape(node[1], '/').replace('\\\\', '\\')
+        s = lit.escape(node.v, '/').replace('\\\\', '\\')
         return [
             f'let regexp = /{s}/gy;',
             'regexp.lastIndex = this.pos;',

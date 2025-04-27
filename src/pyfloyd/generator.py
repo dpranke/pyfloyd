@@ -16,7 +16,7 @@ import re
 import textwrap
 from typing import Dict, List, Optional, Set, Union
 
-from pyfloyd.ast import Regexp
+from pyfloyd.ast import Apply, BinExpr, Regexp
 from pyfloyd.analyzer import Grammar, Node
 from pyfloyd.formatter import flatten, Comma, FormatObj, Saw, Tree
 from pyfloyd import string_literal as lit
@@ -201,6 +201,7 @@ class Generator:
         )
 
     def _ty_apply(self, node: Node) -> List[str]:
+        assert isinstance(node, Apply)
         if self._options.memoize and node.rule_name.startswith('r_'):
             name = node.rule_name[2:]
             if (
@@ -228,37 +229,37 @@ class Generator:
         # sure we're not being called that way.
         # TODO: Figure out if we need this routine or not when we also
         # fix the quals.
-        assert len(node[2]) != 0
-        args = [self._gen_expr(n) for n in node[2]]
+        assert len(node.ch) != 0
+        args = [self._gen_expr(c) for c in node.ch]
         return Saw('(', Comma(args), ')')
 
     def _ty_e_const(self, node: Node) -> str:
-        return self._map[node[1]]
+        assert isinstance(node.v, str)
+        return self._map[node.v]
 
     def _ty_e_getitem(self, node: Node) -> Saw:
-        return Saw('[', self._gen_expr(node[2][0]), ']')
+        return Saw('[', self._gen_expr(node.child), ']')
 
     def _ty_e_lit(self, node: Node) -> str:
         return lit.encode(node.v)
 
     def _ty_e_minus(self, node: Node) -> Tree:
-        return Tree(
-            self._gen_expr(node.ch[0]), '-', self._gen_expr(node.ch[1])
-        )
+        assert isinstance(node, BinExpr)
+        return Tree(self._gen_expr(node.left), '-', self._gen_expr(node.right))
 
     def _ty_e_not(self, node: Node) -> Tree:
         return Tree(None, self._map['not'], self._gen_expr(node.child))
 
     def _ty_e_num(self, node: Node) -> str:
-        return node[1]
+        assert isinstance(node.v, str)
+        return node.v
 
     def _ty_e_paren(self, node: Node) -> FormatObj:
         return self._gen_expr(node.child)
 
     def _ty_e_plus(self, node: Node) -> Tree:
-        return Tree(
-            self._gen_expr(node.ch[0]), '+', self._gen_expr(node.ch[1])
-        )
+        assert isinstance(node, BinExpr)
+        return Tree(self._gen_expr(node.left), '+', self._gen_expr(node.right))
 
     def _ty_e_qual(self, node: Node) -> Saw:
         first = node.ch[0]
@@ -297,7 +298,7 @@ class Generator:
     def _ty_e_var(self, node: Node) -> str:
         if self._current_rule in self._grammar.outer_scope_rules:
             return self._invoke('lookup', "'" + node.v + "'")
-        if node[1] in self._grammar.externs:
+        if node.v in self._grammar.externs:
             return self._extern(node.v)
         return self._varname(node.v)
 
@@ -319,7 +320,7 @@ class Generator:
             self._invoke(
                 'leftrec',
                 self._rulename(node.child.v),
-                "'" + node[1] + "'",
+                "'" + node.v + "'",
                 left_assoc,
             )
         ]
@@ -336,7 +337,7 @@ class Generator:
     def _ty_operator(self, node) -> List[str]:
         # Operator nodes have no children, but subrules for each arm
         # of the expression cluster have been defined and are referenced
-        # from self._grammar.operators[node[1]].choices.
+        # from self._grammar.operators[node.v].choices.
         assert node.ch == []
         return [self._invoke('operator', "'" + node.v + "'")]
 
