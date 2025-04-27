@@ -584,6 +584,11 @@ wheels = [
 name = "pyfloyd"
 source = { editable = "." }
 
+[package.optional-dependencies]
+typ = [
+    { name = "typ" },
+]
+
 [package.dev-dependencies]
 dev = [
     { name = "build" },
@@ -593,11 +598,12 @@ dev = [
     { name = "pylint" },
     { name = "ruff" },
     { name = "twine" },
-    { name = "typ" },
     { name = "uv" },
 ]
 
 [package.metadata]
+requires-dist = [{ name = "typ", marker = "extra == 'typ'", editable = "subpackages/typ-dev" }]
+provides-extras = ["typ"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -608,7 +614,6 @@ dev = [
     { name = "pylint", specifier = "==3.3.6" },
     { name = "ruff", specifier = "==0.11.2" },
     { name = "twine", specifier = "==6.1.0" },
-    { name = "typ", editable = "subpackages/typ-dev" },
     { name = "uv", specifier = "==0.6.11" },
 ]
 

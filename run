@@ -103,9 +103,12 @@ class Runner:
         )
         subp.add_argument('test', nargs='*', action='store')
 
-        self.add_parser(
+        subp = self.add_parser(
             'devenv',
             help='Set up a dev venv at //.venv with all the needed packages.',
+        )
+        subp.add_argument('-t', '--typ', action='store_true',
+            help='Install local typ package as well'
         )
 
         subp = self.add_parser(
@@ -276,6 +279,8 @@ class Runner:
             sys.exit(2)
 
         cmd = [self.uv_path, 'sync']
+        if self.args.typ:
+            cmd.extend(['--extra', 'typ'])
         if self.args.quiet:
             cmd.append('--quiet')
 

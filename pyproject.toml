@@ -32,8 +32,12 @@ dev = [
     'pylint==3.3.6',
     'ruff==0.11.2',
     'twine==6.1.0',
-    'typ @ file:///${PROJECT_ROOT}/subpackages/typ-dev',
     'uv==0.6.11',
+]
+
+[project.optional-dependencies]
+typ = [
+    'typ @ file:///${PROJECT_ROOT}/subpackages/typ-dev',
 ]
 
 [project.urls]
