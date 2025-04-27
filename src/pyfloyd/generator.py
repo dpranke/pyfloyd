@@ -14,7 +14,7 @@
 
 import re
 import textwrap
-from typing import Dict, List, Optional, Set, Union
+from typing import Dict, List, Optional, Set
 
 from pyfloyd.ast import Apply, BinExpr, Regexp, Var
 from pyfloyd.analyzer import Grammar, Node
@@ -105,13 +105,13 @@ class Generator:
     def generate(self) -> str:
         return self._gen_text()
 
-    def _extern(self, varname: str) -> str:
+    def _extern(self, name: str) -> str:
         raise NotImplementedError
 
-    def _invoke(self, method: str, *args) -> str:
+    def _invoke(self, fn: str, *args) -> str:
         raise NotImplementedError
 
-    def _thisvar(self, varname: str) -> str:
+    def _thisvar(self, name: str) -> str:
         raise NotImplementedError
 
     def _gen_text(self) -> str:
@@ -134,11 +134,11 @@ class Generator:
             + '\n'
         )
 
-    def _rulename(self, v: str) -> str:
+    def _rulename(self, name: str) -> str:
         raise NotImplementedError
 
-    def _varname(self, v: str) -> str:
-        r = f'v_{v.replace("$", "_")}'
+    def _varname(self, name: str) -> str:
+        r = f'v_{name.replace("$", "_")}'
         return r
 
     def _find_vars(self, node) -> Set[str]:
@@ -155,9 +155,6 @@ class Generator:
         m = self._base_rule_regex.match(rule_name)
         assert m is not None
         return m.group(1)
-
-    def _can_fail(self, node: Node) -> bool:
-        return self._grammar.can_fail(node)
 
     def _needed_methods(self) -> str:
         text = ''

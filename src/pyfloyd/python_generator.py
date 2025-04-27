@@ -14,14 +14,13 @@
 
 # pylint: disable=too-many-lines
 
-import re
 import shlex
 import sys
-from typing import Dict, Iterable, List
+from typing import Dict, List
 
 from pyfloyd.analyzer import Grammar, Node
 from pyfloyd.ast import Not, Label
-from pyfloyd.formatter import flatten, Comma, FormatObj, Saw, Tree
+from pyfloyd.formatter import flatten
 from pyfloyd.generator import Generator, GeneratorOptions
 from pyfloyd.version import __version__
 from pyfloyd import string_literal as lit
@@ -259,22 +258,21 @@ class PythonGenerator(Generator):
                 """,
                 level=1,
             )
-        else:
-            return self._dedent(
-                f"""\
-                def parse(self, externs: Externs = None):
-                    if externs:
-                        for k, v in externs.items():
-                            self._externs[k] = v
-            
-                    self._r_{starting_rule}()
-                    if self._failed:
-                        return Result(None, self._error(), self._errpos)
-                    return Result(self._val, None, self._pos)
+        return self._dedent(
+            f"""\
+            def parse(self, externs: Externs = None):
+                if externs:
+                    for k, v in externs.items():
+                        self._externs[k] = v
+        
+                self._r_{starting_rule}()
+                if self._failed:
+                    return Result(None, self._error(), self._errpos)
+                return Result(self._val, None, self._pos)
 
-                """,
-                level=1,
-            )
+            """,
+            level=1,
+        )
 
     def _gen_main_footer(self) -> str:
         return self._dedent("""\
@@ -397,14 +395,14 @@ class PythonGenerator(Generator):
             text += f'        {line}\n'
         return text
 
-    def _thisvar(self, varname: str) -> str:
-        return 'self._' + varname
+    def _thisvar(self, name: str) -> str:
+        return 'self._' + name
 
-    def _rulename(self, rule: str) -> str:
-        return 'self._' + rule
+    def _rulename(self, name: str) -> str:
+        return 'self._' + name
 
-    def _extern(self, varname: str) -> str:
-        return "self._externs['" + varname + "']"
+    def _extern(self, name: str) -> str:
+        return "self._externs['" + name + "']"
 
     def _invoke(self, fn, *args) -> str:
         return 'self._' + fn + '(' + ', '.join(args) + ')'
@@ -862,7 +860,7 @@ class PythonGenerator(Generator):
             """,
             'fn_unicode_lookup': """\
                 def _fn_unicode_lookup(self, s):
-                    return unicodedata.unicode_lookup(s)
+                    return unicodedata.lookup(s)
             """,
             'fn_utoi': """\
                 def _fn_utoi(self, s):

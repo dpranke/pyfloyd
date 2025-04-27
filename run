@@ -19,6 +19,7 @@ class Runner:
     def __init__(self):
         self.arg_parser = None
         self.args = None
+        self.remaining_args = None
         self.grammar = 'grammars/floyd.g'
         self.package = 'pyfloyd'
         self.top = f'src/{self.package}'
@@ -349,6 +350,7 @@ class Runner:
             print(f'{self.parser_file} is up to date.')
         elif old == new:
             print(f'{self.parser_file} is up to date.')
+            os.remove(new_file)
         else:
             os.rename(new_file, self.parser_file)
             print(f'{self.parser_file} regenerated.')

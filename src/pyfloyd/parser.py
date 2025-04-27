@@ -2033,4 +2033,4 @@ class _Parser:
         return a + b
 
     def _fn_unicode_lookup(self, s):
-        return unicodedata.unicode_lookup(s)
+        return unicodedata.lookup(s)

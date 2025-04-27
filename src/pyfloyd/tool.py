@@ -62,7 +62,6 @@ def main(argv=None, host=None):
             ast, err = pyfloyd.dump_ast(
                 grammar,
                 args.grammar,
-                rewrite_filler=args.rewrite_filler,
                 rewrite_subrules=args.rewrite_subrules,
             )
             if ast:

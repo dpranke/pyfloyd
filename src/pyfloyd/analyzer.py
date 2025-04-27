@@ -13,9 +13,24 @@
 # limitations under the License.
 
 import collections
-from typing import Any, List, Optional, Union
 
-from pyfloyd.ast import *
+from pyfloyd.ast import (
+    Apply,
+    Choice,
+    Count,
+    Label,
+    Leftrec,
+    Node,
+    Op,
+    Operator,
+    Paren,
+    Regexp,
+    Rule,
+    Rules,
+    Scope,
+    Seq,
+    Star,
+)
 
 
 class AnalysisError(Exception):
@@ -55,7 +70,7 @@ class Grammar:
         self.needed_builtin_rules = set()
         self.operators = {}
         self.leftrec_rules = set()
-        self._outer_scope_rules = set()
+        self.outer_scope_rules = set()
         self.externs = {}
 
         has_starting_rule = False
@@ -76,7 +91,7 @@ class Grammar:
         return node
 
     def _set_can_fail(self, node):
-        if node._can_fail is not None:
+        if node.can_fail_set():
             return
         for c in node.ch:
             self._set_can_fail(c)
@@ -97,8 +112,8 @@ class Grammar:
     # might be places where it's safe to ignore if something can fail if
     # inlined but not otherwise. See the commented-out lines below.
     def _can_fail(self, node: Node, inline: bool = True) -> bool:
-        if node._can_fail is not None:
-            return node._can_fail
+        if node.can_fail_set():
+            return node.can_fail
         if node.t in ('action', 'empty', 'opt', 'star'):
             return False
         if node.t == 'apply':
@@ -161,9 +176,6 @@ class Grammar:
         )
 
         return True
-
-    def can_fail(self, node: Node, inline: bool = True) -> bool:
-        return node.can_fail
 
 
 class OperatorState:
@@ -328,7 +340,7 @@ class _Analyzer:
             assert choice.ch[1].t == 'action'
             assert choice.ch[1].child.t == 'e_const'
             assert choice.ch[1].child.v in ('true', 'false')
-            value = True if choice.ch[1].child.v == 'true' else False
+            value = choice.ch[1].child.v == 'true'
             self.grammar.externs[key] = value
 
     def _collect_idents(self, s, node):
@@ -440,7 +452,6 @@ class _Analyzer:
     def _check_named_vars(self, node, labels, local_labels, references):
         if node.t == 'seq':
             outer_labels = labels.copy()
-            local_references = references.copy()
             local_labels = {}
             for c in node.ch:
                 if c.t == 'label':
@@ -472,7 +483,7 @@ class _Analyzer:
                     node.outer_scope = True
                     labels[var_name].outer_scope = True
                     self.grammar.lookup_needed = True
-                    self.grammar._outer_scope_rules.add(self.current_rule)
+                    self.grammar.outer_scope_rules.add(self.current_rule)
             if var_name in labels:
                 references.add(var_name)
             elif var_name in self.grammar.externs:
@@ -491,14 +502,14 @@ class _Analyzer:
 
 def _rewrite_scopes(grammar):
     def rewrite_node(node):
-        for i in range(len(node.ch)):
-            node.ch[i] = rewrite_node(node.ch[i])
+        for i, c in enumerate(node.ch):
+            node.ch[i] = rewrite_node(c)
         if node.t == 'seq' and any(c.t == 'label' for c in node.ch):
             return Scope([node])
         return node
 
     for rule in grammar.ast.rules:
-        if rule.name in grammar._outer_scope_rules:
+        if rule.name in grammar.outer_scope_rules:
             rule.child = rewrite_node(rule.child)
 
 
@@ -792,7 +803,7 @@ class _SubRuleRewriter:
     def _walk(self, node):
         fn = getattr(self, f'_ty_{node.t}', None)
         if fn:
-            return fn(node)
+            return fn(node)  # pylint: disable=not-callable
         return self._walkn(node)
 
     def _walkn(self, node):

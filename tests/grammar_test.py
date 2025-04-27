@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# pylint: disable=too-many-lines
+# pylint: disable=too-many-lines, too-many-positional-arguments
 
 import json
 import os
@@ -1190,23 +1190,12 @@ class _GeneratedParserWrapper:
         )
         if proc.stderr:
             stderr = proc.stderr.decode('utf8').strip()
-            try:
-                assert inp in stderr, f'"{inp}" not in "{stderr}"'
-            except Exception as e:
-                import pdb
-
-                pdb.set_trace()
-
+            assert inp in stderr, f'"{inp}" not in "{stderr}"'
             stderr = stderr.replace(inp, path)
         else:
             stderr = None
         if proc.returncode == 0:
-            try:
-                return json.loads(proc.stdout), None, 0
-            except Exception as e:
-                import pdb
-
-                pdb.set_trace()
+            return json.loads(proc.stdout), None, 0
 
         return None, stderr, 0
 

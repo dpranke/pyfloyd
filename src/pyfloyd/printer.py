@@ -27,14 +27,13 @@ class Printer:
 
     def _build_rules(self):
         rules = []
-        for ty, rule_name, node in self._ast[2]:
+        for _, rule_name, node in self._ast[2]:
             self._max_rule_len = max(len(rule_name), self._max_rule_len)
             cs = self._fmt_rule(node[0])
             rules.append((rule_name, cs))
         return rules
 
     def _fmt_rule(self, node):
-        single_line_str = self._proc(node)
         cs = []
         if node[0] == 'choice':
             for choice_node in node[2]:

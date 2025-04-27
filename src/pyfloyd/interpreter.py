@@ -79,9 +79,9 @@ class Interpreter:
         return parser.Result(self._val, None, self._pos)
 
     def _interpret(self, node):
-        node_handler = getattr(self, f'_ty_{node.t}', None)
-        assert node_handler, f"Unimplemented node type '{node.t}'"
-        node_handler(node)
+        fn = getattr(self, f'_ty_{node.t}', None)
+        assert fn, f"Unimplemented node type '{node.t}'"
+        fn(node)  # pylint: disable=not-callable
 
     def _fail(self, errstr=None):
         self._failed = True

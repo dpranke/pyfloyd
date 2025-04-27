@@ -14,15 +14,14 @@
 
 # pylint: disable=too-many-lines
 
-import re
 import shlex
 import sys
 from typing import Dict, List, Set
 
 from pyfloyd.ast import Not, Count
 from pyfloyd.analyzer import Grammar
-from pyfloyd.formatter import flatten, Comma, Saw, Tree
-from pyfloyd.generator import Generator, GeneratorOptions, FormatObj
+from pyfloyd.formatter import flatten
+from pyfloyd.generator import Generator, GeneratorOptions
 from pyfloyd.version import __version__
 from pyfloyd import string_literal as lit
 
@@ -223,14 +222,14 @@ class JavaScriptGenerator(Generator):
         fn = getattr(self, f'_ty_{node.t}')
         return lines + fn(node)
 
-    def _thisvar(self, v):
-        return 'this.' + v
+    def _thisvar(self, name):
+        return 'this.' + name
 
-    def _rulename(self, fn):
-        return 'this.' + fn
+    def _rulename(self, name):
+        return 'this.' + name
 
-    def _extern(self, v):
-        return "this.externs.get('" + v + "');"
+    def _extern(self, name):
+        return "this.externs.get('" + name + "');"
 
     def _invoke(self, fn, *args):
         return 'this.' + fn + '(' + ', '.join(args) + ')'

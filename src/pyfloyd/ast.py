@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections
 from typing import Any, List, Optional, Union
 
 
@@ -157,6 +156,9 @@ class Node:
     def can_fail(self, flag: bool):
         self._can_fail = flag
 
+    def can_fail_set(self) -> bool:
+        return self._can_fail is not None
+
 
 class Action(Node):
     def __init__(self, child):
@@ -231,7 +233,7 @@ class Empty(Node):
         super().__init__('empty', None, [])
 
     def __repr__(self):
-        return f'Empty()'
+        return 'Empty()'
 
 
 class EndsIn(Node):
@@ -252,7 +254,7 @@ class Equals(Node):
 
 class Const(Node):
     def __init__(self, val):
-        return super().__init__('e_const', val, [])
+        super().__init__('e_const', val, [])
 
     def __repr__(self):
         return f'Const({repr(self.v)})'
@@ -276,7 +278,10 @@ class Label(Node):
         return self.v
 
     def __repr__(self):
-        return f'Label(name={repr(self.name)}, child={repr(self.child)})'
+        return (
+            f'Label(name={repr(self.name)}, child={repr(self.child)}, '
+            f'outer_scope={repr(self.outer_scope)})'
+        )
 
 
 class Leftrec(Node):
@@ -491,17 +496,17 @@ class Val(Node):
     def __init__(self, ty, val):
         super().__init__(ty, val, [])
 
-    def __repr(self):
+    def __repr__(self):
         return f'Val({repr(self.t)}, {repr(self.v)})'
 
 
 class Var(Node):
-    def __init__(self, val):
-        super().__init__('e_var', val, [])
+    def __init__(self, name):
+        super().__init__('e_var', name, [])
         self.outer_scope = False
 
     def __repr__(self):
-        return f'Var({repr(self.v)})'
+        return f'Var(name={repr(self.name)}, outer_scope={repr(self.outer_scope)})'
 
     @property
     def name(self):
