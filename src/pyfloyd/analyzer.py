@@ -58,24 +58,24 @@ class Grammar:
         self.externs = {}
 
         has_starting_rule = False
-        for n in self.ast[2]:
-            if n[1].startswith('%'):
-                self.pragmas.append(n)
+        for rule in self.ast.rules:
+            if rule.name.startswith('%'):
+                self.pragmas.append(rule)
             elif not has_starting_rule:
-                self.starting_rule = n[1]
+                self.starting_rule = rule.name
                 has_starting_rule = True
-            self.rules[n[1]] = n[2][0]
+            self.rules[rule.name] = rule.child
 
     def update_rules(self):
         # Update grammar.rules to match grammar.ast for rules in
         # grammar.ast and then append any new rules to grammar.ast.
         rules = set()
-        for rule in self.ast[2]:
-            self.rules[rule[1]] = rule[2][0]
-            rules.add(rule[1])
+        for rule in self.ast.rules:
+            self.rules[rule.name] = rule.child
+            rules.add(rule.name)
         for rule in self.rules:
             if rule not in rules:
-                self.ast[2].append(Rule(rule, self.rules[rule]))
+                self.ast.rules.append(Rule(rule, self.rules[rule]))
 
 
 class OperatorState:
@@ -131,7 +131,7 @@ def analyze(ast, rewrite_subrules: bool) -> Grammar:
     def _exception_needed(node):
         if node[0] == 'pred':
             return True
-        return any(_exception_needed(sn) for sn in node[2])
+        return any(_exception_needed(c) for c in node.ch)
 
     g.exception_needed = _exception_needed(g.ast)
 
@@ -170,107 +170,107 @@ BUILTIN_RULES = (
 class _Analyzer:
     def __init__(self, grammar):
         self.grammar = grammar
-        assert self.grammar.ast[0] == 'rules'
+        assert self.grammar.ast.t == 'rules'
         self.errors = []
         self.current_prec = 0
         self.current_rule = None
 
     def add_pragmas(self):
-        for node in self.grammar.ast[2]:
-            self.current_rule = node[1]
-            if node[1][0] == '%':
-                self.check_pragma(node)
+        for rule in self.grammar.ast.rules:
+            self.current_rule = rule.name
+            if rule.name[0] == '%':
+                self.check_pragma(rule)
                 continue
 
     def run_checks(self):
-        for node in self.grammar.ast[2]:
-            if node[1].startswith('_'):
+        for rule in self.grammar.ast.rules:
+            if rule.name.startswith('_'):
                 self.errors.append(
-                    f'Illegal rule name "{node[1]}": '
+                    f'Illegal rule name "{rule.name}": '
                     'names starting with an "_" are reserved'
                 )
-            self.current_rule = node[1]
-            if node[1][0] == '%':
+            self.current_rule = rule.name
+            if rule.name[0] == '%':
                 continue
-            self.check_for_unknown_rules(node)
-            self.check_for_unknown_functions(node)
-            self.check_positional_vars(node)
-            self.check_named_vars(node)
+            self.check_for_unknown_rules(rule)
+            self.check_for_unknown_functions(rule)
+            self.check_positional_vars(rule)
+            self.check_named_vars(rule)
 
-    def check_pragma(self, node):
-        pragma = node[1]
-        choice = node[2][0]
+    def check_pragma(self, rule):
+        pragma = rule.name
+        choice = rule.child
 
-        if pragma == '%externs':
-            self._collect_externs(node)
-        elif pragma == '%tokens':
-            self._collect_idents(self.grammar.tokens, node)
+        if rule.name == '%externs':
+            self._collect_externs(rule)
+        elif rule.name == '%tokens':
+            self._collect_idents(self.grammar.tokens, rule)
             for t in self.grammar.tokens:
                 if t not in self.grammar.rules:
                     self.errors.append(f'Unknown token rule "{t}"')
-        elif pragma == '%whitespace':
+        elif rule.name == '%whitespace':
             self.grammar.whitespace = choice
-        elif pragma == '%comment':
+        elif rule.name == '%comment':
             self.grammar.comment = choice
-        elif pragma == '%prec':
+        elif rule.name == '%prec':
             operators = set()
-            for c in choice[2]:
+            for c in rule.child.ch:
                 self._collect_operators(operators, c)
                 for op in operators:
                     self.grammar.prec[op] = self.current_prec
                 self.current_prec += 2
-        elif pragma == '%assoc':
-            choice = node[2][0]
-            seq = choice[2][0]
-            operator = seq[2][0][1]
-            direction = seq[2][1][1]
+        elif rule.name == '%assoc':
+            choice = rule.child
+            seq = choice.child
+            operator = seq.ch[0][1]
+            direction = seq.ch[1][1]
             self.grammar.assoc[operator] = direction
         else:
             self.errors.append(f'Unknown pragma "{pragma}"')
 
     def _collect_externs(self, n):
-        assert n[2][0][0] == 'choice'
-        for choice in n[2][0][2]:
+        assert n.child.t == 'choice'
+        for choice in n.child.ch:
             assert choice[0] == 'seq'
-            assert choice[2][0][0] == 'apply'
-            key = choice[2][0][1]
-            assert choice[2][1][0] == 'action'
-            assert choice[2][1][2][0][0] == 'e_const'
-            assert choice[2][1][2][0][1] in ('true', 'false')
-            value = True if choice[2][1][2][0][1] == 'true' else False
+            assert choice.ch[0].t == 'apply'
+            key = choice.ch[0].v
+            assert choice.ch[1].t == 'action'
+            assert choice.ch[1].child.t == 'e_const'
+            assert choice.ch[1].child.v in ('true', 'false')
+            value = True if choice.ch[1].child.v == 'true' else False
             self.grammar.externs[key] = value
 
-    def _collect_idents(self, s, n):
-        if n[0] == 'apply':
-            s.add(n[1])
-        for sn in n[2]:
-            self._collect_idents(s, sn)
+    def _collect_idents(self, s, node):
+        if node.t == 'apply':
+            s.add(node.rule)
+        for c in node.ch:
+            self._collect_idents(s, c)
 
     def _collect_operators(self, operators, node):
-        if node[0] == 'lit':
-            operators.add(node[1])
+        if node.t == 'lit':
+            operators.add(node.v)
             return
-        if node[0] == 'apply':
-            if node[1] not in self.grammar.rules:
-                self.errors.append(f'Unknown rule "{node[1]}"')
+        if node.t == 'apply':
+            if node.rule not in self.grammar.rules:
+                self.errors.append(f'Unknown rule "{node.rule}"')
                 return
-            self._collect_operators(operators, self.grammar.rules[node[1]])
+            self._collect_operators(operators, self.grammar.rules[node.rule])
             return
-        if node[0] in ('rule', 'choice', 'seq'):
-            for sn in node[2]:
-                self._collect_operators(operators, sn)
+        if node.t in ('rule', 'choice', 'seq'):
+            for c in node.ch:
+                self._collect_operators(operators, c)
             return
-        self.errors.append(f'Unexpected AST node type {node[0]} in %prec')
+        self.errors.append(f'Unexpected AST node type {node.t} in %prec')
 
     def check_for_unknown_rules(self, node):
         if (
-            node[0] == 'apply'
-            and node[1] not in self.grammar.rules
-            and node[1] not in ('any', 'end')
+            node.t == 'apply'
+            and node.rule not in self.grammar.rules
+            and node.rule not in ('any', 'end')
         ):
-            self.errors.append(f'Unknown rule "{node[1]}"')
-        for sn in node[2]:
-            self.check_for_unknown_rules(sn)
+            self.errors.append(f'Unknown rule "{node.rule}"')
+        for c in node.ch:
+            self.check_for_unknown_rules(c)
 
     def check_positional_vars(self, node):
         """Checks that:
@@ -281,78 +281,78 @@ class _Analyzer:
         And then rewrites the AST to insert label nodes for the needed
         positional vars.
         """
-        if node[0] != 'seq':
-            for n in node[2]:
-                self.check_positional_vars(n)
+        if node.t != 'seq':
+            for c in node.ch:
+                self.check_positional_vars(c)
 
         labels_needed = set()
-        for i, n in enumerate(node[2], start=1):
+        for i, c in enumerate(node.ch, start=1):
             name = f'${i}'
-            if n[0] == 'label':
-                if n[1][0] == '$':
+            if c.t == 'label':
+                if c.name[0] == '$':
                     self.errors.append(
-                        f'"{n[1]}" is a reserved variable name '
+                        f'"{c.name}" is a reserved variable name '
                         'and cannot be explicitly defined'
                     )
-                self.check_positional_vars(n[2][0])
-            if n[0] in ('action', 'equals', 'pred'):
-                self._check_positional_var_refs(n[2][0], i, labels_needed)
+                self.check_positional_vars(c.child)
+            if c.t in ('action', 'equals', 'pred'):
+                self._check_positional_var_refs(c.child, i, labels_needed)
 
         # Now define all the positional vars we need.
-        for i, n in enumerate(node[2], start=1):
+        for i, c in enumerate(node.ch, start=1):
             name = f'${i}'
             if name in labels_needed:
-                node[2][i - 1] = ['label', name, [n]]
+                node[2][i - 1] = Label(name, c)
 
     def _check_positional_var_refs(self, node, current_index, labels_needed):
-        if node[0] == 'e_var':
-            if node[1][0] == '$':
-                num = int(node[1][1:])
+        if node.t == 'e_var':
+            if node.v[0] == '$':
+                num = int(node.v[1:])
                 if num >= current_index:
                     self.errors.append(
-                        f'Variable "{node[1]}" referenced before '
+                        f'Variable "{node.v}" referenced before '
                         'it was available'
                     )
                 else:
                     # We don't want to think of unknown variables as
                     # referenced, so just keep track of the known ones.
-                    labels_needed.add(node[1])
+                    labels_needed.add(node.v)
 
-        if node[0] == 'e_qual' and node[2][1][0] == 'e_call':
-            assert node[2][0][0] == 'e_var'
+        if node.t == 'e_qual' and node.ch[1].t == 'e_call':
+            assert node.ch[0].t == 'e_var'
             # Skip over the first child as it is a function name.
             start = 1
         else:
             start = 0
-        for n in node[2][start:]:
+        for n in node.ch[start:]:
             self._check_positional_var_refs(n, current_index, labels_needed)
 
     def check_for_unknown_functions(self, node):
-        if node[0] == 'e_qual' and node[2][1][0] == 'e_call':
-            name = node[2][0][1]
-            if name not in BUILTIN_FUNCTIONS:
-                self.errors.append(f'Unknown function "{name}" called')
-        for n in node[2]:
-            self.check_for_unknown_functions(n)
+        if node.t == 'e_qual' and node.ch[1].t == 'e_call':
+            function_name = node.ch[0].v
+            if function_name not in BUILTIN_FUNCTIONS:
+                self.errors.append(f'Unknown function "{function_name}" called')
+        for c in node.ch:
+            self.check_for_unknown_functions(c)
 
     def check_named_vars(self, node):
-        assert node[0] == 'rule'
+        assert node.t == 'rule'
         labels = set()
         references = set()
         self._check_named_vars(node, labels, references)
 
     def _check_named_vars(self, node, labels, references):
-        if node[0] == 'seq':
+        if node.t == 'seq':
             outer_labels = labels.copy()
             local_labels = set()
-            for n in node[2]:
-                if n[0] == 'label':
-                    if n[1][0] != '$':
-                        labels.add(n[1])
-                        local_labels.add(n[1])
-                    self._check_named_vars(n[2][0], labels, references)
+            for c in node.ch:
+                if c.t == 'label':
+                    if c.name[0] != '$':
+                        labels.add(c.name)
+                        local_labels.add(c.name)
+                    self._check_named_vars(c.child, labels, references)
                 else:
-                    self._check_named_vars(n, labels, references)
+                    self._check_named_vars(c, labels, references)
 
             for v in local_labels - references:
                 self.errors.append(f'Variable "{v}" never used')
@@ -366,49 +366,50 @@ class _Analyzer:
                 labels.remove(v)
             return
 
-        if node[0] == 'e_var':
-            if node[1] in labels:
-                references.add(node[1])
-            elif node[1] in self.grammar.externs:
+        if node.t == 'e_var':
+            var_name = node.v
+            if var_name in labels:
+                references.add(var_name)
+            elif var_name in self.grammar.externs:
                 pass
-            elif not node[1][0] == '$':
-                self.errors.append(f'Unknown variable "{node[1]}" referenced')
+            elif not var_name[0] == '$':
+                self.errors.append(f'Unknown variable "{var_name}" referenced')
 
-        if node[0] == 'e_qual' and node[2][1][0] == 'e_call':
+        if node.t == 'e_qual' and node.ch[1].t == 'e_call':
             # Skip over names that are functions.
             start = 1
         else:
             start = 0
-        for n in node[2][start:]:
-            self._check_named_vars(n, labels, references)
+        for c in node.ch[start:]:
+            self._check_named_vars(c, labels, references)
 
 
 def _rewrite_scopes(grammar):
     def rewrite_node(node):
-        for i in range(len(node[2])):
-            node[2][i] = rewrite_node(node[2][i])
-        if node[0] == 'seq' and any(sn[0] == 'label' for sn in node[2]):
+        for i in range(len(node.ch)):
+            node.ch[i] = rewrite_node(node.ch[i])
+        if node.t == 'seq' and any(c.t == 'label' for c in node.ch):
             return Scope([node])
         return node
 
-    for rule in grammar.ast[2]:
-        if rule[1] in grammar.outer_scope_rules:
-            rule[2][0] = rewrite_node(rule[2][0])
+    for rule in grammar.ast.rules:
+        if rule.name in grammar.outer_scope_rules:
+            rule.child = rewrite_node(rule.child)
 
 
 def _rewrite_recursion(grammar):
     """Rewrite the AST to insert leftrec and operator nodes as needed."""
-    for node in grammar.ast[2]:
-        if node[1][0] == '%':
+    for node in grammar.ast.rules:
+        if node.name[0] == '%':
             continue
-        name = node[1]
-        assert node[2][0][0] == 'choice'
-        choices = node[2][0][2]
+        name = node.name
+        assert node.child.t == 'choice'
+        choices = node.child.ch
 
         operator_node = _check_operator(grammar, name, choices)
         if operator_node:
-            name = operator_node[2][0][1]
-            node[2] = [operator_node]
+            name = operator_node.ch[0].v
+            node.ch = [operator_node]
             grammar.rules[name] = operator_node
             continue
 
@@ -425,28 +426,28 @@ def _check_operator(grammar, name, choices):
         return None
     operators = []
     for choice in choices[:-1]:
-        has_scope = choice[0] == 'scope'
+        has_scope = choice.t == 'scope'
         if has_scope:
             # TODO: is this the right logic?
-            choice = choice[2][0]
-        assert choice[0] == 'seq'
-        if len(choice[2]) not in (3, 4):
+            choice = choice.child
+        assert choice.t == 'seq'
+        if len(choice.ch) not in (3, 4):
             return None
-        if (choice[2][0] != Label('$1', Apply(name)) and
-            choice[2][0] != Apply(name)):
+        if (choice.ch[0] != Label('$1', Apply(name)) and
+            choice.ch[0] != Apply(name)):
             return None
-        if choice[2][1][0] != 'lit' or choice[2][1][1] not in grammar.prec:
+        if choice.ch[1].t != 'lit' or choice.ch[1].v not in grammar.prec:
             return None
-        operator = choice[2][1][1]
+        operator = choice.ch[1].v
         prec = grammar.prec[operator]
-        if (choice[2][2] != Label('$3', Apply(name)) and
-            choice[2][2] != Apply(name)):
+        if (choice.ch[2] != Label('$3', Apply(name)) and
+            choice.ch[2] != Apply(name)):
             return None
-        if len(choice[2]) == 4 and choice[2][3][0] != 'action':
+        if len(choice.ch) == 4 and choice.ch[3].t != 'action':
             return None
         if has_scope:
             choice = Scope([choice])
-        operators.append(['op', [operator, prec], [choice]])
+        operators.append(Op(operator, prec, choice))
     choice = choices[-1]
     if len(choice[2]) != 1:
         return None
@@ -455,37 +456,36 @@ def _check_operator(grammar, name, choices):
 
 def _check_lr(name, node, grammar, seen):
     # pylint: disable=too-many-branches
-    ty = node[0]
-    if ty == 'apply':
-        if node[1] == name:
+    if node.t == 'apply':
+        if node.rule == name:
             seen.add(name)
             return True  # Direct recursion.
-        if node[1] in ('any', 'anything', 'end'):
+        if node.rule in ('any', 'anything', 'end'):
             return False
-        if node[1] in seen:
+        if node.rule in seen:
             # We've hit left recursion on a different rule, so, no.
             return False
-        seen.add(node[1])
-        return _check_lr(name, grammar.rules[node[1]], grammar, seen)
-    if ty in ('lit', 'ends_in', 'not_one', 'plus', 'unicat'):
+        seen.add(node.rule)
+        return _check_lr(name, grammar.rules[node.rule], grammar, seen)
+    if node.t in ('lit', 'ends_in', 'not_one', 'plus', 'unicat'):
         return False
-    if ty == 'seq':
-        for subnode in node[2]:
-            if subnode[0] == 'lit':
+    if node.t == 'seq':
+        for c in node.ch:
+            if c.t == 'lit':
                 return False
-            r = _check_lr(name, subnode, grammar, seen)
+            r = _check_lr(name, c, grammar, seen)
             if r is not None:
                 return r
         return False
-    if ty == 'choice':
-        for n in node[2]:
-            r = _check_lr(name, n, grammar, seen)
+    if node.t == 'choice':
+        for c in node.ch:
+            r = _check_lr(name, c, grammar, seen)
             if r is not None:
                 return r
         return None
-    if ty in ('opt', 'star'):
+    if node.t in ('opt', 'star'):
         return None
-    if ty in (
+    if node.t in (
         'count',
         'label',
         'not',
@@ -495,12 +495,12 @@ def _check_lr(name, node, grammar, seen):
         'scope',
         'star',
     ):
-        return _check_lr(name, node[2][0], grammar, seen)
+        return _check_lr(name, node.child, grammar, seen)
 
     # If we get here, either this is an unknown AST node type, or
     # it is one we think we shouldn't be able to reach, like an
     # operator node or a e_* node.
-    assert ty in (
+    assert node.t in (
         'action',
         'empty',
         'equals',
@@ -510,7 +510,7 @@ def _check_lr(name, node, grammar, seen):
         'regexp',
         'set',
     ), (
-        'unexpected AST node type %s' % ty  # pragma: no cover
+        'unexpected AST node type %s' % node.t  # pragma: no cover
     )
     return False
 
@@ -531,17 +531,17 @@ def _rewrite_filler(grammar):
 def _collect_tokens(grammar, node):
     # Collect the list of all rules reachable from this token rule:
     # all of them should be treated as tokens as well.
-    if node[0] == 'rules':
-        for sn in node[2]:
-            if sn[1] in grammar.tokens:
-                _collect_tokens(grammar, sn)
+    if node.t == 'rules':
+        for rule in node.rules:
+            if rule.name in grammar.tokens:
+                _collect_tokens(grammar, rule)
         return
 
-    if node[0] == 'apply' and node[1] not in BUILTIN_RULES:
-        grammar.tokens.add(node[1])
+    if node.t == 'apply' and node.rule not in BUILTIN_RULES:
+        grammar.tokens.add(node.rule)
 
-    for n in node[2]:
-        _collect_tokens(grammar, n)
+    for c in node.ch:
+        _collect_tokens(grammar, c)
 
 
 def _add_filler_rules(grammar):
@@ -552,22 +552,22 @@ def _add_filler_rules(grammar):
     filler = None
     if grammar.whitespace and grammar.comment:
         if (
-            grammar.whitespace[0] == 'regexp'
-            and grammar.comment[0] == 'regexp'
+            grammar.whitespace.t == 'regexp'
+            and grammar.comment.t == 'regexp'
         ):
             filler = Regexp(
-                f'(({grammar.whitespace[1]})|({grammar.comment[1]}))*',
+                f'(({grammar.whitespace.v})|({grammar.comment.v}))*',
             )
         else:
             filler = Star(Choice([Apply('%whitespace'), Apply('%comment')]))
     elif grammar.comment:
-        if grammar.comment[0] == 'regexp':
-            filler = Regexp(f'({grammar.comment[1]})*')
+        if grammar.comment.t == 'regexp':
+            filler = Regexp(f'({grammar.comment.v})*')
         else:
             filler = Star(Apply('%comment'))
     elif grammar.whitespace:
-        if grammar.whitespace[0] == 'regexp':
-            filler = Regexp(f'({grammar.whitespace[1]})*')
+        if grammar.whitespace.t == 'regexp':
+            filler = Regexp(f'({grammar.whitespace.v})*')
         else:
             filler = Star(Apply('%whitespace'))
     if filler:
@@ -576,44 +576,44 @@ def _add_filler_rules(grammar):
 
 def _add_filler_nodes(grammar, node):
     def should_fill(node):
-        if node[0] in ('escape', 'lit', 'range', 'regexp', 'set'):
+        if node.t in ('escape', 'lit', 'range', 'regexp', 'set'):
             return True
-        if node[0] == 'apply' and node[1] in (
+        if node.t == 'apply' and node.rule in (
             '%comment',
             '%filler',
             '%whitespace',
         ):
             return False
-        if node[0] == 'apply' and (
-            node[1] == 'end' or node[1] in grammar.tokens
+        if node.t == 'apply' and (
+            node.rule == 'end' or node.rule in grammar.tokens
         ):
             return True
         return False
 
-    if node[0] == 'rule' and node[1].startswith('%'):
+    if node.t == 'rule' and node.name.startswith('%'):
         # Don't mess with the pragmas.
         return node
-    if node[0] == 'rule' and node[1] in grammar.tokens:
+    if node.t == 'rule' and node.name in grammar.tokens:
         # By definition we don't want to insert filler into token rules.
         return node
-    if node[0] == 'rule' and node[1] in ('%comment', '%filler', '%whitespace'):
+    if node.t == 'rule' and node.name in ('%comment', '%filler', '%whitespace'):
         # These *are* the filler rules, so we don't want to insert filler
         # into them.
         return node
-    if node[0] == 'seq':
+    if node.t == 'seq':
         children = []
-        for child in node[2]:
-            if should_fill(child):
+        for c in node.ch:
+            if should_fill(c):
                 children.append(Apply('%filler'))
-                children.append(child)
+                children.append(c)
             else:
-                sn = _add_filler_nodes(grammar, child)
+                sn = _add_filler_nodes(grammar, c)
                 children.append(sn)
         return Seq(children)
     if should_fill(node):
         return Paren(Seq([Apply('%filler'), node]))
 
-    r = Node.to([node[0], node[1], [_add_filler_nodes(grammar, n) for n in node[2]]])
+    r = Node.to([node.t, node.v, [_add_filler_nodes(grammar, c) for c in node.ch]])
     return r
 
 
@@ -622,9 +622,9 @@ def _rewrite_singles(grammar):
     that child."""
 
     def walk(node):
-        if node[0] in ('choice', 'seq') and len(node[2]) == 1:
-            return walk(node[2][0])
-        return Node.to([node[0], node[1], [walk(n) for n in node[2]]])
+        if node.t in ('choice', 'seq') and len(node.ch) == 1:
+            return walk(node.child)
+        return Node.to([node.t, node.v, [walk(c) for c in node.ch]])
 
     grammar.ast = walk(grammar.ast)
     grammar.update_rules()
@@ -680,18 +680,18 @@ class _SubRuleRewriter:
 
     def _walkn(self, node):
         subnodes = []
-        for child in node[2]:
-            if self._can_inline(child):
-                subnodes.append(self._walk(child))
+        for c in node.ch:
+            if self._can_inline(c):
+                subnodes.append(self._walk(c))
             else:
-                subnodes.append(self._make_subrule(child))
-        return Node.to([node[0], node[1], subnodes])
+                subnodes.append(self._make_subrule(c))
+        return Node.to([node.t, node.v, subnodes])
 
     def _split1(self, node):
-        return Node.to([node[0], node[1], [self._make_subrule(node[2][0])]])
+        return Node.to([node.t, node.v, [self._make_subrule(node.child)]])
 
     def _can_inline(self, node) -> bool:
-        return node[0] not in (
+        return node.t not in (
             'choice',
             'count',
             'not',
@@ -711,7 +711,7 @@ class _SubRuleRewriter:
 
     def _ty_apply(self, node):
         if node.rule in ('any', 'end'):
-            self._grammar.needed_builtin_rules.add(node[1])
+            self._grammar.needed_builtin_rules.add(node.v)
         return Apply(self._rule_fmt.format(rule=node.rule))
 
     def _ty_ends_in(self, node):
@@ -729,13 +729,13 @@ class _SubRuleRewriter:
 
     def _ty_lit(self, node):
         self._grammar.ch_needed = True
-        if len(node[1]) > 1:
+        if len(node.v) > 1:
             self._grammar.str_needed = True
         return node
 
     def _ty_e_qual(self, node):
-        if node[2][0][0] == 'e_var' and node[2][1][0] == 'e_call':
-            self._grammar.needed_builtin_functions.add(node[2][0][1])
+        if node.ch[0].t == 'e_var' and node.ch[1].t == 'e_call':
+            self._grammar.needed_builtin_functions.add(node.ch[0].v)
         return self._walkn(node)
 
     def _ty_not_one(self, node):
@@ -745,17 +745,17 @@ class _SubRuleRewriter:
     def _ty_operator(self, node):
         self._grammar.operator_needed = True
         o = OperatorState()
-        for operator in node[2]:
-            op, prec = operator[1]
-            subnode = operator[2][0]
+        for operator in node.ch:
+            op, prec = operator.v
+            subnode = operator.child
             o.prec_ops.setdefault(prec, []).append(op)
             if self._grammar.assoc.get(op) == 'right':
                 o.rassoc.add(op)
             subnode_rule = self._subrule()
             o.choices[op] = subnode_rule
             self._subrules[subnode_rule] = self._walk(subnode)
-        self._grammar.operators[node[1]] = o
-        return Node.to([node[0], node[1], []])
+        self._grammar.operators[node.v] = o
+        return Node.to([node.t, node.v, []])
 
     def _ty_paren(self, node):
         return self._split1(node)
@@ -782,24 +782,24 @@ def _rewrite_pragma_rules(grammar):
     # languages, so we need to rewrite rule names containing '%' to something
     # else.
     def _rewrite(node):
-        if node[0] == 'apply' and node[1].startswith('%'):
-            return Apply(node[1].replace('%', '_'))
-        return Node.to([node[0], node[1], [_rewrite(sn) for sn in node[2]]])
+        if node.t == 'apply' and node.rule.startswith('%'):
+            return Apply(node.rule.replace('%', '_'))
+        return Node.to([node.t, node.v, [_rewrite(c) for c in node.ch]])
 
     new_rules = []
-    for rule in grammar.ast[2]:
-        if rule[1].startswith('%'):
-            if rule[1] in ('%comment', '%whitespace', '%filler'):
+    for rule in grammar.ast.rules:
+        if rule.name.startswith('%'):
+            if rule.name in ('%comment', '%whitespace', '%filler'):
                 new_rule = Rule(
                     rule.name.replace('%', '_'), _rewrite(rule.child),
                 )
                 new_rules.append(new_rule)
-                assert new_rule[1] not in grammar.rules, (
-                    f'Collision with existing rule {new_rule[1]}'
+                assert new_rule.name not in grammar.rules, (
+                    f'Collision with existing rule {new_rule.name}'
                 )
-                grammar.rules[new_rule[1]] = new_rule[2][0]
-            if rule[1] in grammar.rules:
-                del grammar.rules[rule[1]]
+                grammar.rules[new_rule.name] = new_rule.child
+            if rule.name in grammar.rules:
+                del grammar.rules[rule.name]
         else:
             new_rules.append(_rewrite(rule))
     grammar.ast = Rules(new_rules)
