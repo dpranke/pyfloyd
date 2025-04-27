@@ -105,10 +105,7 @@ class Grammar:
             if node.rule_name in ('any', 'r_any', 'end', 'r_end'):
                 return True
             # return self._can_fail(self.rules[node.rule_name], inline=False)
-            try:
-                return self._can_fail(self.rules[node.rule_name], inline)
-            except Exception as e:
-                import pdb; pdb.set_trace()
+            return self._can_fail(self.rules[node.rule_name], inline)
         if node.t == 'label':
             # When the code for a label is being inlined, if the child
             # node can fail, its return will exit the outer method as well,
@@ -459,20 +456,14 @@ class _Analyzer:
 
             # Something referenced a variable in an outer scope.
             for v in references - set(local_labels.keys()):
-                try:
-                    labels[v].outer_scope = True
-                except KeyError:
-                    import pdb; pdb.set_trace()
+                labels[v].outer_scope = True
                 self.grammar.outer_scope_rules.add(self.current_rule)
 
             # Now remove any variables that were defined in this scope.
             for v in set(local_labels.keys()).difference(set(outer_labels.keys())):
-                try:
-                    if v in references:
-                        references.remove(v)
-                    del labels[v]
-                except Exception as e:
-                    import pdb; pdb.set_trace()
+                if v in references:
+                    references.remove(v)
+                del labels[v]
             return
 
         if node.t == 'e_var':
@@ -919,34 +910,23 @@ def _rewrite_pragma_rules(grammar):
     # else.
     def _rewrite(node):
         if node.t == 'apply' and node.rule_name.startswith('%'):
-            return Apply(node.rule_name.replace('%', '_'))
-        if node.t == 'label':
-            l = Label(node.name, _rewrite(node.child))
-            l.outer_scope = node.outer_scope
-            return l
-        if node.t == 'var':
-            v = Var(node.v)
-            v.outer_scope = node.outer_scope
-            return v
-        node.ch = [_rewrite(c) for c in node.ch]
-        return node
-        # return Node.to([node.t, node.v, [_rewrite(c) for c in node.ch]])
+            node.rule_name = node.rule_name.replace('%', '_')
+        for c in node.ch:
+            _rewrite(c)
 
     new_rules = []
     for rule in grammar.ast.rules:
         if rule.name.startswith('%'):
+            old_rule_name = rule.name
             if rule.name in ('%comment', '%whitespace', '%filler'):
-                new_rule = Rule(
-                    rule.name.replace('%', '_'),
-                    _rewrite(rule.child),
-                )
-                new_rules.append(new_rule)
-                assert new_rule.name not in grammar.rules, (
-                    f'Collision with existing rule {new_rule.name}'
-                )
-                grammar.rules[new_rule.name] = new_rule.child
-            if rule.name in grammar.rules:
-                del grammar.rules[rule.name]
+                rule.name = rule.name.replace('%', '_')
+                _rewrite(rule.child)
+                new_rules.append(rule)
+                grammar.rules[rule.name] = rule
+            if old_rule_name in grammar.rules:
+                del grammar.rules[old_rule_name]
         else:
-            new_rules.append(_rewrite(rule))
-    grammar.ast = Rules(new_rules)
+            _rewrite(rule.child)
+            new_rules.append(rule)
+    grammar.ast.rules = new_rules
+

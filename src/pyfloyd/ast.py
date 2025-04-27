@@ -177,6 +177,10 @@ class Apply(Node):
     def rule_name(self):
         return self.v
 
+    @rule_name.setter
+    def rule_name(self, v):
+        self.v = v
+
 
 class BinExpr(Node):
     def __init__(self, ty, left, right):
@@ -403,6 +407,10 @@ class Rule(Node):
     def name(self):
         return self.v
 
+    @name.setter
+    def name(self, v):
+        self.v = v
+
     def __repr__(self):
         return f'Rule(name={repr(self.name)}, {repr(self.child)})'
 
@@ -417,6 +425,10 @@ class Rules(Node):
     @property
     def rules(self):
         return self.ch
+
+    @rules.setter
+    def rules(self, ch):
+        self.ch = ch
 
 
 class Run(Node):
