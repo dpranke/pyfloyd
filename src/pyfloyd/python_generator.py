@@ -450,7 +450,7 @@ class PythonGenerator(Generator):
         lines = [
             'while True:',
         ] + ['    ' + line for line in sublines]
-        if self._can_fail(node.child, True):
+        if node.can_fail:
             lines.extend(['    if not self._failed:', '        break'])
         lines.extend(
             [
@@ -463,7 +463,7 @@ class PythonGenerator(Generator):
 
     def _ty_label(self, node: Node) -> List[str]:
         lines = self._gen_stmts(node.child)
-        if self._can_fail(node.child, True):
+        if node.child.can_fail:
             lines.extend(['if self._failed:', '    return'])
         if self._current_rule in self._grammar.outer_scope_rules:
             lines.extend([f"self._scopes[-1]['{node.name}'] = self._val"])
@@ -495,7 +495,7 @@ class PythonGenerator(Generator):
         return lines
 
     def _ty_not_one(self, node: Node) -> List[str]:
-        sublines = self._gen_stmts(Not(node.child))
+        sublines = self._gen_stmts(self._grammar.node(Not, node.child))
         return sublines + ['if not self._failed:', '    self._r_any()']
 
     def _ty_opt(self, node: Node) -> List[str]:
@@ -568,7 +568,7 @@ class PythonGenerator(Generator):
     def _ty_run(self, node: Node) -> List[str]:
         sublines = self._gen_stmts(node.child)
         lines = ['start = self._pos'] + sublines
-        if self._can_fail(node.child, True):
+        if node.child.can_fail:
             lines.extend(['if self._failed:', '    return'])
         lines.extend(
             [
@@ -591,11 +591,11 @@ class PythonGenerator(Generator):
 
     def _ty_seq(self, node: Node) -> List[str]:
         lines = self._gen_stmts(node.ch[0])
-        if self._can_fail(node.ch[0], inline=True):
+        if node.ch[0].can_fail:
             lines.extend(['if self._failed:', '    return'])
         for subnode in node.ch[1:-1]:
             lines.extend(self._gen_stmts(subnode))
-            if self._can_fail(subnode, inline=True):
+            if subnode.can_fail:
                 lines.extend(['if self._failed:', '    return'])
         lines.extend(self._gen_stmts(node.ch[-1]))
         return lines

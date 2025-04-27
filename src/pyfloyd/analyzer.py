@@ -66,6 +66,21 @@ class Grammar:
                 has_starting_rule = True
             self.rules[rule.name] = rule.child
 
+    def node(self, cls, *args, **kwargs) -> Node:
+        n = cls(*args, **kwargs)
+        return self.update_node(n)
+
+    def update_node(self, node: Node) -> Node:
+        self._set_can_fail(node)
+        return node
+
+    def _set_can_fail(self, node):
+        if node._can_fail is not None:
+            return
+        for c in node.ch:
+            self._set_can_fail(c)
+        node.can_fail = self._can_fail(node)
+
     def update_rules(self):
         # Update grammar.rules to match grammar.ast for rules in
         # grammar.ast and then append any new rules to grammar.ast.
@@ -76,6 +91,76 @@ class Grammar:
         for rule_name in self.rules:
             if rule_name not in rules:
                 self.ast.rules.append(Rule(rule_name, self.rules[rule_name]))
+
+    # TODO: Figure out what to do with `inline`; it seems like there are
+    # might be places where it's safe to ignore if something can fail if
+    # inlined but not otherwise. See the commented-out lines below.
+    def _can_fail(self, node: Node, inline: bool = True) -> bool:
+        if node._can_fail is not None:
+            return node._can_fail
+        if node.t in ('action', 'empty', 'opt', 'star'):
+            return False
+        if node.t == 'apply':
+            if node.rule_name in ('any', 'r_any', 'end', 'r_end'):
+                return True
+            # return self._can_fail(self.rules[node.rule_name], inline=False)
+            return self._can_fail(self.rules[node.rule_name], inline)
+        if node.t == 'label':
+            # When the code for a label is being inlined, if the child
+            # node can fail, its return will exit the outer method as well,
+            # so we don't have to worry about it. At that point, then
+            # we just have the label code itself, which can't fail.
+            # When the code isn't being inlined into the outer method,
+            # we do have to include the failure of the child node.
+            # TODO: This same reasoning may be true for other types of nodes.
+            # return False if inline else self._can_fail(node.child, inline)
+            return self._can_fail(node.child, inline)
+        if node.t in ('label', 'paren', 'rule', 'run'):
+            return self._can_fail(node.child, inline)
+        if node.t == 'count':
+            return node.start != 0
+        if node.t in ('leftrec', 'operator', 'op'):
+            # TODO: Figure out if there's a way to tell if these can not fail.
+            return True
+        if node.t in ('choice', 'rules'):
+            r = all(self._can_fail(n, inline) for n in node.ch)
+            return r
+        if node.t == 'scope':
+            # TODO: is this right?
+            # return self._can_fail(node.ch[0], False)
+            return self._can_fail(node.ch[0], inline)
+        if node.t == 'seq':
+            r = any(self._can_fail(n, inline) for n in node.ch)
+            return r
+        if node.t.startswith('e_'):
+            return True
+
+        # You might think that if a not's child node can fail, then
+        # the not can't fail, but it doesn't work that way. If the
+        # child == ['lit', 'foo'], then it'll fail if foo isn't next,
+        # so it can fail, but ['not', [child]] can fail also (if
+        # foo is next).
+        # Note that some regexps might not fail, but to figure that
+        # out we'd have to analyze the regexp itself, which I don't want to
+        # do yet.
+        assert node.t in (
+            'ends_in',
+            'equals',
+            'lit',
+            'not',
+            'not_one',
+            'plus',
+            'pred',
+            'range',
+            'regexp',
+            'set',
+            'unicat',
+        )
+
+        return True
+
+    def can_fail(self, node: Node, inline: bool = True) -> bool:
+        return node.can_fail
 
 
 class OperatorState:
@@ -134,6 +219,9 @@ def analyze(ast, rewrite_subrules: bool) -> Grammar:
         return any(_exception_needed(c) for c in node.ch)
 
     g.exception_needed = _exception_needed(g.ast)
+
+    # Figure out which nodes can fail, etc.
+    g.update_node(g.ast)
 
     return g
 

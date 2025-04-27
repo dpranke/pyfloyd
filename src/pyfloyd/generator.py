@@ -159,61 +159,8 @@ class Generator:
         assert m is not None
         return m.group(1)
 
-    def _can_fail(self, node: Node, inline: bool) -> bool:
-        if node.t in ('action', 'empty', 'opt', 'star'):
-            return False
-        if node.t == 'apply':
-            if node.rule_name in ('r_any', 'r_end'):
-                return True
-            return self._can_fail(self._grammar.rules[node.rule_name], inline=False)
-        if node.t == 'label':
-            # When the code for a label is being inlined, if the child
-            # node can fail, its return will exit the outer method as well,
-            # so we don't have to worry about it. At that point, then
-            # we just have the label code itself, which can't fail.
-            # When the code isn't being inlined into the outer method,
-            # we do have to include the failure of the child node.
-            # TODO: This same reasoning may be true for other types of nodes.
-            return False if inline else self._can_fail(node.child, inline)
-        if node.t in ('label', 'paren', 'run'):
-            return self._can_fail(node.child, inline)
-        if node.t == 'count':
-            return node.start != 0
-        if node.t in ('leftrec', 'operator'):
-            # TODO: Figure out if there's a way to tell if these can not fail.
-            return True
-        if node.t == 'choice':
-            r = all(self._can_fail(n, inline) for n in node.ch)
-            return r
-        if node.t == 'scope':
-            # TODO: is this right?
-            return self._can_fail(node.ch[0], False)
-        if node.t == 'seq':
-            r = any(self._can_fail(n, inline) for n in node.ch)
-            return r
-
-        # You might think that if a not's child node can fail, then
-        # the not can't fail, but it doesn't work that way. If the
-        # child == ['lit', 'foo'], then it'll fail if foo isn't next,
-        # so it can fail, but ['not', [child]] can fail also (if
-        # foo is next).
-        # Note that some regexps might not fail, but to figure that
-        # out we'd have to analyze the regexp itself, which I don't want to
-        # do yet.
-        assert node.t in (
-            'ends_in',
-            'equals',
-            'lit',
-            'not',
-            'not_one',
-            'plus',
-            'pred',
-            'range',
-            'regexp',
-            'set',
-            'unicat',
-        )
-        return True
+    def _can_fail(self, node: Node) -> bool:
+        return self._grammar.can_fail(node)
 
     def _needed_methods(self) -> str:
         text = ''

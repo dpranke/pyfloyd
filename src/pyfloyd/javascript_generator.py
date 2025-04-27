@@ -338,7 +338,7 @@ class JavaScriptGenerator(Generator):
         return lines
 
     def _ty_not_one(self, node) -> List[str]:
-        sublines = self._gen(Not(node.child))
+        sublines = self._gen(self._grammar.node(Not, node.child))
         return sublines + [
             'if (!this.failed) {',
             '    this.r_any(p);',

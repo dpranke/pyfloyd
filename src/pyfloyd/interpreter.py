@@ -327,7 +327,7 @@ class Interpreter:
             self._interpret(node.child)
             if not self._failed:
                 return
-            self._ty_apply(Apply('any'))
+            self._ty_apply(self._grammar.node(Apply, 'any'))
             if self._failed:
                 return
 
@@ -391,9 +391,9 @@ class Interpreter:
             self._fail(val)
 
     def _ty_not_one(self, node):
-        self._ty_not(Not(node.child))
+        self._ty_not(self._grammar.node(Not, node.child))
         if not self._failed:
-            self._ty_apply(Apply('any'))
+            self._ty_apply(self._grammar.node(Apply, 'any'))
 
     def _ty_operator(self, node):
         pos = self._pos
@@ -517,7 +517,7 @@ class Interpreter:
                 break
 
     def _ty_set(self, node):
-        new_node = Regexp('[' + node.v + ']')
+        new_node = self._grammar.node(Regexp, '[' + node.v + ']')
         self._interpret(new_node)
 
     def _ty_star(self, node):
