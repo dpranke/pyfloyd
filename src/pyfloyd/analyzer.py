@@ -105,7 +105,10 @@ class Grammar:
             if node.rule_name in ('any', 'r_any', 'end', 'r_end'):
                 return True
             # return self._can_fail(self.rules[node.rule_name], inline=False)
-            return self._can_fail(self.rules[node.rule_name], inline)
+            try:
+                return self._can_fail(self.rules[node.rule_name], inline)
+            except Exception as e:
+                import pdb; pdb.set_trace()
         if node.t == 'label':
             # When the code for a label is being inlined, if the child
             # node can fail, its return will exit the outer method as well,
@@ -431,37 +434,53 @@ class _Analyzer:
 
     def check_named_vars(self, node):
         assert node.t == 'rule'
-        labels = set()
+        labels = {}
+        local_labels = {}
         references = set()
-        self._check_named_vars(node, labels, references)
+        self._check_named_vars(node, labels, local_labels, references)
 
-    def _check_named_vars(self, node, labels, references):
+    def _check_named_vars(self, node, labels, local_labels, references):
         if node.t == 'seq':
             outer_labels = labels.copy()
-            local_labels = set()
+            local_references = references.copy()
+            local_labels = {}
             for c in node.ch:
                 if c.t == 'label':
                     if c.name[0] != '$':
-                        labels.add(c.name)
-                        local_labels.add(c.name)
-                    self._check_named_vars(c.child, labels, references)
+                        labels[c.name] = c
+                        local_labels[c.name] = c
+                    self._check_named_vars(c.child, labels, local_labels,
+                                           references)
                 else:
-                    self._check_named_vars(c, labels, references)
+                    self._check_named_vars(c, labels, local_labels, references)
 
-            for v in local_labels - references:
+            for v in set(local_labels.keys()) - set(references):
                 self.errors.append(f'Variable "{v}" never used')
 
             # Something referenced a variable in an outer scope.
-            if references - local_labels:
+            for v in references - set(local_labels.keys()):
+                try:
+                    labels[v].outer_scope = True
+                except KeyError:
+                    import pdb; pdb.set_trace()
                 self.grammar.outer_scope_rules.add(self.current_rule)
 
             # Now remove any variables that were defined in this scope.
-            for v in labels.difference(outer_labels):
-                labels.remove(v)
+            for v in set(local_labels.keys()).difference(set(outer_labels.keys())):
+                try:
+                    if v in references:
+                        references.remove(v)
+                    del labels[v]
+                except Exception as e:
+                    import pdb; pdb.set_trace()
             return
 
         if node.t == 'e_var':
             var_name = node.v
+            if var_name not in local_labels:
+                if var_name in labels:
+                    node.outer_scope = True
+                    labels[var_name].outer_scope = True
             if var_name in labels:
                 references.add(var_name)
             elif var_name in self.grammar.externs:
@@ -475,7 +494,7 @@ class _Analyzer:
         else:
             start = 0
         for c in node.ch[start:]:
-            self._check_named_vars(c, labels, references)
+            self._check_named_vars(c, labels, local_labels, references)
 
 
 def _rewrite_scopes(grammar):
@@ -712,10 +731,12 @@ def _add_filler_nodes(grammar, node):
     if should_fill(node):
         return Paren(Seq([Apply('%filler'), node]))
 
-    r = Node.to(
-        [node.t, node.v, [_add_filler_nodes(grammar, c) for c in node.ch]]
-    )
-    return r
+    node.ch = [_add_filler_nodes(grammar, c) for c in node.ch]
+    return node
+    #r = Node.to(
+    #    [node.t, node.v, [_add_filler_nodes(grammar, c) for c in node.ch]]
+    #)
+    # return r
 
 
 def _rewrite_singles(grammar):
@@ -725,7 +746,9 @@ def _rewrite_singles(grammar):
     def walk(node):
         if node.t in ('choice', 'seq') and len(node.ch) == 1:
             return walk(node.child)
-        return Node.to([node.t, node.v, [walk(c) for c in node.ch]])
+        node.ch = [walk(c) for c in node.ch]
+        return node
+        # return Node.to([node.t, node.v, [walk(c) for c in node.ch]])
 
     grammar.ast = walk(grammar.ast)
     grammar.update_rules()
@@ -792,10 +815,14 @@ class _SubRuleRewriter:
                 subnodes.append(self._walk(c))
             else:
                 subnodes.append(self._make_subrule(c))
-        return Node.to([node.t, node.v, subnodes])
+        node.ch = subnodes
+        return node
+        # return Node.to([node.t, node.v, subnodes])
 
     def _split1(self, node):
-        return Node.to([node.t, node.v, [self._make_subrule(node.child)]])
+        node.ch = [self._make_subrule(node.child)]
+        return node
+        # return Node.to([node.t, node.v, [self._make_subrule(node.child)]])
 
     def _can_inline(self, node) -> bool:
         return node.t not in (
@@ -862,7 +889,9 @@ class _SubRuleRewriter:
             o.choices[op] = subnode_rule
             self._subrules[subnode_rule] = self._walk(subnode)
         self._grammar.operators[node.v] = o
-        return Node.to([node.t, node.v, []])
+        node.ch = []
+        return node
+        # return Node.to([node.t, node.v, []])
 
     def _ty_paren(self, node):
         return self._split1(node)
@@ -891,7 +920,17 @@ def _rewrite_pragma_rules(grammar):
     def _rewrite(node):
         if node.t == 'apply' and node.rule_name.startswith('%'):
             return Apply(node.rule_name.replace('%', '_'))
-        return Node.to([node.t, node.v, [_rewrite(c) for c in node.ch]])
+        if node.t == 'label':
+            l = Label(node.name, _rewrite(node.child))
+            l.outer_scope = node.outer_scope
+            return l
+        if node.t == 'var':
+            v = Var(node.v)
+            v.outer_scope = node.outer_scope
+            return v
+        node.ch = [_rewrite(c) for c in node.ch]
+        return node
+        # return Node.to([node.t, node.v, [_rewrite(c) for c in node.ch]])
 
     new_rules = []
     for rule in grammar.ast.rules:

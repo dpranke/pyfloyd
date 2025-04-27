@@ -265,6 +265,7 @@ class ListExpr(Node):
 class Label(Node):
     def __init__(self, name, child):
         super().__init__('label', name, [child])
+        self.outer_scope = False
 
     @property
     def name(self):
@@ -391,7 +392,7 @@ class Regexp(Node):
         super().__init__('regexp', val, [])
 
     def __repr__(self):
-        return f'Regexp({repr(self.val)})'
+        return f'Regexp({repr(self.v)})'
 
 
 class Rule(Node):
@@ -439,7 +440,7 @@ class Seq(Node):
         super().__init__('seq', None, ch)
 
     def __repr__(self):
-        return f'(Seq(ch={repr(self.ch)})'
+        return f'Seq(ch={repr(self.ch)})'
 
 
 class Set(Node):
@@ -476,7 +477,7 @@ class Unicat(Node):
 
 class Val(Node):
     def __init__(self, ty, val):
-        return super().__init__(ty, val, [])
+        super().__init__(ty, val, [])
 
     def __repr(self):
         return f'Val({repr(self.t)}, {repr(self.v)})'
@@ -484,7 +485,8 @@ class Val(Node):
 
 class Var(Node):
     def __init__(self, val):
-        return super().__init__('e_var', val, [])
+        super().__init__('e_var', val, [])
+        self.outer_scope = False
 
     def __repr__(self):
         return f'Var({repr(self.v)})'

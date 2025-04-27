@@ -466,7 +466,8 @@ class PythonGenerator(Generator):
         lines = self._gen_stmts(node.child)
         if node.child.can_fail:
             lines.extend(['if self._failed:', '    return'])
-        if self._current_rule in self._grammar.outer_scope_rules:
+        # if self._current_rule in self._grammar.outer_scope_rules:
+        if node.outer_scope:
             lines.extend([f"self._scopes[-1]['{node.name}'] = self._val"])
         else:
             lines.extend(

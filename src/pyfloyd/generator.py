@@ -296,7 +296,7 @@ class Generator:
         return saw
 
     def _ty_e_var(self, node: Node) -> str:
-        if self._current_rule in self._grammar.outer_scope_rules:
+        if node.outer_scope:
             return self._invoke('lookup', "'" + node.v + "'")
         if node.v in self._grammar.externs:
             return self._extern(node.v)
