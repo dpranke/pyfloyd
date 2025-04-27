@@ -51,8 +51,7 @@ class Node:
                 | 'e_qual'
                 | 'e_var'
             ):
-                return Expr(val[0], val[1],
-                            [Node.to(sn) for sn in val[2]])
+                return Expr(val[0], val[1], [Node.to(sn) for sn in val[2]])
             case 'label':
                 return Label(val[1], Node.to(val[2][0]))
             case 'leftrec':
@@ -130,10 +129,11 @@ class Node:
 
     def __eq__(self, other: 'Node') -> bool:
         assert isinstance(other, Node)
-        return (self.t == other.t and
-            self.v == other.v and 
-            self.ch == other.ch and
-            self._can_fail == other._can_fail
+        return (
+            self.t == other.t
+            and self.v == other.v
+            and self.ch == other.ch
+            and self._can_fail == other._can_fail
         )
 
     def __repr__(self):

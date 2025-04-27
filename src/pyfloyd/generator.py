@@ -125,7 +125,9 @@ class Generator:
         try:
             fn = getattr(self, f'_ty_{node.t}')
         except Exception as e:
-            import pdb; pdb.set_trace()
+            import pdb
+
+            pdb.set_trace()
         return fn(node)
 
     def _dedent(self, s: str, level=0) -> str:
@@ -207,7 +209,9 @@ class Generator:
             ):
                 return [
                     self._invoke(
-                        'memoize', f"'{node.rule_name}'", self._rulename(node.rule_name)
+                        'memoize',
+                        f"'{node.rule_name}'",
+                        self._rulename(node.rule_name),
                     )
                 ]
 
