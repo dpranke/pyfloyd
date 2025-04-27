@@ -23,28 +23,70 @@ class Node:
         assert isinstance(val[0], str)
         assert isinstance(val[2], list)
         match val[0]:
+            case 'action':
+                return Action(Node.to(val[2][0]))
             case 'apply':
                 return Apply(val[1])
             case 'choice':
                 return Choice([Node.to(sn) for sn in val[2]])
+            case 'count':
+                return Count(Node.to(val[2][0]), val[1][0], val[1][1])
+            case 'empty':
+                return Empty()
+            case 'ends_in':
+                return EndsIn(Node.to(val[2][0]))
+            case 'equals':
+                return Equals(Node.to(val[2][0]))
+            case ('e_arr' | 'e_call' | 'e_const' | 'e_getitem' | 'e_lit' |
+                 'e_minus' | 'e_num' | 'e_not' | 'e_paren' | 'e_plus' |
+                 'e_qual' | 'e_var'):
+                return Expr(val[0], val[1], [Node.to(sn) for sn in val[2]])
             case 'label':
                 return Label(val[1], Node.to(val[2][0]))
+            case 'leftrec':
+                return Leftrec(val[1], Node.to(val[2][0]))
+            case 'lit':
+                return Lit(val[1])
+            case 'not':
+                return Not(Node.to(val[2][0]))
+            case 'not_one':
+                return NotOne(Node.to(val[2][0]))
+            case 'op':
+                return Op(val[1][0], val[1][1], Node.to(val[2][0]))
             case 'operator':
                 return Operator(val[1], [Node.to(sn) for sn in val[2]])
+            case 'opt':
+                return Opt(Node.to(val[2][0]))
+            case 'paren':
+                return Paren(Node.to(val[2][0]))
+            case 'plus':
+                return Plus(Node.to(val[2][0]))
+            case 'pred':
+                return Pred(Node.to(val[2][0]))
+            case 'range':
+                return Range(val[1][0], val[1][1])
             case 'regexp':
                 return Regexp(val[1])
             case 'rule':
                 return Rule(val[1], Node.to(val[2][0]))
             case 'rules':
                 return Rules([Node.to(sn) for sn in val[2]])
+            case 'run':
+                return Run(Node.to(val[2][0]))
             case 'scope':
                 return Scope([Node.to(sn) for sn in val[2]])
+            case 'set':
+                return Set(val[1])
             case 'seq':
                 return Seq([Node.to(sn) for sn in val[2]])
+            case 'plus':
+                return Plus(Node.to(val[2][0]))
             case 'star':
                 return Star(Node.to(val[2][0]))
+            case 'unicat':
+                return Unicat(val[1])
             case _:
-                return Node(val[0], val[1], [Node.to(sn) for sn in val[2]])
+                raise ValueError(f'Unexpected AST node type "{val[0]}"')
 
     def __init__(
         self, ty: str, val: Any = None, children: Optional[List['Node']] = None
@@ -83,6 +125,9 @@ class Node:
             self.ch == other[2]
         )
 
+    def __repr__(self):
+        return f'Node({repr(self.t)}, {repr(self.v)}, {repr(self.ch)})'
+
     def __len__(self):
         return 3
 
@@ -94,12 +139,20 @@ class Node:
 N = lambda t, v, ch: Node.to([t, v, ch])
 
 
+class Action(Node):
+    def __init__(self, child):
+        super().__init__('action', None, [child])
+
+    def __repr__(self):
+        return f'Action(ch={repr(self.ch)})'
+
+
 class Apply(Node):
     def __init__(self, rule):
         super().__init__('apply', rule, [])
 
     def __repr__(self):
-        return f'Apply(rule={repr(self.rule)})'
+        return f'Apply({repr(self.rule)})'
 
     @property
     def rule(self):
@@ -111,7 +164,57 @@ class Choice(Node):
         super().__init__('choice', None, ch)
 
     def __repr__(self):
-        return f'(Choice(ch={repr(self.ch)})'
+        return f'Choice(ch={repr(self.ch)})'
+
+
+class Count(Node):
+    def __init__(self, child, start, stop):
+        super().__init__('count', [start, stop], [child])
+
+    @property
+    def start(self):
+        return self.v[0]
+
+    @property
+    def stop(self):
+        return self.v[1]
+
+    def __repr__(self):
+        return (
+            f'Count({repr(self.child)}, {repr(self.start)}, {repr(self.stop)})'
+        )
+
+
+class Empty(Node):
+    def __init__(self):
+        super().__init__('empty', None, [])
+
+    def __repr__(self):
+        return f'Empty()'
+
+
+class EndsIn(Node):
+    def __init__(self, child):
+        super().__init__('ends_in', None, [child])
+
+    def __repr__(self):
+        return f'EndsIn({repr(self.child)})'
+
+
+class Equals(Node):
+    def __init__(self, child):
+        super().__init__('equals', None, [child])
+
+    def __repr__(self):
+        return f'Equals(ch={repr(self.ch)})'
+
+
+class Expr(Node):
+    def __init__(self, ty, val, ch):
+        super().__init__(ty, val, ch)
+
+    def __repr__(self):
+        return f'Expr({repr(self.t)}, {repr(self.v)}, {repr(self.ch)})'
 
 
 class Label(Node):
@@ -138,6 +241,47 @@ class Leftrec(Node):
         return f'Leftrec(name={repr(self.name)}, child={repr.self.child})'
 
 
+class Lit(Node):
+    def __init__(self, val):
+        super().__init__('lit', val, [])
+
+    def __repr__(self):
+        return f'Lit({repr(self.v)})'
+
+
+class Not(Node):
+    def __init__(self, child):
+        super().__init__('not', None, [child])
+
+    def __repr__(self):
+        return f'Not({repr(self.child)})'
+
+
+class NotOne(Node):
+    def __init__(self, child):
+        super().__init__('not_one', None, [child])
+
+    def __repr__(self):
+        return f'NotOne({repr(self.child)})'
+
+
+
+class Op(Node):
+    def __init__(self, op, prec, child):
+        super().__init__('op', [op, prec], [child])
+
+    def __repr__(self):
+        return f'Op(op={self.op}, prec={self.prec}, child={self.child})'
+
+    @property
+    def op(self):
+        return self.v[0]
+
+    @property
+    def prec(self):
+        return self.v[1]
+
+
 class Operator(Node):
     def __init__(self, name, ch):
         super().__init__('operator', name, ch)
@@ -150,12 +294,52 @@ class Operator(Node):
         return f'Operator(name={repr(self.name)}, ch={repr(self.ch)})'
 
 
+class Opt(Node):
+    def __init__(self, child):
+        super().__init__('opt', None, [child])
+
+    def __repr__(self):
+        return f'Opt({repr(self.child)})'
+
+
 class Paren(Node):
     def __init__(self, child):
         super().__init__('choice', None, [child])
 
     def __repr__(self):
         return f'(Paren({repr(self.child)})'
+
+
+class Plus(Node):
+    def __init__(self, child):
+        super().__init__('plus', None, [child])
+
+    def __repr__(self):
+        return f'Plus({repr(self.child)})'
+
+
+class Pred(Node):
+    def __init__(self, child):
+        super().__init__('pred', None, [child])
+
+    def __repr__(self):
+        return f'Pred({repr(self.child)})'
+
+
+class Range(Node):
+    def __init__(self, start, stop):
+        super().__init__('range', [start, stop], [])
+
+    @property
+    def start(self):
+        return self.v[0]
+
+    @property
+    def stop(self):
+        return self.v[1]
+
+    def __repr__(self):
+        return f'Range({repr(self.start)}, {repr(self.stop)})'
 
 
 class Regexp(Node):
@@ -186,6 +370,14 @@ class Rules(Node):
         return f'Rules({repr(self.ch)})'
 
 
+class Run(Node):
+    def __init__(self, child):
+        super().__init__('run', None, [child])
+
+    def __repr__(self):
+        return f'Run({repr(self.child)})'
+
+
 class Scope(Node):
     def __init__(self, ch):
         super().__init__('scope', None, ch)
@@ -202,12 +394,28 @@ class Seq(Node):
         return f'(Seq(ch={repr(self.ch)})'
 
 
+class Set(Node):
+    def __init__(self, val):
+        super().__init__('set', val, [])
+
+    def __repr__(self):
+        return f'Set({repr(self.v)})'
+
+
 class Star(Node):
     def __init__(self, child):
         super().__init__('star', None, [child])
 
     def __repr__(self):
         return f'Star({repr(self.child)})'
+
+
+class Unicat(Node):
+    def __init__(self, v):
+        super().__init__('unicat', v, [])
+
+    def __repr__(self):
+        return f'Unicat({repr(self.v)})'
 
 
 
@@ -639,7 +847,7 @@ def _check_operator(grammar, name, choices):
         if len(choice[2]) == 4 and choice[2][3][0] != 'action':
             return None
         if has_scope:
-            choice = ['scope', None, [choice]]
+            choice = Scope([choice])
         operators.append(['op', [operator, prec], [choice]])
     choice = choices[-1]
     if len(choice[2]) != 1:
@@ -906,7 +1114,7 @@ class _SubRuleRewriter:
     def _ty_apply(self, node):
         if node.rule in ('any', 'end'):
             self._grammar.needed_builtin_rules.add(node[1])
-        return Apply(self._rule_fmt.format(node.rule))
+        return Apply(self._rule_fmt.format(rule=node.rule))
 
     def _ty_ends_in(self, node):
         self._grammar.needed_builtin_rules.add('any')
