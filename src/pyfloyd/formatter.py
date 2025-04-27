@@ -14,6 +14,7 @@
 
 from typing import List, Union
 
+
 class Formatter:
     def fmt(self, current_depth: int, max_depth: int, indent: str):
         """Returns a list of strings, each representing a line."""
@@ -23,7 +24,9 @@ class Formatter:
 FormatObj = str | Formatter
 
 
-def flatten(obj: FormatObj, max_length: int = 67, indent : str ='    ') -> List[str]:
+def flatten(
+    obj: FormatObj, max_length: int = 67, indent: str = '    '
+) -> List[str]:
     """Flatten an object into a list of 1 or more strings.
 
     Each string must be shorter than `max_length` characters, if possible.
@@ -43,7 +46,9 @@ def flatten(obj: FormatObj, max_length: int = 67, indent : str ='    ') -> List[
     return lines
 
 
-def fmt(obj: FormatObj, current_depth: int, max_depth: int, indent: str) -> List[str]:
+def fmt(
+    obj: FormatObj, current_depth: int, max_depth: int, indent: str
+) -> List[str]:
     if isinstance(obj, str):
         return [obj]
     return obj.fmt(current_depth, max_depth, indent)
@@ -75,7 +80,9 @@ class Saw(Formatter):
     def __repr__(self):
         return f'Saw({repr(self.start)}, {repr(self.mid)}, {repr(self.end)})'
 
-    def fmt(self, current_depth: int, max_depth: int, indent: str) -> List[str]:
+    def fmt(
+        self, current_depth: int, max_depth: int, indent: str
+    ) -> List[str]:
         if current_depth == max_depth:
             s = (
                 fmt(self.start, current_depth, max_depth, indent)[0]

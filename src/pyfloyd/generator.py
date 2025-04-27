@@ -97,9 +97,9 @@ class Generator:
         self._base_rule_regex = re.compile(r's_(.+)_\d+$')
 
         # Expected to be overridden in subclasses
-        self._indent : str = '  '
-        self._map : Dict[str, str] = {}
-        self._builtin_methods : Dict[str, str] = {}
+        self._indent: str = '  '
+        self._map: Dict[str, str] = {}
+        self._builtin_methods: Dict[str, str] = {}
 
     def generate(self) -> str:
         return self._gen_text()
@@ -307,7 +307,7 @@ class Generator:
     def _ty_e_qual(self, node: Node) -> Saw:
         first = node[2][0]
         second = node[2][1]
-        start : str
+        start: str
         if first[0] == 'e_var':
             if second[0] == 'e_call':
                 # first is an identifier, but it must refer to a

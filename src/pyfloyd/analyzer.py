@@ -73,9 +73,9 @@ class Grammar:
         for rule in self.ast.rules:
             self.rules[rule.name] = rule.child
             rules.add(rule.name)
-        for rule in self.rules:
-            if rule not in rules:
-                self.ast.rules.append(Rule(rule, self.rules[rule]))
+        for rule_name in self.rules:
+            if rule_name not in rules:
+                self.ast.rules.append(Rule(rule_name, self.rules[rule_name]))
 
 
 class OperatorState:
@@ -233,7 +233,7 @@ class _Analyzer:
         for choice in n.child.ch:
             assert choice[0] == 'seq'
             assert choice.ch[0].t == 'apply'
-            key = choice.ch[0].v
+            key = choice.ch[0].rule_name
             assert choice.ch[1].t == 'action'
             assert choice.ch[1].child.t == 'e_const'
             assert choice.ch[1].child.v in ('true', 'false')
@@ -242,7 +242,7 @@ class _Analyzer:
 
     def _collect_idents(self, s, node):
         if node.t == 'apply':
-            s.add(node.rule)
+            s.add(node.rule_name)
         for c in node.ch:
             self._collect_idents(s, c)
 
@@ -251,10 +251,12 @@ class _Analyzer:
             operators.add(node.v)
             return
         if node.t == 'apply':
-            if node.rule not in self.grammar.rules:
-                self.errors.append(f'Unknown rule "{node.rule}"')
+            if node.rule_name not in self.grammar.rules:
+                self.errors.append(f'Unknown rule "{node.rule_name}"')
                 return
-            self._collect_operators(operators, self.grammar.rules[node.rule])
+            self._collect_operators(
+                operators, self.grammar.rules[node.rule_name]
+            )
             return
         if node.t in ('rule', 'choice', 'seq'):
             for c in node.ch:
@@ -265,10 +267,10 @@ class _Analyzer:
     def check_for_unknown_rules(self, node):
         if (
             node.t == 'apply'
-            and node.rule not in self.grammar.rules
-            and node.rule not in ('any', 'end')
+            and node.rule_name not in self.grammar.rules
+            and node.rule_name not in ('any', 'end')
         ):
-            self.errors.append(f'Unknown rule "{node.rule}"')
+            self.errors.append(f'Unknown rule "{node.rule_name}"')
         for c in node.ch:
             self.check_for_unknown_rules(c)
 
@@ -331,7 +333,9 @@ class _Analyzer:
         if node.t == 'e_qual' and node.ch[1].t == 'e_call':
             function_name = node.ch[0].v
             if function_name not in BUILTIN_FUNCTIONS:
-                self.errors.append(f'Unknown function "{function_name}" called')
+                self.errors.append(
+                    f'Unknown function "{function_name}" called'
+                )
         for c in node.ch:
             self.check_for_unknown_functions(c)
 
@@ -433,15 +437,17 @@ def _check_operator(grammar, name, choices):
         assert choice.t == 'seq'
         if len(choice.ch) not in (3, 4):
             return None
-        if (choice.ch[0] != Label('$1', Apply(name)) and
-            choice.ch[0] != Apply(name)):
+        if choice.ch[0] != Label('$1', Apply(name)) and choice.ch[0] != Apply(
+            name
+        ):
             return None
         if choice.ch[1].t != 'lit' or choice.ch[1].v not in grammar.prec:
             return None
         operator = choice.ch[1].v
         prec = grammar.prec[operator]
-        if (choice.ch[2] != Label('$3', Apply(name)) and
-            choice.ch[2] != Apply(name)):
+        if choice.ch[2] != Label('$3', Apply(name)) and choice.ch[2] != Apply(
+            name
+        ):
             return None
         if len(choice.ch) == 4 and choice.ch[3].t != 'action':
             return None
@@ -454,32 +460,34 @@ def _check_operator(grammar, name, choices):
     return Choice([Operator(name, operators), choices[-1]])
 
 
-def _check_lr(name, node, grammar, seen):
+def _check_lr(rule_name, node, grammar, seen):
     # pylint: disable=too-many-branches
     if node.t == 'apply':
-        if node.rule == name:
-            seen.add(name)
+        if node.rule_name == rule_name:
+            seen.add(rule_name)
             return True  # Direct recursion.
-        if node.rule in ('any', 'anything', 'end'):
+        if node.rule_name in ('any', 'anything', 'end'):
             return False
-        if node.rule in seen:
+        if node.rule_name in seen:
             # We've hit left recursion on a different rule, so, no.
             return False
-        seen.add(node.rule)
-        return _check_lr(name, grammar.rules[node.rule], grammar, seen)
+        seen.add(node.rule_name)
+        return _check_lr(
+            rule_name, grammar.rules[node.rule_name], grammar, seen
+        )
     if node.t in ('lit', 'ends_in', 'not_one', 'plus', 'unicat'):
         return False
     if node.t == 'seq':
         for c in node.ch:
             if c.t == 'lit':
                 return False
-            r = _check_lr(name, c, grammar, seen)
+            r = _check_lr(rule_name, c, grammar, seen)
             if r is not None:
                 return r
         return False
     if node.t == 'choice':
         for c in node.ch:
-            r = _check_lr(name, c, grammar, seen)
+            r = _check_lr(rule_name, c, grammar, seen)
             if r is not None:
                 return r
         return None
@@ -495,7 +503,7 @@ def _check_lr(name, node, grammar, seen):
         'scope',
         'star',
     ):
-        return _check_lr(name, node.child, grammar, seen)
+        return _check_lr(rule_name, node.child, grammar, seen)
 
     # If we get here, either this is an unknown AST node type, or
     # it is one we think we shouldn't be able to reach, like an
@@ -537,8 +545,8 @@ def _collect_tokens(grammar, node):
                 _collect_tokens(grammar, rule)
         return
 
-    if node.t == 'apply' and node.rule not in BUILTIN_RULES:
-        grammar.tokens.add(node.rule)
+    if node.t == 'apply' and node.rule_name not in BUILTIN_RULES:
+        grammar.tokens.add(node.rule_name)
 
     for c in node.ch:
         _collect_tokens(grammar, c)
@@ -551,10 +559,7 @@ def _add_filler_rules(grammar):
         grammar.tokens.add('%comment')
     filler = None
     if grammar.whitespace and grammar.comment:
-        if (
-            grammar.whitespace.t == 'regexp'
-            and grammar.comment.t == 'regexp'
-        ):
+        if grammar.whitespace.t == 'regexp' and grammar.comment.t == 'regexp':
             filler = Regexp(
                 f'(({grammar.whitespace.v})|({grammar.comment.v}))*',
             )
@@ -578,14 +583,14 @@ def _add_filler_nodes(grammar, node):
     def should_fill(node):
         if node.t in ('escape', 'lit', 'range', 'regexp', 'set'):
             return True
-        if node.t == 'apply' and node.rule in (
+        if node.t == 'apply' and node.rule_name in (
             '%comment',
             '%filler',
             '%whitespace',
         ):
             return False
         if node.t == 'apply' and (
-            node.rule == 'end' or node.rule in grammar.tokens
+            node.rule_name == 'end' or node.rule_name in grammar.tokens
         ):
             return True
         return False
@@ -596,7 +601,11 @@ def _add_filler_nodes(grammar, node):
     if node.t == 'rule' and node.name in grammar.tokens:
         # By definition we don't want to insert filler into token rules.
         return node
-    if node.t == 'rule' and node.name in ('%comment', '%filler', '%whitespace'):
+    if node.t == 'rule' and node.name in (
+        '%comment',
+        '%filler',
+        '%whitespace',
+    ):
         # These *are* the filler rules, so we don't want to insert filler
         # into them.
         return node
@@ -613,7 +622,9 @@ def _add_filler_nodes(grammar, node):
     if should_fill(node):
         return Paren(Seq([Apply('%filler'), node]))
 
-    r = Node.to([node.t, node.v, [_add_filler_nodes(grammar, c) for c in node.ch]])
+    r = Node.to(
+        [node.t, node.v, [_add_filler_nodes(grammar, c) for c in node.ch]]
+    )
     return r
 
 
@@ -633,7 +644,7 @@ def _rewrite_singles(grammar):
 def _rewrite_subrules(grammar):
     """Extracts subrules from rules as needed to be able to generate
     code properly."""
-    sr = _SubRuleRewriter(grammar, 'r_{rule}', 's_{rule}_{counter}')
+    sr = _SubRuleRewriter(grammar, 'r_{rule_name}', 's_{rule_name}_{counter}')
     sr.rewrite()
 
 
@@ -642,18 +653,20 @@ class _SubRuleRewriter:
         self._grammar = grammar
         self._rule_fmt = rule_fmt
         self._subrule_fmt = subrule_fmt
-        self._rule = None
+        self._rule_name = None
         self._counter = 0
         self._methods = {}
         self._subrules = {}
 
     def rewrite(self):
-        for rule, node in self._grammar.rules.items():
-            self._rule = rule
+        for rule_name, node in self._grammar.rules.items():
+            self._rule_name = rule_name
             self._subrules = {}
             self._counter = 0
             new_node = self._walk(node)
-            self._methods[self._rule_fmt.format(rule=rule)] = new_node
+            self._methods[self._rule_fmt.format(rule_name=rule_name)] = (
+                new_node
+            )
             subrules = sorted(self._subrules.keys(), key=self._subrule_key)
             for subrule in subrules:
                 self._methods[subrule] = self._subrules[subrule]
@@ -665,15 +678,19 @@ class _SubRuleRewriter:
 
     def _subrule(self) -> str:
         self._counter += 1
-        return self._subrule_fmt.format(rule=self._rule, counter=self._counter)
+        return self._subrule_fmt.format(
+            rule_name=self._rule_name, counter=self._counter
+        )
 
     def _subrule_key(self, s: str) -> int:
         return int(
-            s.replace('s_{rule}_'.format(rule=self._rule), '').replace('_', '')
+            s.replace(
+                's_{rule_name}_'.format(rule_name=self._rule_name), ''
+            ).replace('_', '')
         )
 
     def _walk(self, node):
-        fn = getattr(self, f'_ty_{node[0]}', None)
+        fn = getattr(self, f'_ty_{node.t}', None)
         if fn:
             return fn(node)
         return self._walkn(node)
@@ -710,9 +727,9 @@ class _SubRuleRewriter:
         return Apply(subnode_rule)
 
     def _ty_apply(self, node):
-        if node.rule in ('any', 'end'):
-            self._grammar.needed_builtin_rules.add(node.v)
-        return Apply(self._rule_fmt.format(rule=node.rule))
+        if node.rule_name in ('any', 'end'):
+            self._grammar.needed_builtin_rules.add(node.rule_name)
+        return Apply(self._rule_fmt.format(rule_name=node.rule_name))
 
     def _ty_ends_in(self, node):
         self._grammar.needed_builtin_rules.add('any')
@@ -782,8 +799,8 @@ def _rewrite_pragma_rules(grammar):
     # languages, so we need to rewrite rule names containing '%' to something
     # else.
     def _rewrite(node):
-        if node.t == 'apply' and node.rule.startswith('%'):
-            return Apply(node.rule.replace('%', '_'))
+        if node.t == 'apply' and node.rule_name.startswith('%'):
+            return Apply(node.rule_name.replace('%', '_'))
         return Node.to([node.t, node.v, [_rewrite(c) for c in node.ch]])
 
     new_rules = []
@@ -791,7 +808,8 @@ def _rewrite_pragma_rules(grammar):
         if rule.name.startswith('%'):
             if rule.name in ('%comment', '%whitespace', '%filler'):
                 new_rule = Rule(
-                    rule.name.replace('%', '_'), _rewrite(rule.child),
+                    rule.name.replace('%', '_'),
+                    _rewrite(rule.child),
                 )
                 new_rules.append(new_rule)
                 assert new_rule.name not in grammar.rules, (

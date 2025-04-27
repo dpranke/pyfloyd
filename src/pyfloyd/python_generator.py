@@ -387,7 +387,9 @@ class PythonGenerator(Generator):
 
         return text
 
-    def _gen_method_text(self, method_name: str, method_body: List[str]) -> str:
+    def _gen_method_text(
+        self, method_name: str, method_body: List[str]
+    ) -> str:
         text = '\n'
         text += '    def _%s(self):\n' % method_name
         for line in method_body:
