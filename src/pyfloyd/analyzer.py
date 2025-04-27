@@ -403,17 +403,17 @@ def _rewrite_scopes(grammar):
 
 def _rewrite_recursion(grammar):
     """Rewrite the AST to insert leftrec and operator nodes as needed."""
-    for node in grammar.ast.rules:
-        if node.name[0] == '%':
+    for rule in grammar.ast.rules:
+        if rule.name[0] == '%':
             continue
-        name = node.name
-        assert node.child.t == 'choice'
-        choices = node.child.ch
+        name = rule.name
+        assert rule.child.t == 'choice'
+        choices = rule.child.ch
 
         operator_node = _check_operator(grammar, name, choices)
         if operator_node:
             name = operator_node.ch[0].v
-            node.ch = [operator_node]
+            rule.ch = [operator_node]
             grammar.rules[name] = operator_node
             continue
 
