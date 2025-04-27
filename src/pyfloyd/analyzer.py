@@ -136,9 +136,6 @@ class Node:
         return self.ch[0]
 
 
-N = lambda t, v, ch: Node.to([t, v, ch])
-
-
 class Action(Node):
     def __init__(self, child):
         super().__init__('action', None, [child])
@@ -1015,7 +1012,7 @@ def _add_filler_nodes(grammar, node):
     if should_fill(node):
         return Paren(Seq([Apply('%filler'), node]))
 
-    r = N(node[0], node[1], [_add_filler_nodes(grammar, n) for n in node[2]])
+    r = Node.to([node[0], node[1], [_add_filler_nodes(grammar, n) for n in node[2]]])
     return r
 
 
@@ -1026,7 +1023,7 @@ def _rewrite_singles(grammar):
     def walk(node):
         if node[0] in ('choice', 'seq') and len(node[2]) == 1:
             return walk(node[2][0])
-        return N(node[0], node[1], [walk(n) for n in node[2]])
+        return Node.to([node[0], node[1], [walk(n) for n in node[2]]])
 
     grammar.ast = walk(grammar.ast)
     grammar.update_rules()
@@ -1087,10 +1084,10 @@ class _SubRuleRewriter:
                 subnodes.append(self._walk(child))
             else:
                 subnodes.append(self._make_subrule(child))
-        return N(node[0], node[1], subnodes)
+        return Node.to([node[0], node[1], subnodes])
 
     def _split1(self, node):
-        return N(node[0], node[1], [self._make_subrule(node[2][0])])
+        return Node.to([node[0], node[1], [self._make_subrule(node[2][0])]])
 
     def _can_inline(self, node) -> bool:
         return node[0] not in (
@@ -1157,7 +1154,7 @@ class _SubRuleRewriter:
             o.choices[op] = subnode_rule
             self._subrules[subnode_rule] = self._walk(subnode)
         self._grammar.operators[node[1]] = o
-        return N(node[0], node[1], [])
+        return Node.to([node[0], node[1], []])
 
     def _ty_paren(self, node):
         return self._split1(node)
@@ -1186,7 +1183,7 @@ def _rewrite_pragma_rules(grammar):
     def _rewrite(node):
         if node[0] == 'apply' and node[1].startswith('%'):
             return Apply(node[1].replace('%', '_'))
-        return N(node[0], node[1], [_rewrite(sn) for sn in node[2]])
+        return Node.to([node[0], node[1], [_rewrite(sn) for sn in node[2]]])
 
     new_rules = []
     for rule in grammar.ast[2]:
