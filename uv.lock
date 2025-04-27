@@ -7,12 +7,6 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 
-[manifest]
-members = [
-    "pyfloyd",
-    "typ",
-]
-
 [[package]]
 name = "astroid"
 version = "3.3.9"
@@ -584,11 +578,6 @@ wheels = [
 name = "pyfloyd"
 source = { editable = "." }
 
-[package.optional-dependencies]
-typ = [
-    { name = "typ" },
-]
-
 [package.dev-dependencies]
 dev = [
     { name = "build" },
@@ -598,12 +587,11 @@ dev = [
     { name = "pylint" },
     { name = "ruff" },
     { name = "twine" },
+    { name = "typ" },
     { name = "uv" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "typ", marker = "extra == 'typ'", editable = "subpackages/typ-dev" }]
-provides-extras = ["typ"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -614,6 +602,7 @@ dev = [
     { name = "pylint", specifier = "==3.3.6" },
     { name = "ruff", specifier = "==0.11.2" },
     { name = "twine", specifier = "==6.1.0" },
+    { name = "typ", git = "https://github.com/dpranke/typ-dev" },
     { name = "uv", specifier = "==0.6.11" },
 ]
 
@@ -807,37 +796,8 @@ wheels = [
 
 [[package]]
 name = "typ"
-source = { editable = "subpackages/typ-dev" }
-
-[package.optional-dependencies]
-dev = [
-    { name = "build" },
-    { name = "coverage" },
-    { name = "mypy" },
-    { name = "pip" },
-    { name = "pylint" },
-    { name = "requests" },
-    { name = "ruff" },
-    { name = "twine" },
-    { name = "uv" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "build", marker = "extra == 'dev'", specifier = "==1.2.2.post1" },
-    { name = "coverage", marker = "python_full_version >= '3.9' and extra == 'dev'", specifier = "==7.8.0" },
-    { name = "coverage", marker = "python_full_version < '3.9' and extra == 'dev'", specifier = "==7.5.4" },
-    { name = "mypy", marker = "python_full_version >= '3.9' and extra == 'dev'", specifier = "==1.15.0" },
-    { name = "mypy", marker = "python_full_version < '3.9' and extra == 'dev'", specifier = "==1.14.1" },
-    { name = "pip", marker = "extra == 'dev'", specifier = "==25.0.1" },
-    { name = "pylint", marker = "python_full_version >= '3.9' and extra == 'dev'", specifier = "==3.3.6" },
-    { name = "pylint", marker = "python_full_version < '3.9' and extra == 'dev'", specifier = "==3.2.7" },
-    { name = "requests", marker = "extra == 'dev'", specifier = "==2.31.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = "==0.11.2" },
-    { name = "twine", marker = "extra == 'dev'", specifier = "==6.1.0" },
-    { name = "uv", marker = "extra == 'dev'", specifier = "==0.6.11" },
-]
-provides-extras = ["dev"]
+version = "0.13.0.dev0"
+source = { git = "https://github.com/dpranke/typ-dev#13f100525a68f3d4accd10b10c717b9a9888b115" }
 
 [[package]]
 name = "typing-extensions"
