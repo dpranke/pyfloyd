@@ -16,7 +16,7 @@ import re
 import textwrap
 from typing import Dict, List, Optional, Set, Union
 
-from pyfloyd.ast import Apply, BinExpr, Regexp
+from pyfloyd.ast import Apply, BinExpr, Regexp, Var
 from pyfloyd.analyzer import Grammar, Node
 from pyfloyd.formatter import flatten, Comma, FormatObj, Saw, Tree
 from pyfloyd import string_literal as lit
@@ -122,12 +122,7 @@ class Generator:
         return fn(node)
 
     def _gen_stmts(self, node: Node) -> List[str]:
-        try:
-            fn = getattr(self, f'_ty_{node.t}')
-        except Exception as e:
-            import pdb
-
-            pdb.set_trace()
+        fn = getattr(self, f'_ty_{node.t}')
         return fn(node)
 
     def _dedent(self, s: str, level=0) -> str:
@@ -172,7 +167,7 @@ class Generator:
         text += self._builtin_methods['fail'] + '\n'
         if self._grammar.leftrec_needed:
             text += self._builtin_methods['leftrec'] + '\n'
-        if self._grammar.outer_scope_rules:
+        if self._grammar.lookup_needed:
             text += self._builtin_methods['lookup'] + '\n'
         text += self._builtin_methods['offsets'] + '\n'
         if self._options.memoize:
@@ -296,6 +291,7 @@ class Generator:
         return saw
 
     def _ty_e_var(self, node: Node) -> str:
+        assert isinstance(node, Var)
         if node.outer_scope:
             return self._invoke('lookup', "'" + node.v + "'")
         if node.v in self._grammar.externs:

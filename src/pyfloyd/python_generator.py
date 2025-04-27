@@ -321,7 +321,7 @@ class PythonGenerator(Generator):
             text += '        self._blocked = set()\n'
         if self._grammar.re_needed:
             text += '        self._regexps = {}\n'
-        if self._grammar.outer_scope_rules:
+        if self._grammar.lookup_needed:
             text += '        self._scopes = []\n'
         if self._grammar.operator_needed:
             text += self._gen_operator_state()
@@ -466,7 +466,6 @@ class PythonGenerator(Generator):
         lines = self._gen_stmts(node.child)
         if node.child.can_fail:
             lines.extend(['if self._failed:', '    return'])
-        # if self._current_rule in self._grammar.outer_scope_rules:
         if node.outer_scope:
             lines.extend([f"self._scopes[-1]['{node.name}'] = self._val"])
         else:

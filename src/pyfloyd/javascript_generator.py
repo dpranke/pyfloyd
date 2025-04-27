@@ -108,7 +108,7 @@ class JavaScriptGenerator(Generator):
             text += '    this.blocked = new Set();\n'
         if self._grammar.operator_needed:
             text += self._operator_state()
-        if self._grammar.outer_scope_rules:
+        if self._grammar.lookup_needed:
             text += '    this.scopes = [];\n'
         text += '  }\n'
         text += '\n'
@@ -300,7 +300,7 @@ class JavaScriptGenerator(Generator):
     def _ty_label(self, node) -> List[str]:
         lines = self._gen(node.child)
         varname = self._varname(node.v)
-        if self._current_rule in self._grammar.outer_scope_rules:
+        if node.outer_scope:
             lines.extend(
                 [
                     'if (!this.failed) {',

@@ -44,6 +44,7 @@ class Grammar:
         self.prec = {}
         self.exception_needed = False
         self.leftrec_needed = False
+        self.lookup_needed = False
         self.operator_needed = False
         self.unicat_needed = False
         self.ch_needed = False
@@ -54,7 +55,7 @@ class Grammar:
         self.needed_builtin_rules = set()
         self.operators = {}
         self.leftrec_rules = set()
-        self.outer_scope_rules = set()
+        self._outer_scope_rules = set()
         self.externs = {}
 
         has_starting_rule = False
@@ -446,21 +447,19 @@ class _Analyzer:
                     if c.name[0] != '$':
                         labels[c.name] = c
                         local_labels[c.name] = c
-                    self._check_named_vars(c.child, labels, local_labels,
-                                           references)
+                    self._check_named_vars(
+                        c.child, labels, local_labels, references
+                    )
                 else:
                     self._check_named_vars(c, labels, local_labels, references)
 
             for v in set(local_labels.keys()) - set(references):
                 self.errors.append(f'Variable "{v}" never used')
 
-            # Something referenced a variable in an outer scope.
-            for v in references - set(local_labels.keys()):
-                labels[v].outer_scope = True
-                self.grammar.outer_scope_rules.add(self.current_rule)
-
             # Now remove any variables that were defined in this scope.
-            for v in set(local_labels.keys()).difference(set(outer_labels.keys())):
+            for v in set(local_labels.keys()).difference(
+                set(outer_labels.keys())
+            ):
                 if v in references:
                     references.remove(v)
                 del labels[v]
@@ -472,6 +471,8 @@ class _Analyzer:
                 if var_name in labels:
                     node.outer_scope = True
                     labels[var_name].outer_scope = True
+                    self.grammar.lookup_needed = True
+                    self.grammar._outer_scope_rules.add(self.current_rule)
             if var_name in labels:
                 references.add(var_name)
             elif var_name in self.grammar.externs:
@@ -497,7 +498,7 @@ def _rewrite_scopes(grammar):
         return node
 
     for rule in grammar.ast.rules:
-        if rule.name in grammar.outer_scope_rules:
+        if rule.name in grammar._outer_scope_rules:
             rule.child = rewrite_node(rule.child)
 
 
@@ -724,10 +725,6 @@ def _add_filler_nodes(grammar, node):
 
     node.ch = [_add_filler_nodes(grammar, c) for c in node.ch]
     return node
-    #r = Node.to(
-    #    [node.t, node.v, [_add_filler_nodes(grammar, c) for c in node.ch]]
-    #)
-    # return r
 
 
 def _rewrite_singles(grammar):
@@ -739,7 +736,6 @@ def _rewrite_singles(grammar):
             return walk(node.child)
         node.ch = [walk(c) for c in node.ch]
         return node
-        # return Node.to([node.t, node.v, [walk(c) for c in node.ch]])
 
     grammar.ast = walk(grammar.ast)
     grammar.update_rules()
@@ -808,12 +804,10 @@ class _SubRuleRewriter:
                 subnodes.append(self._make_subrule(c))
         node.ch = subnodes
         return node
-        # return Node.to([node.t, node.v, subnodes])
 
     def _split1(self, node):
         node.ch = [self._make_subrule(node.child)]
         return node
-        # return Node.to([node.t, node.v, [self._make_subrule(node.child)]])
 
     def _can_inline(self, node) -> bool:
         return node.t not in (
@@ -882,7 +876,6 @@ class _SubRuleRewriter:
         self._grammar.operators[node.v] = o
         node.ch = []
         return node
-        # return Node.to([node.t, node.v, []])
 
     def _ty_paren(self, node):
         return self._split1(node)
@@ -929,4 +922,3 @@ def _rewrite_pragma_rules(grammar):
             _rewrite(rule.child)
             new_rules.append(rule)
     grammar.ast.rules = new_rules
-
