@@ -73,7 +73,7 @@ class Runner:
             sys.exit(proc.returncode)
         return proc
 
-    def main(self, argv):
+    def main(self, argv):  # pylint: disable=too-many-statements
         self.arg_parser = argparse.ArgumentParser(prog='run')
         self.subps = self.arg_parser.add_subparsers(required=True)
 
@@ -107,8 +107,11 @@ class Runner:
             'devenv',
             help='Set up a dev venv at //.venv with all the needed packages.',
         )
-        subp.add_argument('-t', '--typ', action='store_true',
-            help='Install local typ package as well'
+        subp.add_argument(
+            '-t',
+            '--typ',
+            action='store_true',
+            help='Install local typ package as well',
         )
 
         subp = self.add_parser(
@@ -308,11 +311,17 @@ class Runner:
 
     def run_presubmit(self):
         self.args.check = True
+        print('# ./run regen --check')
         self.run_regen()
+        print('# ./run format --check')
         self.run_format()
+        print('# ./run check')
         self.run_check()
+        print('# ./run lint')
         self.run_lint()
+        print('# ./run mypy')
         self.run_mypy()
+        print('# ./run coverage')
         self.run_coverage()
 
     def run_publish(self):

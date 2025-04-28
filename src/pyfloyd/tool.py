@@ -58,16 +58,19 @@ def main(argv=None, host=None):
             k, v = d.split('=', 1)
             externs[k] = json.loads(v)
 
-        if args.ast:
+        if args.ast or args.full_ast:
             ast, err = pyfloyd.dump_ast(
                 grammar,
                 args.grammar,
                 rewrite_subrules=args.rewrite_subrules,
             )
             if ast:
-                s = io.StringIO()
-                pprint.pprint(ast, stream=s)
-                contents = s.getvalue()
+                if args.as_json:
+                    contents = json.dumps(ast.to_json(args.full_ast), indent=2)
+                else:
+                    s = io.StringIO()
+                    pprint.pprint(ast, stream=s)
+                    contents = s.getvalue()
             else:
                 contents = None
         elif args.pretty_print:
@@ -102,6 +105,14 @@ def _parse_args(host, argv):
     generator.add_language_arguments(ap)
     ap.add_argument(
         '--ast', action='store_true', help='dump the parsed AST of the grammar'
+    )
+    ap.add_argument(
+        '--full-ast',
+        action='store_true',
+        help='dump the full AST of the grammar including derived attributes',
+    )
+    ap.add_argument(
+        '--as-json', action='store_true', help='dump the AST as JSON'
     )
     ap.add_argument(
         '-c',

@@ -12,10 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 
 class Node:
+    v_alias: Optional[str] = None
+    v_aliases: List[str] = []
+    ch_alias: Optional[str] = None
+    ch_aliases: List[str] = []
+    derived_attrs: List[str] = []
+
     @classmethod
     def to(cls, val: List[Any]) -> 'Node':
         assert len(val) == 3
@@ -36,18 +42,30 @@ class Node:
                 return EndsIn(Node.to(val[2][0]))
             case 'equals':
                 return Equals(Node.to(val[2][0]))
+            case 'e_arr':
+                return EArr([Node.to(sn) for sn in val[2]])
+            case 'e_call':
+                return ECall([Node.to(sn) for sn in val[2]])
             case 'e_const':
-                return Const(val[1])
-            case 'e_lit' | 'e_num':
-                return Val(val[0], val[1])
+                return EConst(val[1])
+            case 'e_getitem':
+                return EGetitem(Node.to(val[2][0]))
+            case 'e_lit':
+                return ELit(val[1])
+            case 'e_num':
+                return ENum(val[1])
             case 'e_var':
                 return Var(val[1])
-            case 'e_getitem' | 'e_paren' | 'e_not':
-                return UnaryExpr(val[0], Node.to(val[2][0]))
-            case 'e_plus' | 'e_minus':
-                return BinExpr(val[0], Node.to(val[2][0]), Node.to(val[2][1]))
-            case 'e_arr' | 'e_call' | 'e_qual':
-                return ListExpr(val[0], [Node.to(sn) for sn in val[2]])
+            case 'e_not':
+                return ENot(Node.to(val[2][0]))
+            case 'e_minus':
+                return EMinus(Node.to(val[2][0]), Node.to(val[2][1]))
+            case 'e_paren':
+                return EParen(Node.to(val[2][0]))
+            case 'e_plus':
+                return EPlus(Node.to(val[2][0]), Node.to(val[2][1]))
+            case 'e_qual':
+                return EQual([Node.to(sn) for sn in val[2]])
             case 'label':
                 return Label(val[1], Node.to(val[2][0]))
             case 'leftrec':
@@ -95,16 +113,38 @@ class Node:
             case _:
                 raise ValueError(f'Unexpected AST node type "{val[0]}"')
 
-    def __init__(
-        self,
-        ty: str,
-        val: Any = None,
-        children: Optional[List['Node']] = None,
-    ):
-        self.t: str = ty
-        self.v: Any = val
-        self.ch: List['Node'] = children or []
+    def __init__(self, t: str, v: Any, ch: List['Node']):
+        self.t: str = t
+        self.v: Any = v
+        self.ch: List['Node'] = ch
         self._can_fail: Optional[bool] = None
+
+    def __getattr__(self, attr: str) -> Any:
+        if attr == 'child':
+            assert len(self.ch) == 1
+            return self.ch[0]
+
+        if attr == self.v_alias:
+            attr = 'v'
+        if attr == self.ch_alias:
+            attr = 'ch'
+            return self.ch
+        if attr in self.v_aliases:
+            return self.v[self.v_aliases.index(attr)]
+        if attr in self.ch_aliases:
+            return self.ch[self.ch_aliases.index(attr)]
+        return super().__getattribute__(attr)
+
+    def __setattr__(self, attr: str, v: Any) -> None:
+        if attr == 'child':
+            assert len(self.ch) == 1
+            self.ch[0] = v
+            return
+        if attr == self.v_alias:
+            attr = 'v'
+        elif attr == self.ch_alias:
+            attr = 'ch'
+        super().__setattr__(attr, v)
 
     def __getitem__(self, i: int) -> Union[str | Any | List['Node']]:
         assert 0 <= i <= 2
@@ -133,19 +173,13 @@ class Node:
         )
 
     def __repr__(self):
-        return f'Node({repr(self.t)}, {repr(self.v)}, {repr(self.ch)})'
+        s = self.__class__.__name__ + '('
+        s += ', '.join(f'{a}={repr(getattr(self, a))}' for a in self.attrs)
+        s += ')'
+        return s
 
     def __len__(self):
         return 3
-
-    @property
-    def child(self):
-        assert len(self.ch) == 1
-        return self.ch[0]
-
-    @child.setter
-    def child(self, v):
-        self.ch[0] = v
 
     @property
     def can_fail(self):
@@ -159,354 +193,274 @@ class Node:
     def can_fail_set(self) -> bool:
         return self._can_fail is not None
 
+    @property
+    def attrs(self) -> Tuple[str, ...]:
+        fn = self.__class__.__init__.__code__
+        return fn.co_varnames[1 : fn.co_argcount]
+
+    def to_json(self, include_derived=False) -> Any:
+        d: Dict[str, Any] = {}
+        d['t'] = self.t
+        attrs = list(self.attrs)
+        child = 'child' in attrs
+        if child:
+            attrs.remove('child')
+        ch = 'ch' in self.attrs
+        if ch:
+            attrs.remove('ch')
+        if self.ch_alias:
+            attrs.remove(self.ch_alias)
+        for a in attrs:
+            v = getattr(self, a)
+            if isinstance(v, list):
+                d[a] = [c.to_json(include_derived) for c in v]
+            elif isinstance(v, Node):
+                d[a] = v.to_json(include_derived)
+            else:
+                d[a] = v
+        if include_derived:
+            d['can_fail'] = self.can_fail
+            for a in self.derived_attrs:
+                d[a] = getattr(self, a)
+        if child:
+            d['child'] = self.child.to_json(include_derived)
+        if self.ch_alias:
+            d[self.ch_alias] = [c.to_json(include_derived) for c in self.ch]
+        if ch:
+            d['ch'] = [c.to_json(include_derived) for c in self.ch]
+        return d
+
 
 class Action(Node):
     def __init__(self, child):
         super().__init__('action', None, [child])
 
-    def __repr__(self):
-        return f'Action(ch={repr(self.ch)})'
-
 
 class Apply(Node):
+    v_alias = 'rule_name'
+
     def __init__(self, rule_name):
         super().__init__('apply', rule_name, [])
-
-    def __repr__(self):
-        return f'Apply({repr(self.rule_name)})'
-
-    @property
-    def rule_name(self):
-        return self.v
-
-    @rule_name.setter
-    def rule_name(self, v):
-        self.v = v
-
-
-class BinExpr(Node):
-    def __init__(self, ty, left, right):
-        super().__init__(ty, None, [left, right])
-
-    def __repr__(self):
-        return (
-            f'BinExpr({repr(self.t)}, {repr(self.left)}, {repr(self.right)})'
-        )
-
-    @property
-    def left(self):
-        return self.ch[0]
-
-    @property
-    def right(self):
-        return self.ch[1]
 
 
 class Choice(Node):
     def __init__(self, ch):
         super().__init__('choice', None, ch)
 
-    def __repr__(self):
-        return f'Choice(ch={repr(self.ch)})'
-
 
 class Count(Node):
+    v_aliases = ['start', 'stop']
+
     def __init__(self, child, start, stop):
         super().__init__('count', [start, stop], [child])
 
-    @property
-    def start(self):
-        return self.v[0]
 
-    @property
-    def stop(self):
-        return self.v[1]
+class EArr(Node):
+    def __init__(self, ch):
+        super().__init__('e_arr', None, ch)
 
-    def __repr__(self):
-        return (
-            f'Count({repr(self.child)}, {repr(self.start)}, {repr(self.stop)})'
-        )
+
+class ECall(Node):
+    def __init__(self, ch):
+        super().__init__('e_call', None, ch)
+
+
+class EConst(Node):
+    def __init__(self, v):
+        super().__init__('e_const', v, [])
+
+
+class EGetitem(Node):
+    def __init__(self, child):
+        super().__init__('e_getitem', None, [child])
+
+
+class ELit(Node):
+    def __init__(self, v):
+        super().__init__('e_lit', v, [])
+
+
+class EParen(Node):
+    def __init__(self, child):
+        super().__init__('e_paren', None, [child])
+
+
+class EMinus(Node):
+    ch_aliases = ['left', 'right']
+
+    def __init__(self, left, right):
+        super().__init__('e_minus', None, [left, right])
+
+
+class ENot(Node):
+    def __init__(self, ch):
+        super().__init__('e_not', None, [ch])
+
+
+class ENum(Node):
+    def __init__(self, v):
+        super().__init__('e_num', v, [])
+
+
+class EPlus(Node):
+    ch_aliases = ['left', 'right']
+
+    def __init__(self, left, right):
+        super().__init__('e_plus', None, [left, right])
+
+
+class EQual(Node):
+    def __init__(self, ch):
+        super().__init__('e_qual', None, ch)
 
 
 class Empty(Node):
     def __init__(self):
         super().__init__('empty', None, [])
 
-    def __repr__(self):
-        return 'Empty()'
-
 
 class EndsIn(Node):
     def __init__(self, child):
         super().__init__('ends_in', None, [child])
-
-    def __repr__(self):
-        return f'EndsIn({repr(self.child)})'
 
 
 class Equals(Node):
     def __init__(self, child):
         super().__init__('equals', None, [child])
 
-    def __repr__(self):
-        return f'Equals(ch={repr(self.ch)})'
-
-
-class Const(Node):
-    def __init__(self, val):
-        super().__init__('e_const', val, [])
-
-    def __repr__(self):
-        return f'Const({repr(self.v)})'
-
-
-class ListExpr(Node):
-    def __init__(self, ty, ch):
-        super().__init__(ty, None, ch)
-
-    def __repr__(self):
-        return f'ListExpr({repr(self.t)}, {repr(self.ch)})'
-
 
 class Label(Node):
+    v_alias = 'name'
+    derived_attrs = ['outer_scope']
+
     def __init__(self, name, child):
         super().__init__('label', name, [child])
         self.outer_scope = False
 
-    @property
-    def name(self):
-        return self.v
-
-    def __repr__(self):
-        return (
-            f'Label(name={repr(self.name)}, child={repr(self.child)}, '
-            f'outer_scope={repr(self.outer_scope)})'
-        )
-
 
 class Leftrec(Node):
+    v_alias = 'name'
+
     def __init__(self, name, child):
         super().__init__('leftrec', name, [child])
 
-    @property
-    def name(self):
-        return self.v
-
-    def __repr__(self):
-        return f'Leftrec(name={repr(self.name)}, child={repr.self.child})'
-
 
 class Lit(Node):
-    def __init__(self, val):
-        super().__init__('lit', val, [])
-
-    def __repr__(self):
-        return f'Lit({repr(self.v)})'
+    def __init__(self, v):
+        super().__init__('lit', v, [])
 
 
 class Not(Node):
     def __init__(self, child):
         super().__init__('not', None, [child])
 
-    def __repr__(self):
-        return f'Not({repr(self.child)})'
-
 
 class NotOne(Node):
     def __init__(self, child):
         super().__init__('not_one', None, [child])
 
-    def __repr__(self):
-        return f'NotOne({repr(self.child)})'
-
 
 class Op(Node):
+    v_aliases = ['op', 'prec']
+
     def __init__(self, op, prec, child):
         super().__init__('op', [op, prec], [child])
 
-    def __repr__(self):
-        return f'Op(op={self.op}, prec={self.prec}, child={self.child})'
-
-    @property
-    def op(self):
-        return self.v[0]
-
-    @property
-    def prec(self):
-        return self.v[1]
-
 
 class Operator(Node):
+    v_alias = 'name'
+
     def __init__(self, name, ch):
         super().__init__('operator', name, ch)
-
-    @property
-    def name(self):
-        return self.v
-
-    def __repr__(self):
-        return f'Operator(name={repr(self.name)}, ch={repr(self.ch)})'
 
 
 class Opt(Node):
     def __init__(self, child):
         super().__init__('opt', None, [child])
 
-    def __repr__(self):
-        return f'Opt({repr(self.child)})'
-
 
 class Paren(Node):
     def __init__(self, child):
         super().__init__('choice', None, [child])
-
-    def __repr__(self):
-        return f'(Paren({repr(self.child)})'
 
 
 class Plus(Node):
     def __init__(self, child):
         super().__init__('plus', None, [child])
 
-    def __repr__(self):
-        return f'Plus({repr(self.child)})'
-
 
 class Pred(Node):
     def __init__(self, child):
         super().__init__('pred', None, [child])
 
-    def __repr__(self):
-        return f'Pred({repr(self.child)})'
-
 
 class Range(Node):
+    v_aliases = ['start', 'stop']
+
     def __init__(self, start, stop):
         super().__init__('range', [start, stop], [])
 
-    @property
-    def start(self):
-        return self.v[0]
-
-    @property
-    def stop(self):
-        return self.v[1]
-
-    def __repr__(self):
-        return f'Range({repr(self.start)}, {repr(self.stop)})'
-
 
 class Regexp(Node):
-    def __init__(self, val):
-        super().__init__('regexp', val, [])
-
-    def __repr__(self):
-        return f'Regexp({repr(self.v)})'
+    def __init__(self, v):
+        super().__init__('regexp', v, [])
 
 
 class Rule(Node):
+    v_alias = 'name'
+
     def __init__(self, name, child):
         super().__init__('rule', name, [child])
 
-    @property
-    def name(self):
-        return self.v
-
-    @name.setter
-    def name(self, v):
-        self.v = v
-
-    def __repr__(self):
-        return f'Rule(name={repr(self.name)}, {repr(self.child)})'
-
 
 class Rules(Node):
-    def __init__(self, ch):
-        super().__init__('rules', None, ch)
+    ch_alias = 'rules'
 
-    def __repr__(self):
-        return f'Rules({repr(self.ch)})'
-
-    @property
-    def rules(self):
-        return self.ch
-
-    @rules.setter
-    def rules(self, ch):
-        self.ch = ch
+    def __init__(self, rules):
+        super().__init__('rules', None, rules)
 
 
 class Run(Node):
     def __init__(self, child):
         super().__init__('run', None, [child])
 
-    def __repr__(self):
-        return f'Run({repr(self.child)})'
-
 
 class Scope(Node):
     def __init__(self, ch):
         super().__init__('scope', None, ch)
-
-    def __repr__(self):
-        return f'(Scope(ch={repr(self.ch)})'
 
 
 class Seq(Node):
     def __init__(self, ch):
         super().__init__('seq', None, ch)
 
-    def __repr__(self):
-        return f'Seq(ch={repr(self.ch)})'
-
 
 class Set(Node):
-    def __init__(self, val):
-        super().__init__('set', val, [])
-
-    def __repr__(self):
-        return f'Set({repr(self.v)})'
+    def __init__(self, v):
+        super().__init__('set', v, [])
 
 
 class Star(Node):
     def __init__(self, child):
         super().__init__('star', None, [child])
 
-    def __repr__(self):
-        return f'Star({repr(self.child)})'
-
-
-class UnaryExpr(Node):
-    def __init__(self, ty, child):
-        super().__init__(ty, None, [child])
-
-    def __repr__(self):
-        return f'UnaryExpr({repr(self.t)}, {repr(self.child)})'
-
 
 class Unicat(Node):
     def __init__(self, v):
         super().__init__('unicat', v, [])
 
-    def __repr__(self):
-        return f'Unicat({repr(self.v)})'
-
 
 class Val(Node):
-    def __init__(self, ty, val):
-        super().__init__(ty, val, [])
-
-    def __repr__(self):
-        return f'Val({repr(self.t)}, {repr(self.v)})'
+    def __init__(self, t, val):
+        super().__init__(t, val, [])
 
 
 class Var(Node):
+    derived_attrs = ['outer_scope']
+
     def __init__(self, name):
         super().__init__('e_var', name, [])
         self.outer_scope = False
-
-    def __repr__(self):
-        return f'Var(name={repr(self.name)}, outer_scope={repr(self.outer_scope)})'
 
     @property
     def name(self):

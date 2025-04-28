@@ -16,7 +16,7 @@ import re
 import textwrap
 from typing import Dict, List, Optional, Set
 
-from pyfloyd.ast import Apply, BinExpr, Regexp, Var
+from pyfloyd.ast import Apply, EMinus, EPlus, Regexp, Var
 from pyfloyd.analyzer import Grammar, Node
 from pyfloyd.formatter import flatten, Comma, FormatObj, Saw, Tree
 from pyfloyd import string_literal as lit
@@ -236,7 +236,7 @@ class Generator:
         return lit.encode(node.v)
 
     def _ty_e_minus(self, node: Node) -> Tree:
-        assert isinstance(node, BinExpr)
+        assert isinstance(node, EMinus)
         return Tree(self._gen_expr(node.left), '-', self._gen_expr(node.right))
 
     def _ty_e_not(self, node: Node) -> Tree:
@@ -250,7 +250,7 @@ class Generator:
         return self._gen_expr(node.child)
 
     def _ty_e_plus(self, node: Node) -> Tree:
-        assert isinstance(node, BinExpr)
+        assert isinstance(node, EPlus)
         return Tree(self._gen_expr(node.left), '+', self._gen_expr(node.right))
 
     def _ty_e_qual(self, node: Node) -> Saw:
