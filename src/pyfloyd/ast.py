@@ -431,8 +431,11 @@ class Scope(Node):
 
 
 class Seq(Node):
+    derived_attrs = ['locals']
+
     def __init__(self, ch):
         super().__init__('seq', None, ch)
+        self.locals = []
 
 
 class Set(Node):

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import collections
+from typing import Set
 
 from pyfloyd.ast import (
     Apply,
@@ -224,6 +225,8 @@ def analyze(ast, rewrite_subrules: bool) -> Grammar:
         # Extract subnodes into their own rules to make codegen easier.
         # Not needed when just interpreting the grammar.
         _rewrite_subrules(g)
+
+    _compute_local_vars(g)
 
     # TODO: Figure out how to statically analyze predicates to
     # catch ones that don't return booleans, so that we don't need
@@ -933,3 +936,23 @@ def _rewrite_pragma_rules(grammar):
             _rewrite(rule.child)
             new_rules.append(rule)
     grammar.ast.rules = new_rules
+
+
+def _compute_local_vars(grammar):
+    def _walk(node) -> Set[str]:
+        vs : Set[str] = set()
+        if node.t == 'seq':
+            for c in node.ch:
+                vs.update(_walk(c))
+            node.locals = list(vs)
+            return set()
+
+        if node.t == 'label':
+            vs.add(node.name)
+        for c in node.ch:
+            vs.update(_walk(c))
+        return vs
+
+    for rule in grammar.ast.rules:
+        vs = _walk(rule.child)
+        assert vs == set()

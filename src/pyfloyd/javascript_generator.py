@@ -214,10 +214,8 @@ class JavaScriptGenerator(Generator):
         # All of the rule methods return a list of lines.
         lines: List[str] = []
         if node.t == 'seq':
-            vs: Set[str] = self._find_vars(node)
-            lines = []
-            for v in sorted(vs):
-                lines.append(f'let {v};')
+            for v in sorted(node.locals):
+                lines.append(f'let {self._varname(v)};')
 
         fn = getattr(self, f'_ty_{node.t}')
         return lines + fn(node)
@@ -635,7 +633,7 @@ _PARSE = """\
         this.externs[key] = externs[key];
       }}
     }}
-      
+
     if (errors != '') {{
       return new Result(null, errors.trim(), 0);
     }}

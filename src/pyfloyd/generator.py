@@ -141,14 +141,6 @@ class Generator:
         r = f'v_{name.replace("$", "_")}'
         return r
 
-    def _find_vars(self, node) -> Set[str]:
-        vs = set()
-        if node.t == 'label':
-            vs.add(self._varname(node.name))
-        for c in node.ch:
-            vs = vs.union(self._find_vars(c))
-        return vs
-
     def _base_rule_name(self, rule_name: str) -> str:
         if rule_name.startswith('r_'):
             return rule_name[2:]
