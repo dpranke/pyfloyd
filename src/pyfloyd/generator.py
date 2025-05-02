@@ -20,7 +20,9 @@ from typing import Dict, List, Optional, Set
 from pyfloyd import string_literal
 from pyfloyd.ast import Apply, EMinus, EPlus, Regexp, Var
 from pyfloyd.analyzer import Grammar, Node
-from pyfloyd.formatter import flatten, Comma, FormatObj, Lit, Saw, Tree
+from pyfloyd.formatter import (
+    flatten, Comma, FormatObj, ListObj, Lit, HList, VList, Saw, Tree
+)
 from pyfloyd.version import __version__
 
 
@@ -149,7 +151,7 @@ class Generator:
     def _gen_extern(self, name: str) -> str:
         raise NotImplementedError
 
-    def _gen_invoke(self, fn: str, *args) -> str:
+    def _gen_invoke(self, fn: str, *args) -> FormatObj:
         raise NotImplementedError
 
     def _gen_thisvar(self, name: str) -> str:
@@ -169,9 +171,11 @@ class Generator:
         fn = getattr(self, f'_ty_{node.t}')
         return fn(node)
 
-    def _gen_stmts(self, node: Node) -> List[str]:
+    def _gen_stmts(self, node: Node) -> ListObj:
         fn = getattr(self, f'_ty_{node.t}')
-        return fn(node)
+        r = fn(node)
+        assert isinstance(r, ListObj)
+        return r
 
     def _gen_needed_methods(self) -> str:
         text = ''
@@ -202,28 +206,22 @@ class Generator:
     # Handlers for each non-host node in the glop AST follow.
     #
 
-    def _ty_action(self, node: Node) -> List[str]:
-        obj = self._gen_expr(node.child)
-        return flatten(
-            Saw(
+    def _ty_action(self, node: Node) -> ListObj:
+        return HList([Saw(
                 self._gen_rulename('succeed') + '(',
-                obj,
-                ')' + self._map['end'],
-            ),
-            indent=self._map['indent'],
-        )
+                self._gen_expr(node.child),
+                ')'), self._map['end']])
 
-    def _ty_apply(self, node: Node) -> List[str]:
+    def _ty_apply(self, node: Node) -> ListObj:
         assert isinstance(node, Apply)
         if node.memoize:
-            return [
+            return HList([
                 self._gen_invoke(
                     'memoize',
                     f"'{node.rule_name}'",
                     self._gen_rulename(node.rule_name),
-                )
-            ]
-        return [self._gen_invoke(node.rule_name) + self._map['end']]
+                ), self._map['end']])
+        return HList([self._gen_invoke(node.rule_name), self._map['end']])
 
     def _ty_e_arr(self, node: Node) -> Lit | Saw:
         if len(node.ch) == 0:
@@ -303,70 +301,63 @@ class Generator:
             next_saw = new_saw
         return saw
 
-    def _ty_e_var(self, node: Node) -> Lit:
+    def _ty_e_var(self, node: Node) -> FormatObj:
         assert isinstance(node, Var)
         if node.outer_scope:
-            return Lit(self._gen_invoke('lookup', "'" + node.v + "'"))
+            return self._gen_invoke('lookup', "'" + node.v + "'")
         if node.v in self._grammar.externs:
             return Lit(self._gen_extern(node.v))
         return Lit(self._gen_varname(node.v))
 
-    def _ty_empty(self, node) -> List[str]:
+    def _ty_empty(self, node) -> ListObj:
         del node
-        return [
-            self._gen_invoke('succeed', self._map['null']) + self._map['end']
-        ]
+        return HList([self._gen_invoke('succeed', self._map['null']), self._map['end']])
 
-    def _ty_equals(self, node) -> List[str]:
+    def _ty_equals(self, node) -> ListObj:
         arg = self._gen_expr(node.child)
-        return [self._gen_invoke('str', flatten(arg)[0]) + self._map['end']]
+        return HList([self._gen_invoke('str', arg), self._map['end']])
 
-    def _ty_leftrec(self, node) -> List[str]:
+    def _ty_leftrec(self, node) -> ListObj:
         if node.left_assoc:
             left_assoc = self._map['true']
         else:
             left_assoc = self._map['false']
 
-        lines = [
-            self._gen_invoke(
+        return HList([self._gen_invoke(
                 'leftrec',
                 self._gen_rulename(node.child.v),
                 "'" + node.v + "'",
                 left_assoc,
-            )
-        ]
-        return lines
+            ), self._map['end']])
 
-    def _ty_lit(self, node) -> List[str]:
+    def _ty_lit(self, node) -> ListObj:
         expr = self._gen_lit(node.v)
         if len(node.v) == 1:
             method = 'ch'
         else:
             method = 'str'
-        return [self._gen_invoke(method, expr)]
+        return HList([self._gen_invoke(method, expr), self._map['end']])
 
-    def _ty_operator(self, node) -> List[str]:
+    def _ty_operator(self, node) -> ListObj:
         # Operator nodes have no children, but subrules for each arm
         # of the expression cluster have been defined and are referenced
         # from self._grammar.operators[node.v].choices.
         assert node.ch == []
-        return [self._gen_invoke('operator', "'" + node.v + "'")]
+        return HList([self._gen_invoke('operator', "'" + node.v + "'"), self._map['end']])
 
-    def _ty_range(self, node) -> List[str]:
-        return [
+    def _ty_range(self, node) -> ListObj:
+        return HList([
             self._gen_invoke(
                 'range', self._gen_lit(node.start), self._gen_lit(node.stop)
-            )
-        ]
+            ), self._map['end']]
+        )
 
-    def _ty_regexp(self, node) -> List[str]:
+    def _ty_regexp(self, node) -> ListObj:
         raise NotImplementedError
 
-    def _ty_set(self, node) -> List[str]:
+    def _ty_set(self, node) -> ListObj:
         new_node = Regexp('[' + node.v + ']')
         return self._ty_regexp(new_node)
 
-    def _ty_unicat(self, node) -> List[str]:
-        return [
-            self._gen_invoke('unicat', self._gen_lit(node.v)) + self._map['end']
-        ]
+    def _ty_unicat(self, node) -> ListObj:
+        return HList([self._gen_invoke('unicat', self._gen_lit(node.v)), self._map['end']])

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List
+from typing import List, Sequence
 
 
 class FormatObj:
@@ -51,17 +51,66 @@ def fmt(
     return obj.fmt(current_depth, max_depth, indent)
 
 
+class Indent(FormatObj):
+    def __init__(self, obj):
+        self.obj = obj
+
+    def fmt(self, current_depth: int, max_depth: int, indent: str) -> List[str]:
+        return [indent + line for line in self.obj.fmt(current_depth, max_depth, indent)]
+
+
 class Lit(FormatObj):
     def __init__(self, s):
         self.s = s
 
     def __repr__(self):
-        return f'Lit({repr(self.s)}'
+        return f'Lit({repr(self.s)})'
 
     def fmt(
         self, current_depth: int, max_depth: int, indent: str
     ) -> List[str]:
         return [self.s]
+
+
+class ListObj(FormatObj):
+    pass
+
+
+class VList(ListObj):
+    def __init__(self, objs: Sequence[FormatObj|str]):
+        self.objs = objs
+
+    def fmt(self, current_depth: int, max_depth: int, indent: str) -> List[str]:
+        lines = []
+        for obj in self.objs:
+            if isinstance(obj, str):
+                lines.append(obj)
+            else:
+                assert isinstance(obj, FormatObj)
+                lines.extend(obj.fmt(current_depth, max_depth, indent))
+        return lines
+
+
+class HList(ListObj):
+    def __init__(self, objs: List[FormatObj|str]):
+        self.objs = objs
+
+    def fmt(self, current_depth: int, max_depth: int, indent: str) -> List[str]:
+        lines: List[str] = []
+        if len(self.objs):
+            if isinstance(self.objs[0], str):
+                lines.append(self.objs[0])
+            else:
+                lines = self.objs[0].fmt(current_depth, max_depth, indent)
+            for obj in self.objs[1:]:
+                if isinstance(obj, str):
+                    lines[-1] += obj
+                else:
+                    sublines = obj.fmt(current_depth, max_depth, indent)
+                    lines[-1] += sublines[0]
+                    if len(sublines) > 1:
+                        lines.extend(sublines[1:])
+        return lines
 
 
 class Saw(FormatObj):
@@ -93,19 +142,22 @@ class Saw(FormatObj):
     def fmt(
         self, current_depth: int, max_depth: int, indent: str
     ) -> List[str]:
-        if current_depth == max_depth:
-            s = (
-                fmt(self.start, current_depth, max_depth, indent)[0]
-                + fmt(self.mid, current_depth, max_depth, indent)[0]
-                + fmt(self.end, current_depth, max_depth, indent)[0]
-            )
-            return [s]
-        lines = [self.start]
-        for line in fmt(self.mid, current_depth + 1, max_depth, indent):
-            lines.append(indent + line)
-        for line in fmt(self.end, current_depth, max_depth, indent):
-            lines.append(line)
-        return lines
+        try:
+            if current_depth == max_depth:
+                s = (
+                    fmt(self.start, current_depth, max_depth, indent)[0]
+                    + fmt(self.mid, current_depth, max_depth, indent)[0]
+                    + fmt(self.end, current_depth, max_depth, indent)[0]
+                )
+                return [s]
+            lines = [self.start]
+            for line in fmt(self.mid, current_depth + 1, max_depth, indent):
+                lines.append(indent + line)
+            for line in fmt(self.end, current_depth, max_depth, indent):
+                lines.append(line)
+            return lines
+        except Exception as e:
+            import pdb; pdb.set_trace()
 
 
 class Comma(FormatObj):
@@ -124,6 +176,9 @@ class Comma(FormatObj):
         return 'Comma(' + repr(self.args) + ')'
 
     def fmt(self, current_depth, max_depth, indent):
+        if not self.args:
+            return ['']
+
         if current_depth == max_depth:
             s = fmt(self.args[0], current_depth, max_depth, indent)[0]
             for arg in self.args[1:]:

@@ -18,7 +18,7 @@ from typing import List
 
 from pyfloyd.analyzer import Grammar, Node
 from pyfloyd.ast import Not, Label
-from pyfloyd.formatter import flatten
+from pyfloyd.formatter import flatten, Comma, FormatObj, HList, Indent, ListObj, Saw, VList
 from pyfloyd.generator import Generator, GeneratorOptions
 
 
@@ -369,7 +369,8 @@ class PythonGenerator(Generator):
     def _gen_rule_methods(self) -> str:
         text = ''
         for rule, node in self._grammar.rules.items():
-            text += self._gen_method_text(rule, self._gen_stmts(node))
+            stmts = flatten(self._gen_stmts(node), indent=self._indent)
+            text += self._gen_method_text(rule, stmts)
         text += '\n'
 
         if self._grammar.needed_builtin_rules:
@@ -399,31 +400,31 @@ class PythonGenerator(Generator):
     def _gen_extern(self, name: str) -> str:
         return "self._externs['" + name + "']"
 
-    def _gen_invoke(self, fn, *args) -> str:
-        return 'self._' + fn + '(' + ', '.join(args) + ')'
+    def _gen_invoke(self, fn, *args) -> Saw:
+        return Saw('self._' + fn + '(', Comma(args), ')')
 
     #
     # Handlers for each non-host node in the glop AST follow.
     #
 
-    def _ty_choice(self, node: Node) -> List[str]:
-        lines = ['p = self._pos']
+    def _ty_choice(self, node: Node) -> ListObj:
+        lines: List[str|FormatObj] = ['p = self._pos']
         for subnode in node.ch[:-1]:
-            lines.extend(self._gen_stmts(subnode))
+            lines.append(self._gen_stmts(subnode))
             lines.append('if not self._failed:')
             lines.append('    return')
             lines.append('self._rewind(p)')
-        lines.extend(self._gen_stmts(node.ch[-1]))
-        return lines
+        lines.append(self._gen_stmts(node.ch[-1]))
+        return VList(lines)
 
-    def _ty_count(self, node: Node) -> List[str]:
-        lines = [
+    def _ty_count(self, node: Node) -> ListObj:
+        lines: List[str|FormatObj] = [
             'vs = []',
             'i = 0',
             f'cmin, cmax = {node.v}',
             'while i < cmax:',
         ]
-        lines.extend(['    ' + line for line in self._gen_stmts(node.child)])
+        lines.append(Indent(self._gen_stmts(node.child)))
         lines.extend(
             [
                 '    if self._failed:',
@@ -436,13 +437,13 @@ class PythonGenerator(Generator):
                 'self._succeed(vs)',
             ]
         )
-        return lines
+        return VList(lines)
 
-    def _ty_ends_in(self, node: Node) -> List[str]:
+    def _ty_ends_in(self, node: Node) -> ListObj:
         sublines = self._gen_stmts(node.child)
         lines = [
             'while True:',
-        ] + ['    ' + line for line in sublines]
+        ] + [Indent(sublines)]
         if node.can_fail:
             lines.extend(['    if not self._failed:', '        break'])
         lines.extend(
@@ -452,11 +453,11 @@ class PythonGenerator(Generator):
                 '        break',
             ]
         )
-        return lines
+        return VList(lines)
 
-    def _ty_label(self, node: Node) -> List[str]:
+    def _ty_label(self, node: Node) -> ListObj:
         assert isinstance(node, Label)
-        lines = self._gen_stmts(node.child)
+        lines: List[FormatObj|str] = [self._gen_stmts(node.child)]
         if node.child.can_fail:
             lines.extend(['if self._failed:', '    return'])
         if node.outer_scope:
@@ -467,16 +468,16 @@ class PythonGenerator(Generator):
                     f'{self._gen_varname(node.name)} = self._val',
                 ]
             )
-        return lines
+        return VList(lines)
 
-    def _ty_not(self, node: Node) -> List[str]:
+    def _ty_not(self, node: Node) -> ListObj:
         sublines = self._gen_stmts(node.child)
         lines = (
             [
                 'p = self._pos',
                 'errpos = self._errpos',
             ]
-            + sublines
+            + [sublines]
             + [
                 'if self._failed:',
                 '    self._succeed(None, p)',
@@ -486,19 +487,19 @@ class PythonGenerator(Generator):
                 '    self._fail()',
             ]
         )
-        return lines
+        return VList(lines)
 
-    def _ty_not_one(self, node: Node) -> List[str]:
+    def _ty_not_one(self, node: Node) -> ListObj:
         sublines = self._gen_stmts(self._grammar.node(Not, node.child))
-        return sublines + ['if not self._failed:', '    self._r_any()']
+        return VList([sublines, 'if not self._failed:', '    self._r_any()'])
 
-    def _ty_opt(self, node: Node) -> List[str]:
+    def _ty_opt(self, node: Node) -> ListObj:
         sublines = self._gen_stmts(node.child)
-        lines = (
+        return VList(
             [
                 'p = self._pos',
             ]
-            + sublines
+            + [sublines]
             + [
                 'if self._failed:',
                 '    self._succeed([], p)',
@@ -506,16 +507,15 @@ class PythonGenerator(Generator):
                 '    self._succeed([self._val])',
             ]
         )
-        return lines
 
-    def _ty_paren(self, node: Node) -> List[str]:
+    def _ty_paren(self, node: Node) -> ListObj:
         return self._gen_stmts(node.child)
 
-    def _ty_plus(self, node: Node) -> List[str]:
+    def _ty_plus(self, node: Node) -> ListObj:
         sublines = self._gen_stmts(node.child)
         lines = (
             ['vs = []']
-            + sublines
+            + [sublines]
             + [
                 'if self._failed:',
                 '    return',
@@ -523,7 +523,7 @@ class PythonGenerator(Generator):
                 'while True:',
                 '    p = self._pos',
             ]
-            + ['    ' + line for line in sublines]
+            + [Indent(sublines)]
             + [
                 '    if self._failed or self._pos == p:',
                 '        self._rewind(p)',
@@ -533,22 +533,22 @@ class PythonGenerator(Generator):
             ]
         )
 
-        return lines
+        return VList(lines)
 
-    def _ty_pred(self, node: Node) -> List[str]:
+    def _ty_pred(self, node: Node) -> ListObj:
         arg = self._gen_expr(node.child)
-        return [
-            'v = ' + flatten(arg, indent=self._map['indent'])[0],
+        return VList([
+            HList(['v = ', arg]),
             'if v is True:',
             '    self._succeed(v)',
             'elif v is False:',
             '    self._fail()',
             'else:',
             "    raise _ParsingRuntimeError('Bad predicate value')",
-        ]
+        ])
 
-    def _ty_regexp(self, node: Node) -> List[str]:
-        return [
+    def _ty_regexp(self, node: Node) -> ListObj:
+        return VList([
             f'p = {self._gen_lit(node.v)}',
             'if p not in self._regexps:',
             '    self._regexps[p] = re.compile(p)',
@@ -557,11 +557,11 @@ class PythonGenerator(Generator):
             '    self._succeed(m.group(0), m.end())',
             '    return',
             'self._fail()',
-        ]
+        ])
 
-    def _ty_run(self, node: Node) -> List[str]:
+    def _ty_run(self, node: Node) -> VList:
         sublines = self._gen_stmts(node.child)
-        lines = ['start = self._pos'] + sublines
+        lines = ['start = self._pos'] + [sublines]
         if node.child.can_fail:
             lines.extend(['if self._failed:', '    return'])
         lines.extend(
@@ -570,31 +570,31 @@ class PythonGenerator(Generator):
                 'self._val = self._text[start:end]',
             ]
         )
-        return lines
+        return VList(lines)
 
-    def _ty_scope(self, node: Node) -> List[str]:
-        return (
+    def _ty_scope(self, node: Node) -> VList:
+        return VList(
             [
                 'self._scopes.append({})',
             ]
-            + self._gen_stmts(node.child)
+            + [self._gen_stmts(node.child)]
             + [
                 'self._scopes.pop()',
             ]
         )
 
-    def _ty_seq(self, node: Node) -> List[str]:
-        lines = self._gen_stmts(node.ch[0])
+    def _ty_seq(self, node: Node) -> VList:
+        lines: List[str|ListObj] = [self._gen_stmts(node.ch[0])]
         if node.ch[0].can_fail:
             lines.extend(['if self._failed:', '    return'])
         for subnode in node.ch[1:-1]:
-            lines.extend(self._gen_stmts(subnode))
+            lines.append(self._gen_stmts(subnode))
             if subnode.can_fail:
                 lines.extend(['if self._failed:', '    return'])
-        lines.extend(self._gen_stmts(node.ch[-1]))
-        return lines
+        lines.append(self._gen_stmts(node.ch[-1]))
+        return VList(lines)
 
-    def _ty_star(self, node: Node) -> List[str]:
+    def _ty_star(self, node: Node) -> VList:
         sublines = self._gen_stmts(node.child)
         lines = (
             [
@@ -602,7 +602,7 @@ class PythonGenerator(Generator):
                 'while True:',
                 '    p = self._pos',
             ]
-            + ['    ' + line for line in sublines]
+            + [Indent(sublines)]
             + [
                 '    if self._failed or self._pos == p:',
                 '        self._rewind(p)',
@@ -611,7 +611,7 @@ class PythonGenerator(Generator):
                 'self._succeed(vs)',
             ]
         )
-        return lines
+        return VList(lines)
 
     def _gen_main_footer(self) -> str:
         return self._dedent("""\

@@ -18,7 +18,7 @@ from typing import Dict, List
 
 from pyfloyd.ast import Not, Count
 from pyfloyd.analyzer import Grammar
-from pyfloyd.formatter import flatten
+from pyfloyd.formatter import flatten, Comma, HList, Indent, VList, Saw, Sequence, FormatObj
 from pyfloyd.generator import Generator, GeneratorOptions
 
 
@@ -296,7 +296,8 @@ class JavaScriptGenerator(Generator):
             lines = []
             for v in node.local_vars:
                 lines.append(f'let {v};')
-            lines.extend(self._gen_stmts(node))
+            fmt_obj = VList([self._gen_stmts(node)])
+            lines.extend(flatten(fmt_obj, indent=self._indent))
 
             text += self._gen_method_text(rule, lines)
 
@@ -323,34 +324,34 @@ class JavaScriptGenerator(Generator):
     def _gen_extern(self, name: str) -> str:
         return "this.externs.get('" + name + "');"
 
-    def _gen_invoke(self, fn: str, *args) -> str:
-        return 'this.' + fn + '(' + ', '.join(args) + ')'
+    def _gen_invoke(self, fn: str, *args) -> Saw:
+        return Saw('this.' + fn + '(', Comma(args), ')')
 
     #
     # Handlers for each non-host node in the glop AST follow.
     #
 
-    def _ty_choice(self, node) -> List[str]:
-        lines = ['pos = this.pos;']
+    def _ty_choice(self, node) -> VList:
+        lines: List[str|FormatObj] = ['pos = this.pos;']
         for subnode in node.ch[:-1]:
-            lines.extend(self._gen_stmts(subnode))
+            lines.append(self._gen_stmts(subnode))
             lines.append('if (!this.failed) {')
             lines.append('  return;')
             lines.append('}')
             lines.append('this.rewind(pos);')
-        lines.extend(self._gen_stmts(node.ch[-1]))
-        return lines
+        lines.append(self._gen_stmts(node.ch[-1]))
+        return VList(lines)
 
-    def _ty_count(self, node) -> List[str]:
+    def _ty_count(self, node) -> VList:
         assert isinstance(node, Count)
-        lines = [
+        lines: List[str|FormatObj] = [
             'vs = [];',
             'i = 0;',
             f'cmin = {node.start};',
             f'cmax = {node.stop};',
             'while (i < cmax) {',
         ]
-        lines.extend(['  ' + line for line in self._gen_stmts(node.child)])
+        lines.append(Indent(self._gen_stmts(node.child)))
         lines.extend(
             [
                 '  if (this.failed) {',
@@ -366,15 +367,15 @@ class JavaScriptGenerator(Generator):
                 'this.succeed(vs);',
             ]
         )
-        return lines
+        return VList(lines)
 
-    def _ty_ends_in(self, node) -> List[str]:
+    def _ty_ends_in(self, node) -> VList:
         sublines = self._gen_stmts(node.child)
-        lines = (
+        return VList(
             [
                 'while (true) {',
             ]
-            + ['  ' + line for line in sublines]
+            + [Indent(sublines)]
             + [
                 '  if (!this.failed) {',
                 '    break;',
@@ -386,37 +387,36 @@ class JavaScriptGenerator(Generator):
                 '}',
             ]
         )
-        return lines
 
-    def _ty_label(self, node) -> List[str]:
-        lines = self._gen_stmts(node.child)
+    def _ty_label(self, node) -> VList:
+        lines = [self._gen_stmts(node.child)]
         varname = self._gen_varname(node.v)
         if node.outer_scope:
-            lines.extend(
-                [
+            lines.append(
+                VList([
                     'if (!this.failed) {',
                     f"  this.scopes[this.scopes.length-1].set('{node.v}', this.val);"
                     '}',
-                ]
+                ])
             )
         else:
-            lines.extend(
-                [
+            lines.append(
+                VList([
                     'if (!this.failed) {',
                     f'  {varname} = this.val;',
                     '}',
-                ]
+                ])
             )
-        return lines
+        return VList(lines)
 
-    def _ty_not(self, node) -> List[str]:
+    def _ty_not(self, node) -> VList:
         sublines = self._gen_stmts(node.child)
         lines = (
             [
                 'pos = this.pos;',
                 'errpos = this.errpos;',
             ]
-            + sublines
+            + [sublines]
             + [
                 'if (this.failed) {',
                 '  this.succeed(null, pos);',
@@ -427,23 +427,23 @@ class JavaScriptGenerator(Generator):
                 '}',
             ]
         )
-        return lines
+        return VList(lines)
 
-    def _ty_not_one(self, node) -> List[str]:
+    def _ty_not_one(self, node) -> VList:
         sublines = self._gen_stmts(self._grammar.node(Not, node.child))
-        return sublines + [
+        return VList([sublines] + [
             'if (!this.failed) {',
             '  this.r_any(pos);',
             '}',
-        ]
+        ])
 
-    def _ty_opt(self, node) -> List[str]:
+    def _ty_opt(self, node) -> VList:
         sublines = self._gen_stmts(node.child)
         lines = (
             [
                 'pos = this.pos;',
             ]
-            + sublines
+            + [sublines]
             + [
                 'if (this.failed) {',
                 '  this.succeed([], pos);',
@@ -452,16 +452,16 @@ class JavaScriptGenerator(Generator):
                 '}',
             ]
         )
-        return lines
+        return VList(lines)
 
-    def _ty_paren(self, node) -> List[str]:
+    def _ty_paren(self, node) -> VList:
         return self._gen_stmts(node.child)
 
-    def _ty_plus(self, node) -> List[str]:
+    def _ty_plus(self, node) -> VList:
         sublines = self._gen_stmts(node.child)
-        lines = (
+        lines = VList(
             ['vs = [];']
-            + sublines
+            + [sublines]
             + [
                 'vs.push(this.val);',
                 'if (this.failed) {',
@@ -470,7 +470,7 @@ class JavaScriptGenerator(Generator):
                 'while (true) {',
                 '  pos = this.pos;',
             ]
-            + ['  ' + line for line in sublines]
+            + [Indent(sublines)]
             + [
                 '  if (this.failed || this.pos === pos) {',
                 '    this.rewind(pos);',
@@ -483,10 +483,10 @@ class JavaScriptGenerator(Generator):
         )
         return lines
 
-    def _ty_pred(self, node) -> List[str]:
+    def _ty_pred(self, node) -> VList:
         arg = self._gen_expr(node.child)
-        return [
-            'v = ' + flatten(arg, indent=self._map['indent'])[0],
+        return VList([
+            HList(['v = ', arg]),
             'if (v === true) {',
             '  this.succeed(v);',
             '} else if (v === false) {',
@@ -494,10 +494,10 @@ class JavaScriptGenerator(Generator):
             '} else {',
             "  throw new ParsingRuntimeError('Bad predicate value');",
             '}',
-        ]
+        ])
 
-    def _ty_regexp(self, node) -> List[str]:
-        return [
+    def _ty_regexp(self, node) -> VList:
+        return VList([
             f"r = new RegExp({self._gen_lit(node.v)}, 'gy');"
             'r.lastIndex = this.pos;',
             'found = r.exec(this.text);',
@@ -506,13 +506,13 @@ class JavaScriptGenerator(Generator):
             '  return;',
             '}',
             'this.fail();',
-        ]
+        ])
 
-    def _ty_run(self, node) -> List[str]:
+    def _ty_run(self, node) -> VList:
         lines = self._gen_stmts(node.child)
-        return (
+        return VList(
             ['start = this.pos;']
-            + lines
+            + [lines]
             + [
                 'if (this.failed) {',
                 '  return;',
@@ -522,30 +522,30 @@ class JavaScriptGenerator(Generator):
             ]
         )
 
-    def _ty_scope(self, node) -> List[str]:
-        return (
+    def _ty_scope(self, node) -> VList:
+        return VList(
             [
                 'this.scopes.push(new Map());',
             ]
-            + self._gen_stmts(node.child)
+            + [self._gen_stmts(node.child)]
             + [
                 'this.scopes.pop();',
             ]
         )
 
-    def _ty_seq(self, node) -> List[str]:
-        lines = []
+    def _ty_seq(self, node) -> VList:
+        lines: List[str|FormatObj] = []
         for v in node.vars:
             lines.append(f'let {self._gen_varname(v)};')
 
-        lines.extend(self._gen_stmts(node.ch[0]))
+        lines.append(self._gen_stmts(node.ch[0]))
         for subnode in node.ch[1:]:
             lines.append('if (!this.failed) {')
-            lines.extend('  ' + line for line in self._gen_stmts(subnode))
+            lines.append(Indent(self._gen_stmts(subnode)))
             lines.append('}')
-        return lines
+        return VList(lines)
 
-    def _ty_star(self, node) -> List[str]:
+    def _ty_star(self, node) -> VList:
         sublines = self._gen_stmts(node.child)
         lines = (
             [
@@ -553,7 +553,7 @@ class JavaScriptGenerator(Generator):
                 'while (true) {',
                 '  pos = this.pos;',
             ]
-            + ['  ' + line for line in sublines]
+            + [Indent(sublines)]
             + [
                 '  if (this.failed || this.pos === pos) {',
                 '    this.rewind(pos);',
@@ -564,7 +564,7 @@ class JavaScriptGenerator(Generator):
                 'this.succeed(vs);',
             ]
         )
-        return lines
+        return VList(lines)
 
     def _gen_main_footer(self) -> str:
         return self._dedent("""\
