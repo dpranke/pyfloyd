@@ -952,7 +952,7 @@ def _rewrite_pragma_rules(grammar):
 
 def _compute_local_vars(grammar):
     def _walk(node) -> Set[str]:
-        vs : Set[str] = set()
+        vs: Set[str] = set()
         if node.t == 'seq':
             for c in node.ch:
                 vs.update(_walk(c))

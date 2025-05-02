@@ -365,7 +365,7 @@ class JavaScriptGenerator(Generator):
     def _gen_methods(self) -> str:
         text = self._gen_parse_method(
             exception_needed=self._grammar.exception_needed,
-            starting_rule=self._grammar.starting_rule
+            starting_rule=self._grammar.starting_rule,
         )
 
         text += self._gen_rule_methods()
@@ -496,7 +496,7 @@ class JavaScriptGenerator(Generator):
             lines.extend(
                 [
                     'if (!this.failed) {',
-f"  this.scopes[this.scopes.length-1].set('{node.v}', this.val);"
+                    f"  this.scopes[this.scopes.length-1].set('{node.v}', this.val);"
                     '}',
                 ]
             )
@@ -567,7 +567,7 @@ f"  this.scopes[this.scopes.length-1].set('{node.v}', this.val);"
                 'vs.push(this.val);',
                 'if (this.failed) {',
                 '  return;',
-'}',
+                '}',
                 'while (true) {',
                 '  pos = this.pos;',
             ]
@@ -581,7 +581,7 @@ f"  this.scopes[this.scopes.length-1].set('{node.v}', this.val);"
                 '}',
                 'this.succeed(vs);',
             ]
-)
+        )
         return lines
 
     def _ty_pred(self, node) -> List[str]:
@@ -627,7 +627,7 @@ f"  this.scopes[this.scopes.length-1].set('{node.v}', this.val);"
 
     def _ty_scope(self, node) -> List[str]:
         return (
-[
+            [
                 'this.scopes.push(new Map());',
             ]
             + self._gen(node.child)
@@ -667,7 +667,7 @@ f"  this.scopes[this.scopes.length-1].set('{node.v}', this.val);"
 
     def _load_builtins(self):
         return {
-           'r_any': """\
+            'r_any': """\
                 r_any() {
                     if (this.pos < this.end) {
                         this.succeed(this.text[this.pos], this.pos + 1);
