@@ -408,9 +408,13 @@ class Regexp(Node):
 
 class Rule(Node):
     v_alias = 'name'
+    derived_attrs = ['local_vars']
 
     def __init__(self, name, child):
         super().__init__('rule', name, [child])
+        # Note: This will not actually be derived until the generator
+        # does so.
+        self.local_vars = []
 
 
 class Rules(Node):
@@ -431,11 +435,11 @@ class Scope(Node):
 
 
 class Seq(Node):
-    derived_attrs = ['locals']
+    derived_attrs = ['vars']
 
     def __init__(self, ch):
         super().__init__('seq', None, ch)
-        self.locals = []
+        self.vars = []
 
 
 class Set(Node):

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import collections
-from typing import Set
+from typing import List, Set
 
 from pyfloyd.ast import (
     Apply,
@@ -67,8 +67,11 @@ class Grammar:
         self.str_needed = False
         self.range_needed = False
         self.re_needed = False
+
+        # TODO: Make these just be lists.
         self.needed_builtin_functions = set()
         self.needed_builtin_rules = set()
+
         self.operators = {}
         self.leftrec_rules = set()
         self.outer_scope_rules = set()
@@ -240,6 +243,11 @@ def analyze(ast, rewrite_subrules: bool) -> Grammar:
 
     # Figure out which nodes can fail, etc.
     g.update_node(g.ast)
+
+    # TODO: Figure out how to convert these from sets to lists without
+    # needing to change the type of the field.
+    g.needed_builtin_rules = sorted(g.needed_builtin_rules)
+    g.needed_builtin_functions = sorted(g.needed_builtin_functions)
 
     return g
 
@@ -878,15 +886,19 @@ class _SubRuleRewriter:
     def _ty_operator(self, node):
         self._grammar.operator_needed = True
         o = OperatorState()
+        prec_ops = {}
         for operator in node.ch:
             op, prec = operator.v
             subnode = operator.child
-            o.prec_ops.setdefault(prec, []).append(op)
+            prec_ops.setdefault(prec, []).append(op)
             if self._grammar.assoc.get(op) == 'right':
                 o.rassoc.add(op)
             subnode_rule = self._subrule()
             o.choices[op] = subnode_rule
             self._subrules[subnode_rule] = self._walk(subnode)
+
+        for prec in sorted(prec_ops):
+            o.prec_ops[prec] = prec_ops[prec]
         self._grammar.operators[node.v] = o
         node.ch = []
         return node
@@ -944,7 +956,7 @@ def _compute_local_vars(grammar):
         if node.t == 'seq':
             for c in node.ch:
                 vs.update(_walk(c))
-            node.locals = list(vs)
+            node.vars = sorted(vs)
             return set()
 
         if node.t == 'label':

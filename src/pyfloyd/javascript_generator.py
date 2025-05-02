@@ -32,7 +32,7 @@ class JavaScriptGenerator(Generator):
         self._builtin_methods = self._load_builtin_methods()
         self._methods: Dict[str, List[str]] = {}
         self._operators: Dict[str, str] = {}
-        self._map = {
+        self._map: Dict[str, str] = {
             'end': ';',
             'false': 'false',
             'indent': '  ',
@@ -42,6 +42,23 @@ class JavaScriptGenerator(Generator):
             'null': 'null',
             'true': 'true',
         }
+
+        # Keep this updated and in sync with the text of each node type.
+        self._local_vars: Dict[str, List[str]] = {
+            'choice': ['pos'],
+            'count': ['cmin', 'cmax', 'i', 'vs'],
+            'not': ['errpos', 'pos'],
+            'not_one': ['errpos', 'pos'],
+            'opt': ['pos'],
+            'plus': ['pos', 'vs'],
+            'pred': ['v'],
+            'regexp': ['found', 'r'],
+            'run': ['end', 'start'],
+            'set': ['found', 'r'],
+            'star': ['pos', 'vs'],
+        }
+        self._derive_local_vars()
+
 
     def _gen_text(self) -> str:
         imports = self._imports()
@@ -120,7 +137,7 @@ class JavaScriptGenerator(Generator):
         for rule, o in self._grammar.operators.items():
             text += '    o = new OperatorState()\n'
             text += '    o.precOps = new Map()\n'
-            for prec in sorted(o.prec_ops):
+            for prec in o.prec_ops:
                 text += '    o.precOps.set(%d, [' % prec
                 text += ', '.join("'%s'" % op for op in o.prec_ops[prec])
                 text += ']);\n'
@@ -159,7 +176,7 @@ class JavaScriptGenerator(Generator):
         text = self._gen_rule_methods()
 
         if self._grammar.needed_builtin_rules:
-            for name in sorted(self._grammar.needed_builtin_rules):
+            for name in self._grammar.needed_builtin_rules:
                 method_txt = self._builtin_methods[f'r_{name}']
                 text += '  ' + method_txt
                 text += '\n'
@@ -170,33 +187,20 @@ class JavaScriptGenerator(Generator):
             text += '\n'
             text += '  ' + '\n  '.join(
                 self._builtin_methods[f'fn_{name}']
-                for name in sorted(self._grammar.needed_builtin_functions)
+                for name in self._grammar.needed_builtin_functions
             )
         return text
 
     def _gen_rule_methods(self):
         text = ''
-        local_vars = ('errpos', 'found', 'p', 'regexp')
         for rule, node in self._grammar.rules.items():
-            self._current_rule = self._base_rule_name(rule)
-            local_vars_defined = set()
             lines = []
-            original_lines = self._gen(node)
-            for line in original_lines:
-                modified = False
-                for v in local_vars:
-                    if f'let {v} =' in line:
-                        if v in local_vars_defined:
-                            lines.append(line.replace(f'let {v}', v))
-                            modified = True
-                            break
-                        local_vars_defined.add(v)
-                if not modified:
-                    lines.append(line)
+            for v in node.local_vars:
+                lines.append(f'let {v};')
+            lines.extend(self._gen(node))
 
             text += self._gen_method_text(rule, lines)
             self._methods[rule] = lines
-            self._current_rule = None
 
         text += '\n'
         text += '\n'
@@ -214,7 +218,7 @@ class JavaScriptGenerator(Generator):
         # All of the rule methods return a list of lines.
         lines: List[str] = []
         if node.t == 'seq':
-            for v in sorted(node.locals):
+            for v in node.vars:
                 lines.append(f'let {self._varname(v)};')
 
         fn = getattr(self, f'_ty_{node.t}')
@@ -237,23 +241,23 @@ class JavaScriptGenerator(Generator):
     #
 
     def _ty_choice(self, node) -> List[str]:
-        lines = ['let p = this.pos;']
+        lines = ['pos = this.pos;']
         for subnode in node.ch[:-1]:
             lines.extend(self._gen(subnode))
             lines.append('if (!this.failed) {')
             lines.append('  return;')
             lines.append('}')
-            lines.append('this.rewind(p);')
+            lines.append('this.rewind(pos);')
         lines.extend(self._gen(node.ch[-1]))
         return lines
 
     def _ty_count(self, node) -> List[str]:
         assert isinstance(node, Count)
         lines = [
-            'let vs = [];',
-            'let i = 0;',
-            f'let cmin = {node.start};',
-            f'let cmax = {node.stop};',
+            'vs = [];',
+            'i = 0;',
+            f'cmin = {node.start};',
+            f'cmax = {node.stop};',
             'while (i < cmax) {',
         ]
         lines.extend(['    ' + line for line in self._gen(node.child)])
@@ -301,7 +305,7 @@ class JavaScriptGenerator(Generator):
             lines.extend(
                 [
                     'if (!this.failed) {',
-                    f"  this.scopes[this.scopes.length-1].set('{node.v}', this.val);"
+f"  this.scopes[this.scopes.length-1].set('{node.v}', this.val);"
                     '}',
                 ]
             )
@@ -319,15 +323,15 @@ class JavaScriptGenerator(Generator):
         sublines = self._gen(node.child)
         lines = (
             [
-                'let p = this.pos;',
-                'let errpos = this.errpos;',
+                'pos = this.pos;',
+                'errpos = this.errpos;',
             ]
             + sublines
             + [
                 'if (this.failed) {',
-                '  this.succeed(null, p);',
+                '  this.succeed(null, pos);',
                 '} else {',
-                '  this.rewind(p);',
+                '  this.rewind(pos);',
                 '  this.errpos = errpos;',
                 '  this.fail();',
                 '}',
@@ -339,7 +343,7 @@ class JavaScriptGenerator(Generator):
         sublines = self._gen(self._grammar.node(Not, node.child))
         return sublines + [
             'if (!this.failed) {',
-            '    this.r_any(p);',
+            '    this.r_any(pos);',
             '}',
         ]
 
@@ -347,12 +351,12 @@ class JavaScriptGenerator(Generator):
         sublines = self._gen(node.child)
         lines = (
             [
-                'let p = this.pos;',
+                'pos = this.pos;',
             ]
             + sublines
             + [
                 'if (this.failed) {',
-                '  this.succeed([], p);',
+                '  this.succeed([], pos);',
                 '} else {',
                 '  this.succeed([this.val]);',
                 '}',
@@ -366,33 +370,33 @@ class JavaScriptGenerator(Generator):
     def _ty_plus(self, node) -> List[str]:
         sublines = self._gen(node.child)
         lines = (
-            ['let vs = [];']
+            ['vs = [];']
             + sublines
             + [
                 'vs.push(this.val);',
                 'if (this.failed) {',
                 '  return;',
-                '}',
+'}',
                 'while (true) {',
-                '  let p = this.pos;',
+                '  pos = this.pos;',
             ]
             + ['  ' + line for line in sublines]
             + [
-                '  if (this.failed || this.pos === p) {',
-                '    this.rewind(p);',
+                '  if (this.failed || this.pos === pos) {',
+                '    this.rewind(pos);',
                 '    break;',
                 '  }',
                 '  vs.push(this.val);',
                 '}',
                 'this.succeed(vs);',
             ]
-        )
+)
         return lines
 
     def _ty_pred(self, node) -> List[str]:
         arg = self._gen_expr(node.child)
         return [
-            'let v = ' + flatten(arg, indent=self._map['indent'])[0],
+            'v = ' + flatten(arg, indent=self._map['indent'])[0],
             'if (v === true) {',
             '  this.succeed(v);',
             '} else if (v === false) {',
@@ -403,12 +407,12 @@ class JavaScriptGenerator(Generator):
         ]
 
     def _ty_regexp(self, node) -> List[str]:
-        # TODO: Explain why this is correct.
+        # TODO: Explain why this escaping is correct.
         s = lit.escape(node.v, '/').replace('\\\\', '\\')
         return [
-            f'let regexp = /{s}/gy;',
-            'regexp.lastIndex = this.pos;',
-            'let found = regexp.exec(this.text);',
+            f'r = /{s}/gy;',
+            'r.lastIndex = this.pos;',
+            'found = r.exec(this.text);',
             'if (found) {',
             '    this.succeed(found[0], this.pos + found[0].length);',
             '    return;',
@@ -419,20 +423,20 @@ class JavaScriptGenerator(Generator):
     def _ty_run(self, node) -> List[str]:
         lines = self._gen(node.child)
         return (
-            ['let start = this.pos;']
+            ['start = this.pos;']
             + lines
             + [
                 'if (this.failed) {',
                 '    return;',
                 '}',
-                'let end = this.pos;',
+                'end = this.pos;',
                 'this.val = this.text.substr(start, end);',
             ]
         )
 
     def _ty_scope(self, node) -> List[str]:
         return (
-            [
+[
                 'this.scopes.push(new Map());',
             ]
             + self._gen(node.child)
@@ -453,14 +457,14 @@ class JavaScriptGenerator(Generator):
         sublines = self._gen(node.child)
         lines = (
             [
-                'let vs = [];',
+                'vs = [];',
                 'while (true) {',
-                '  let p = this.pos;',
+                '  pos = this.pos;',
             ]
             + ['  ' + line for line in sublines]
             + [
-                '  if (this.failed || this.pos === p) {',
-                '    this.rewind(p);',
+                '  if (this.failed || this.pos === pos) {',
+                '    this.rewind(pos);',
                 '    break;',
                 '  }',
                 '  vs.push(this.val);',
@@ -696,8 +700,8 @@ _BUILTIN_METHODS = """\
   }
 
   ch(c) {
-    let p = this.pos;
-    if (p < this.end && this.text[p] === c) {
+    let pos = this.pos;
+    if (pos < this.end && this.text[pos] === c) {
       this.succeed(c, this.pos + 1);
     } else {
       this.fail();
@@ -786,16 +790,16 @@ _BUILTIN_METHODS = """\
   }
 
   memoize(rule_name, fn) {
-    let p = this.pos;
-    if (!this.cache.has(p)) {
-      this.cache.set(p, new Map());
+    let pos = this.pos;
+    if (!this.cache.has(pos)) {
+      this.cache.set(pos, new Map());
     }
-    if (this.cache.get(p).has(rule_name)) {
-      [this.val, this.failed, this.pos] = this.cache.get(p).get(rule_name);
+    if (this.cache.get(pos).has(rule_name)) {
+      [this.val, this.failed, this.pos] = this.cache.get(pos).get(rule_name);
       return;
     }
     fn.call(this);
-    this.cache.get(p).set(rule_name, [this.val, this.failed, this.pos]);
+    this.cache.get(pos).set(rule_name, [this.val, this.failed, this.pos]);
   }
 
   operator(rule_name) {
@@ -848,14 +852,14 @@ _BUILTIN_METHODS = """\
   }
 
   range(i, j) {
-    let p = this.pos;
-    if (p == this.end) {
+    let pos = this.pos;
+    if (pos == this.end) {
       this.fail();
       return;
     }
-    let c = this.text[p];
+    let c = this.text[pos];
     if (i <= c && c <= j) {
-      this.succeed(this.text[p], this.pos + 1);
+      this.succeed(this.text[pos], this.pos + 1);
     } else {
       this.fail();
     }

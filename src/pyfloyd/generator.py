@@ -101,6 +101,18 @@ class Generator:
         self._indent: str = '  '
         self._map: Dict[str, str] = {}
         self._builtin_methods: Dict[str, str] = {}
+        self._local_vars: Dict[str, List[str]] = {}
+
+    def _derive_local_vars(self):
+        def _walk(node) -> Set[str]:
+            local_vars: Set[str] = set()
+            local_vars.update(set(self._local_vars.get(node.t, [])))
+            for c in node.ch:
+                local_vars.update(_walk(c))
+            return local_vars
+
+        for rule, node in self._grammar.rules.items():
+            node.local_vars = _walk(node)
 
     def generate(self) -> str:
         return self._gen_text()
