@@ -15,13 +15,10 @@
 from typing import List
 
 
-class Formatter:
+class FormatObj:
     def fmt(self, current_depth: int, max_depth: int, indent: str):
         """Returns a list of strings, each representing a line."""
         raise NotImplementedError  # pragma: no cover
-
-
-FormatObj = str | Formatter
 
 
 def flatten(
@@ -54,7 +51,20 @@ def fmt(
     return obj.fmt(current_depth, max_depth, indent)
 
 
-class Saw(Formatter):
+class Lit(FormatObj):
+    def __init__(self, s):
+        self.s = s
+
+    def __repr__(self):
+        return f'Lit({repr(self.s)}'
+
+    def fmt(
+        self, current_depth: int, max_depth: int, indent: str
+    ) -> List[str]:
+        return [self.s]
+
+
+class Saw(FormatObj):
     """Formats series of calls and lists as a saw-shaped pattern.
 
     Expressions of the form `foo(x)`, `[4]`, and `foo(x)[4]` can be called
@@ -98,7 +108,7 @@ class Saw(Formatter):
         return lines
 
 
-class Comma(Formatter):
+class Comma(FormatObj):
     """Format a comma-separated list of arguments.
 
     If we need to format a list of arguments across multiple lines, we
@@ -127,7 +137,7 @@ class Comma(Formatter):
         return lines
 
 
-class Tree(Formatter):
+class Tree(FormatObj):
     """Format a tree of expressions.
 
     This formats a tree of expressions, like `1 + 2 - 3`. If the expressions

@@ -14,7 +14,7 @@
 
 # pylint: disable=too-many-lines
 
-from typing import Dict, List
+from typing import List
 
 from pyfloyd.analyzer import Grammar, Node
 from pyfloyd.ast import Not, Label

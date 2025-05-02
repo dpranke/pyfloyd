@@ -314,16 +314,16 @@ class JavaScriptGenerator(Generator):
         text += '  }'
         return text
 
-    def _gen_thisvar(self, name):
+    def _gen_thisvar(self, name: str) -> str:
         return 'this.' + name
 
-    def _gen_rulename(self, name):
+    def _gen_rulename(self, name: str) -> str:
         return 'this.' + name
 
-    def _gen_extern(self, name):
+    def _gen_extern(self, name: str) -> str:
         return "this.externs.get('" + name + "');"
 
-    def _gen_invoke(self, fn, *args):
+    def _gen_invoke(self, fn: str, *args) -> str:
         return 'this.' + fn + '(' + ', '.join(args) + ')'
 
     #
