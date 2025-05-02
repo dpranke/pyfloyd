@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import collections
-from typing import Set
+from typing import Any, Dict, List, Optional, Set
 
 from pyfloyd.ast import (
     Apply,
@@ -48,34 +48,32 @@ class AnalysisError(Exception):
 
 
 class Grammar:
-    def __init__(self, ast):
-        self.ast = Node.to(ast)
-        self.comment = None
-        self.rules = collections.OrderedDict()
-        self.pragmas = []
-        self.starting_rule = None
-        self.tokens = set()
-        self.whitespace = None
-        self.assoc = {}
-        self.prec = {}
-        self.exception_needed = False
-        self.leftrec_needed = False
-        self.lookup_needed = False
-        self.operator_needed = False
-        self.unicat_needed = False
-        self.ch_needed = False
-        self.str_needed = False
-        self.range_needed = False
-        self.re_needed = False
+    def __init__(self, ast: Any):
+        self.ast: Node = Node.to(ast)
+        self.comment: Optional[Rule] = None
+        self.rules: Dict[str, Rule] = collections.OrderedDict()
+        self.pragmas: List[Rule] = []
+        self.starting_rule: Optional[str] = None
+        self.tokens: Set[str] = set()
+        self.whitespace: Optional[Rule] = None
+        self.assoc: Dict[str, str] = {}
+        self.prec: Dict[str, int] = {}
+        self.exception_needed: bool = False
+        self.leftrec_needed: bool = False
+        self.lookup_needed: bool = False
+        self.operator_needed: bool = False
+        self.unicat_needed: bool = False
+        self.ch_needed: bool = False
+        self.str_needed: bool = False
+        self.range_needed: bool = False
+        self.re_needed: bool = False
+        self.needed_builtin_functions: List[str] = []
+        self.needed_builtin_rules: List[str] = []
 
-        # TODO: Make these just be lists.
-        self.needed_builtin_functions = set()
-        self.needed_builtin_rules = set()
-
-        self.operators = {}
-        self.leftrec_rules = set()
-        self.outer_scope_rules = set()
-        self.externs = {}
+        self.operators: Dict[str, OperatorState] = {}
+        self.leftrec_rules: Set[str] = set()
+        self.outer_scope_rules: Set[str] = set()
+        self.externs: Dict[str, bool] = {}
 
         has_starting_rule = False
         for rule in self.ast.rules:
@@ -184,9 +182,15 @@ class Grammar:
 
 class OperatorState:
     def __init__(self):
-        self.prec_ops = {}
-        self.rassoc = set()
-        self.choices = {}
+        # Map of precedence level to a list of operator literals that
+        # have that level, e.g. {0: ['+'], 2: ['*']}
+        self.prec_ops = {}  # Dict[int, List[str]]
+
+        # Set of operator literals that are right-associative.
+        self.rassoc = set()  # Set[str]
+
+        # Map of operator literals to corresponding subrule names.
+        self.choices = {}  # Dict[str, str]
 
 
 def analyze(ast, rewrite_subrules: bool) -> Grammar:
@@ -244,10 +248,8 @@ def analyze(ast, rewrite_subrules: bool) -> Grammar:
     # Figure out which nodes can fail, etc.
     g.update_node(g.ast)
 
-    # TODO: Figure out how to convert these from sets to lists without
-    # needing to change the type of the field.
-    g.needed_builtin_rules = sorted(g.needed_builtin_rules)
-    g.needed_builtin_functions = sorted(g.needed_builtin_functions)
+    g.needed_builtin_rules = sorted(set(g.needed_builtin_rules))
+    g.needed_builtin_functions = sorted(set(g.needed_builtin_functions))
 
     return g
 
@@ -852,11 +854,11 @@ class _SubRuleRewriter:
 
     def _ty_apply(self, node):
         if node.rule_name in ('any', 'end'):
-            self._grammar.needed_builtin_rules.add(node.rule_name)
+            self._grammar.needed_builtin_rules.append(node.rule_name)
         return Apply(self._rule_fmt.format(rule_name=node.rule_name))
 
     def _ty_ends_in(self, node):
-        self._grammar.needed_builtin_rules.add('any')
+        self._grammar.needed_builtin_rules.append('any')
         return self._walkn(node)
 
     def _ty_equals(self, node):
@@ -876,11 +878,11 @@ class _SubRuleRewriter:
 
     def _ty_e_qual(self, node):
         if node.ch[0].t == 'e_var' and node.ch[1].t == 'e_call':
-            self._grammar.needed_builtin_functions.add(node.ch[0].v)
+            self._grammar.needed_builtin_functions.append(node.ch[0].v)
         return self._walkn(node)
 
     def _ty_not_one(self, node):
-        self._grammar.needed_builtin_rules.add('any')
+        self._grammar.needed_builtin_rules.append('any')
         return self._walkn(node)
 
     def _ty_operator(self, node):

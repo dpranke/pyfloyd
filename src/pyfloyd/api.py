@@ -16,7 +16,7 @@
 
 from typing import Any, Dict, NamedTuple, Optional, Protocol, Tuple
 
-from pyfloyd import analyzer
+from pyfloyd import analyzer, ast
 from pyfloyd.interpreter import Interpreter
 from pyfloyd import parser
 from pyfloyd.printer import Printer
@@ -222,7 +222,7 @@ def dump_ast(
     grammar: str,
     path: str = '<string>',
     rewrite_subrules: bool = False,
-) -> Tuple[Optional[str], Optional[str]]:
+) -> Tuple[Optional[ast.Node], Optional[str]]:
     """Returns the parsed AST from the grammar. Possibly useful for debugging.
 
     `rewrite_subrules` works as in the other methods.

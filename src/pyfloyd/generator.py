@@ -13,13 +13,16 @@
 # limitations under the License.
 
 import re
+import shlex
+import sys
 import textwrap
 from typing import Dict, List, Optional, Set
 
+from pyfloyd import string_literal as lit
 from pyfloyd.ast import Apply, EMinus, EPlus, Regexp, Var
 from pyfloyd.analyzer import Grammar, Node
 from pyfloyd.formatter import flatten, Comma, FormatObj, Saw, Tree
-from pyfloyd import string_literal as lit
+from pyfloyd.version import __version__
 
 
 DEFAULT_LANGUAGE = 'python'
@@ -84,6 +87,8 @@ class GeneratorOptions:
         self.main = main
         self.memoize = memoize
         self.defines = defines or {}
+        self.version = __version__
+        self.args = shlex.join(sys.argv[1:])
 
 
 class Generator:
@@ -113,9 +118,6 @@ class Generator:
 
         for _, node in self._grammar.rules.items():
             node.local_vars = _walk(node)
-
-    def generate(self) -> str:
-        return self._gen_text()
 
     def _extern(self, name: str) -> str:
         raise NotImplementedError
@@ -154,14 +156,7 @@ class Generator:
         r = f'v_{name.replace("$", "_")}'
         return r
 
-    def _base_rule_name(self, rule_name: str) -> str:
-        if rule_name.startswith('r_'):
-            return rule_name[2:]
-        m = self._base_rule_regex.match(rule_name)
-        assert m is not None
-        return m.group(1)
-
-    def _needed_methods(self) -> str:
+    def _gen_needed_methods(self) -> str:
         text = ''
         if self._grammar.ch_needed:
             text += self._builtin_methods['ch'] + '\n'
