@@ -106,6 +106,25 @@ class Generator:
         self._builtin_methods: Dict[str, str] = {}
         self._local_vars: Dict[str, List[str]] = {}
 
+        self._derive_memoize()
+
+    def _derive_memoize(self):
+        def _walk(node):
+            if node.t == 'apply':
+                if self._options.memoize and node.rule_name.startswith('r_'):
+                    name = node.rule_name[2:]
+                    node.memoize = (
+                        name not in self._grammar.operators
+                        and name not in self._grammar.leftrec_rules
+                    )
+                else:
+                    node.memoize = False
+            else:
+                for c in node.ch:
+                    _walk(c)
+
+        _walk(self._grammar.ast)
+
     def _derive_local_vars(self):
         def _walk(node) -> Set[str]:
             local_vars: Set[str] = set()
@@ -194,20 +213,14 @@ class Generator:
 
     def _ty_apply(self, node: Node) -> List[str]:
         assert isinstance(node, Apply)
-        if self._options.memoize and node.rule_name.startswith('r_'):
-            name = node.rule_name[2:]
-            if (
-                name not in self._grammar.operators
-                and name not in self._grammar.leftrec_rules
-            ):
-                return [
-                    self._gen_invoke(
-                        'memoize',
-                        f"'{node.rule_name}'",
-                        self._gen_rulename(node.rule_name),
-                    )
-                ]
-
+        if node.memoize:
+            return [
+                self._gen_invoke(
+                    'memoize',
+                    f"'{node.rule_name}'",
+                    self._gen_rulename(node.rule_name),
+                )
+            ]
         return [self._gen_invoke(node.rule_name) + self._map['end']]
 
     def _ty_e_arr(self, node: Node) -> str | Saw:

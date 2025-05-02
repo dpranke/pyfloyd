@@ -238,9 +238,12 @@ class Action(Node):
 
 class Apply(Node):
     v_alias = 'rule_name'
+    derived_attrs = ['memoize']
 
     def __init__(self, rule_name):
         super().__init__('apply', rule_name, [])
+        # This will only be set by the generator.
+        self.memoize = None
 
 
 class Choice(Node):
