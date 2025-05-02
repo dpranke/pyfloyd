@@ -319,7 +319,7 @@ class Generator:
         return [self._gen_invoke('str', flatten(arg)[0]) + self._map['end']]
 
     def _ty_leftrec(self, node) -> List[str]:
-        if self._grammar.assoc.get(node.name, 'left') == 'left':
+        if node.left_assoc:
             left_assoc = self._map['true']
         else:
             left_assoc = self._map['false']

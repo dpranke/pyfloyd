@@ -343,9 +343,11 @@ class Label(Node):
 
 class Leftrec(Node):
     v_alias = 'name'
+    derived_attrs = ['leftrec']
 
     def __init__(self, name, child):
         super().__init__('leftrec', name, [child])
+        self.left_assoc = None
 
 
 class Lit(Node):
