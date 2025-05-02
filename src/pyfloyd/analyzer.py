@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import collections
-from typing import List, Set
+from typing import Set
 
 from pyfloyd.ast import (
     Apply,

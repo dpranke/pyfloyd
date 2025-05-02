@@ -44,8 +44,8 @@ class PythonGenerator(Generator):
         }
 
         self._builtin_methods = {}
-        more_builtins = self._load_builtins()
-        for k, v in more_builtins.items():
+        builtins = self._load_builtins()
+        for k, v in builtins.items():
             self._builtin_methods[k] = self._dedent(v, 1)
 
     def _gen_text(self) -> str:
@@ -65,7 +65,7 @@ class PythonGenerator(Generator):
             text += self._gen_operator_state_class()
 
         externs = self._gen_externs()
-        text += self._gen_parser_class(externs=externs)
+        text += self._gen_parser_class(externs)
 
         text += self._gen_state()
 

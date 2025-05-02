@@ -111,7 +111,7 @@ class Generator:
                 local_vars.update(_walk(c))
             return local_vars
 
-        for rule, node in self._grammar.rules.items():
+        for _, node in self._grammar.rules.items():
             node.local_vars = _walk(node)
 
     def generate(self) -> str:
