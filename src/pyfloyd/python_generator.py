@@ -20,7 +20,6 @@ from pyfloyd.analyzer import Grammar, Node
 from pyfloyd.ast import Not, Label
 from pyfloyd.formatter import flatten
 from pyfloyd.generator import Generator, GeneratorOptions
-from pyfloyd import string_literal as lit
 
 
 class PythonGenerator(Generator):
@@ -239,7 +238,8 @@ class PythonGenerator(Generator):
         return text
 
     def _gen_constructor(self) -> str:
-        text = self._dedent("""\
+        text = self._dedent(
+            """\
                 def __init__(self, text, path):
                     self._text = text
                     self._end = len(self._text)
@@ -248,8 +248,10 @@ class PythonGenerator(Generator):
                     self._path = path
                     self._pos = 0
                     self._val = None
-                """, 1)
-        
+                """,
+            1,
+        )
+
         externs = self._gen_externs()
         text += '        self._externs = ' + externs + '\n'
 
@@ -547,7 +549,7 @@ class PythonGenerator(Generator):
 
     def _ty_regexp(self, node: Node) -> List[str]:
         return [
-            f'p = {lit.encode(node.v)}',
+            f'p = {self._gen_lit(node.v)}',
             'if p not in self._regexps:',
             '    self._regexps[p] = re.compile(p)',
             'm = self._regexps[p].match(self._text, self._pos)',

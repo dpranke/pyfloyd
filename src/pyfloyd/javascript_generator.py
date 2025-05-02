@@ -20,7 +20,6 @@ from pyfloyd.ast import Not, Count
 from pyfloyd.analyzer import Grammar
 from pyfloyd.formatter import flatten
 from pyfloyd.generator import Generator, GeneratorOptions
-from pyfloyd import string_literal as lit
 
 
 class JavaScriptGenerator(Generator):
@@ -185,7 +184,7 @@ class JavaScriptGenerator(Generator):
         if self._grammar.lookup_needed:
             text += '    this.scopes = [];\n'
 
-        text += "  }\n\n"
+        text += '  }\n\n'
 
         return text
 
@@ -275,7 +274,9 @@ class JavaScriptGenerator(Generator):
             self._gen_parse_method(
                 exception_needed=self._grammar.exception_needed,
                 starting_rule=self._grammar.starting_rule,
-            ), 1)
+            ),
+            1,
+        )
 
         text += self._gen_rule_methods()
 
@@ -496,10 +497,8 @@ class JavaScriptGenerator(Generator):
         ]
 
     def _ty_regexp(self, node) -> List[str]:
-        # TODO: Explain why this escaping is correct.
-        s = lit.escape(node.v, '/').replace('\\\\', '\\')
         return [
-            f'r = /{s}/gy;',
+            f"r = new RegExp({self._gen_lit(node.v)}, 'gy');"
             'r.lastIndex = this.pos;',
             'found = r.exec(this.text);',
             'if (found) {',
@@ -975,4 +974,3 @@ _BUILTINS = {
         }
         """,
 }
-

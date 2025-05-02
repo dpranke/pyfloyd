@@ -99,8 +99,6 @@ class Generator:
             grammar.unicat_needed
             or 'unicode_lookup' in self._grammar.needed_builtin_functions
         )
-        self._current_rule: str = ''
-        self._base_rule_regex = re.compile(r's_(.+)_\d+$')
 
         # Expected to be overridden in subclasses
         self._indent: str = '  '
@@ -123,9 +121,7 @@ class Generator:
         s = textwrap.dedent(s)
         indent = self._indent * level
         return (
-            '\n'.join(
-                ((indent + line).rstrip() for line in s.splitlines())
-            )
+            '\n'.join(((indent + line).rstrip() for line in s.splitlines()))
             + '\n'
         )
 
@@ -144,6 +140,9 @@ class Generator:
     def _gen_varname(self, name: str) -> str:
         r = f'v_{name.replace("$", "_")}'
         return r
+
+    def _gen_lit(self, l: str) -> str:
+        return lit.encode(l)
 
     def _gen_expr(self, node: Node) -> FormatObj:
         fn = getattr(self, f'_ty_{node.t}')
@@ -185,7 +184,11 @@ class Generator:
     def _ty_action(self, node: Node) -> List[str]:
         obj = self._gen_expr(node.child)
         return flatten(
-            Saw(self._gen_rulename('succeed') + '(', obj, ')' + self._map['end']),
+            Saw(
+                self._gen_rulename('succeed') + '(',
+                obj,
+                ')' + self._map['end'],
+            ),
             indent=self._map['indent'],
         )
 
@@ -230,7 +233,7 @@ class Generator:
         return Saw('[', self._gen_expr(node.child), ']')
 
     def _ty_e_lit(self, node: Node) -> str:
-        return lit.encode(node.v)
+        return self._gen_lit(node.v)
 
     def _ty_e_minus(self, node: Node) -> Tree:
         assert isinstance(node, EMinus)
@@ -294,7 +297,9 @@ class Generator:
 
     def _ty_empty(self, node) -> List[str]:
         del node
-        return [self._gen_invoke('succeed', self._map['null']) + self._map['end']]
+        return [
+            self._gen_invoke('succeed', self._map['null']) + self._map['end']
+        ]
 
     def _ty_equals(self, node) -> List[str]:
         arg = self._gen_expr(node.child)
@@ -317,7 +322,7 @@ class Generator:
         return lines
 
     def _ty_lit(self, node) -> List[str]:
-        expr = lit.encode(node.v)
+        expr = self._gen_lit(node.v)
         if len(node.v) == 1:
             method = 'ch'
         else:
@@ -334,16 +339,15 @@ class Generator:
     def _ty_range(self, node) -> List[str]:
         return [
             self._gen_invoke(
-                'range', lit.encode(node.start), lit.encode(node.stop)
+                'range', self._gen_lit(node.start), self._gen_lit(node.stop)
             )
         ]
-
-    def _ty_regexp(self, node) -> List[str]:
-        raise NotImplementedError
 
     def _ty_set(self, node) -> List[str]:
         new_node = Regexp('[' + node.v + ']')
         return self._ty_regexp(new_node)
 
     def _ty_unicat(self, node) -> List[str]:
-        return [self._gen_invoke('unicat', lit.encode(node.v)) + self._map['end']]
+        return [
+            self._gen_invoke('unicat', self._gen_lit(node.v)) + self._map['end']
+        ]
