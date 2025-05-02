@@ -388,16 +388,16 @@ class PythonGenerator(Generator):
             text += f'        {line}\n'
         return text
 
-    def _thisvar(self, name: str) -> str:
+    def _gen_thisvar(self, name: str) -> str:
         return 'self._' + name
 
-    def _rulename(self, name: str) -> str:
+    def _gen_rulename(self, name: str) -> str:
         return 'self._' + name
 
-    def _extern(self, name: str) -> str:
+    def _gen_extern(self, name: str) -> str:
         return "self._externs['" + name + "']"
 
-    def _invoke(self, fn, *args) -> str:
+    def _gen_invoke(self, fn, *args) -> str:
         return 'self._' + fn + '(' + ', '.join(args) + ')'
 
     #
@@ -462,7 +462,7 @@ class PythonGenerator(Generator):
         else:
             lines.extend(
                 [
-                    f'{self._varname(node.name)} = self._val',
+                    f'{self._gen_varname(node.name)} = self._val',
                 ]
             )
         return lines

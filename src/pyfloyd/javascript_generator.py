@@ -313,16 +313,16 @@ class JavaScriptGenerator(Generator):
         text += '  }'
         return text
 
-    def _thisvar(self, name):
+    def _gen_thisvar(self, name):
         return 'this.' + name
 
-    def _rulename(self, name):
+    def _gen_rulename(self, name):
         return 'this.' + name
 
-    def _extern(self, name):
+    def _gen_extern(self, name):
         return "this.externs.get('" + name + "');"
 
-    def _invoke(self, fn, *args):
+    def _gen_invoke(self, fn, *args):
         return 'this.' + fn + '(' + ', '.join(args) + ')'
 
     #
@@ -389,7 +389,7 @@ class JavaScriptGenerator(Generator):
 
     def _ty_label(self, node) -> List[str]:
         lines = self._gen_stmts(node.child)
-        varname = self._varname(node.v)
+        varname = self._gen_varname(node.v)
         if node.outer_scope:
             lines.extend(
                 [
@@ -537,7 +537,7 @@ class JavaScriptGenerator(Generator):
     def _ty_seq(self, node) -> List[str]:
         lines = []
         for v in node.vars:
-            lines.append(f'let {self._varname(v)};')
+            lines.append(f'let {self._gen_varname(v)};')
 
         lines.extend(self._gen_stmts(node.ch[0]))
         for subnode in node.ch[1:]:

@@ -119,26 +119,6 @@ class Generator:
         for _, node in self._grammar.rules.items():
             node.local_vars = _walk(node)
 
-    def _extern(self, name: str) -> str:
-        raise NotImplementedError
-
-    def _invoke(self, fn: str, *args) -> str:
-        raise NotImplementedError
-
-    def _thisvar(self, name: str) -> str:
-        raise NotImplementedError
-
-    def _gen_text(self) -> str:
-        raise NotImplementedError
-
-    def _gen_expr(self, node: Node) -> FormatObj:
-        fn = getattr(self, f'_ty_{node.t}')
-        return fn(node)
-
-    def _gen_stmts(self, node: Node) -> List[str]:
-        fn = getattr(self, f'_ty_{node.t}')
-        return fn(node)
-
     def _dedent(self, s: str, level=0) -> str:
         s = textwrap.dedent(s)
         indent = self._indent * level
@@ -149,12 +129,29 @@ class Generator:
             + '\n'
         )
 
-    def _rulename(self, name: str) -> str:
+    def _gen_extern(self, name: str) -> str:
         raise NotImplementedError
 
-    def _varname(self, name: str) -> str:
+    def _gen_invoke(self, fn: str, *args) -> str:
+        raise NotImplementedError
+
+    def _gen_thisvar(self, name: str) -> str:
+        raise NotImplementedError
+
+    def _gen_rulename(self, name: str) -> str:
+        raise NotImplementedError
+
+    def _gen_varname(self, name: str) -> str:
         r = f'v_{name.replace("$", "_")}'
         return r
+
+    def _gen_expr(self, node: Node) -> FormatObj:
+        fn = getattr(self, f'_ty_{node.t}')
+        return fn(node)
+
+    def _gen_stmts(self, node: Node) -> List[str]:
+        fn = getattr(self, f'_ty_{node.t}')
+        return fn(node)
 
     def _gen_needed_methods(self) -> str:
         text = ''
@@ -188,7 +185,7 @@ class Generator:
     def _ty_action(self, node: Node) -> List[str]:
         obj = self._gen_expr(node.child)
         return flatten(
-            Saw(self._rulename('succeed') + '(', obj, ')' + self._map['end']),
+            Saw(self._gen_rulename('succeed') + '(', obj, ')' + self._map['end']),
             indent=self._map['indent'],
         )
 
@@ -201,14 +198,14 @@ class Generator:
                 and name not in self._grammar.leftrec_rules
             ):
                 return [
-                    self._invoke(
+                    self._gen_invoke(
                         'memoize',
                         f"'{node.rule_name}'",
-                        self._rulename(node.rule_name),
+                        self._gen_rulename(node.rule_name),
                     )
                 ]
 
-        return [self._invoke(node.rule_name) + self._map['end']]
+        return [self._gen_invoke(node.rule_name) + self._map['end']]
 
     def _ty_e_arr(self, node: Node) -> str | Saw:
         if len(node.ch) == 0:
@@ -264,7 +261,7 @@ class Generator:
                 function_name = first.v
                 # Note that unknown functions were caught during analysis
                 # so we don't have to worry about that here.
-                start = self._thisvar(f'fn_{function_name}')
+                start = self._gen_thisvar(f'fn_{function_name}')
             else:
                 # If second isn't a call, then first refers to a variable.
                 start = self._ty_e_var(first)
@@ -290,18 +287,18 @@ class Generator:
     def _ty_e_var(self, node: Node) -> str:
         assert isinstance(node, Var)
         if node.outer_scope:
-            return self._invoke('lookup', "'" + node.v + "'")
+            return self._gen_invoke('lookup', "'" + node.v + "'")
         if node.v in self._grammar.externs:
-            return self._extern(node.v)
-        return self._varname(node.v)
+            return self._gen_extern(node.v)
+        return self._gen_varname(node.v)
 
     def _ty_empty(self, node) -> List[str]:
         del node
-        return [self._invoke('succeed', self._map['null']) + self._map['end']]
+        return [self._gen_invoke('succeed', self._map['null']) + self._map['end']]
 
     def _ty_equals(self, node) -> List[str]:
         arg = self._gen_expr(node.child)
-        return [self._invoke('str', flatten(arg)[0]) + self._map['end']]
+        return [self._gen_invoke('str', flatten(arg)[0]) + self._map['end']]
 
     def _ty_leftrec(self, node) -> List[str]:
         if self._grammar.assoc.get(node.name, 'left') == 'left':
@@ -310,9 +307,9 @@ class Generator:
             left_assoc = self._map['false']
 
         lines = [
-            self._invoke(
+            self._gen_invoke(
                 'leftrec',
-                self._rulename(node.child.v),
+                self._gen_rulename(node.child.v),
                 "'" + node.v + "'",
                 left_assoc,
             )
@@ -325,18 +322,18 @@ class Generator:
             method = 'ch'
         else:
             method = 'str'
-        return [self._invoke(method, expr)]
+        return [self._gen_invoke(method, expr)]
 
     def _ty_operator(self, node) -> List[str]:
         # Operator nodes have no children, but subrules for each arm
         # of the expression cluster have been defined and are referenced
         # from self._grammar.operators[node.v].choices.
         assert node.ch == []
-        return [self._invoke('operator', "'" + node.v + "'")]
+        return [self._gen_invoke('operator', "'" + node.v + "'")]
 
     def _ty_range(self, node) -> List[str]:
         return [
-            self._invoke(
+            self._gen_invoke(
                 'range', lit.encode(node.start), lit.encode(node.stop)
             )
         ]
@@ -349,4 +346,4 @@ class Generator:
         return self._ty_regexp(new_node)
 
     def _ty_unicat(self, node) -> List[str]:
-        return [self._invoke('unicat', lit.encode(node.v)) + self._map['end']]
+        return [self._gen_invoke('unicat', lit.encode(node.v)) + self._map['end']]
