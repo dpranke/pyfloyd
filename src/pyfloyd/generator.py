@@ -139,9 +139,10 @@ class Generator:
 
     def _dedent(self, s: str, level=0) -> str:
         s = textwrap.dedent(s)
+        indent = self._indent * level
         return (
             '\n'.join(
-                ((self._indent * level) + line) for line in s.splitlines()
+                ((indent + line).rstrip() for line in s.splitlines())
             )
             + '\n'
         )

@@ -82,10 +82,6 @@ class JavaScriptGenerator(Generator):
 
         text += self._gen_parser_class()
 
-        text += self._gen_state()
-
-        text += self._gen_methods()
-        text += self._gen_endclass()
 
         if self._options.main:
             text += self._gen_main_footer()
@@ -136,7 +132,11 @@ class JavaScriptGenerator(Generator):
 
     def _gen_parser_class(self) -> str:
         externs = self._gen_externs()
-        return self._dedent(f"""\
+        state = self._gen_state()
+        methods = self._gen_methods()
+        endclass = self._gen_endclass()
+
+        text = self._dedent(f"""\
             class Result {{
               constructor(val, err, pos) {{
                 this.val = val;
@@ -152,17 +152,24 @@ class JavaScriptGenerator(Generator):
             }}
 
             class Parser {{
-                constructor(text, path) {{
-                    this.text = text;
-                    this.end = text.length;
-                    this.errpos = 0;
-                    this.failed = false;
-                    this.path = path;
-                    this.pos = 0;
-                    this.val = undefined;
-                    this.externs = new Map();
-                    {externs}
+              constructor(text, path) {{
+                this.text = text;
+                this.end = text.length;
+                this.errpos = 0;
+                this.failed = false;
+                this.path = path;
+                this.pos = 0;
+                this.val = undefined;
+                this.externs = new Map();
             """)
+
+        text += externs
+        text += state
+        text += "  }\n\n"
+
+        text += methods
+        text += endclass
+        return text
 
     def _gen_main_footer(self) -> str:
         return self._dedent("""\
@@ -252,57 +259,57 @@ class JavaScriptGenerator(Generator):
         if exception_needed:
             return self._dedent(f"""\
                 parse(externs = null) {{
-                externs = externs || new Map();
-                let errors = '';
-                for (let key of externs.keys()) {{
+                  externs = externs || new Map();
+                  let errors = '';
+                  for (let key of externs.keys()) {{
                     if (!this.externs.has(key)) {{
-                    errors += `Unexpected extern "${{key}}"\\n`;
+                      errors += `Unexpected extern "${{key}}"\\n`;
                     }} else {{
-                    this.externs[key] = externs[key];
+                      this.externs[key] = externs[key];
                     }}
-                }}
-                if (errors != '') {{
+                  }}
+                  if (errors != '') {{
                     return new Result(null, errors.trim(), 0);
-                }}
-                try {{
+                  }}
+                  try {{
                     this.r_{starting_rule}();
                     if (this.failed) {{
-                    return new Result(null, this.error(), this.errpos);
+                      return new Result(null, this.error(), this.errpos);
                     }} else {{
-                    return new Result(this.val, null, this.pos);
+                      return new Result(this.val, null, this.pos);
                     }}
-                }} catch (e) {{
+                  }} catch (e) {{
                     if (e instanceof ParsingRuntimeError) {{
-                    let [lineno, _] = this.offsets(this.errpos);
-                    return new Result(null, this.path + ':' + lineno + ' ' + e.toString());
-                        }} else {{
-                        throw e;
-                        }}
+                      let [lineno, _] = this.offsets(this.errpos);
+                      return new Result(null, this.path + ':' + lineno + ' ' + e.toString());
+                    }} else {{
+                      throw e;
                     }}
-                }}    \
+                  }}
+                }}
                 """)
         return self._dedent(f"""\
             parse(externs = null) {{
-                externs = externs || new Map();
-                let errors = '';
-                for (let key of externs.keys()) {{
+              externs = externs || new Map();
+              let errors = '';
+              for (let key of externs.keys()) {{
                 if (!this.externs.has(key)) {{
                     errors += `Unexpected extern "${{key}}"\\n`;
                 }} else {{
                     this.externs[key] = externs[key];
                 }}
-                }}
+              }}
 
-                if (errors != '') {{
+              if (errors != '') {{
                 return new Result(null, errors.trim(), 0);
-                }}
-                this.r_{starting_rule}();
-                if (this.failed) {{
+              }}
+              this.r_{starting_rule}();
+              if (this.failed) {{
                 return new Result(null, this.error(), this.errpos);
-                }} else {{
+              }} else {{
                 return new Result(this.val, null, this.pos);
-                }}
-            }}\
+              }}
+            }}
             """)
 
     def _gen_imports(self) -> str:
@@ -314,8 +321,6 @@ class JavaScriptGenerator(Generator):
             for k, v in self._grammar.externs.items():
                 v = 'true' if v else 'false'
                 externs += f"    this.externs.set('{k}', {v});\n"
-        else:
-            externs = '\n'
         return externs
 
     def _gen_state(self) -> str:
@@ -330,8 +335,6 @@ class JavaScriptGenerator(Generator):
             text += self._gen_operator_state()
         if self._grammar.lookup_needed:
             text += '    this.scopes = [];\n'
-        text += '  }\n'
-        text += '\n'
 
         return text
 
@@ -360,13 +363,14 @@ class JavaScriptGenerator(Generator):
         return text
 
     def _gen_endclass(self):
-        return '}\n'
+        return '}\n\n'
 
     def _gen_methods(self) -> str:
-        text = self._gen_parse_method(
-            exception_needed=self._grammar.exception_needed,
-            starting_rule=self._grammar.starting_rule,
-        )
+        text = self._dedent(
+            self._gen_parse_method(
+                exception_needed=self._grammar.exception_needed,
+                starting_rule=self._grammar.starting_rule,
+            ), 1)
 
         text += self._gen_rule_methods()
 
@@ -394,11 +398,10 @@ class JavaScriptGenerator(Generator):
             text += '  ' + self._builtin_methods[f'r_{name}']
             text += '\n'
 
-        text += '\n'
         return text
 
     def _gen_method_text(self, method_name, method_body) -> str:
-        text = '\n\n'
+        text = '\n'
         text += '  %s() {\n' % method_name
         for line in method_body:
             text += f'    {line}\n'
@@ -451,18 +454,18 @@ class JavaScriptGenerator(Generator):
             f'cmax = {node.stop};',
             'while (i < cmax) {',
         ]
-        lines.extend(['    ' + line for line in self._gen(node.child)])
+        lines.extend(['  ' + line for line in self._gen(node.child)])
         lines.extend(
             [
-                '    if (this.failed) {',
-                '        if (i >= cmin) {',
-                '            this.succeed(vs);',
-                '            return;',
-                '        }',
-                '        return;',
+                '  if (this.failed) {',
+                '    if (i >= cmin) {',
+                '      this.succeed(vs);',
+                '      return;',
                 '    }',
-                '    vs.push(this.val);',
-                '    i += 1;',
+                '    return;',
+                '  }',
+                '  vs.push(this.val);',
+                '  i += 1;',
                 '}',
                 'this.succeed(vs);',
             ]
@@ -475,15 +478,15 @@ class JavaScriptGenerator(Generator):
             [
                 'while (true) {',
             ]
-            + ['    ' + line for line in sublines]
+            + ['  ' + line for line in sublines]
             + [
-                '    if (!this.failed) {',
-                '        break;',
-                '    }',
-                '    this.r_any();',
-                '    if (this.failed) {',
-                '        break;',
-                '    }',
+                '  if (!this.failed) {',
+                '    break;',
+                '  }',
+                '  this.r_any();',
+                '  if (this.failed) {',
+                '    break;',
+                '  }',
                 '}',
             ]
         )
@@ -534,7 +537,7 @@ class JavaScriptGenerator(Generator):
         sublines = self._gen(self._grammar.node(Not, node.child))
         return sublines + [
             'if (!this.failed) {',
-            '    this.r_any(pos);',
+            '  this.r_any(pos);',
             '}',
         ]
 
@@ -605,8 +608,8 @@ class JavaScriptGenerator(Generator):
             'r.lastIndex = this.pos;',
             'found = r.exec(this.text);',
             'if (found) {',
-            '    this.succeed(found[0], this.pos + found[0].length);',
-            '    return;',
+            '  this.succeed(found[0], this.pos + found[0].length);',
+            '  return;',
             '}',
             'this.fail();',
         ]
@@ -618,7 +621,7 @@ class JavaScriptGenerator(Generator):
             + lines
             + [
                 'if (this.failed) {',
-                '    return;',
+                '  return;',
                 '}',
                 'end = this.pos;',
                 'this.val = this.text.substr(start, end);',
@@ -669,323 +672,323 @@ class JavaScriptGenerator(Generator):
         return {
             'r_any': """\
                 r_any() {
-                    if (this.pos < this.end) {
-                        this.succeed(this.text[this.pos], this.pos + 1);
-                    } else {
-                        this.fail();
-                    }
+                  if (this.pos < this.end) {
+                    this.succeed(this.text[this.pos], this.pos + 1);
+                  } else {
+                    this.fail();
+                  }
                 }
                 """,
             'r_end': """\
                 r_end() {
-                    if (this.pos === this.end) {
-                        this.succeed(null);
-                    } else {
-                        this.fail();
-                    }
+                  if (this.pos === this.end) {
+                    this.succeed(null);
+                  } else {
+                    this.fail();
+                  }
                 }
                 """,
             'ch': """\
                 ch(c) {
-                    let pos = this.pos;
-                    if (pos < this.end && this.text[pos] === c) {
-                        this.succeed(c, this.pos + 1);
-                    } else {
-                        this.fail();
-                    }
+                  let pos = this.pos;
+                  if (pos < this.end && this.text[pos] === c) {
+                    this.succeed(c, this.pos + 1);
+                  } else {
+                    this.fail();
+                  }
                 }
                 """,
             'offsets': """\
                 offsets(pos) {
-                    let lineno = 1;
-                    let colno = 1;
-                    for (let i = 0; i < pos; i++) {
-                        if (this.text[i] === '\\n') {
-                            lineno += 1;
-                            colno = 1;
-                        } else {
-                            colno += 1;
-                        }
+                  let lineno = 1;
+                  let colno = 1;
+                  for (let i = 0; i < pos; i++) {
+                    if (this.text[i] === '\\n') {
+                      lineno += 1;
+                      colno = 1;
+                    } else {
+                      colno += 1;
                     }
-                    return [lineno, colno];
+                  }
+                  return [lineno, colno];
                 }
                 """,
             'error': """\
                 error() {
-                    let [lineno, colno] = this.offsets(this.errpos);
-                    let thing;
-                    if (this.errpos === this.end) {
-                        thing = 'end of input';
-                    } else {
-                        thing = JSON.stringify(this.text[this.errpos]);
-                    }
-                    return `${this.path}:${lineno} Unexpected ${thing} at column ${colno}`;
+                  let [lineno, colno] = this.offsets(this.errpos);
+                  let thing;
+                  if (this.errpos === this.end) {
+                    thing = 'end of input';
+                  } else {
+                    thing = JSON.stringify(this.text[this.errpos]);
+                  }
+                  return `${this.path}:${lineno} Unexpected ${thing} at column ${colno}`;
                 }
                 """,
             'fail': """\
                 fail() {
-                    this.val = undefined;
-                    this.failed = true;
-                    this.errpos = Math.max(this.errpos, this.pos);
+                  this.val = undefined;
+                  this.failed = true;
+                  this.errpos = Math.max(this.errpos, this.pos);
                 }
                 """,
             'leftrec': """\
                 leftrec(rule, rule_name, left_assoc) {
-                    let pos = this.pos;
-                    let key = [rule_name, pos];
-                    let seed = this.seeds[key];
-                    if (seed) {
-                        [this.val, this.failed, this.pos] = seed;
-                        return;
-                    }
-                    if (this.blocked.has(rule_name)) {
-                        this.val = undefined;
-                        this.failed = true;
-                        return;
-                    }
-                    let current = [undefined, true, this.pos];
-                    this.seeds[key] = current;
-                    if (left_assoc) {
-                        this.blocked.add(rule_name);
-                    }
-                    while (true) {
+                  let pos = this.pos;
+                  let key = [rule_name, pos];
+                  let seed = this.seeds[key];
+                  if (seed) {
+                    [this.val, this.failed, this.pos] = seed;
+                    return;
+                  }
+                  if (this.blocked.has(rule_name)) {
+                    this.val = undefined;
+                    this.failed = true;
+                    return;
+                  }
+                  let current = [undefined, true, this.pos];
+                  this.seeds[key] = current;
+                  if (left_assoc) {
+                    this.blocked.add(rule_name);
+                  }
+                  while (true) {
                     rule.call(this);
                     if (this.pos > current[2]) {
-                        current = [this.val, this.failed, this.pos];
-                        this.seeds[key] = current;
-                        this.pos = pos;
+                      current = [this.val, this.failed, this.pos];
+                      this.seeds[key] = current;
+                      this.pos = pos;
                     } else {
-                        delete this.seeds[key];
-                        [this.val, this.failed, this.pos] = current;
-                        if (left_assoc) {
-                            this.blocked.delete(rule_name);
-                        }
-                        return;
+                      delete this.seeds[key];
+                      [this.val, this.failed, this.pos] = current;
+                      if (left_assoc) {
+                        this.blocked.delete(rule_name);
+                      }
+                      return;
                     }
-                    }
+                  }
                 }
                 """,
             'lookup': """\
                 lookup(v) {
-                    let l = this.scopes.length - 1;
-                    while (l >= 0) {
+                  let l = this.scopes.length - 1;
+                  while (l >= 0) {
                     if (this.scopes[l].has(v)) {
-                        return this.scopes[l].get(v);
+                      return this.scopes[l].get(v);
                     }
                     l -= 1;
-                    }
-                    if (this.externs.has(v)) {
-                        return this.externs.get(v);
-                    }
-                    throw new ParsingRuntimeError(`Unknown var "${v}"`);
+                  }
+                  if (this.externs.has(v)) {
+                    return this.externs.get(v);
+                  }
+                  throw new ParsingRuntimeError(`Unknown var "${v}"`);
                 }
                 """,
             'memoize': """\
                 memoize(rule_name, fn) {
-                    let pos = this.pos;
-                    if (!this.cache.has(pos)) {
-                        this.cache.set(pos, new Map());
-                    }
-                    if (this.cache.get(pos).has(rule_name)) {
-                        [this.val, this.failed, this.pos] = this.cache.get(pos).get(rule_name);
-                        return;
-                    }
-                    fn.call(this);
-                    this.cache.get(pos).set(rule_name, [this.val, this.failed, this.pos]);
+                  let pos = this.pos;
+                  if (!this.cache.has(pos)) {
+                    this.cache.set(pos, new Map());
+                  }
+                  if (this.cache.get(pos).has(rule_name)) {
+                    [this.val, this.failed, this.pos] = this.cache.get(pos).get(rule_name);
+                    return;
+                  }
+                  fn.call(this);
+                  this.cache.get(pos).set(rule_name, [this.val, this.failed, this.pos]);
                 }
                 """,
             'operator': """\
                 operator(rule_name) {
-                    let o = this.operators[rule_name];
-                    let pos = this.pos;
-                    let key = [rule_name, pos];
-                    let seed = this.seeds[key];
-                    if (seed) {
-                        [this.val, this.failed, this.pos] = seed;
-                        return;
+                  let o = this.operators[rule_name];
+                  let pos = this.pos;
+                  let key = [rule_name, pos];
+                  let seed = this.seeds[key];
+                  if (seed) {
+                    [this.val, this.failed, this.pos] = seed;
+                    return;
+                  }
+                  o.currentDepth += 1;
+                  let current = [null, true, pos];
+                  this.seeds[key] = current;
+                  let minPrec = o.currentPrec;
+                  let i = 0;
+                  while (i < o.precs.length) {
+                    let repeat = false;
+                    let prec = o.precs[i];
+                    let precOps = o.precOps.get(prec);
+                    if (prec < minPrec) {
+                      break;
                     }
-                    o.currentDepth += 1;
-                    let current = [null, true, pos];
-                    this.seeds[key] = current;
-                    let minPrec = o.currentPrec;
-                    let i = 0;
-                    while (i < o.precs.length) {
-                        let repeat = false;
-                        let prec = o.precs[i];
-                        let precOps = o.precOps.get(prec);
-                        if (prec < minPrec) {
-                            break;
-                        }
-                        o.currentPrec = prec;
-                        if (!o.rassoc.has(precOps[0])) {
-                            o.currentPrec += 1;
-                        }
-                        for (let j = 0; j < precOps.length; j += 1) {
-                            let op = precOps[j];
-                            o.choices.get(op).call(this);
-                            if (!this.failed && this.pos > pos) {
-                                current = [this.val, this.failed, this.pos];
-                                this.seeds[key] = current;
-                                repeat = true;
-                                break;
-                            }
-                            this.rewind(pos);
-                        }
-                        if (!repeat) {
-                            i += 1;
-                        }
+                    o.currentPrec = prec;
+                    if (!o.rassoc.has(precOps[0])) {
+                      o.currentPrec += 1;
                     }
+                    for (let j = 0; j < precOps.length; j += 1) {
+                      let op = precOps[j];
+                      o.choices.get(op).call(this);
+                      if (!this.failed && this.pos > pos) {
+                        current = [this.val, this.failed, this.pos];
+                        this.seeds[key] = current;
+                        repeat = true;
+                        break;
+                      }
+                      this.rewind(pos);
+                    }
+                    if (!repeat) {
+                      i += 1;
+                    }
+                  }
 
-                    delete this.seeds[key];
-                    o.currentDepth -= 1;
-                    if (o.currentDepth === 0) {
-                        o.currentPrec = 0;
-                    }
-                    [this.val, this.failed, this.pos] = current;
+                  delete this.seeds[key];
+                  o.currentDepth -= 1;
+                  if (o.currentDepth === 0) {
+                    o.currentPrec = 0;
+                  }
+                  [this.val, this.failed, this.pos] = current;
                 }
                 """,
             'range': """\
                 range(i, j) {
-                    let pos = this.pos;
-                    if (pos == this.end) {
-                        this.fail();
-                        return;
-                    }
-                    let c = this.text[pos];
-                    if (i <= c && c <= j) {
-                        this.succeed(this.text[pos], this.pos + 1);
-                    } else {
-                        this.fail();
-                    }
+                  let pos = this.pos;
+                  if (pos == this.end) {
+                    this.fail();
+                    return;
+                  }
+                  let c = this.text[pos];
+                  if (i <= c && c <= j) {
+                    this.succeed(this.text[pos], this.pos + 1);
+                  } else {
+                    this.fail();
+                  }
                 }
                 """,
             'rewind': """\
                 rewind(newpos) {
-                    this.succeed(null, newpos);
+                  this.succeed(null, newpos);
                 }
                 """,
             'str': """\
                 str(s) {
-                    for (let ch of s) {
+                  for (let ch of s) {
                     this.ch(ch);
                     if (this.failed) {
-                        return;
+                      return;
                     }
-                        this.val = s;
+                      this.val = s;
                     }
                 }
                 """,
             'succeed': """\
                 succeed(v, newpos = null) {
-                    this.val = v;
-                    this.failed = false;
-                    if (newpos !== null) {
-                        this.pos = newpos;
-                    }
+                  this.val = v;
+                  this.failed = false;
+                  if (newpos !== null) {
+                    this.pos = newpos;
+                  }
                 }
                 """,
             'unicat': """\
                 unicat(cat) {
-                    if (this.pos == this.end) {
-                        this.fail();
-                        return
-                    }
-                    let c = this.text[this.pos];
-                    let re = new RegExp(`\\\\p{${cat}}`, 'u');
-                    if (c.match(re)) {
-                    this.succeed(c, this.pos + 1);
-                    } else {
+                  if (this.pos == this.end) {
                     this.fail();
-                    }
+                    return
+                  }
+                  let c = this.text[this.pos];
+                  let re = new RegExp(`\\\\p{${cat}}`, 'u');
+                  if (c.match(re)) {
+                    this.succeed(c, this.pos + 1);
+                  } else {
+                    this.fail();
+                  }
                 }
                 """,
             'fn_atof': """\
                 fn_atof(a) {
-                    return parseFloat(a)
+                  return parseFloat(a)
                 }
                 """,
             'fn_atoi': """\
                 fn_atoi(a, base) {
-                    return parseInt(a, base);
+                  return parseInt(a, base);
                 }
                 """,
             'fn_atou': """\
                 fn_atou(a, base) {
-                    return String.fromCharCode(Number.parseInt(a, base));
+                  return String.fromCharCode(Number.parseInt(a, base));
                 }
                 """,
             'fn_cat': """\
                 fn_cat(ss) {
-                    return ss.join('');
+                  return ss.join('');
                 }
                 """,
             'fn_concat': """\
                 fn_concat(xs, ys) {
-                    return xs.concat(ys);
+                  return xs.concat(ys);
                 }
                 """,
             'fn_cons': """\
                 fn_cons(hd, tl) {
-                    return [hd].concat(tl)
+                  return [hd].concat(tl);
                 }
                 """,
             'fn_dedent': """\
                 fn_dedent(s) {
-                    return s
+                  return s;
                 }
                 """,
             'fn_dict': """\
                 fn_dict(pairs) {
-                    let m = new Map();
-                    for (let [k, v] of pairs) {
-                        m[k] = v;
-                    }
-                    return m;
+                  let m = new Map();
+                  for (let [k, v] of pairs) {
+                    m[k] = v;
+                  }
+                  return m;
                 }
                 """,
             'fn_itou': """\
                 fn_itou(n) {
-                    return String.fromCharCode(n);
+                  return String.fromCharCode(n);
                 }
                 """,
             'fn_join': """\
                 fn_join(s, vs) {
-                    return vs.join(s);
+                  return vs.join(s);
                 }
                 """,
             'fn_scat': """\
                 fn_scat(ss) {
-                    return ss.join('');
+                  return ss.join('');
                 }
                 """,
             'fn_scons': """\
                 fn_scons(hd, tl) {
-                    return [hd].concat(tl);
+                  return [hd].concat(tl);
                 }
                 """,
             'fn_strcat': """\
                 fn_strcat(a, b) {
-                    return a.concat(b);
+                  return a.concat(b);
                 }
                 """,
             'fn_unicode_lookup': """\
                 fn_unicode_lookup(s) {
-                    throw new ParsingRuntimeError('Unsupported function "unicode_lookup"');
+                  throw new ParsingRuntimeError('Unsupported function "unicode_lookup"');
                 }
                 """,
             'fn_utoi': """\
                 fn_utoi(s) {
-                    return s.charCodeAt(0);
+                  return s.charCodeAt(0);
                 }
                 """,
             'fn_xtoi': """\
                 fn_xtoi(s) {
-                    return Number.parseInt(s, 16);
+                  return Number.parseInt(s, 16);
                 }
                 """,
             'fn_xtou': """\
                 fn_xtou(s) {
-                    return String.fromCharCode(Number.parseInt(s, 16));
+                  return String.fromCharCode(Number.parseInt(s, 16));
                 }
                 """,
         }
