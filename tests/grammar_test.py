@@ -1230,6 +1230,7 @@ class GeneratorMixin:
 
 
 class PythonGenerator(unittest.TestCase, GeneratorMixin, GrammarTestsMixin):
+    maxDiff = None
     cmd = [sys.executable]
     language = 'python'
     ext = '.py'
