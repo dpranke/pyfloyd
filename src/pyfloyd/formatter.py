@@ -55,6 +55,9 @@ class Indent(FormatObj):
     def __init__(self, obj):
         self.obj = obj
 
+    def __repr__(self):
+        return 'Indent(' + repr(self.obj) + ')'
+
     def fmt(self, current_depth: int, max_depth: int, indent: str) -> List[str]:
         return [indent + line for line in self.obj.fmt(current_depth, max_depth, indent)]
 
@@ -80,6 +83,18 @@ class VList(ListObj):
     def __init__(self, objs: Sequence[FormatObj|str]):
         self.objs = objs
 
+    def __repr__(self):
+        if self.objs:
+            return (
+                'VList([\n  ' +
+                ',\n  '.join(repr(o) for o in self.objs) +
+                '\n])'
+            )
+        return 'VList([])'
+
+    def append(self, obj: FormatObj|str):
+        self.objs.append(obj)
+
     def fmt(self, current_depth: int, max_depth: int, indent: str) -> List[str]:
         lines = []
         for obj in self.objs:
@@ -94,6 +109,9 @@ class VList(ListObj):
 class HList(ListObj):
     def __init__(self, objs: List[FormatObj|str]):
         self.objs = objs
+
+    def __repr__(self):
+        return 'VList([' + ', '.join(repr(o) for o in self.objs) + '])'
 
     def fmt(self, current_depth: int, max_depth: int, indent: str) -> List[str]:
         lines: List[str] = []

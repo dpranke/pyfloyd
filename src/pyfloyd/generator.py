@@ -21,7 +21,7 @@ from pyfloyd import string_literal
 from pyfloyd.ast import Apply, EMinus, EPlus, Regexp, Var
 from pyfloyd.analyzer import Grammar, Node
 from pyfloyd.formatter import (
-    flatten, Comma, FormatObj, ListObj, Lit, HList, VList, Saw, Tree
+    flatten, Comma, FormatObj, Indent, ListObj, Lit, HList, VList, Saw, Tree
 )
 from pyfloyd.version import __version__
 
@@ -145,6 +145,15 @@ class Generator:
             + '\n'
         )
 
+    def _defmt(self, s: str, level=0) -> FormatObj:
+        obj = VList(textwrap.dedent(s).splitlines())
+        for i in range(level):
+            obj = Indent(obj)
+        return obj
+
+    def _fmt(self, obj: FormatObj) -> str:
+        return '\n'.join(flatten(obj, indent=self._indent))
+
     def generate(self) -> str:
         raise NotImplementedError
 
@@ -177,30 +186,35 @@ class Generator:
         assert isinstance(r, ListObj)
         return r
 
-    def _gen_needed_methods(self) -> str:
-        text = ''
+    def _gen_needed_methods(self) -> FormatObj:
+        obj = VList([])
+
+        def m(name: str) -> FormatObj:
+            obj.append(self._defmt(self._builtin_methods[name]))
+            obj.append('\n')
+
         if self._grammar.ch_needed:
-            text += self._builtin_methods['ch'] + '\n'
-        text += self._builtin_methods['error'] + '\n'
-        text += self._builtin_methods['fail'] + '\n'
+            m('ch')
+        m('error')
+        m('fail')
         if self._grammar.leftrec_needed:
-            text += self._builtin_methods['leftrec'] + '\n'
+            m('leftrec')
         if self._grammar.lookup_needed:
-            text += self._builtin_methods['lookup'] + '\n'
-        text += self._builtin_methods['offsets'] + '\n'
+            m('lookup')
+        m('offsets')
         if self._options.memoize:
-            text += self._builtin_methods['memoize'] + '\n'
+            m('memoize')
         if self._grammar.operator_needed:
-            text += self._builtin_methods['operator'] + '\n'
+            m('operator')
         if self._grammar.range_needed:
-            text += self._builtin_methods['range'] + '\n'
-        text += self._builtin_methods['rewind'] + '\n'
+            m('range')
+        m('rewind')
         if self._grammar.str_needed:
-            text += self._builtin_methods['str'] + '\n'
-        text += self._builtin_methods['succeed'] + '\n'
+            m('str')
+        m('succeed')
         if self._grammar.unicat_needed:
-            text += self._builtin_methods['unicat'] + '\n'
-        return text
+            m('unicat')
+        return obj
 
     #
     # Handlers for each non-host node in the glop AST follow.
