@@ -22,7 +22,7 @@ class FormatObj:
 
 
 def flatten(
-    obj: FormatObj, max_length: int = 67, indent: str = '    '
+    obj: FormatObj, max_length: int = 79, indent: str = '    '
 ) -> List[str]:
     """Flatten an object into a list of 1 or more strings.
 
@@ -250,14 +250,15 @@ class Tree(FormatObj):
                     s += fmt(self.right, current_depth, max_depth, indent)[0]
             return [s]
 
-        if self.right is None:
-            right = ['']
-        else:
-            right = fmt(self.right, current_depth, max_depth, indent)
+        #if self.right is None:
+        #    right = ['']
+        #else:
+        #    right = fmt(self.right, current_depth, max_depth, indent)
 
         if self.left is None:
             s = self.op + fmt(self.right, current_depth, max_depth, indent)[0]
             lines = [s]
+            return lines
         else:
             lines = fmt(self.left, current_depth, max_depth, indent)
         if self.right is None:
