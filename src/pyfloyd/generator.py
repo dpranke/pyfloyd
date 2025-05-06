@@ -158,14 +158,18 @@ class Generator:
         try:
             vl = VList(textwrap.dedent(s).splitlines())
         except Exception as e:
-            import pdb; pdb.set_trace()
+            import pdb
+
+            pdb.set_trace()
         return vl
 
     def _defmtf(self, s: str, **kwargs) -> VList:
         try:
             vl = VList(textwrap.dedent(s).format(**kwargs).splitlines())
         except Exception as e:
-            import pdb; pdb.set_trace()
+            import pdb
+
+            pdb.set_trace()
         return vl
 
     def _fmt(self, obj: FormatObj) -> str:
@@ -205,11 +209,12 @@ class Generator:
         return r
 
     def _gen_needed_methods(self) -> FormatObj:
-        obj = VList([])
+        obj = VList()
 
         def add_method(name: str):
-            obj.append(self._defmt(self._builtin_methods[name]))
-            obj.append('\n')
+            nonlocal obj
+            obj += self._defmt(self._builtin_methods[name])
+            obj += '\n'
 
         if self._grammar.ch_needed:
             add_method('ch')

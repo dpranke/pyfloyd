@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Sequence
+from typing import List, Optional, Sequence
 
 
 class FormatObj:
@@ -85,8 +85,12 @@ class ListObj(FormatObj):
 
 
 class VList(ListObj):
-    def __init__(self, objs: Sequence[FormatObj | str]):
-        self.objs : List[FormatObj|str] = list(objs)
+    def __init__(self, objs: Optional[Sequence[FormatObj | str]] = None):
+        objs = objs or []
+        if len(objs) == 1 and isinstance(objs[0], VList):
+            self.objs: List[FormatObj | str] = objs[0].objs
+        else:
+            self.objs: List[FormatObj | str] = list(objs)
 
     def __repr__(self):
         if self.objs:
@@ -95,16 +99,13 @@ class VList(ListObj):
                 + ',\n  '.join(repr(o) for o in self.objs)
                 + '\n])'
             )
-        return 'VList([])'
-
-    def append(self, obj: FormatObj | str):
-        self.objs.append(obj)
-
-    def extend(self, vl: 'VList'):
-        self.objs.extend(vl.objs)
+        return 'VList()'
 
     def __iadd__(self, obj):
-        self.append(obj)
+        if isinstance(obj, VList):
+            self.objs.extend(obj.objs)
+        else:
+            self.objs.append(obj)
         return self
 
     def fmt(
