@@ -21,7 +21,16 @@ from pyfloyd import string_literal
 from pyfloyd.ast import Apply, EMinus, EPlus, Regexp, Var
 from pyfloyd.analyzer import Grammar, Node
 from pyfloyd.formatter import (
-    flatten, Comma, FormatObj, Indent, ListObj, Lit, HList, VList, Saw, Tree
+    flatten,
+    Comma,
+    FormatObj,
+    Indent,
+    ListObj,
+    Lit,
+    HList,
+    VList,
+    Saw,
+    Tree,
 )
 from pyfloyd.version import __version__
 
@@ -145,14 +154,22 @@ class Generator:
             + '\n'
         )
 
-    def _defmt(self, s: str, level=0) -> FormatObj:
-        obj = VList(textwrap.dedent(s).splitlines())
-        for i in range(level):
-            obj = Indent(obj)
-        return obj
+    def _defmt(self, s: str) -> VList:
+        try:
+            vl = VList(textwrap.dedent(s).splitlines())
+        except Exception as e:
+            import pdb; pdb.set_trace()
+        return vl
+
+    def _defmtf(self, s: str, **kwargs) -> VList:
+        try:
+            vl = VList(textwrap.dedent(s).format(**kwargs).splitlines())
+        except Exception as e:
+            import pdb; pdb.set_trace()
+        return vl
 
     def _fmt(self, obj: FormatObj) -> str:
-        return '\n'.join(flatten(obj, indent=self._indent))
+        return '\n'.join(flatten(obj, indent=self._indent)) + '\n'
 
     def generate(self) -> str:
         raise NotImplementedError
@@ -180,40 +197,41 @@ class Generator:
         fn = getattr(self, f'_ty_{node.t}')
         return fn(node)
 
-    def _gen_stmts(self, node: Node) -> ListObj:
+    def _gen_stmts(self, node: Node) -> VList:
         fn = getattr(self, f'_ty_{node.t}')
         r = fn(node)
-        assert isinstance(r, ListObj)
+        if not isinstance(r, VList):
+            r = VList([r])
         return r
 
     def _gen_needed_methods(self) -> FormatObj:
         obj = VList([])
 
-        def m(name: str) -> FormatObj:
+        def add_method(name: str):
             obj.append(self._defmt(self._builtin_methods[name]))
             obj.append('\n')
 
         if self._grammar.ch_needed:
-            m('ch')
-        m('error')
-        m('fail')
+            add_method('ch')
+        add_method('error')
+        add_method('fail')
         if self._grammar.leftrec_needed:
-            m('leftrec')
+            add_method('leftrec')
         if self._grammar.lookup_needed:
-            m('lookup')
-        m('offsets')
+            add_method('lookup')
+        add_method('offsets')
         if self._options.memoize:
-            m('memoize')
+            add_method('memoize')
         if self._grammar.operator_needed:
-            m('operator')
+            add_method('operator')
         if self._grammar.range_needed:
-            m('range')
-        m('rewind')
+            add_method('range')
+        add_method('rewind')
         if self._grammar.str_needed:
-            m('str')
-        m('succeed')
+            add_method('str')
+        add_method('succeed')
         if self._grammar.unicat_needed:
-            m('unicat')
+            add_method('unicat')
         return obj
 
     #
@@ -221,20 +239,30 @@ class Generator:
     #
 
     def _ty_action(self, node: Node) -> ListObj:
-        return HList([Saw(
-                self._gen_rulename('succeed') + '(',
-                self._gen_expr(node.child),
-                ')'), self._map['end']])
+        return HList(
+            [
+                Saw(
+                    self._gen_rulename('succeed') + '(',
+                    self._gen_expr(node.child),
+                    ')',
+                ),
+                self._map['end'],
+            ]
+        )
 
     def _ty_apply(self, node: Node) -> ListObj:
         assert isinstance(node, Apply)
         if node.memoize:
-            return HList([
-                self._gen_invoke(
-                    'memoize',
-                    f"'{node.rule_name}'",
-                    self._gen_rulename(node.rule_name),
-                ), self._map['end']])
+            return HList(
+                [
+                    self._gen_invoke(
+                        'memoize',
+                        f"'{node.rule_name}'",
+                        self._gen_rulename(node.rule_name),
+                    ),
+                    self._map['end'],
+                ]
+            )
         return HList([self._gen_invoke(node.rule_name), self._map['end']])
 
     def _ty_e_arr(self, node: Node) -> Lit | Saw:
@@ -294,7 +322,9 @@ class Generator:
                 start = Lit(self._gen_thisvar(f'fn_{function_name}'))
             else:
                 # If second isn't a call, then first refers to a variable.
-                start = self._ty_e_var(first)
+                v = self._ty_e_var(first)
+                assert isinstance(v, Lit)
+                start = v
 
             saw = self._gen_expr(second)
             assert isinstance(saw, Saw), f'{second} did not return a Saw'
@@ -325,7 +355,9 @@ class Generator:
 
     def _ty_empty(self, node) -> ListObj:
         del node
-        return HList([self._gen_invoke('succeed', self._map['null']), self._map['end']])
+        return HList(
+            [self._gen_invoke('succeed', self._map['null']), self._map['end']]
+        )
 
     def _ty_equals(self, node) -> ListObj:
         arg = self._gen_expr(node.child)
@@ -337,12 +369,17 @@ class Generator:
         else:
             left_assoc = self._map['false']
 
-        return HList([self._gen_invoke(
-                'leftrec',
-                self._gen_rulename(node.child.v),
-                "'" + node.v + "'",
-                left_assoc,
-            ), self._map['end']])
+        return HList(
+            [
+                self._gen_invoke(
+                    'leftrec',
+                    self._gen_rulename(node.child.v),
+                    "'" + node.v + "'",
+                    left_assoc,
+                ),
+                self._map['end'],
+            ]
+        )
 
     def _ty_lit(self, node) -> ListObj:
         expr = self._gen_lit(node.v)
@@ -357,13 +394,23 @@ class Generator:
         # of the expression cluster have been defined and are referenced
         # from self._grammar.operators[node.v].choices.
         assert node.ch == []
-        return HList([self._gen_invoke('operator', "'" + node.v + "'"), self._map['end']])
+        return HList(
+            [
+                self._gen_invoke('operator', "'" + node.v + "'"),
+                self._map['end'],
+            ]
+        )
 
     def _ty_range(self, node) -> ListObj:
-        return HList([
-            self._gen_invoke(
-                'range', self._gen_lit(node.start), self._gen_lit(node.stop)
-            ), self._map['end']]
+        return HList(
+            [
+                self._gen_invoke(
+                    'range',
+                    self._gen_lit(node.start),
+                    self._gen_lit(node.stop),
+                ),
+                self._map['end'],
+            ]
         )
 
     def _ty_regexp(self, node) -> ListObj:
@@ -374,4 +421,9 @@ class Generator:
         return self._ty_regexp(new_node)
 
     def _ty_unicat(self, node) -> ListObj:
-        return HList([self._gen_invoke('unicat', self._gen_lit(node.v)), self._map['end']])
+        return HList(
+            [
+                self._gen_invoke('unicat', self._gen_lit(node.v)),
+                self._map['end'],
+            ]
+        )

@@ -548,7 +548,10 @@ def _rewrite_recursion(grammar):
             if has_lr:
                 grammar.leftrec_rules.update(seen)
                 node_name = '%s#%d' % (name, i + 1)
-                choices[i] = Leftrec(node_name, choice, )
+                choices[i] = Leftrec(
+                    node_name,
+                    choice,
+                )
                 choices[i].left_assoc = (
                     grammar.assoc.get(node_name, 'left') == 'left'
                 )

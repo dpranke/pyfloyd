@@ -1193,7 +1193,9 @@ class _GeneratedParserWrapper:
             try:
                 assert inp in stderr, f'"{inp}" not in "{stderr}"'
             except Exception as e:
-                import pdb; pdb.set_trace()
+                import pdb
+
+                pdb.set_trace()
             stderr = stderr.replace(inp, path)
         else:
             stderr = None

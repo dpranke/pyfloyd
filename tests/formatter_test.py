@@ -128,7 +128,7 @@ class FormatterTests(unittest.TestCase):
                 'self._long4',
                 ')',
             ],
-            flatten(t),
+            flatten(t, max_length=67),
         )
         t = Saw(
             'foo(',

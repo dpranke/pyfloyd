@@ -18,7 +18,16 @@ from typing import Dict, List
 
 from pyfloyd.ast import Not, Count
 from pyfloyd.analyzer import Grammar
-from pyfloyd.formatter import flatten, Comma, HList, Indent, VList, Saw, Sequence, FormatObj
+from pyfloyd.formatter import (
+    flatten,
+    Comma,
+    HList,
+    Indent,
+    VList,
+    Saw,
+    Sequence,
+    FormatObj,
+)
 from pyfloyd.generator import Generator, GeneratorOptions
 
 
@@ -280,7 +289,9 @@ class JavaScriptGenerator(Generator):
 
         text += self._gen_rule_methods()
 
-        text += self._gen_needed_methods()
+        text += '\n'.join(
+            flatten(self._gen_needed_methods(), indent=self._indent)
+        )
 
         if self._grammar.needed_builtin_functions:
             text += '\n'
@@ -332,7 +343,7 @@ class JavaScriptGenerator(Generator):
     #
 
     def _ty_choice(self, node) -> VList:
-        lines: List[str|FormatObj] = ['pos = this.pos;']
+        lines: List[str | FormatObj] = ['pos = this.pos;']
         for subnode in node.ch[:-1]:
             lines.append(self._gen_stmts(subnode))
             lines.append('if (!this.failed) {')
@@ -344,7 +355,7 @@ class JavaScriptGenerator(Generator):
 
     def _ty_count(self, node) -> VList:
         assert isinstance(node, Count)
-        lines: List[str|FormatObj] = [
+        lines: List[str | FormatObj] = [
             'vs = [];',
             'i = 0;',
             f'cmin = {node.start};',
@@ -393,19 +404,23 @@ class JavaScriptGenerator(Generator):
         varname = self._gen_varname(node.v)
         if node.outer_scope:
             lines.append(
-                VList([
-                    'if (!this.failed) {',
-                    f"  this.scopes[this.scopes.length-1].set('{node.v}', this.val);"
-                    '}',
-                ])
+                VList(
+                    [
+                        'if (!this.failed) {',
+                        f"  this.scopes[this.scopes.length-1].set('{node.v}', this.val);"
+                        '}',
+                    ]
+                )
             )
         else:
             lines.append(
-                VList([
-                    'if (!this.failed) {',
-                    f'  {varname} = this.val;',
-                    '}',
-                ])
+                VList(
+                    [
+                        'if (!this.failed) {',
+                        f'  {varname} = this.val;',
+                        '}',
+                    ]
+                )
             )
         return VList(lines)
 
@@ -431,11 +446,14 @@ class JavaScriptGenerator(Generator):
 
     def _ty_not_one(self, node) -> VList:
         sublines = self._gen_stmts(self._grammar.node(Not, node.child))
-        return VList([sublines] + [
-            'if (!this.failed) {',
-            '  this.r_any(pos);',
-            '}',
-        ])
+        return VList(
+            [sublines]
+            + [
+                'if (!this.failed) {',
+                '  this.r_any(pos);',
+                '}',
+            ]
+        )
 
     def _ty_opt(self, node) -> VList:
         sublines = self._gen_stmts(node.child)
@@ -485,28 +503,32 @@ class JavaScriptGenerator(Generator):
 
     def _ty_pred(self, node) -> VList:
         arg = self._gen_expr(node.child)
-        return VList([
-            HList(['v = ', arg]),
-            'if (v === true) {',
-            '  this.succeed(v);',
-            '} else if (v === false) {',
-            '  this.fail();',
-            '} else {',
-            "  throw new ParsingRuntimeError('Bad predicate value');",
-            '}',
-        ])
+        return VList(
+            [
+                HList(['v = ', arg]),
+                'if (v === true) {',
+                '  this.succeed(v);',
+                '} else if (v === false) {',
+                '  this.fail();',
+                '} else {',
+                "  throw new ParsingRuntimeError('Bad predicate value');",
+                '}',
+            ]
+        )
 
     def _ty_regexp(self, node) -> VList:
-        return VList([
-            f"r = new RegExp({self._gen_lit(node.v)}, 'gy');"
-            'r.lastIndex = this.pos;',
-            'found = r.exec(this.text);',
-            'if (found) {',
-            '  this.succeed(found[0], this.pos + found[0].length);',
-            '  return;',
-            '}',
-            'this.fail();',
-        ])
+        return VList(
+            [
+                f"r = new RegExp({self._gen_lit(node.v)}, 'gy');"
+                'r.lastIndex = this.pos;',
+                'found = r.exec(this.text);',
+                'if (found) {',
+                '  this.succeed(found[0], this.pos + found[0].length);',
+                '  return;',
+                '}',
+                'this.fail();',
+            ]
+        )
 
     def _ty_run(self, node) -> VList:
         lines = self._gen_stmts(node.child)
@@ -534,7 +556,7 @@ class JavaScriptGenerator(Generator):
         )
 
     def _ty_seq(self, node) -> VList:
-        lines: List[str|FormatObj] = []
+        lines: List[str | FormatObj] = []
         for v in node.vars:
             lines.append(f'let {self._gen_varname(v)};')
 
