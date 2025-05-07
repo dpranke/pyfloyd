@@ -14,6 +14,8 @@
 
 from typing import List, Optional, Sequence, Union
 
+# pylint: disable=too-many-positional-arguments
+
 
 class FormatObj:
     def __init__(self):
@@ -25,7 +27,7 @@ class FormatObj:
         self.lines = []
 
     def check_last(self, off: int, max_len: int):
-        return self.lens and all(off + l <= max_len for l in self.lens)
+        return self.lens and all(off + le <= max_len for le in self.lens)
 
     def set_last(self, lines: List[str]):
         self.lens = [len(line) for line in lines]
@@ -67,7 +69,12 @@ def flatten(
 
 
 def _fmt(
-    obj: FormatObj, off: int, max_len: int, cur_d: int, max_d: int, ind: str
+    obj: Union[FormatObj | str],
+    off: int,
+    max_len: int,
+    cur_d: int,
+    max_d: int,
+    ind: str,
 ) -> List[str]:
     if isinstance(obj, str):
         return [obj]
@@ -94,10 +101,12 @@ class Indent(FormatObj):
             return self.last_lines()
 
         new_off = off + len(ind)
-        lines = [
-            ind + line
-            for line in self.obj.fmt(new_off, max_len, cur_d, max_d, ind)
-        ]
+        lines = []
+        for line in self.obj.fmt(new_off, max_len, cur_d, max_d, ind):
+            if line:
+                lines.append(ind + line)
+            else:
+                lines.append(line)
         self.set_last(lines)
         return lines
 
@@ -330,6 +339,7 @@ class Tree(FormatObj):
         self.left = left
         self.op = op
         self.right = right
+        assert self.left is not None or self.right is not None
 
     def __repr__(self):
         return 'Tree(%s, %s, %s)' % (
@@ -352,6 +362,7 @@ class Tree(FormatObj):
         if cur_d == max_d:
             if self.left is None:
                 s = self.op
+                assert self.right is not None
                 s += _fmt(self.right, off, max_len, cur_d, max_d, ind)[0]
             else:
                 s = _fmt(self.left, off, max_len, cur_d, max_d, ind)[0]
@@ -367,6 +378,7 @@ class Tree(FormatObj):
             return [s]
 
         if self.left is None:
+            assert self.right is not None
             s = self.op + _fmt(self.right, off, max_len, cur_d, max_d, ind)[0]
             lines = [s]
             self.set_last(lines)
@@ -377,21 +389,22 @@ class Tree(FormatObj):
             lines[-1] += self.op
         else:
             op = self.op
-            right = self.right
+            right: Optional[FormatObj] = self.right
             while isinstance(right, Tree):
                 new_off = off + len(op) + 1
-                right_lines = _fmt(
-                    right.left, new_off, max_len, cur_d, max_d, ind
-                )
-                lines.append(op + ' ' + right_lines[0])
-                lines += right_lines[1:]
+                if right.left is not None:
+                    right_lines = _fmt(
+                        right.left, new_off, max_len, cur_d, max_d, ind
+                    )
+                    lines.append(op + ' ' + right_lines[0])
+                    lines += right_lines[1:]
                 op = right.op
                 right = right.right
             if right is not None:
                 new_off = off + len(op) + 1
                 if isinstance(right, FormatObj):
                     right_lines = _fmt(
-                        right.right, new_off, max_len, cur_d, max_d, ind
+                        right, new_off, max_len, cur_d, max_d, ind
                     )
                     lines.append(op + ' ' + right_lines[0])
                     lines += right_lines[1:]

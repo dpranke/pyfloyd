@@ -65,11 +65,17 @@ class PythonGenerator(Generator):
             )
 
         if self._grammar.exception_needed:
+            vl += ''
+            vl += ''
             vl += self._gen_parsing_runtime_exception_class()
 
         if self._grammar.operators:
+            vl += ''
+            vl += ''
             vl += self._gen_operator_state_class()
 
+        vl += ''
+        vl += ''
         vl += self._gen_result_class()
         vl += ''
         vl += ''
@@ -143,8 +149,6 @@ class PythonGenerator(Generator):
                     return 1
                 print(json.dumps(result.val, indent=2), file=stdout)
                 return 0
-
-
             """,
             imports=imports,
             args=args,
@@ -334,8 +338,8 @@ class PythonGenerator(Generator):
         vobj += self._gen_needed_methods()
 
         for name in self._grammar.needed_builtin_functions:
-            vobj += self._defmt(self._builtin_methods[f'fn_{name}'])
             vobj += ''
+            vobj += self._defmt(self._builtin_methods[f'fn_{name}'])
 
         return vobj
 
@@ -387,6 +391,7 @@ class PythonGenerator(Generator):
     def _gen_rule_methods(self) -> VList:
         obj = VList()
         for rule, node in self._grammar.rules.items():
+            obj += ''
             obj += self._gen_method_text(rule, node)
 
         if self._grammar.needed_builtin_rules:

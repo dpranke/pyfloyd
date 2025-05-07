@@ -56,15 +56,15 @@ class _Parser:
         self._text = text
         self._end = len(self._text)
         self._errpos = 0
+        self._failed = False
+        self._path = path
+        self._pos = 0
+        self._val = None
         self._externs = {
             'unicode': True,
             'unicode_categories': True,
             'unicode_names': True,
         }
-        self._failed = False
-        self._path = path
-        self._pos = 0
-        self._val = None
         self._cache = {}
         self._regexps = {}
 
@@ -80,6 +80,7 @@ class _Parser:
             return Result(None, errors, 0)
         try:
             self._r_grammar()
+
             if self._failed:
                 return Result(None, self._error(), self._errpos)
             return Result(self._val, None, self._pos)

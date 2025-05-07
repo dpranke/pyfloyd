@@ -327,6 +327,7 @@ class Generator:
         for n in node.ch[i:]:
             new_saw = self._gen_expr(n)
             assert isinstance(new_saw, Saw), f'{n} did not return a Saw'
+            assert isinstance(next_saw.end, str)
             new_saw.start = next_saw.end + new_saw.start
             next_saw.end = new_saw
             next_saw = new_saw
