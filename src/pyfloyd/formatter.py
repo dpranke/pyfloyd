@@ -12,11 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Union
 
 
 class FormatObj:
-    def fmt(self, current_depth: int, max_depth: int, indent: str):
+    def __init__(self):
+        self.lens = []
+        self.lines = []
+
+    def reset(self):
+        self.lens = []
+        self.lines = []
+
+    def check_last(self, off: int, max_len: int):
+        return self.lens and all(off + l <= max_len for l in self.lens)
+
+    def set_last(self, lines: List[str]):
+        self.lens = [len(line) for line in lines]
+        self.lines = lines
+
+    def last_lines(self):
+        return self.lines
+
+    def fmt(self, off: int, max_len: int, cur_d: int, max_d: int, ind: str):
         """Returns a list of strings, each representing a line."""
         raise NotImplementedError  # pragma: no cover
 
@@ -33,8 +51,10 @@ def flatten(
     """
     depth = 0
     last_num_lines = 0
+    if isinstance(obj, FormatObj):
+        obj.reset()
     while True:
-        lines = fmt(obj, 0, depth, indent)
+        lines = _fmt(obj, 0, max_length, 0, depth, indent)
         if all(len(line) <= max_length for line in lines):
             return lines
         num_lines = len(lines)
@@ -46,57 +66,78 @@ def flatten(
     return lines
 
 
-def fmt(
-    obj: FormatObj, current_depth: int, max_depth: int, indent: str
+def _fmt(
+    obj: FormatObj, off: int, max_len: int, cur_d: int, max_d: int, ind: str
 ) -> List[str]:
     if isinstance(obj, str):
         return [obj]
-    return obj.fmt(current_depth, max_depth, indent)
+    return obj.fmt(off, max_len, cur_d, max_d, ind)
 
 
 class Indent(FormatObj):
-    def __init__(self, obj):
+    def __init__(self, obj: FormatObj):
+        super().__init__()
         self.obj = obj
 
     def __repr__(self):
         return 'Indent(' + repr(self.obj) + ')'
 
+    def reset(self):
+        super().reset()
+        if isinstance(self.obj, FormatObj):
+            self.obj.reset()
+
     def fmt(
-        self, current_depth: int, max_depth: int, indent: str
+        self, off: int, max_len: int, cur_d: int, max_d: int, ind: str
     ) -> List[str]:
-        r = [
-            indent + line
-            for line in self.obj.fmt(current_depth, max_depth, indent)
+        if self.check_last(off, max_len):
+            return self.last_lines()
+
+        new_off = off + len(ind)
+        lines = [
+            ind + line
+            for line in self.obj.fmt(new_off, max_len, cur_d, max_d, ind)
         ]
-        return r
+        self.set_last(lines)
+        return lines
 
 
 class Lit(FormatObj):
-    def __init__(self, s):
+    def __init__(self, s: str):
+        super().__init__()
         self.s = s
 
     def __repr__(self):
         return f'Lit({repr(self.s)})'
 
     def fmt(
-        self, current_depth: int, max_depth: int, indent: str
+        self, off: int, max_len: int, cur_d: int, max_d: int, ind: str
     ) -> List[str]:
         return [self.s]
 
 
 class ListObj(FormatObj):
-    # pylint: disable=abstract-method
-    pass
-
-
-class VList(ListObj):
     def __init__(self, objs: Optional[Sequence[FormatObj | str]] = None):
+        super().__init__()
         objs = objs or []
-        if len(objs) == 1 and isinstance(objs[0], VList):
+        if len(objs) == 1 and isinstance(objs[0], self.__class__):
             self.objs: List[FormatObj | str] = objs[0].objs
         else:
             self.objs = list(objs)
 
+    def reset(self):
+        super().reset()
+        for o in self.objs:
+            if isinstance(o, FormatObj):
+                o.reset()
+
+    def fmt(
+        self, off: int, max_len: int, cur_d: int, max_d: int, ind: str
+    ) -> List[str]:
+        raise NotImplementedError
+
+
+class VList(ListObj):
     def __repr__(self):
         if self.objs:
             return (
@@ -114,42 +155,48 @@ class VList(ListObj):
         return self
 
     def fmt(
-        self, current_depth: int, max_depth: int, indent: str
+        self, off: int, max_len: int, cur_d: int, max_d: int, ind: str
     ) -> List[str]:
+        if self.check_last(off, max_len):
+            return self.last_lines()
+
         lines = []
         for obj in self.objs:
             if isinstance(obj, str):
                 lines.append(obj)
             else:
                 assert isinstance(obj, FormatObj)
-                lines.extend(obj.fmt(current_depth, max_depth, indent))
+                lines.extend(obj.fmt(off, max_len, cur_d, max_d, ind))
+        self.set_last(lines)
         return lines
 
 
 class HList(ListObj):
-    def __init__(self, objs: List[FormatObj | str]):
-        self.objs = objs
-
     def __repr__(self):
         return 'HList([' + ', '.join(repr(o) for o in self.objs) + '])'
 
     def fmt(
-        self, current_depth: int, max_depth: int, indent: str
+        self, off: int, max_len: int, cur_d: int, max_d: int, ind: str
     ) -> List[str]:
+        if self.check_last(off, max_len):
+            return self.last_lines()
+
         lines: List[str] = []
         if len(self.objs):
             if isinstance(self.objs[0], str):
                 lines.append(self.objs[0])
             else:
-                lines = self.objs[0].fmt(current_depth, max_depth, indent)
+                lines = self.objs[0].fmt(off, max_len, cur_d, max_d, ind)
             for obj in self.objs[1:]:
                 if isinstance(obj, str):
                     lines[-1] += obj
                 else:
-                    sublines = obj.fmt(current_depth, max_depth, indent)
+                    new_off = off + len(lines[-1])
+                    sublines = obj.fmt(new_off, max_len, cur_d, max_d, ind)
                     lines[-1] += sublines[0]
                     if len(sublines) > 1:
                         lines.extend(sublines[1:])
+        self.set_last(lines)
         return lines
 
 
@@ -171,7 +218,13 @@ class Saw(FormatObj):
     parts may be on one or more lines.
     """
 
-    def __init__(self, start, mid, end):
+    def __init__(
+        self,
+        start: str,
+        mid: Union[FormatObj, str],
+        end: Union[FormatObj, str],
+    ):
+        super().__init__()
         self.start = start
         self.mid = mid
         self.end = end
@@ -179,21 +232,34 @@ class Saw(FormatObj):
     def __repr__(self):
         return f'Saw({repr(self.start)}, {repr(self.mid)}, {repr(self.end)})'
 
+    def reset(self):
+        super().reset()
+        if isinstance(self.mid, FormatObj):
+            self.mid.reset()
+        if isinstance(self.end, FormatObj):
+            self.end.reset()
+
     def fmt(
-        self, current_depth: int, max_depth: int, indent: str
+        self, off: int, max_len: int, cur_d: int, max_d: int, ind: str
     ) -> List[str]:
-        if current_depth == max_depth:
+        if self.check_last(off, max_len):
+            return self.last_lines()
+
+        if cur_d == max_d:
             s = (
-                fmt(self.start, current_depth, max_depth, indent)[0]
-                + fmt(self.mid, current_depth, max_depth, indent)[0]
-                + fmt(self.end, current_depth, max_depth, indent)[0]
+                _fmt(self.start, off, max_len, cur_d, max_d, ind)[0]
+                + _fmt(self.mid, off, max_len, cur_d, max_d, ind)[0]
+                + _fmt(self.end, off, max_len, cur_d, max_d, ind)[0]
             )
+            self.set_last([s])
             return [s]
         lines = [self.start]
-        for line in fmt(self.mid, current_depth + 1, max_depth, indent):
-            lines.append(indent + line)
-        for line in fmt(self.end, current_depth, max_depth, indent):
+        new_off = off + len(ind)
+        for line in _fmt(self.mid, new_off, max_len, cur_d + 1, max_d, ind):
+            lines.append(ind + line)
+        for line in _fmt(self.end, new_off, max_len, cur_d, max_d, ind):
             lines.append(line)
+        self.set_last(lines)
         return lines
 
 
@@ -207,25 +273,39 @@ class Comma(FormatObj):
 
     def __init__(self, args):
         # Ensure that if we were passed a generator we can hold onto the values.
+        super().__init__()
         self.args = list(args)
 
     def __repr__(self):
         return 'Comma(' + repr(self.args) + ')'
 
-    def fmt(self, current_depth, max_depth, indent):
+    def reset(self):
+        super().reset()
+        for arg in self.args:
+            if isinstance(arg, FormatObj):
+                arg.reset()
+
+    def fmt(self, off: int, max_len: int, cur_d: int, max_d: int, ind: str):
         if not self.args:
             return ['']
 
-        if current_depth == max_depth:
-            s = fmt(self.args[0], current_depth, max_depth, indent)[0]
+        if self.check_last(off, max_len):
+            return self.last_lines()
+
+        if cur_d == max_d:
+            s = _fmt(self.args[0], off, max_len, cur_d, max_d, ind)[0]
             for arg in self.args[1:]:
-                s += ', ' + fmt(arg, current_depth, max_depth, indent)[0]
+                new_off = off + len(s) + 2
+                s += ', ' + _fmt(arg, new_off, max_len, cur_d, max_d, ind)[0]
+            self.set_last([s])
             return [s]
-        lines = []
-        for arg in self.args:
-            arg_lines = fmt(arg, current_depth, max_depth, indent)
-            lines += arg_lines
+        lines = _fmt(self.args[0], off, max_len, cur_d, max_d, ind)
+        for arg in self.args[1:]:
             lines[-1] += ','
+            lines += _fmt(arg, off, max_len, cur_d, max_d, ind)
+        if len(self.args) > 1:
+            lines[-1] += ','
+        self.set_last(lines)
         return lines
 
 
@@ -243,7 +323,10 @@ class Tree(FormatObj):
     `left` and `right` may be `None` to handle prefix and postfix operators.
     """
 
-    def __init__(self, left, op, right):
+    def __init__(
+        self, left: Optional[FormatObj], op: str, right: Optional[FormatObj]
+    ):
+        super().__init__()
         self.left = left
         self.op = op
         self.right = right
@@ -255,36 +338,64 @@ class Tree(FormatObj):
             repr(self.right),
         )
 
-    def fmt(self, current_depth, max_depth, indent):
-        if current_depth == max_depth:
+    def reset(self):
+        super().reset()
+        if isinstance(self.left, FormatObj):
+            self.left.reset()
+        if isinstance(self.right, FormatObj):
+            self.right.reset()
+
+    def fmt(self, off: int, max_len: int, cur_d: int, max_d: int, ind: str):
+        if self.check_last(off, max_len):
+            return self.last_lines()
+
+        if cur_d == max_d:
             if self.left is None:
                 s = self.op
-                s += fmt(self.right, current_depth, max_depth, indent)[0]
+                s += _fmt(self.right, off, max_len, cur_d, max_d, ind)[0]
             else:
-                s = fmt(self.left, current_depth, max_depth, indent)[0]
+                s = _fmt(self.left, off, max_len, cur_d, max_d, ind)[0]
                 if self.right is None:
                     s += self.op
                 else:
                     s += ' ' + self.op + ' '
-                    s += fmt(self.right, current_depth, max_depth, indent)[0]
+                    new_off = off + len(s)
+                    s += _fmt(self.right, new_off, max_len, cur_d, max_d, ind)[
+                        0
+                    ]
+            self.set_last([s])
             return [s]
 
-        # if self.right is None:
-        #    right = ['']
-        # else:
-        #    right = fmt(self.right, current_depth, max_depth, indent)
-
         if self.left is None:
-            s = self.op + fmt(self.right, current_depth, max_depth, indent)[0]
+            s = self.op + _fmt(self.right, off, max_len, cur_d, max_d, ind)[0]
             lines = [s]
+            self.set_last(lines)
             return lines
 
-        lines = fmt(self.left, current_depth, max_depth, indent)
+        lines = _fmt(self.left, off, max_len, cur_d, max_d, ind)
         if self.right is None:
             lines[-1] += self.op
         else:
-            right = fmt(self.right, current_depth, max_depth, indent)
-            lines.append(self.op + ' ' + right[0])
-            if right[1:]:
-                lines += right[1:]
+            op = self.op
+            right = self.right
+            while isinstance(right, Tree):
+                new_off = off + len(op) + 1
+                right_lines = _fmt(
+                    right.left, new_off, max_len, cur_d, max_d, ind
+                )
+                lines.append(op + ' ' + right_lines[0])
+                lines += right_lines[1:]
+                op = right.op
+                right = right.right
+            if right is not None:
+                new_off = off + len(op) + 1
+                if isinstance(right, FormatObj):
+                    right_lines = _fmt(
+                        right.right, new_off, max_len, cur_d, max_d, ind
+                    )
+                    lines.append(op + ' ' + right_lines[0])
+                    lines += right_lines[1:]
+                else:
+                    lines.append(op + ' ' + right)
+        self.set_last(lines)
         return lines
