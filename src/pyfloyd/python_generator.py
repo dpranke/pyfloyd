@@ -259,11 +259,7 @@ class PythonGenerator(Generator):
         return vl
 
     def _gen_constructor(self) -> VList:
-        obj = self._defmt(
-            """\
-                def __init__(self, text, path):
-            """
-        )
+        obj = VList(['def __init__(self, text, path):'])
 
         vl = self._defmt("""\
             self._text = text
@@ -414,8 +410,7 @@ class PythonGenerator(Generator):
     def _gen_rulename(self, name: str) -> str:
         return 'self._' + name
 
-    def _gen_extern(self, name: str) -> str:
-        return "self._externs['" + name + "']"
+    def _gen_extern(self, name: str) -> str: return "self._externs['" + name + "']"
 
     def _gen_invoke(self, fn, *args) -> Saw:
         return Saw('self._' + fn + '(', Comma(args), ')')
@@ -425,36 +420,34 @@ class PythonGenerator(Generator):
     #
 
     def _ty_choice(self, node: Node) -> ListObj:
-        lines: FormatObjList = ['p = self._pos']
+        vl = VList(['p = self._pos'])
         for subnode in node.ch[:-1]:
-            lines.append(self._gen_stmts(subnode))
-            lines.append('if not self._failed:')
-            lines.append('    return')
-            lines.append('self._rewind(p)')
-        lines.append(self._gen_stmts(node.ch[-1]))
-        return VList(lines)
+            vl += self._gen_stmts(subnode)
+            vl += 'if not self._failed:'
+            vl += '    return'
+            vl += 'self._rewind(p)'
+        vl += self._gen_stmts(node.ch[-1])
+        return vl
 
     def _ty_count(self, node: Node) -> ListObj:
-        lines: FormatObjList = [
+        vl = VList([
             'vs = []',
             'i = 0',
             f'cmin, cmax = {node.v}',
             'while i < cmax:',
-        ]
-        lines.append(Indent(self._gen_stmts(node.child)))
-        lines.extend(
-            [
-                '    if self._failed:',
-                '        if i >= cmin:',
-                '            self._succeed(vs)',
-                '            return',
-                '        return',
-                '    vs.append(self._val)',
-                '    i += 1',
-                'self._succeed(vs)',
-            ]
-        )
-        return VList(lines)
+        ])
+        svl = self._gen_stmts(node.child)
+        svl += 'if self._failed:'
+        svl += '    if i >= cmin:'
+        svl += '        self._succeed(vs)'
+        svl += '        return'
+        svl += '    return'
+        svl += 'vs.append(self._val)'
+        svl += 'i += 1'
+
+        vl += Indent(svl)
+        vl += 'self._succeed(vs)'
+        return vl
 
     def _ty_ends_in(self, node: Node) -> ListObj:
         sublines = self._gen_stmts(node.child)
