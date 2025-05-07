@@ -24,7 +24,6 @@ from pyfloyd.formatter import (
     flatten,
     Comma,
     FormatObj,
-    Indent,
     ListObj,
     Lit,
     HList,
@@ -146,34 +145,17 @@ class Generator:
         for _, node in self._grammar.rules.items():
             node.local_vars = _walk(node)
 
-    def _dedent(self, s: str, level=0) -> str:
-        s = textwrap.dedent(s)
-        indent = self._indent * level
-        return (
-            '\n'.join(((indent + line).rstrip() for line in s.splitlines()))
-            + '\n'
-        )
-
     def _defmt(self, s: str) -> VList:
-        try:
-            vl = VList(textwrap.dedent(s).splitlines())
-        except Exception as e:
-            import pdb
-
-            pdb.set_trace()
+        vl = VList(textwrap.dedent(s).splitlines())
         return vl
 
     def _defmtf(self, s: str, **kwargs) -> VList:
-        try:
-            vl = VList(textwrap.dedent(s).format(**kwargs).splitlines())
-        except Exception as e:
-            import pdb
-
-            pdb.set_trace()
+        vl = VList(textwrap.dedent(s).format(**kwargs).splitlines())
         return vl
 
     def _fmt(self, obj: FormatObj) -> str:
-        return '\n'.join(flatten(obj, indent=self._indent)) + '\n'
+        text = '\n'.join(flatten(obj, indent=self._indent)) + '\n'
+        return text
 
     def generate(self) -> str:
         raise NotImplementedError
@@ -194,8 +176,8 @@ class Generator:
         r = f'v_{name.replace("$", "_")}'
         return r
 
-    def _gen_lit(self, l: str) -> str:
-        return string_literal.encode(l)
+    def _gen_lit(self, lit: str) -> str:
+        return string_literal.encode(lit)
 
     def _gen_expr(self, node: Node) -> FormatObj:
         fn = getattr(self, f'_ty_{node.t}')
@@ -213,8 +195,8 @@ class Generator:
 
         def add_method(name: str):
             nonlocal obj
+            obj += ''
             obj += self._defmt(self._builtin_methods[name])
-            obj += '\n'
 
         if self._grammar.ch_needed:
             add_method('ch')

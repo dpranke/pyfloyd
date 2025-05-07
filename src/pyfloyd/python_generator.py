@@ -19,9 +19,9 @@ from typing import List
 from pyfloyd.analyzer import Grammar, Node
 from pyfloyd.ast import Not, Label
 from pyfloyd.formatter import (
-    flatten,
     Comma,
     FormatObj,
+    FormatObjList,
     HList,
     Indent,
     ListObj,
@@ -48,7 +48,7 @@ class PythonGenerator(Generator):
 
         self._builtin_methods = {}
         for k, v in _BUILTINS.items():
-            self._builtin_methods[k] = self._dedent(v, 1)
+            self._builtin_methods[k] = v
 
         # Python doesn't need to declare local vars.
         self._local_vars = {}
@@ -57,12 +57,12 @@ class PythonGenerator(Generator):
         vl = VList()
         if self._options.main:
             vl += self._gen_main_header(
-                    self._options.version, self._options.args
-                )
+                self._options.version, self._options.args
+            )
         else:
             vl += self._gen_default_header(
-                    self._options.version, self._options.args
-                )
+                self._options.version, self._options.args
+            )
 
         if self._grammar.exception_needed:
             vl += self._gen_parsing_runtime_exception_class()
@@ -71,9 +71,11 @@ class PythonGenerator(Generator):
             vl += self._gen_operator_state_class()
 
         vl += self._gen_result_class()
-        vl += '\n\n'
+        vl += ''
+        vl += ''
         vl += self._gen_parse_function()
-        vl += '\n\n'
+        vl += ''
+        vl += ''
         vl += self._gen_parser_class()
 
         if self._options.main:
@@ -247,12 +249,12 @@ class PythonGenerator(Generator):
             """)
 
         methods = self._gen_constructor()
-        methods += '\n'
+        methods += ''
         methods += self._gen_methods()
         vl += Indent(methods)
         return vl
 
-    def _gen_constructor(self) -> FormatObj:
+    def _gen_constructor(self) -> VList:
         obj = self._defmt(
             """\
                 def __init__(self, text, path):
@@ -267,7 +269,7 @@ class PythonGenerator(Generator):
             self._path = path
             self._pos = 0
             self._val = None
-                """)
+            """)
 
         if self._grammar.externs:
             vl += 'self._externs = {'
@@ -292,17 +294,6 @@ class PythonGenerator(Generator):
         obj += Indent(vl)
         return obj
 
-    def _gen_externs(self) -> str:
-        if self._grammar.externs:
-            externs = '{\n            '
-            externs += '\n            '.join(
-                f"'{k}': {v}," for k, v in self._grammar.externs.items()
-            )
-            externs += '\n        }'
-        else:
-            externs = '{}'
-        return externs
-
     def _gen_operator_state(self) -> FormatObj:
         vl = VList()
         vl += 'self._operators = {}'
@@ -325,7 +316,7 @@ class PythonGenerator(Generator):
             vl += 'o.choices = {'
             choices = VList()
             for op in o.choices:
-                choices += "'%s': self._%s,\n" % (op, o.choices[op])
+                choices += "'%s': self._%s," % (op, o.choices[op])
             vl += Indent(choices)
             vl += '}'
             vl += "self._operators['%s'] = o" % rule
@@ -334,9 +325,9 @@ class PythonGenerator(Generator):
     def _gen_methods(self) -> FormatObj:
         vobj = VList()
         vobj += self._gen_parse_method(
-                exception_needed=self._grammar.exception_needed,
-                starting_rule=self._grammar.starting_rule,
-            )
+            exception_needed=self._grammar.exception_needed,
+            starting_rule=self._grammar.starting_rule,
+        )
 
         vobj += self._gen_rule_methods()
 
@@ -344,7 +335,7 @@ class PythonGenerator(Generator):
 
         for name in self._grammar.needed_builtin_functions:
             vobj += self._defmt(self._builtin_methods[f'fn_{name}'])
-            vobj += '\n'
+            vobj += ''
 
         return vobj
 
@@ -364,6 +355,7 @@ class PythonGenerator(Generator):
                         return Result(None, errors, 0)
                     try:
                         self._r_{starting_rule}()
+
                         if self._failed:
                             return Result(None, self._error(), self._errpos)
                         return Result(self._val, None, self._pos)
@@ -384,6 +376,7 @@ class PythonGenerator(Generator):
                         self._externs[k] = v
 
                 self._r_{starting_rule}()
+
                 if self._failed:
                     return Result(None, self._error(), self._errpos)
                 return Result(self._val, None, self._pos)
@@ -395,12 +388,11 @@ class PythonGenerator(Generator):
         obj = VList()
         for rule, node in self._grammar.rules.items():
             obj += self._gen_method_text(rule, node)
-        obj += '\n'
 
         if self._grammar.needed_builtin_rules:
             for name in sorted(self._grammar.needed_builtin_rules):
+                obj += ''
                 obj += self._defmt(self._builtin_methods[f'r_{name}'])
-                obj += '\n'
         return obj
 
     def _gen_method_text(self, method_name: str, node: Node) -> VList:
@@ -428,7 +420,7 @@ class PythonGenerator(Generator):
     #
 
     def _ty_choice(self, node: Node) -> ListObj:
-        lines: List[str | FormatObj] = ['p = self._pos']
+        lines: FormatObjList = ['p = self._pos']
         for subnode in node.ch[:-1]:
             lines.append(self._gen_stmts(subnode))
             lines.append('if not self._failed:')
@@ -438,7 +430,7 @@ class PythonGenerator(Generator):
         return VList(lines)
 
     def _ty_count(self, node: Node) -> ListObj:
-        lines: List[str | FormatObj] = [
+        lines: FormatObjList = [
             'vs = []',
             'i = 0',
             f'cmin, cmax = {node.v}',
@@ -477,7 +469,7 @@ class PythonGenerator(Generator):
 
     def _ty_label(self, node: Node) -> ListObj:
         assert isinstance(node, Label)
-        lines: List[FormatObj | str] = [self._gen_stmts(node.child)]
+        lines: FormatObjList = [self._gen_stmts(node.child)]
         if node.child.can_fail:
             lines.extend(['if self._failed:', '    return'])
         if node.outer_scope:
@@ -637,16 +629,16 @@ class PythonGenerator(Generator):
         )
         return VList(lines)
 
-    def _gen_main_footer(self) -> str:
-        return self._dedent("""\
+    def _gen_main_footer(self) -> VList:
+        return self._defmt("""\
 
 
             if __name__ == '__main__':
                 sys.exit(main())
-        """)
+            """)
 
-    def _gen_default_footer(self) -> str:
-        return ''
+    def _gen_default_footer(self) -> VList:
+        return VList()
 
 
 _BUILTINS = {

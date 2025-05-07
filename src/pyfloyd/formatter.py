@@ -21,6 +21,9 @@ class FormatObj:
         raise NotImplementedError  # pragma: no cover
 
 
+FormatObjList = List[str | FormatObj]
+
+
 def flatten(
     obj: FormatObj, max_length: int = 79, indent: str = '    '
 ) -> List[str]:
@@ -61,10 +64,11 @@ class Indent(FormatObj):
     def fmt(
         self, current_depth: int, max_depth: int, indent: str
     ) -> List[str]:
-        return [
+        r = [
             indent + line
             for line in self.obj.fmt(current_depth, max_depth, indent)
         ]
+        return r
 
 
 class Lit(FormatObj):
@@ -81,6 +85,7 @@ class Lit(FormatObj):
 
 
 class ListObj(FormatObj):
+    # pylint: disable=abstract-method
     pass
 
 
@@ -90,7 +95,7 @@ class VList(ListObj):
         if len(objs) == 1 and isinstance(objs[0], VList):
             self.objs: List[FormatObj | str] = objs[0].objs
         else:
-            self.objs: List[FormatObj | str] = list(objs)
+            self.objs = list(objs)
 
     def __repr__(self):
         if self.objs:
@@ -126,7 +131,7 @@ class HList(ListObj):
         self.objs = objs
 
     def __repr__(self):
-        return 'VList([' + ', '.join(repr(o) for o in self.objs) + '])'
+        return 'HList([' + ', '.join(repr(o) for o in self.objs) + '])'
 
     def fmt(
         self, current_depth: int, max_depth: int, indent: str
@@ -273,8 +278,8 @@ class Tree(FormatObj):
             s = self.op + fmt(self.right, current_depth, max_depth, indent)[0]
             lines = [s]
             return lines
-        else:
-            lines = fmt(self.left, current_depth, max_depth, indent)
+
+        lines = fmt(self.left, current_depth, max_depth, indent)
         if self.right is None:
             lines[-1] += self.op
         else:
