@@ -37,7 +37,7 @@ if (
 # pylint: disable=wrong-import-position
 import pyfloyd
 from pyfloyd import generator
-from pyfloyd.host import Host
+from pyfloyd.support import Host
 
 
 def main(argv=None, host=None):

@@ -25,7 +25,7 @@ from typing import Optional, Dict
 import unittest
 
 import pyfloyd
-import pyfloyd.host
+import pyfloyd.support
 
 
 THIS_DIR = pathlib.Path(__file__).parent
@@ -314,7 +314,7 @@ class GrammarTestsMixin:
 
     @skip('integration')
     def test_floyd(self):
-        h = pyfloyd.host.Host()
+        h = pyfloyd.support.Host()
         path = str(THIS_DIR / '../grammars/floyd.g')
         grammar = h.read_text_file(path)
         p, err, _ = self.compile(
@@ -330,7 +330,7 @@ class GrammarTestsMixin:
 
     @skip('integration')
     def test_floyd_ws(self):
-        h = pyfloyd.host.Host()
+        h = pyfloyd.support.Host()
         path = str(THIS_DIR / '../grammars/floyd_ws.g')
         grammar = h.read_text_file(path)
         p, err, _ = self.compile(grammar, path, externs=self.floyd_externs)
@@ -433,7 +433,7 @@ class GrammarTestsMixin:
 
     @skip('integration')
     def test_json(self):
-        h = pyfloyd.host.Host()
+        h = pyfloyd.support.Host()
         path = str(THIS_DIR / '../grammars/json.g')
         p, err, _ = self.compile(h.read_text_file(path), path)
         self.assertIsNone(err)
@@ -447,7 +447,7 @@ class GrammarTestsMixin:
     @skip('integration')
     def test_json5(self):
         externs = {'strict': True}
-        h = pyfloyd.host.Host()
+        h = pyfloyd.support.Host()
         path = str(THIS_DIR / '../grammars/json5.g')
         p, err, _ = self.compile(h.read_text_file(path), path)
         self.assertIsNone(err)
@@ -457,7 +457,7 @@ class GrammarTestsMixin:
     @skip('integration')
     def test_json5_special_floats(self):
         externs = {'strict': True}
-        h = pyfloyd.host.Host()
+        h = pyfloyd.support.Host()
         path = str(THIS_DIR / '../grammars/json5.g')
         p, err, _ = self.compile(h.read_text_file(path), path)
         self.assertIsNone(err)
@@ -514,7 +514,7 @@ class GrammarTestsMixin:
         # Check the sample file from pyjson5.
         # this skips the `'to': Infinity` pair because that can't
         # be marshalled in and out of JSON.
-        h = pyfloyd.host.Host()
+        h = pyfloyd.support.Host()
         path = str(THIS_DIR / '../grammars/json5.g')
         p, err, _ = self.compile(h.read_text_file(path), path)
         self.assertIsNone(err)
@@ -569,7 +569,7 @@ class GrammarTestsMixin:
     @skip('integration')
     def test_json5_ws(self):
         externs = {'strict': False}
-        h = pyfloyd.host.Host()
+        h = pyfloyd.support.Host()
         path = str(THIS_DIR / '../grammars/json5_ws.g')
         grammar = h.read_text_file(path)
         p, err, _ = self.compile(grammar, path)
@@ -1170,7 +1170,7 @@ class _GeneratedParserWrapper:
         self.cmd = cmd
         self.ext = ext
         self.source_code = source_code
-        self.host = pyfloyd.host.Host()
+        self.host = pyfloyd.support.Host()
         self.tempdir = self.host.mkdtemp()
         self.source_code = source_code
         self.source = os.path.join(self.tempdir, f'parser{self.ext}')

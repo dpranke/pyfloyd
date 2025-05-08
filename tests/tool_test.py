@@ -17,9 +17,9 @@ import sys
 import unittest
 
 import pyfloyd
+from pyfloyd.support import FakeHost, Host
 import pyfloyd.tool
 
-from tests.host_fake import FakeHost
 
 
 class ToolTest(unittest.TestCase):
@@ -66,7 +66,7 @@ class ToolTest(unittest.TestCase):
         # This does a full end-to-end test with pyfloyd writing the
         # compiled parser to the filesystem, loading the file from
         # filesystem, and using it to parse something.
-        host = pyfloyd.host.Host()
+        host = Host()
         d = host.mkdtemp()
         try:
             path = d + '/grammar.g'
@@ -88,7 +88,7 @@ class ToolTest(unittest.TestCase):
         # This does a full end-to-end test with pyfloyd writing the
         # compiled parser to the filesystem, loading the file from
         # filesystem, and using it to parse something.
-        host = pyfloyd.host.Host()
+        host = Host()
         d = host.mkdtemp()
         try:
             path = d + '/grammar.g'
@@ -114,7 +114,7 @@ class ToolTest(unittest.TestCase):
         # This does a full end-to-end test with pyfloyd writing the
         # compiled parser to the filesystem, loading the file from
         # filesystem, and using it to parse something.
-        host = pyfloyd.host.Host()
+        host = Host()
         d = host.mkdtemp()
         try:
             path = d + '/grammar.g'

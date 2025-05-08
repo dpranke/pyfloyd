@@ -1,4 +1,4 @@
-# Copyright 2024 Google Inc. All rights reserved.
+# Copyright 2017 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,10 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import io
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
+import unittest
 
 
 class Host:
@@ -50,3 +53,32 @@ class Host:
     def write_text_file(self, path, contents):
         with open(path, 'w', encoding='utf-8') as f:
             f.write(contents)
+
+
+class FakeHost:
+    def __init__(self):
+        self.stderr = io.StringIO()
+        self.stdin = io.StringIO()
+        self.stdout = io.StringIO()
+        self.files = {}
+        self.written_files = {}
+
+    def exists(self, path):
+        return path in self.files
+
+    def make_executable(self, path):
+        pass
+
+    def print(self, *args, end='\n', file=None):
+        file = file or self.stdout
+        print(*args, end=end, file=file, flush=True)
+
+    def read_text_file(self, path):
+        return self.files[path]
+
+    def splitext(self, path):
+        return path.rsplit('.')
+
+    def write_text_file(self, path, contents):
+        self.files[path] = contents
+        self.written_files[path] = contents
