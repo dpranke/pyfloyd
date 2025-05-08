@@ -15,7 +15,7 @@
 import shlex
 import sys
 import textwrap
-from typing import Dict, List, Optional, Set
+from typing import Dict, Optional, Set
 
 from pyfloyd import string_literal
 from pyfloyd.ast import Apply, EMinus, EPlus, Regexp, Var
@@ -113,7 +113,7 @@ class Generator:
         self._indent: str = '  '
         self._map: Dict[str, str] = {}
         self._builtin_methods: Dict[str, str] = {}
-        self._local_vars: Dict[str, List[str]] = {}
+        self._local_vars: Dict[str, list[str]] = {}
 
         self._derive_memoize()
 

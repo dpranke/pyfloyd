@@ -14,14 +14,12 @@
 
 # pylint: disable=too-many-lines
 
-from typing import List
-
 from pyfloyd.analyzer import Grammar, Node
 from pyfloyd.ast import Not, Label
 from pyfloyd.formatter import (
     Comma,
-    FormatObj,
     ElList,
+    FormatObj,
     HList,
     Indent,
     ListObj,
@@ -410,7 +408,8 @@ class PythonGenerator(Generator):
     def _gen_rulename(self, name: str) -> str:
         return 'self._' + name
 
-    def _gen_extern(self, name: str) -> str: return "self._externs['" + name + "']"
+    def _gen_extern(self, name: str) -> str:
+        return "self._externs['" + name + "']"
 
     def _gen_invoke(self, fn, *args) -> Saw:
         return Saw('self._' + fn + '(', Comma(args), ')')
@@ -430,12 +429,14 @@ class PythonGenerator(Generator):
         return vl
 
     def _ty_count(self, node: Node) -> ListObj:
-        vl = VList([
-            'vs = []',
-            'i = 0',
-            f'cmin, cmax = {node.v}',
-            'while i < cmax:',
-        ])
+        vl = VList(
+            [
+                'vs = []',
+                'i = 0',
+                f'cmin, cmax = {node.v}',
+                'while i < cmax:',
+            ]
+        )
         svl = self._gen_stmts(node.child)
         svl += 'if self._failed:'
         svl += '    if i >= cmin:'
@@ -467,7 +468,7 @@ class PythonGenerator(Generator):
 
     def _ty_label(self, node: Node) -> ListObj:
         assert isinstance(node, Label)
-        lines: FormatObjList = [self._gen_stmts(node.child)]
+        lines: ElList = [self._gen_stmts(node.child)]
         if node.child.can_fail:
             lines.extend(['if self._failed:', '    return'])
         if node.outer_scope:
@@ -598,7 +599,7 @@ class PythonGenerator(Generator):
         )
 
     def _ty_seq(self, node: Node) -> VList:
-        lines: List[str | ListObj] = [self._gen_stmts(node.ch[0])]
+        lines: ElList = [self._gen_stmts(node.ch[0])]
         if node.ch[0].can_fail:
             lines.extend(['if self._failed:', '    return'])
         for subnode in node.ch[1:-1]:

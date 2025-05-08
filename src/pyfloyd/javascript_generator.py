@@ -14,8 +14,6 @@
 
 # pylint: disable=too-many-lines
 
-from typing import Dict, List
-
 from pyfloyd.ast import Not, Count
 from pyfloyd.analyzer import Grammar
 from pyfloyd.formatter import (
@@ -33,7 +31,7 @@ class JavaScriptGenerator(Generator):
     def __init__(self, grammar: Grammar, options: GeneratorOptions):
         super().__init__(grammar, options)
         self._indent = '  '
-        self._map: Dict[str, str] = {
+        self._map: dict[str, str] = {
             'end': ';',
             'false': 'false',
             'indent': '  ',
@@ -49,7 +47,7 @@ class JavaScriptGenerator(Generator):
             self._builtin_methods[k] = v
 
         # Keep this updated and in sync with the text of each node type.
-        self._local_vars: Dict[str, List[str]] = {
+        self._local_vars: dict[str, list[str]] = {
             'choice': ['pos'],
             'count': ['cmin', 'cmax', 'i', 'vs'],
             'not': ['errpos', 'pos'],
@@ -123,10 +121,10 @@ class JavaScriptGenerator(Generator):
                 constructor() {
                     this.currentDepth = 0
                     this.currentPrec = 0
-                    this.precOps = {}  // Map[int, [str]]
-                    this.precs = []    // List[int]
+                    this.precOps = {}  // dict[int, [str]]
+                    this.precs = []    // list[int]
                     this.rassoc = new Set()
-                    this.choices = {}  // Map[str, rule]
+                    this.choices = {}  // dict[str, Rule]
                 }
             }
             """)
@@ -334,7 +332,7 @@ class JavaScriptGenerator(Generator):
     #
 
     def _ty_choice(self, node) -> VList:
-        lines: FormatObjList = ['pos = this.pos;']
+        lines: ElList = ['pos = this.pos;']
         for subnode in node.ch[:-1]:
             lines.append(self._gen_stmts(subnode))
             lines.append('if (!this.failed) {')
@@ -346,7 +344,7 @@ class JavaScriptGenerator(Generator):
 
     def _ty_count(self, node) -> VList:
         assert isinstance(node, Count)
-        lines: FormatObjList = [
+        lines: ElList = [
             'vs = [];',
             'i = 0;',
             f'cmin = {node.start};',

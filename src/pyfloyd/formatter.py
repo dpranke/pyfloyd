@@ -12,37 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable, List, Optional, Sequence, Union
+from typing import Callable, Optional, Sequence
 
 
-FormatMethod = Callable[[int, str], [str]]
+FormatMethod = Callable[[int, str], list[str]]
 
-MAX_LENGTH = 1000
+# Pick a line length way over anything practical in order to force
+# things to be formatted on one line where possible.
+MAX_LENGTH = 1000000
 
 
 class FormatObj:
-    def fmt(self, length: int, indent: str) -> List[str]:
+    def fmt(self, length: int, indent: str) -> list[str]:
         """Returns a list of strings, each representing a line."""
-        lines = self.fmt_one(MAX_LENGTH, indent)
-        if all(len(line) < length for line in lines):
-            return lines
-        lines = self.fmt_multiple(MAX_LENGTH, indent)
-        if all(len(line) < length for line in lines):
-            return lines
-        return self.fmt_multiple(length, indent)
-
-    def fmt_one(self, length: int, indent: str) -> List[str]:
-        raise NotImplementedError
-
-    def fmt_multiple(self, length: int, indent: str) -> List[str]:
         raise NotImplementedError
 
 
-El = Union[str | FormatObj]
-ElList = List[El]
+El = str | FormatObj
+ElSeq = Sequence[El]
+ElList = list[El]
 
 
-def flatten(obj: El, length: int = 79, indent: str = '    ') -> List[str]:
+def flatten(obj: El, length: int = 79, indent: str = '    ') -> list[str]:
     """Flatten an object into a list of 1 or more strings.
 
     Each string must be shorter than `max_length` characters, if possible.
@@ -50,10 +41,18 @@ def flatten(obj: El, length: int = 79, indent: str = '    ') -> List[str]:
     return _fmt(obj, length, indent)
 
 
-def _fmt(obj: El, length: int, indent: str) -> List[str]:
+def _fmt(obj: El, length: int, indent: str) -> list[str]:
     if isinstance(obj, str):
         return [obj]
     return obj.fmt(length, indent)
+
+
+def _fmt_one(obj: El, length: int, indent: str) -> str:
+    lines = _fmt(obj, length, indent)
+    assert len(lines) == 1, (
+        f'format unexpectedly returned more than one line: {repr(lines)}'
+    )
+    return lines[0]
 
 
 class Indent(FormatObj):
@@ -64,7 +63,7 @@ class Indent(FormatObj):
     def __repr__(self):
         return 'Indent(' + repr(self.obj) + ')'
 
-    def fmt(self, length: int, indent: str) -> List[str]:
+    def fmt(self, length: int, indent: str) -> list[str]:
         new_length = length - len(indent)
         lines = []
         for line in self.obj.fmt(new_length, indent):
@@ -82,12 +81,30 @@ class Lit(FormatObj):
     def __repr__(self):
         return f'Lit({repr(self.s)})'
 
-    def fmt(self, length: int, indent: str) -> List[str]:
+    def fmt(self, length: int, indent: str) -> list[str]:
         return [self.s]
 
 
+class MultipleObj(FormatObj):
+    def fmt(self, length: int, indent: str) -> list[str]:
+        """Returns a list of strings, each representing a line."""
+        lines = self.fmt_one(MAX_LENGTH, indent)
+        if all(len(line) < length for line in lines):
+            return lines
+        lines = self.fmt_multiple(MAX_LENGTH, indent)
+        if all(len(line) < length for line in lines):
+            return lines
+        return self.fmt_multiple(length, indent)
+
+    def fmt_one(self, length: int, indent: str) -> list[str]:
+        raise NotImplementedError
+
+    def fmt_multiple(self, length: int, indent: str) -> list[str]:
+        raise NotImplementedError
+
+
 class ListObj(FormatObj):
-    def __init__(self, objs: Optional[ElList] = None):
+    def __init__(self, objs: Optional[ElSeq] = None):
         self.objs: ElList
         if not objs:
             self.objs = []
@@ -95,6 +112,9 @@ class ListObj(FormatObj):
             self.objs = objs[0].objs
         else:
             self.objs = list(objs)
+
+    def fmt(self, length: int, indent: str) -> list[str]:
+        raise NotImplementedError
 
 
 class VList(ListObj):
@@ -114,7 +134,7 @@ class VList(ListObj):
             self.objs.append(obj)
         return self
 
-    def fmt(self, length: int, indent: str) -> List[str]:
+    def fmt(self, length: int, indent: str) -> list[str]:
         lines = []
         for obj in self.objs:
             lines.extend(_fmt(obj, length, indent))
@@ -125,8 +145,8 @@ class HList(ListObj):
     def __repr__(self):
         return 'HList([' + ', '.join(repr(o) for o in self.objs) + '])'
 
-    def fmt(self, length: int, indent: str) -> List[str]:
-        lines: List[str] = []
+    def fmt(self, length: int, indent: str) -> list[str]:
+        lines: list[str] = []
         if len(self.objs):
             lines.extend(_fmt(self.objs[0], length, indent))
             for obj in self.objs[1:]:
@@ -141,7 +161,7 @@ class HList(ListObj):
         return lines
 
 
-class Saw(FormatObj):
+class Saw(MultipleObj):
     """Formats series of calls and lists as a saw-shaped pattern.
 
     Expressions of the form `foo(x)`, `[4]`, and `foo(x)[4]` can be called
@@ -167,16 +187,16 @@ class Saw(FormatObj):
 
     def __repr__(self):
         return f'Saw({repr(self.start)}, {repr(self.mid)}, {repr(self.end)})'
-    
-    def fmt_one(self, length: int, indent: str) -> List[str]:
+
+    def fmt_one(self, length: int, indent: str) -> list[str]:
         s = (
-             self.start
-             + _fmt(self.mid, length, indent)[0]
-             + _fmt(self.end, length, indent)[0]
-            )
+            self.start
+            + _fmt_one(self.mid, length, indent)
+            + _fmt_one(self.end, length, indent)
+        )
         return [s]
 
-    def fmt_multiple(self, length: int, indent: str) -> List[str]: 
+    def fmt_multiple(self, length: int, indent: str) -> list[str]:
         lines = [self.start]
         new_length = length - len(indent)
         for line in _fmt(self.mid, length, indent):
@@ -186,7 +206,7 @@ class Saw(FormatObj):
         return lines
 
 
-class Comma(FormatObj):
+class Comma(MultipleObj):
     """Format a comma-separated list of arguments.
 
     If we need to format a list of arguments across multiple lines, we
@@ -194,7 +214,7 @@ class Comma(FormatObj):
     the last line where the trailing comma is unnecessary.
     """
 
-    def __init__(self, objs: Optional[ElList] = None):
+    def __init__(self, objs: Optional[ElSeq] = None):
         self.objs: ElList
         if not objs:
             self.objs = []
@@ -204,18 +224,18 @@ class Comma(FormatObj):
     def __repr__(self):
         return 'Comma(' + repr(self.objs) + ')'
 
-    def fmt_one(self, length: int, indent: str) -> List[str]:
+    def fmt_one(self, length: int, indent: str) -> list[str]:
         if not self.objs:
             return ['']
 
         new_length = length
-        s = _fmt(self.objs[0], new_length, indent)[0]
+        s = _fmt_one(self.objs[0], new_length, indent)
         for obj in self.objs[1:]:
             new_length -= len(s) + 2
-            s += ', ' + _fmt(obj, new_length, indent)[0]
+            s += ', ' + _fmt_one(obj, new_length, indent)
         return [s]
 
-    def fmt_multiple(self, length: int, indent: str) -> List[str]:
+    def fmt_multiple(self, length: int, indent: str) -> list[str]:
         if not self.objs:
             return ['']
 
@@ -228,7 +248,7 @@ class Comma(FormatObj):
         return lines
 
 
-class Tree(FormatObj):
+class Tree(MultipleObj):
     """Format a tree of expressions.
 
     This formats a tree of expressions, like `1 + 2 - 3`. If the expressions
@@ -255,22 +275,22 @@ class Tree(FormatObj):
             repr(self.right),
         )
 
-    def fmt_one(self, length: int, indent: str) -> List[str]:
+    def fmt_one(self, length: int, indent: str) -> list[str]:
         if self.left is None:
             s = self.op
             assert self.right is not None
-            s += _fmt(self.right, length, indent)[0]
+            s += _fmt_one(self.right, length, indent)
         else:
-            s = _fmt(self.left, length, indent)[0]
+            s = _fmt_one(self.left, length, indent)
             if self.right is None:
                 s += self.op
             else:
                 s += ' ' + self.op + ' '
                 new_length = length - len(s)
-                s += _fmt(self.right, new_length, indent)[0]
+                s += _fmt_one(self.right, new_length, indent)
         return [s]
 
-    def fmt_multiple(self, length: int, indent: str) -> List[str]:
+    def fmt_multiple(self, length: int, indent: str) -> list[str]:
         if self.left is None:
             assert self.right is not None
             new_length = length - len(self.op)
@@ -284,7 +304,7 @@ class Tree(FormatObj):
             return lines
 
         op = self.op
-        right = self.right
+        right: Optional[El] = self.right
         while isinstance(right, Tree):
             new_length = length - len(op) - 1
             if right.left is not None:
