@@ -393,12 +393,12 @@ def dedent(s):
         return s
 
     line0 = lines[0]
-    min_indent = min(_indent(l) for l in lines[1:])
+    min_indent = min(_indent(line) for line in lines[1:])
     if line0.strip():
         r = line0 + '\n'
     else:
         r = ''
-    return r + '\n'.join(l[min_indent:] for l in lines[1:]) + '\n'
+    return r + '\n'.join(line[min_indent:] for line in lines[1:]) + '\n'
 
 
 def _walk_ast(

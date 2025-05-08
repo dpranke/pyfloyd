@@ -47,6 +47,6 @@ def encode(s):
     """Return a string literal containing a safely-escaped string of chars."""
     squote = "'"
     dquote = '"'
-    if squote in s:
+    if s.count(squote) > s.count(dquote):
         return dquote + escape(s, dquote) + dquote
     return squote + escape(s, squote) + squote

@@ -1922,7 +1922,7 @@ class _Parser:
         self._s_escape_9()
 
     def _s_escape_1(self):
-        p = "[abfnrtv'\"`]"
+        p = '[abfnrtv\'"`]'
         if p not in self._regexps:
             self._regexps[p] = re.compile(p)
         m = self._regexps[p].match(self._text, self._pos)
@@ -2453,11 +2453,11 @@ class _Parser:
         self._errpos = max(self._errpos, self._pos)
 
     def _lookup(self, var):
-        l = len(self._scopes) - 1
-        while l >= 0:
-            if var in self._scopes[l]:
-                return self._scopes[l][var]
-            l -= 1
+        i = len(self._scopes) - 1
+        while i >= 0:
+            if var in self._scopes[i]:
+                return self._scopes[i][var]
+            i -= 1
         if var in self._externs:
             return self._externs[var]
         assert False, f'unknown var {var}'

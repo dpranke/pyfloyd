@@ -218,6 +218,7 @@ class _BaseTestCase(unittest.TestCase):
             if tmpdir:
                 h.rmtree(tmpdir)
                 h.chdir(orig_wd)
+
     # pylint: enable=too-many-positional-arguments
 
 

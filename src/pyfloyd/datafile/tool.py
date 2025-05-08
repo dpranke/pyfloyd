@@ -33,7 +33,7 @@ import sys
 
 try:
     import pyfloyd
-except ModuleNotFoundError as e:  # pragma: no cover
+except ModuleNotFoundError:  # pragma: no cover
     src_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
     sys.path.insert(0, src_dir)
     import pyfloyd

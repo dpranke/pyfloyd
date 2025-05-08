@@ -24,7 +24,7 @@ class Runner:
         self.top = f'src/{self.package}'
         self.grammars = {
             'grammars/floyd.g': f'{self.top}/parser.py',
-            'grammars/datafile.g': f'{self.top}/datafile/parser.py'
+            'grammars/datafile.g': f'{self.top}/datafile/parser.py',
         }
         self.run_cmd = None
         self.subps = None
@@ -177,7 +177,7 @@ class Runner:
             help='Upload to the real PyPI instance.',
         )
 
-        subp = self.add_parser('regen', help=f'Regenerate parsers.')
+        subp = self.add_parser('regen', help='Regenerate parsers.')
         subp.add_argument(
             '--check',
             action='store_true',
@@ -362,7 +362,9 @@ class Runner:
             if self.args.check:
                 os.remove(new_file)
                 if old != new:
-                    print(f'Need to regenerate {parser_file} with `run regen`.')
+                    print(
+                        f'Need to regenerate {parser_file} with `run regen`.'
+                    )
                     sys.exit(1)
                 print(f'{parser_file} is up to date.')
             elif old == new:

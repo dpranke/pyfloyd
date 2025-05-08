@@ -726,11 +726,11 @@ _BUILTINS = {
         """,
     'lookup': """\
         def _lookup(self, var):
-            l = len(self._scopes) - 1
-            while l >= 0:
-                if var in self._scopes[l]:
-                    return self._scopes[l][var]
-                l -= 1
+            i = len(self._scopes) - 1
+            while i >= 0:
+                if var in self._scopes[i]:
+                    return self._scopes[i][var]
+                i -= 1
             if var in self._externs:
                 return self._externs[var]
             assert False, f'unknown var {var}'
