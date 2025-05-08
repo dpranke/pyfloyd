@@ -20,10 +20,12 @@ class Runner:
         self.arg_parser = None
         self.args = None
         self.remaining_args = None
-        self.grammar = 'grammars/floyd.g'
         self.package = 'pyfloyd'
         self.top = f'src/{self.package}'
-        self.parser_file = f'{self.top}/parser.py'
+        self.grammars = {
+            'grammars/floyd.g': f'{self.top}/parser.py',
+            'grammars/datafile.g': f'{self.top}/datafile/parser.py'
+        }
         self.run_cmd = None
         self.subps = None
         self.uv_path = None
@@ -175,7 +177,7 @@ class Runner:
             help='Upload to the real PyPI instance.',
         )
 
-        subp = self.add_parser('regen', help=f'Regenerate {self.parser_file}.')
+        subp = self.add_parser('regen', help=f'Regenerate parsers.')
         subp.add_argument(
             '--check',
             action='store_true',
@@ -343,31 +345,32 @@ class Runner:
         self.call([self.uv_path, 'publish'] + test + [tgz, wheel])
 
     def run_regen(self):
-        new_file = f'{self.parser_file}.new'
-        with open(self.parser_file, encoding='utf-8') as fp:
-            old = fp.read()
-        self._gen_parser()
-        if self.args.no_execute:
-            if self.args.check:
-                print(f'diff -q {self.parser_file} {new_file}')
-            else:
-                print(f'mv {new_file} {self.parser_file}')
-            return
+        for grammar, parser_file in self.grammars.items():
+            new_file = f'{parser_file}.new'
+            with open(parser_file, encoding='utf-8') as fp:
+                old = fp.read()
+            self._gen_parser(grammar, parser_file)
+            if self.args.no_execute:
+                if self.args.check:
+                    print(f'diff -q {parser_file} {new_file}')
+                else:
+                    print(f'mv {new_file} {parser_file}')
+                continue
 
-        with open(new_file, encoding='utf-8') as fp:
-            new = fp.read()
-        if self.args.check:
-            os.remove(new_file)
-            if old != new:
-                print('Need to regenerate the parser with `run regen`.')
-                sys.exit(1)
-            print(f'{self.parser_file} is up to date.')
-        elif old == new:
-            print(f'{self.parser_file} is up to date.')
-            os.remove(new_file)
-        else:
-            os.rename(new_file, self.parser_file)
-            print(f'{self.parser_file} regenerated.')
+            with open(new_file, encoding='utf-8') as fp:
+                new = fp.read()
+            if self.args.check:
+                os.remove(new_file)
+                if old != new:
+                    print(f'Need to regenerate {parser_file} with `run regen`.')
+                    sys.exit(1)
+                print(f'{parser_file} is up to date.')
+            elif old == new:
+                print(f'{parser_file} is up to date.')
+                os.remove(new_file)
+            else:
+                os.rename(new_file, parser_file)
+                print(f'{parser_file} regenerated.')
 
     def run_tests(self):
         if self.args.typ:
@@ -424,8 +427,8 @@ class Runner:
 
         return argv[i : i + 1] + leading_args + argv[i + 1 :]
 
-    def _gen_parser(self):
-        new_file = f'{self.parser_file}.new'
+    def _gen_parser(self, grammar, parser_file):
+        new_file = f'{parser_file}.new'
         self.call(
             self.run_cmd
             + [
@@ -436,14 +439,14 @@ class Runner:
                 '--memoize',
                 '-c',
                 '--python',
-                self.grammar,
+                grammar,
             ]
         )
         # TODO: Add a command line arg to set the name of the parser file.
         if not self.args.no_execute:
             with open(new_file, encoding='utf8') as fp:
                 orig = fp.read()
-            new = orig.replace(new_file, self.parser_file)
+            new = orig.replace(new_file, parser_file)
             if new != orig:
                 with open(new_file, 'w', encoding='utf8') as fp:
                     fp.write(new)
