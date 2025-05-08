@@ -21,7 +21,7 @@ from pyfloyd.ast import Not, Label
 from pyfloyd.formatter import (
     Comma,
     FormatObj,
-    FormatObjList,
+    ElList,
     HList,
     Indent,
     ListObj,

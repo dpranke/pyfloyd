@@ -20,11 +20,11 @@ from pyfloyd.ast import Not, Count
 from pyfloyd.analyzer import Grammar
 from pyfloyd.formatter import (
     Comma,
+    ElList,
     HList,
     Indent,
     VList,
     Saw,
-    FormatObjList,
 )
 from pyfloyd.generator import Generator, GeneratorOptions
 
