@@ -21,7 +21,6 @@ from pyfloyd.support import FakeHost, Host
 import pyfloyd.tool
 
 
-
 class ToolTest(unittest.TestCase):
     maxDiff = None
 
@@ -32,7 +31,7 @@ class ToolTest(unittest.TestCase):
         self.assertEqual(ret, 0)
         self.assertEqual(host.stdout.getvalue(), '')
         self.assertEqual(host.stderr.getvalue(), '')
-        parser = host.files['grammar.py']
+        parser = host.read_text_file('grammar.py')
         scope = {}
         exec(parser, scope)
         parse_fn = scope['parse']
@@ -148,8 +147,8 @@ class ToolTest(unittest.TestCase):
 
     def test_interpret_file(self):
         host = FakeHost()
-        host.files['grammar.g'] = 'grammar = "Hello" end -> true'
-        host.files['input.txt'] = 'Hello'
+        host.write_text_file('grammar.g', 'grammar = "Hello" end -> true')
+        host.write_text_file('input.txt', 'Hello')
         self.assertEqual(
             pyfloyd.tool.main(['grammar.g', 'input.txt'], host), 0
         )
@@ -180,7 +179,7 @@ class ToolTest(unittest.TestCase):
 
     def test_interpret_input_error(self):
         host = FakeHost()
-        host.files['grammar.g'] = 'grammar = "Hello" end -> true'
+        host.write_text_file('grammar.g', 'grammar = "Hello" end -> true')
         host.stdin.write('Hell')
         host.stdin.seek(0)
         self.assertEqual(pyfloyd.tool.main(['grammar.g'], host), 1)
@@ -192,7 +191,7 @@ class ToolTest(unittest.TestCase):
 
     def test_keyboard_interrupt(self):
         host = FakeHost()
-        host.files['grammar.g'] = ''
+        host.write_text_file('grammar.g', '')
 
         def _error_on_read(path):
             raise KeyboardInterrupt
@@ -209,7 +208,7 @@ class ToolTest(unittest.TestCase):
         self.assertEqual(ret, 0)
         self.assertEqual(host.stdout.getvalue(), '')
         self.assertEqual(host.stderr.getvalue(), '')
-        parser = host.files['grammar.py']
+        parser = host.read_text_file('grammar.py')
         scope = {}
         exec(parser, scope)
         main_fn = scope['main']
@@ -222,7 +221,7 @@ class ToolTest(unittest.TestCase):
         self.assertEqual(ret, 0)
         self.assertEqual(host.stdout.getvalue(), '')
         self.assertEqual(host.stderr.getvalue(), '')
-        parser = host.files['grammar.py']
+        parser = host.read_text_file('grammar.py')
         scope = {}
         exec(parser, scope)
         parse_fn = scope['parse']
@@ -241,7 +240,7 @@ class ToolTest(unittest.TestCase):
 
     def test_read_error(self):
         host = FakeHost()
-        host.files['grammar.g'] = ''
+        host.write_text_file('grammar.g', '')
 
         def _error_on_read(path):
             raise IOError('read error')

@@ -42,6 +42,7 @@ Issues = "https://github.com/dpranke/pyfloyd/issues"
 Changelog = "https://github.com/dpranke/pyfloyd/blob/master/README.md"
 
 [project.scripts]
+fdf = "pyfloyd.datafile:main"
 pyfloyd = "pyfloyd.tool:main"
 
 [tool.black]

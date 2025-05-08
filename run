@@ -450,7 +450,11 @@ class Runner:
 
     def _files(self):
         return (
-            ['run'] + glob.glob(f'{self.top}/*.py') + glob.glob('tests/*.py')
+            ['run']
+            + glob.glob(f'{self.top}/*.py')
+            + glob.glob('tests/*.py')
+            + glob.glob(f'{self.top}/*/*.py')
+            + glob.glob('tests/*/*.py')
         )
 
     def _trim_test_glob(self, test):

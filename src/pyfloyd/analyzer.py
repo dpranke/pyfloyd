@@ -497,6 +497,9 @@ class _Analyzer:
                     labels[var_name].outer_scope = True
                     self.grammar.lookup_needed = True
                     self.grammar.outer_scope_rules.add(self.current_rule)
+            else:
+                if var_name in labels and labels[var_name].outer_scope:
+                    node.outer_scope = True
             if var_name in labels:
                 references.add(var_name)
             elif var_name in self.grammar.externs:

@@ -28,7 +28,6 @@ from typing import (
     Type,
     Union,
 )
-import unicodedata
 
 from . import parser
 
@@ -101,6 +100,7 @@ def load(
         parse_numword=parse_numword,
         object_pairs_hook=object_pairs_hook,
         allow_trailing=allow_trailing,
+        allow_numwords=allow_numwords,
         start=start,
     )
     if err:
@@ -624,7 +624,7 @@ class Encoder:
     def _encode_float(self, obj: float, *, as_key: bool) -> str:
         if obj == float('inf') or obj == float('-inf') or math.isnan(obj):
             raise ValueError('Illegal datafile value: f{obj}')
-        return f'"{repr(s)}"' if as_key else repr(s)
+        return f'"{repr(obj)}"' if as_key else repr(obj)
 
     def _encode_str(self, obj: str, *, as_key: bool) -> str:
         if as_key:
@@ -638,13 +638,13 @@ class Encoder:
     def _encode_quoted_str(self, s: str) -> str:
         """Returns a quoted string with a minimal number of escaped quotes."""
         quote_map = {"'": 0, '"': 0, '`': 0, "'''": 0, '"""': 0, '```': 0}
-        lstrs = {}
+        lstrs: dict[int, bool] = {}
 
         i = 0
         while i < len(s):
             if s[i] == '\\' and s[i + 1] in '\'"`':
                 i += 2
-            for k in quote_map.keys():
+            for k in quote_map:
                 if s[i:].startswith(k):
                     quote_map[k] += 1
                     i += len(k)
@@ -652,7 +652,7 @@ class Encoder:
             else:
                 m = _long_str_re.match(s[i:])
                 if m:
-                    lstrs[len(m.group(0) - 2)] = True
+                    lstrs[len(m.group(0)) - 2] = True
                     i += len(m.group(0))
                 else:
                     i += 1
@@ -661,7 +661,7 @@ class Encoder:
         if quote_map[quote]:
             i = 1
             while True:
-                if lstrs.has_key(i):
+                if i in lstrs:
                     i += 1
                     continue
                 quote = "l'" + '=' * i + "'"
@@ -757,6 +757,8 @@ class Encoder:
     def _encode_dict(
         self, obj: Any, seen: set, level: int, oneline=False
     ) -> str:
+        # TODO: Should I be doing something w/ oneline?
+        del oneline
         if not obj:
             return '{}'
 
