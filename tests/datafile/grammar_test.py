@@ -58,9 +58,14 @@ class Grammar(unittest.TestCase):
     def test_object(self):
         self.check('{}', {})
         self.check('{foo: bar}', {'foo': 'bar'})
+        self.check('{foo: "bar"}', {'foo': 'bar'})
+        self.check("{foo: 'bar'}", {'foo': 'bar'})
         self.check('{foo: bar baz: quux}', {'foo': 'bar', 'baz': 'quux'})
         self.check('{f: 1, g: 2}', {'f': 1, 'g': 2})
         self.check('{"foo": 1}', {'foo': 1})
+
+    def test_top_level_object(self):
+        self.check('foo: bar', {'foo': 'bar'})
 
     def test_raw_str(self):
         self.check(r'r"foo\x"', r'foo\x')

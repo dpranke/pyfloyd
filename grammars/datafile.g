@@ -15,8 +15,8 @@
              | unicode                                -> true
              | unicode_names                          -> true
 
-grammar      = value %filler trailing?                -> $1
-             | member+ %filler trailing?              -> ['object', '', $1]
+grammar      = member+ %filler trailing?              -> ['object', '', $1]
+             | value %filler trailing?                -> $1
 
 trailing     = ?{!allow_trailing} end
 
@@ -75,7 +75,7 @@ raw_str_tag  = ('r' | 'rd' | 'dr')
 string_tag   = ('d' | tag) ~(%whitespace | %comment)  -> $1
 
 tag          = bare_word
-             |                                        -> ''
+             | %filler                                -> ''
 
 bare_word    = ~('true' | 'false' | 'null' | number)
                <(^(punct | %whitespace))+>

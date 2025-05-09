@@ -728,6 +728,8 @@ def _add_filler_nodes(grammar, node):
             node.rule_name == 'end' or node.rule_name in grammar.tokens
         ):
             return True
+        if node.t == 'empty':
+            return True
         return False
 
     if node.t == 'rule' and node.name.startswith('%'):
@@ -746,6 +748,8 @@ def _add_filler_nodes(grammar, node):
         return node
     if node.t == 'seq':
         children = []
+        if len(children) == 1 and node.ch[0].t == 'action':
+            children.append(Apply('%filler'))
         for c in node.ch:
             if should_fill(c):
                 children.append(Apply('%filler'))

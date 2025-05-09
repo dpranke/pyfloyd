@@ -34,6 +34,9 @@ class Host:
     def exists(self, path):
         return os.path.exists(path)
 
+    def dirname(self, path):
+        return os.path.dirname(path)
+
     def getcwd(self):
         return os.getcwd()
 

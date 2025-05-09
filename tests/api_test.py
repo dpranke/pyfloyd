@@ -57,7 +57,7 @@ class APITest(unittest.TestCase):
             err,
             (
                 'Unsupported language "q"\n'
-                'Only "javascript" and "python" are supported.\n'
+                'Only "javascript" and "python" and "datafile" are supported.\n'
             ),
         )
 

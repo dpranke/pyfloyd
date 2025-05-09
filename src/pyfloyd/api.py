@@ -17,10 +17,12 @@
 from typing import Any, Dict, NamedTuple, Optional, Protocol, Tuple
 
 from pyfloyd import analyzer, ast
-from pyfloyd.interpreter import Interpreter
 from pyfloyd import parser
-from pyfloyd.printer import Printer
 from pyfloyd import generator
+from pyfloyd import support
+from pyfloyd.interpreter import Interpreter
+from pyfloyd.printer import Printer
+from pyfloyd.datafile_generator import DatafileGenerator
 from pyfloyd.python_generator import PythonGenerator
 from pyfloyd.javascript_generator import JavaScriptGenerator
 
@@ -36,6 +38,7 @@ SUPPORTED_LANGUAGES = generator.SUPPORTED_LANGUAGES
 _generators = {
     'javascript': JavaScriptGenerator,
     'python': PythonGenerator,
+    'datafile': DatafileGenerator,
 }
 assert set(_generators.keys()) == set(generator.SUPPORTED_LANGUAGES)
 
@@ -152,7 +155,7 @@ def generate(
     gen: Generator
     cls = _generators.get(options.language.lower())
     if cls:
-        gen = cls(grammar_obj, options)
+        gen = cls(support.Host(), grammar_obj, options)
         text = gen.generate()
         return Result(text)
 

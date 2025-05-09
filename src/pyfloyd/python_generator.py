@@ -30,8 +30,8 @@ from pyfloyd.generator import Generator, GeneratorOptions
 
 
 class PythonGenerator(Generator):
-    def __init__(self, grammar: Grammar, options: GeneratorOptions):
-        super().__init__(grammar, options)
+    def __init__(self, host, grammar: Grammar, options: GeneratorOptions):
+        super().__init__(host, grammar, options)
         self._indent = '    '
         self._map = {
             'end': '',

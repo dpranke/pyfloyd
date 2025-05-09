@@ -630,7 +630,7 @@ class Encoder:
         if as_key:
             return obj
 
-        m = _bare_word_re.match(obj, re.MULTILINE)
+        m = _bare_word_re.match(obj)
         if m:
             return obj
         return self._encode_quoted_str(obj)

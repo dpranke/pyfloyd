@@ -36,10 +36,7 @@ from pyfloyd.version import __version__
 
 DEFAULT_LANGUAGE = 'python'
 
-LANG_TO_EXT = {
-    'javascript': '.js',
-    'python': '.py',
-}
+LANG_TO_EXT = {'javascript': '.js', 'python': '.py', 'datafile': '.ft'}
 
 EXT_TO_LANG = {v: k for k, v in LANG_TO_EXT.items()}
 
@@ -101,7 +98,8 @@ class GeneratorOptions:
 
 
 class Generator:
-    def __init__(self, grammar: Grammar, options: GeneratorOptions):
+    def __init__(self, host, grammar: Grammar, options: GeneratorOptions):
+        self._host = host
         self._grammar = grammar
         self._options = options
         self._unicodedata_needed = (

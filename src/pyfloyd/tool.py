@@ -21,6 +21,7 @@ import io
 import json
 import os
 import pathlib
+import pdb
 import pprint
 import sys
 
@@ -98,6 +99,10 @@ def main(argv=None, host=None):
     except KeyboardInterrupt:
         host.print('Interrupted, exiting.', file=host.stderr)
         return 130  # SIGINT
+    except Exception as e:
+        print(f'Exception raised: {repr(e)}')
+        pdb.post_mortem()
+        return 1
 
 
 def _parse_args(host, argv):
@@ -178,6 +183,7 @@ def _parse_args(host, argv):
     ap.add_argument(
         'input', nargs='?', default='-', help='path to read data from'
     )
+    ap.add_argument('--post-mortem', '--pm', action='store_true')
 
     args = ap.parse_args(argv)
 
