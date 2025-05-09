@@ -26,10 +26,10 @@ from pyfloyd.formatter import (
     Saw,
     VList,
 )
-from pyfloyd.generator import Generator, GeneratorOptions
+from pyfloyd.generator import HardCodedGenerator, GeneratorOptions
 
 
-class PythonGenerator(Generator):
+class PythonGenerator(HardCodedGenerator):
     def __init__(self, host, grammar: Grammar, options: GeneratorOptions):
         super().__init__(host, grammar, options)
         self._indent = '    '

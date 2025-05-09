@@ -69,6 +69,8 @@ class Grammar:
         self.re_needed: bool = False
         self.needed_builtin_functions: List[str] = []
         self.needed_builtin_rules: List[str] = []
+        self.unicodedata_needed: bool = False
+        self.seeds_needed: bool = False
 
         self.operators: Dict[str, OperatorState] = {}
         self.leftrec_rules: Set[str] = set()
@@ -250,6 +252,10 @@ def analyze(ast, rewrite_subrules: bool) -> Grammar:
 
     g.needed_builtin_rules = sorted(set(g.needed_builtin_rules))
     g.needed_builtin_functions = sorted(set(g.needed_builtin_functions))
+    g.unicodedata_needed = (
+        g.unicat_needed or 'unicode_lookup' in g.needed_builtin_functions
+    )
+    g.seeds_needed = g.leftrec_needed or g.operator_needed
 
     return g
 

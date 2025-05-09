@@ -42,16 +42,16 @@ class _Tests:
         )
 
     def test_read_command(self):
-        self.check(['-c', '"foo"'], out="foo\n")
+        self.check(['-c', '"foo"'], out='foo\n')
 
     def test_read_from_stdin(self):
-        self.check([], stdin='"foo"\n', out="foo\n")
+        self.check([], stdin='"foo"\n', out='foo\n')
 
     def test_read_from_a_file(self):
         files = {
             'foo.fdf': '"foo"\n',
         }
-        self.check(['foo.fdf'], files=files, out="foo\n")
+        self.check(['foo.fdf'], files=files, out='foo\n')
 
     def test_unknown_switch(self):
         self.check(

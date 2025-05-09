@@ -12,14 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import textwrap
 from typing import Any, Set
 
 from pyfloyd import at_expr
 from pyfloyd import datafile
 from pyfloyd.analyzer import Grammar
-from pyfloyd.ast import Node
-from pyfloyd.formatter import flatten, FormatObj, ListObj, VList
 from pyfloyd.generator import Generator, GeneratorOptions
 
 
@@ -39,6 +36,11 @@ class DatafileGenerator(Generator):
         fname = host.join(host.dirname(__file__), 'python.dft')
         df_str = host.read_text_file(fname)
         self._templates = datafile.loads(df_str)
+        for t, v in self._templates.items():
+            # TODO: Fix dedenting properly.
+            if v.startswith('\n'):
+                self._templates[t] = v[1:]
+
         self._indent = self._templates.get('indent', '    ')
 
     def _derive_memoize(self):
@@ -69,38 +71,10 @@ class DatafileGenerator(Generator):
         for _, node in self._grammar.rules.items():
             node.local_vars = _walk(node)
 
-    def _defmt(self, s: str) -> VList:
-        vl = VList(textwrap.dedent(s).splitlines())
-        return vl
-
-    def _defmtf(self, s: str, **kwargs) -> VList:
-        vl = VList(textwrap.dedent(s).format(**kwargs).splitlines())
-        return vl
-
-    def _fmt(self, obj: FormatObj) -> str:
-        text = '\n'.join(flatten(obj, indent=self._indent)) + '\n'
-        return text
-
     def generate(self) -> str:
         self._global_vars['grammar'] = self._grammar
         self._global_vars['generator_options'] = self._options
         return self._eval_template('generate')
-
-    # TODO: Move these methods from Generator to a different class.
-    def _gen_extern(self, name: str) -> str:
-        raise NotImplementedError
-
-    def _gen_invoke(self, fn: str, *args) -> FormatObj:
-        raise NotImplementedError
-
-    def _gen_thisvar(self, name: str) -> str:
-        raise NotImplementedError
-
-    def _gen_rulename(self, name: str) -> str:
-        raise NotImplementedError
-
-    def _ty_regexp(self, node: Node) -> ListObj:
-        raise NotImplementedError
 
     def _eval_template(self, template, args=None) -> str:
         del args
@@ -165,14 +139,23 @@ class DatafileGenerator(Generator):
                 # into the string, indenting each line as appropriate.
                 if res == '':
                     skip_newline = True
-                    s = s[:-indent]
+                    if indent:
+                        s = s[:-indent]
                     continue
                 lines = res.splitlines()
                 s += lines[0]
                 for line in lines[1:]:
                     s += '\n' + ' ' * indent + line
+                if res.endswith('\n'):
+                    s += '\n'
             else:
                 s += res
+            if (
+                res.endswith('\n')
+                and i < len(exprs)
+                and exprs[i + 1].startswith('\n')
+            ):
+                skip_newline = True
 
         return s
 

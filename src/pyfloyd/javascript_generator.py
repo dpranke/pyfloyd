@@ -24,10 +24,10 @@ from pyfloyd.formatter import (
     VList,
     Saw,
 )
-from pyfloyd.generator import Generator, GeneratorOptions
+from pyfloyd.generator import HardCodedGenerator, GeneratorOptions
 
 
-class JavaScriptGenerator(Generator):
+class JavaScriptGenerator(HardCodedGenerator):
     def __init__(self, host, grammar: Grammar, options: GeneratorOptions):
         super().__init__(host, grammar, options)
         self._indent = '  '

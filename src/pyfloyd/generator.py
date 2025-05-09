@@ -143,6 +143,11 @@ class Generator:
         for _, node in self._grammar.rules.items():
             node.local_vars = _walk(node)
 
+    def generate(self) -> str:
+        raise NotImplementedError
+
+
+class HardCodedGenerator(Generator):
     def _defmt(self, s: str) -> VList:
         vl = VList(textwrap.dedent(s).splitlines())
         return vl
