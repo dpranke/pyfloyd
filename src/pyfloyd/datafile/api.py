@@ -343,6 +343,8 @@ def _decode_escape(s, i):
         return i + 2, '"'
     if c == '`':
         return i + 2, '`'
+    if c == '\\':
+        return i + 2, '\\'
     if c == 'x':
         if _check(s, i + 2, 2, _ishex):
             return i + 4, chr(int(s[i + 2 : i + 4], base=16))

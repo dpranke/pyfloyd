@@ -82,8 +82,9 @@ def main(
 '''  # main_header
 
 imports: '''
-@if[generator_options.main 'import argparse\nimport json\nimport os\n' '']
+@if[generator_options.main 'import argparse\nimport json\nimport os\nimport sys\n' '']
 @if[grammar.re_needed 'import re' '']
+from typing import Any, Dict, NamedTuple, Optional
 @if[grammar.unicodedata_needed 'import unicodedata' '']
 '''  # imports
 
@@ -103,18 +104,27 @@ class Result(NamedTuple):
     val: Any = None
     err: Optional[str] = None
     pos: Optional[int] = None
-'''  # result_class
+'''
 
 parsing_runtime_exception_class: '''
 
 
-# parsing runtime exception class
+class _ParsingRuntimeError(Exception):
+    pass
 '''
+
 
 operator_state_class: '''
 
 
-# operator state class
+class _OperatorState:
+    def __init__(self):
+        self.current_depth = 0
+        self.current_prec = 0
+        self.prec_ops = {}
+        self.precs = []
+        self.rassoc = set()
+        self.choices = {}
 '''
 
 parse_function: '''
@@ -183,21 +193,88 @@ def __init__(self, text, path):
 
 operator_state: '# operator state'
 
-parser_methods: '# parser methods'
+parser_methods: '''
+@parse_method
 
-parse_method: '# parse method'
+@map[[method]
+     [invoke [strcat 'o_' method]]
+     grammar.needed_operators
+     '\n']
+@map[[rule node] [rule_method rule node] grammar.rules '\n']
 
-rule_methods: '# rule methods'
+@if[generator_options.memoize o_operator '']
+@if[grammar.needed_builtin_functions '\n' '']
+@map[[method]
+     [invoke [strcat 'fn_' method]]
+     grammar.needed_builtin_functions
+     '\n'
+    ]
+'''
 
-needed_methods: '# needed methods'
+parse_method: '''
+@if[grammar.exception_needed parse_with_exception parse_without_exception]
+'''
 
-needed_builtin_functions: '# needed builtin functions'
+parse_with_exception: '''
+def parse(self, externs: Externs = None):
+    errors = ''
+    if externs:
+        for k, v in externs.items():
+            if k in self._externs:
+                self._externs[k] = v
+            else:
+                errors += f'Unexpected extern "{k}"\\n'
+    if errors:
+        return Result(None, errors, 0)
+    try:
+        self._r_@grammar.starting_rule()
+
+        if self._failed:
+            return Result(None, self._error(), self._errpos)
+        return Result(self._val, None, self._pos)
+    except _ParsingRuntimeError as e:  # pragma: no cover
+        lineno, _ = self._offsets(self._errpos)
+        return Result(
+            None,
+            self._path + ':' + str(lineno) + ' ' + str(e),
+            self._errpos,
+        )
+'''
+
+parse_without_exception: '''
+def parse(self, externs: Externs = None):
+    if externs:
+        for k, v in externs.items():
+            self._externs[k] = v
+
+    self._r_@grammar.starting_rule()
+
+    if self._failed:
+        return Result(None, self._error(), self._errpos)
+    return Result(self._val, None, self._pos)
+'''
+
+rule_method: '''
+
+def _@rule(self):
+    @invoke[[strcat 'n_' node.t]]
+'''
+
+rulename: 'self._@arg_1'
+
+end: ''
 
 #
 # Rules for each node in the AST
 #
 
-n_action: ''
+n_action: '''
+@hlist[[saw [strcat [rulename 'succeed'] '(']
+            'True'
+            ')']
+       end]
+'''
+   
 
 n_apply: ''
 
@@ -281,7 +358,7 @@ def _offsets(self, pos):
     lineno = 1
     colno = 1
     for i in range(pos):
-        if self._text[i] == '\n':
+        if self._text[i] == '\\n':
             lineno += 1
             colno = 1
         else:

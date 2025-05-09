@@ -17,6 +17,16 @@ from typing import Any, Set
 from pyfloyd import at_expr
 from pyfloyd import datafile
 from pyfloyd.analyzer import Grammar
+from pyfloyd.formatter import (
+    flatten,
+    Comma,
+    FormatObj,
+    HList,
+    Indent,
+    Saw,
+    VList
+)
+
 from pyfloyd.generator import Generator, GeneratorOptions
 
 
@@ -29,6 +39,7 @@ class DatafileGenerator(Generator):
         super().__init__(host, grammar, options)
         self._local_vars: dict[str, Any] = {}
         self._global_vars: dict[str, Any] = {}
+        self._scopes: list[dict[str, Any]] = []
 
         self._derive_memoize()
         self._derive_local_vars()
@@ -38,7 +49,7 @@ class DatafileGenerator(Generator):
         self._templates = datafile.loads(df_str)
         for t, v in self._templates.items():
             # TODO: Fix dedenting properly.
-            if v.startswith('\n'):
+            if isinstance(v, str) and v.startswith('\n'):
                 self._templates[t] = v[1:]
 
         self._indent = self._templates.get('indent', '    ')
@@ -77,26 +88,34 @@ class DatafileGenerator(Generator):
         return self._eval_template('generate')
 
     def _eval_template(self, template, args=None) -> str:
-        del args
+        args = args or []
+        if args:
+            self._scopes.insert(0, {})
+            for i, arg in enumerate(args, start=1):
+                self._scopes[0][f'arg_{i}'] = self._eval_expr(arg)
         v = self._templates[template]
         if isinstance(v, str):
-            return self._eval_text(v)
-        raise NotImplementedError
+            res = self._eval_text(v, [])
+        if isinstance(v, list):
+            res = self._eval_list(v, [])
+        if args:
+            self._scopes.pop(0)
+        return res
 
-    def _eval_text(self, text) -> str:
+    def _eval_text(self, text, args) -> str:
         v, err, pos = at_expr.parse(text, '-')
         if err:
             raise _DFTError('unexpected at-expr parse error: ' + err)
         if pos != len(text):
             raise _DFTError('at-expr parse did not consume everything')
         assert isinstance(v, list)
-
-        r = self._eval_exprs(v, '\n' in text)
+        if (isinstance(v, list) and len(v) and isinstance(v[0], list) and
+            v[0][0] == 'symbol' and v[0][1] == 'lambda'):
+            return self._eval_lambda(v, args)
+        r = self._eval_exprs(v, args)
         return r
 
-    def _eval_exprs(self, exprs, multiline: bool):
-        del multiline
-
+    def _eval_exprs(self, exprs, args):
         def _is_blank(s):
             i = len(s) - 1
             indent = 0
@@ -120,20 +139,10 @@ class DatafileGenerator(Generator):
                     continue
                 s += expr
                 continue
-            if (
-                isinstance(expr, list)
-                and isinstance(expr[0], list)
-                and len(expr[0]) > 0
-                and expr[0][0] == 'symbol'
-            ):
-                res = self._eval_fn(expr[0][1], expr[1:])
-            elif isinstance(expr, list) and expr[0] == 'symbol':
-                res = self._eval_fn(expr[1])
-            else:
-                assert False, f'Unknown expr {expr}'
+            res = self._eval_list(expr, args)
 
             is_blank, indent = _is_blank(s)
-            if i < len(exprs) and exprs[i + 1].startswith('\n') and is_blank:
+            if i < len(exprs) - 1 and exprs[i + 1].startswith('\n') and is_blank:
                 # If the expr is on a line of its own, if it evalues to
                 # '', trim the whole line. Otherwise, splice the result
                 # into the string, indenting each line as appropriate.
@@ -149,7 +158,14 @@ class DatafileGenerator(Generator):
                 if res.endswith('\n'):
                     s += '\n'
             else:
-                s += res
+                if isinstance(res, FormatObj):
+                    lines = flatten(res, 80)
+                    s += lines[0]
+                    for line in lines[1:]:
+                        s += '\n' + ' ' * indent + line
+                    continue
+                else:
+                    s += res
             if (
                 res.endswith('\n')
                 and i < len(exprs)
@@ -162,51 +178,148 @@ class DatafileGenerator(Generator):
     def _eval_expr(self, expr):
         if isinstance(expr, str):
             return expr
-        assert isinstance(expr, list) and expr[0] == 'symbol'
-        return self._eval_template(expr[1])
+        return self._eval_list(expr)
 
-    def _eval_fn(self, symbol, args=None):
-        args = args or []
-        if symbol == 'if':
-            return self._eval_if(args)
-        found, v = self._lookup_global(symbol)
-        if found:
-            return v
-        if symbol in self._templates:
-            return self._eval_template(symbol, args)
-        raise _DFTError(f'Unknown symbol "{symbol}"')
+    def _eval_list(self, expr, args=None):
+        assert isinstance(expr, list)
+        if (isinstance(expr[0], list)
+            and len(expr[0]) > 0
+            and expr[0][0] == 'symbol'
+        ):
+            return self._eval_symbol(expr[0][1], expr[1:])
+        if isinstance(expr, list) and expr[0] == 'symbol':
+            return self._eval_symbol(expr[1])
+        assert False, f'Unknown expr {expr}'
 
     def _eval_if(self, args):
         assert len(args) == 3, (
-            f'Wrong number of args passed to `if`: repr{args}'
+            f'Wrong number of args passed to `if`: {repr(args)}'
         )
-        assert isinstance(args[0], list)
-        assert len(args[0]) == 2
-        assert args[0][0] == 'symbol'
-        v = self._lookup(args[0][1])
+        v = self._eval_expr(args[0])
         if v:
             return self._eval_expr(args[1])
         return self._eval_expr(args[2])
 
+    def _eval_comma(self, args):
+        return Comma([self._eval_expr(arg) for arg in args])
+
+    def _eval_hlist(self, args):
+        return HList([self._eval_expr(arg) for arg in args])
+
+    def _eval_indent(self, args):
+        return Indent(self._eval_expr(args[0]))
+
+    def _eval_vlist(self, args):
+        return VList([self._eval_expr(arg) for arg in args])
+
+    def _eval_saw(self, args):
+        return Saw(self._eval_expr(args[0]), self._eval_expr(args[1]),
+                   self._eval_expr(args[2]))
+
+    def _eval_invoke(self, args):
+        assert len(args) > 0, (
+            f'No args passed to `invoke`: {repr(args)}'
+        )
+        s = self._eval_expr(args[0])
+        assert isinstance(s, str)
+        if s in self._templates:
+            return self._eval_template(s, args[1:])
+        raise _DFTError(f'Unknown symbol "{s}"')
+
+    def _eval_lambda(self, args):
+        import pdb; pdb.set_trace()
+        return '# lambda'
+
+    def _eval_map(self, args):
+        assert len(args) in (3,4)
+        if len(args) == 4:
+            sep = self._eval_expr(args[3])
+        else:
+            sep = ''
+
+        assert isinstance(args[0], list)
+        names = []
+        for _, name in args[0]:
+            names.append(name)
+            
+        scope = {}
+        self._scopes.insert(0, scope)
+        v = self._eval_expr(args[2])
+        if isinstance(v, list) or isinstance(v, set):
+            assert len(names) == 1
+            r = []
+            for el in v:
+                if len(names) == 1:
+                    self._scopes[0][names[0]] = el
+                r.append(self._eval_expr(args[1]))
+            self._scopes.pop(0)
+            return sep.join(r)
+        assert isinstance(v, dict)
+        assert len(names) == 2
+        r = []
+        for k, el in v.items():
+            self._scopes[-1][names[0]] = k
+            self._scopes[-1][names[1]] = el
+            r.append(self._eval_expr(args[1]))
+        self._scopes.pop()
+        return sep.join(r)
+
+    def _eval_strcat(self, args):
+        assert len(args) == 2, (
+            f'Wrong number of args passed to `strcat`: {repr(args)}'
+        )
+        first = self._eval_expr(args[0])
+        second = self._eval_expr(args[1])
+        assert isinstance(first, str), (
+            f'First arg did not evaluate to string in `strcat`: {repr(args[0])}'
+        )
+        assert isinstance(second, str), (
+            f'Second arg did not evaluate to string in `strcat`: {repr(args[1])}'
+        )
+        return first + second
+
+    def _eval_symbol(self, symbol, args=None):
+        args = args or []
+        fns = {
+            'comma': self._eval_comma,
+            'indent': self._eval_indent,
+            'hlist': self._eval_hlist,
+            'if': self._eval_if,
+            'invoke': self._eval_invoke,
+            'map': self._eval_map,
+            'strcat': self._eval_strcat,
+            'vlist': self._eval_vlist,
+            'saw': self._eval_saw,
+        }
+        if symbol in fns:
+            return fns[symbol](args)
+
+        found, v = self._lookup(symbol)
+        if found:
+            if symbol in self._templates:
+                return self._eval_template(symbol, args)
+            return v
+        raise _DFTError(f'Unknown symbol "{symbol}"')
+
     def _lookup(self, symbol):
         if symbol == 'true':
-            return True
+            return True, True
         if symbol == 'false':
-            return False
+            return True, False
         symbols = symbol.split('.')
+        for scope in self._scopes:
+            if symbols[0] in scope:
+                v = scope[symbols[0]]
+                for attr in symbols[1:]:
+                    v = getattr(v, attr)
+                return True, v
+
+        if symbols[0] in self._templates:
+            return True, self._templates[symbols[0]]
+
         if symbols[0] in self._global_vars:
             v = self._global_vars[symbols[0]]
-        else:
-            v = self._templates[symbols[0]]
-        for attr in symbols[1:]:
-            v = getattr(v, attr)
-        return v
-
-    def _lookup_global(self, symbol):
-        symbols = symbol.split('.')
-        if symbols[0] not in self._global_vars:
-            return False, None
-        v = self._global_vars[symbols[0]]
-        for attr in symbols[1:]:
-            v = getattr(v, attr)
-        return True, v
+            for attr in symbols[1:]:
+                v = getattr(v, attr)
+            return True, v
+        return False, None
