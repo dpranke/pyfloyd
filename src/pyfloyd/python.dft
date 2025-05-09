@@ -254,12 +254,14 @@ def parse(self, externs: Externs = None):
     return Result(self._val, None, self._pos)
 '''
 
+# params 'rule', 'node'
 rule_method: '''
 
 def _@rule(self):
     @invoke[[strcat 'n_' node.t]]
 '''
 
+# params 'arg_1'
 rulename: 'self._@arg_1'
 
 end: ''

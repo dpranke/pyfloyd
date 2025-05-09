@@ -36,7 +36,7 @@ from pyfloyd.version import __version__
 
 DEFAULT_LANGUAGE = 'python'
 
-LANG_TO_EXT = {'javascript': '.js', 'python': '.py', 'datafile': '.py'}
+LANG_TO_EXT = {'javascript': '.js', 'python': '.py', 'datafile': '.dpy'}
 
 EXT_TO_LANG = {v: k for k, v in LANG_TO_EXT.items()}
 

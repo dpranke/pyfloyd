@@ -378,7 +378,6 @@ class PythonGenerator(HardCodedGenerator):
                 if self._failed:
                     return Result(None, self._error(), self._errpos)
                 return Result(self._val, None, self._pos)
-
             """
         )
 

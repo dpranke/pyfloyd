@@ -24,7 +24,7 @@ from pyfloyd.formatter import (
     HList,
     Indent,
     Saw,
-    VList
+    VList,
 )
 
 from pyfloyd.generator import Generator, GeneratorOptions
@@ -96,7 +96,8 @@ class DatafileGenerator(Generator):
         v = self._templates[template]
         if isinstance(v, str):
             res = self._eval_text(v, [])
-        if isinstance(v, list):
+        else:
+            assert isinstance(v, list), f'Unexpected template type f{v}'
             res = self._eval_list(v, [])
         if args:
             self._scopes.pop(0)
@@ -109,9 +110,6 @@ class DatafileGenerator(Generator):
         if pos != len(text):
             raise _DFTError('at-expr parse did not consume everything')
         assert isinstance(v, list)
-        if (isinstance(v, list) and len(v) and isinstance(v[0], list) and
-            v[0][0] == 'symbol' and v[0][1] == 'lambda'):
-            return self._eval_lambda(v, args)
         r = self._eval_exprs(v, args)
         return r
 
@@ -142,7 +140,11 @@ class DatafileGenerator(Generator):
             res = self._eval_list(expr, args)
 
             is_blank, indent = _is_blank(s)
-            if i < len(exprs) - 1 and exprs[i + 1].startswith('\n') and is_blank:
+            if (
+                i < len(exprs) - 1
+                and exprs[i + 1].startswith('\n')
+                and is_blank
+            ):
                 # If the expr is on a line of its own, if it evalues to
                 # '', trim the whole line. Otherwise, splice the result
                 # into the string, indenting each line as appropriate.
@@ -164,8 +166,7 @@ class DatafileGenerator(Generator):
                     for line in lines[1:]:
                         s += '\n' + ' ' * indent + line
                     continue
-                else:
-                    s += res
+                s += res
             if (
                 res.endswith('\n')
                 and i < len(exprs)
@@ -181,8 +182,10 @@ class DatafileGenerator(Generator):
         return self._eval_list(expr)
 
     def _eval_list(self, expr, args=None):
+        del args  # TODO: do we need args?
         assert isinstance(expr, list)
-        if (isinstance(expr[0], list)
+        if (
+            isinstance(expr[0], list)
             and len(expr[0]) > 0
             and expr[0][0] == 'symbol'
         ):
@@ -213,25 +216,22 @@ class DatafileGenerator(Generator):
         return VList([self._eval_expr(arg) for arg in args])
 
     def _eval_saw(self, args):
-        return Saw(self._eval_expr(args[0]), self._eval_expr(args[1]),
-                   self._eval_expr(args[2]))
+        return Saw(
+            self._eval_expr(args[0]),
+            self._eval_expr(args[1]),
+            self._eval_expr(args[2]),
+        )
 
     def _eval_invoke(self, args):
-        assert len(args) > 0, (
-            f'No args passed to `invoke`: {repr(args)}'
-        )
+        assert len(args) > 0, f'No args passed to `invoke`: {repr(args)}'
         s = self._eval_expr(args[0])
         assert isinstance(s, str)
         if s in self._templates:
             return self._eval_template(s, args[1:])
         raise _DFTError(f'Unknown symbol "{s}"')
 
-    def _eval_lambda(self, args):
-        import pdb; pdb.set_trace()
-        return '# lambda'
-
     def _eval_map(self, args):
-        assert len(args) in (3,4)
+        assert len(args) in (3, 4)
         if len(args) == 4:
             sep = self._eval_expr(args[3])
         else:
@@ -241,16 +241,17 @@ class DatafileGenerator(Generator):
         names = []
         for _, name in args[0]:
             names.append(name)
-            
+
         scope = {}
         self._scopes.insert(0, scope)
         v = self._eval_expr(args[2])
-        if isinstance(v, list) or isinstance(v, set):
+        if isinstance(v, (list, set)):
             assert len(names) == 1
             r = []
             for el in v:
-                if len(names) == 1:
-                    self._scopes[0][names[0]] = el
+                vals = [el]
+                for j, name in enumerate(names):
+                    self._scopes[0][names[j]] = vals[j]
                 r.append(self._eval_expr(args[1]))
             self._scopes.pop(0)
             return sep.join(r)
@@ -258,8 +259,9 @@ class DatafileGenerator(Generator):
         assert len(names) == 2
         r = []
         for k, el in v.items():
-            self._scopes[-1][names[0]] = k
-            self._scopes[-1][names[1]] = el
+            vals = [k, el]
+            for j, name in enumerate(names):
+                self._scopes[-1][names[j]] = vals[j]
             r.append(self._eval_expr(args[1]))
         self._scopes.pop()
         return sep.join(r)

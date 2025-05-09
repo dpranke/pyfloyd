@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pylint: disable=too-many-lines
+
 import collections
 from typing import Any, Dict, List, Optional, Set
 
@@ -47,16 +49,6 @@ class AnalysisError(Exception):
         return s
 
 
-class _OperatorState:
-    def __init__(self):
-        self.current_depth = 0
-        self.current_prec = 0
-        self.prec_ops = {}
-        self.precs = []
-        self.rassoc = set()
-        self.choices = {}
-
-
 class Grammar:
     def __init__(self, ast: Any):
         self.ast: Node = Node.to(ast)
@@ -77,15 +69,15 @@ class Grammar:
         self.str_needed: bool = False
         self.range_needed: bool = False
         self.re_needed: bool = False
-        self.needed_builtin_functions: Set[str] = set()
-        self.needed_operators: Set[str] = {
+        self.needed_builtin_functions: List[str] = []
+        self.needed_builtin_rules: List[str] = []
+        self.needed_operators: List[str] = [
             'error',
             'fail',
             'offsets',
             'rewind',
-            'succeed'
-        }
-        self.needed_builtin_rules: Set[str] = set()
+            'succeed',
+        ]
         self.unicodedata_needed: bool = False
         self.seeds_needed: bool = False
 
@@ -518,7 +510,7 @@ class _Analyzer:
                 if var_name in labels:
                     node.outer_scope = True
                     labels[var_name].outer_scope = True
-                    self.grammar.needed_operators.add('lookup')
+                    self.grammar.needed_operators.append('lookup')
                     self.grammar.lookup_needed = True
                     self.grammar.outer_scope_rules.add(self.current_rule)
             else:
@@ -892,44 +884,44 @@ class _SubRuleRewriter:
 
     def _ty_apply(self, node):
         if node.rule_name in ('any', 'end'):
-            self._grammar.needed_builtin_rules.add(node.rule_name)
+            self._grammar.needed_builtin_rules.append(node.rule_name)
         return Apply(self._rule_fmt.format(rule_name=node.rule_name))
 
     def _ty_ends_in(self, node):
-        self._grammar.needed_builtin_rules.add('any')
+        self._grammar.needed_builtin_rules.append('any')
         return self._walkn(node)
 
     def _ty_equals(self, node):
-        self._grammar.needed_operators.add('ch')
-        self._grammar.needed_operators.add('str')
+        self._grammar.needed_operators.append('ch')
+        self._grammar.needed_operators.append('str')
         self._grammar.ch_needed = True
         self._grammar.str_needed = True
         return node
 
     def _ty_leftrec(self, node):
-        self._grammar.needed_operators.add('leftrec')
+        self._grammar.needed_operators.append('leftrec')
         self._grammar.leftrec_needed = True
         return self._split1(node)
 
     def _ty_lit(self, node):
-        self._grammar.needed_operators.add('ch')
+        self._grammar.needed_operators.append('ch')
         self._grammar.ch_needed = True
         if len(node.v) > 1:
-            self.grammar.needed_operators.add('str')
+            self._grammar.needed_operators.append('str')
             self._grammar.str_needed = True
         return node
 
     def _ty_e_qual(self, node):
         if node.ch[0].t == 'e_var' and node.ch[1].t == 'e_call':
-            self._grammar.needed_builtin_functions.add(node.ch[0].v)
+            self._grammar.needed_builtin_functions.append(node.ch[0].v)
         return self._walkn(node)
 
     def _ty_not_one(self, node):
-        self._grammar.needed_builtin_rules.add('any')
+        self._grammar.needed_builtin_rules.append('any')
         return self._walkn(node)
 
     def _ty_operator(self, node):
-        self.grammar.needed_operators.add('operator')
+        self._grammar.needed_operators.append('operator')
         self._grammar.operator_needed = True
         o = OperatorState()
         prec_ops = {}
@@ -953,22 +945,22 @@ class _SubRuleRewriter:
         return self._split1(node)
 
     def _ty_range(self, node):
-        self._grammar.needed_operators.add('range')
+        self._grammar.needed_operators.append('range')
         self._grammar.range_needed = True
         return node
 
     def _ty_regexp(self, node):
-        self._grammar.needed_operators.add('regexp')
+        self._grammar.needed_operators.append('regexp')
         self._grammar.re_needed = True
         return node
 
     def _ty_set(self, node):
-        self._grammar.needed_operators.add('regexp')
+        self._grammar.needed_operators.append('regexp')
         self._grammar.re_needed = True
         return node
 
     def _ty_unicat(self, node):
-        self._grammar.needed_operators.add('unicat')
+        self._grammar.needed_operators.append('unicat')
         self._grammar.unicat_needed = True
         return node
 
