@@ -267,114 +267,293 @@ n_unicat: ''
 # Built-in operators and rules
 #
 
-o_ch: ''
+o_ch: '''
+def _ch(self, ch):
+    p = self._pos
+    if p < self._end and self._text[p] == ch:
+        self._succeed(ch, self._pos + 1)
+    else:
+        self._fail()
+'''
 
-o_error: ''
+o_offsets: '''
+def _offsets(self, pos):
+    lineno = 1
+    colno = 1
+    for i in range(pos):
+        if self._text[i] == '\n':
+            lineno += 1
+            colno = 1
+        else:
+            colno += 1
+    return lineno, colno
+'''
 
-o_fail: ''
+o_error: '''
+def _error(self):
+    lineno, colno = self._offsets(self._errpos)
+    if self._errpos == len(self._text):
+        thing = 'end of input'
+    else:
+        thing = repr(self._text[self._errpos]).replace("'", '"')
+    return '%s:%d Unexpected %s at column %d' % (
+        self._path,
+        lineno,
+        thing,
+        colno,
+    )
+'''
 
-o_leftrec: ''
+o_fail: '''
+def _fail(self):
+    self._val = None
+    self._failed = True
+    self._errpos = max(self._errpos, self._pos)
+'''
 
-o_lookup: ''
+o_leftrec: '''
+def _leftrec(self, rule, rule_name, left_assoc):
+    pos = self._pos
+    key = (rule_name, pos)
+    seed = self._seeds.get(key)
+    if seed:
+        self._val, self._failed, self._pos = seed
+        return
+    if rule_name in self._blocked:
+        self._val = None
+        self._failed = True
+        return
+    current = (None, True, self._pos)
+    self._seeds[key] = current
+    if left_assoc:
+        self._blocked.add(rule_name)
+    while True:
+        rule()
+        if self._pos > current[2]:
+            current = (self._val, self._failed, self._pos)
+            self._seeds[key] = current
+            self._pos = pos
+        else:
+            del self._seeds[key]
+            self._val, self._failed, self._pos = current
+            if left_assoc:
+                self._blocked.remove(rule_name)
+            return
+'''
 
-o_memoize: ''
+o_lookup: '''
+def _lookup(self, var):
+    i = len(self._scopes) - 1
+    while i >= 0:
+        if var in self._scopes[i]:
+            return self._scopes[i][var]
+        i -= 1
+    if var in self._externs:
+        return self._externs[var]
+    assert False, f'unknown var {var}'
+'''
 
-o_offsets: ''
+o_memoize: '''
+def _memoize(self, rule_name, fn):
+    p = self._pos
+    r = self._cache.setdefault(p, {}).get(rule_name)
+    if r:
+        self._val, self._failed, self._pos = r
+        return
+    fn()
+    self._cache[p][rule_name] = (self._val, self._failed, self._pos)
+'''
 
-o_operator: ''
+o_operator: '''
+def _operator(self, rule_name):
+    o = self._operators[rule_name]
+    pos = self._pos
+    key = (rule_name, self._pos)
+    seed = self._seeds.get(key)
+    if seed:
+        self._val, self._failed, self._pos = seed
+        return
+    o.current_depth += 1
+    current = (None, True, self._pos)
+    self._seeds[key] = current
+    min_prec = o.current_prec
+    i = 0
+    while i < len(o.precs):
+        repeat = False
+        prec = o.precs[i]
+        prec_ops = o.prec_ops[prec]
+        if prec < min_prec:
+            break
+        o.current_prec = prec
+        if prec_ops[0] not in o.rassoc:
+            o.current_prec += 1
+        for j, _ in enumerate(prec_ops):
+            op = prec_ops[j]
+            o.choices[op]()
+            if not self._failed and self._pos > pos:
+                current = (self._val, self._failed, self._pos)
+                self._seeds[key] = current
+                repeat = True
+                break
+            self._rewind(pos)
+        if not repeat:
+            i += 1
 
-o_range: ''
+    del self._seeds[key]
+    o.current_depth -= 1
+    if o.current_depth == 0:
+        o.current_prec = 0
+    self._val, self._failed, self._pos = current
+'''
 
-o_rewind: ''
+o_range: '''
+def _range(self, i, j):
+    p = self._pos
+    if p != self._end and ord(i) <= ord(self._text[p]) <= ord(j):
+        self._succeed(self._text[p], self._pos + 1)
+    else:
+        self._fail()
+'''
 
-o_str: ''
+o_rewind: '''
+def _rewind(self, newpos):
+    self._succeed(None, newpos)
+'''
 
-o_succeed: ''
+o_str: '''
+def _str(self, s):
+    for ch in s:
+        self._ch(ch)
+        if self._failed:
+            return
+    self._val = s
+'''
 
-o_unicat: ''
+o_succeed: '''
+def _succeed(self, v, newpos=None):
+    self._val = v
+    self._failed = False
+    if newpos is not None:
+        self._pos = newpos
+'''
 
-r_any: ''
+o_unicat: '''
+def _unicat(self, cat):
+    p = self._pos
+    if p < self._end and unicodedata.category(self._text[p]) == cat:
+        self._succeed(self._text[p], self._pos + 1)
+    else:
+        self._fail()
+'''
 
-r_end: ''
+r_any: '''
+def _r_any(self):
+    if self._pos < self._end:
+        self._succeed(self._text[self._pos], self._pos + 1)
+    else:
+        self._fail()
+'''
+
+r_end: '''
+def _r_end(self):
+    if self._pos == self._end:
+        self._succeed(None)
+    else:
+        self._fail()
+'''
 
 #
 # Built-in functions
 #
 
-f_atof: ''
+fn_atof: '''
+def _fn_atof(self, s):
+    if '.' in s or 'e' in s or 'E' in s:
+        return float(s)
+    return int(s)
+'''
 
-f_atoi: ''
+fn_atoi: '''
+def _fn_atoi(self, a, base):
+    return int(a, base)
+'''
 
-f_atou: ''
+fn_atou: '''
+def _fn_atou(self, a, base):
+    return chr(int(a, base))
+'''
 
-f_cat: ''
+fn_cat: '''
+def _fn_cat(self, strs):
+    return ''.join(strs)
+'''
 
-f_concat: ''
+fn_concat: '''
+def _fn_concat(self, xs, ys):
+    return xs + ys
+'''
 
-f_cons: ''
+fn_cons: '''
+def _fn_cons(self, hd, tl):
+    return [hd] + tl
+'''
 
-f_dedent: ''
+fn_dedent: '''
+def _fn_dedent(self, s):
+    return s
+'''
 
-f_dict: ''
+fn_dict: ''' 
+def _fn_dict(self, pairs):
+    return dict(pairs)
+'''
 
-f_itou: ''
+fn_itou: '''
+def _fn_itou(self, n):
+    return chr(n)
+'''
 
-f_join: ''
+fn_join: '''
+def _fn_join(self, s, vs):
+    return s.join(vs)
+'''
 
-f_otou: ''
+fn_otou: '''
+def _fn_otou(self, s):
+    return chr(int(s, base=8))
+'''
 
-f_scat: ''
+fn_scat: '''
+def _fn_scat(self, hd, tl):
+    return self._fn_cat(self._fn_cons(hd, tl))
+'''
 
-f_scons: ''
+fn_scons: '''
+def _fn_scons(self, hd, tl):
+    return [hd] + tl
+'''
 
-f_strcat: ''
+fn_strcat: '''
+def _fn_strcat(self, a, b):
+    return a + b
+'''
 
-f_unicode_lookup: ''
+fn_unicode_lookup: '''
+def _fn_unicode_lookup(self, s):
+    return unicodedata.lookup(s)
+'''
 
-f_utoi: ''
+fn_utoi: '''
+def _fn_utoi(self, s):
+    return ord(s)
+'''
 
-f_xtoi: ''
+fn_xtoi: '''
+def _fn_xtoi(self, s):
+    return int(s, base=16)
+'''
 
-f_xtou: ''
-
-#
-# Miscellaneous rules for simple expansions
-#
-
-thisvar: ''
-
-rulename: ''
-
-extern: ''
-
-invoke: ''
-
-lit: ''
-
-end: ''
-
-#
-# Miscellaneous rules for constants
-#
-
-false: 'False'
-
-indent: '    '
-
-infinity: "float('inf')"
-
-nan: "float('NaN')"
-
-not: 'not '
-
-null: 'None'
-
-true: 'True'
-
-
-
-
-
-
-
-
+fn_xtou: '''
+def _fn_xtou(self, s):
+    return chr(int(s, base=16))
+'''
