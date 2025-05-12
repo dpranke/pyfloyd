@@ -109,14 +109,14 @@ class DatafileGenerator(Generator):
                 if v.startswith('\n'):
                     v = v[1:]
                 expr = [['symbol', 'fn'], [], [['symbol', 'at_expr'], v]]
-                self._interpreter.env.set(t, self.eval(expr))
+                self._interpreter.define(t, expr)
             else:
                 lisp.check(lisp.is_list(v))
                 if v[0] == ['symbol', 'fn'] or v[0] == ['symbol', 'at']:
-                    self._interpreter.env.set(t, self.eval(v))
+                    self._interpreter.define(t, v)
                 else:
                     expr = [['symbol', 'fn'], [], v]
-                    self._interpreter.env.set(t, self.eval(expr))
+                    self._interpreter.define(t, expr)
         if 'indent' in templates:
             self._indent = templates['indent']
 
@@ -135,12 +135,13 @@ class DatafileGenerator(Generator):
         return '\n'.join(res) + '\n'
 
     def f_template(self, name: str) -> str:
-        tmpl = self._interpreter.get(name)
+        tmpl = self._interpreter.env.get(name)
         lisp.check(lisp.is_fn(tmpl))
         return tmpl()
 
     # pylint: disable=too-many-statements
-    def f_at_expr(self, *args) -> Any:
+    def f_at_expr(self, args, env) -> Any:
+        del env
         if len(args) > 1:
             env = lisp.Env(parent=self._interpreter.env)
             names = args[0]
@@ -149,7 +150,7 @@ class DatafileGenerator(Generator):
         else:
             env = None
         text = args[-1]
-        lisp.check(lisp.is_str, text)
+        lisp.check(lisp.is_str(text))
         exprs, err, pos = at_expr.parse(text, '-')
         if err:
             raise lisp.Error('unexpected at-expr parse error: ' + err)
@@ -184,16 +185,16 @@ class DatafileGenerator(Generator):
             res = self._interpreter.eval(expr, env)
             while (
                 lisp.is_list(res)
-                and lisp.length(res)
+                and len(res) > 0
                 and res[0] == ['symbol', 'at_expr']
             ):
                 res = self._interpreter.eval(res, env)
 
             # If `@foo` resolves to a lambda with no parameters,
             # evaluate that.
-            if lisp.is_fn(res) and len(res.parms) == 0:
+            if lisp.is_fn(res) and len(res.params) == 0:
                 r = res
-                res = r()
+                res = r([], env)
 
             is_blank, indent = _is_blank(s)
             if (
@@ -223,7 +224,7 @@ class DatafileGenerator(Generator):
                         s += '\n' + ' ' * indent + line
                     continue
                 if isinstance(res, list):
-                    res = self.eval(res, env)
+                    res = self._interpreter.eval(res, env)
                 s += res
             if (
                 res.endswith('\n')
@@ -236,10 +237,11 @@ class DatafileGenerator(Generator):
 
     # pylint: enable=too-many-statements
 
-    def fexpr_at(self, params, text, env) -> Any:
+    def fexpr_at(self, args: list[Any], env: lisp.Env) -> Any:
+        params, text = args
         names = [p[1] for p in params]
         return lisp.Fn(
-            self,
+            self._interpreter,
             params,
             [['symbol', 'at_expr']]
             + [[['symbol', 'list']] + names]
@@ -248,23 +250,27 @@ class DatafileGenerator(Generator):
             env,
         )
 
-    def eval(self, expr: Any, env: Optional[lisp.Env] = None) -> Any:
-        return self._interpreter.eval(expr, env=env)
-
-    def f_comma(self, *args) -> Any:
+    def f_comma(self, args, env) -> Any:
+        del env
         return Comma(args)
 
-    def f_hlist(self, *args) -> Any:
+    def f_hlist(self, args, env) -> Any:
+        del env
         return HList(args)
 
-    def f_indent(self, arg) -> Any:
-        return Indent(arg)
+    def f_indent(self, args, env) -> Any:
+        del env
+        return Indent(args[0])
 
-    def f_vlist(self, *args) -> Any:
+    def f_vlist(self, args, env) -> Any:
+        del env
         return VList(args)
 
-    def f_saw(self, start, mid, end) -> Any:
+    def f_saw(self, args, env) -> Any:
+        del env
+        start, mid, end = args
         return Saw(start, mid, end)
 
-    def f_invoke(self, symbol, *args) -> Any:
-        return self.eval([['symbol', symbol]] + list(args))
+    def f_invoke(self, args, env) -> Any:
+        exprs = [['symbol', args[0]]] + args[1:]
+        return self._interpreter.eval(exprs, env)

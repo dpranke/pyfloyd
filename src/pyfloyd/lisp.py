@@ -21,59 +21,36 @@ class Error(Exception):
     pass
 
 
-def check(val: Any, msg: str = ''):
-    if not bool(val):
+def check(flag: bool, msg: str = ''):
+    if not flag:
         raise Error(msg)
 
 
-def is_atom(el: Any, *, env=None) -> bool:
-    del env
+def is_atom(el: Any) -> bool:
     return isinstance(el, (bool, int, float, str))
 
 
-def is_bool(el: Any, *, env=None) -> bool:
-    del env
-    return isinstance(el, bool)
-
-
-def is_callable(el: Any, *, env=None) -> bool:
-    del env
-    return is_fn(el) or callable(el)
-
-
-def is_dict(el: Any, *, env=None) -> bool:
-    del env
+def is_dict(el: Any) -> bool:
     return isinstance(el, dict)
 
 
-def is_fn(el: Any, *, env=None) -> bool:
-    del env
+def is_fn(el: Any) -> bool:
     return isinstance(el, Fn)
 
 
-def is_list(el, env=None) -> bool:
-    del env
+def is_list(el: Any) -> bool:
     return isinstance(el, Sequence)
 
 
-def is_str(el: Any, *, env=None) -> bool:
-    del env
+def is_str(el: Any) -> bool:
     return isinstance(el, str)
 
 
-def is_symbol(el: Any, *, env=None) -> bool:
-    del env
+def is_symbol(el: Any) -> bool:
     return is_list(el) and len(el) == 2 and el[0] == 'symbol' and is_str(el[1])
 
 
-def length(el: Any, *, env=None) -> int:
-    del env
-    check(is_list(el))
-    return len(el)
-
-
-def symbol(el: Any, *, env=None) -> str:
-    del env
+def symbol(el: Any) -> str:
     check(is_symbol(el))
     return el[1]
 
@@ -145,29 +122,35 @@ class Env:
         assert self.parent
         return self.parent.get(key)
 
-    def set(self, key: str, value: Any):
+    def set(self, key: str, value: Any) -> None:
         self.values[key] = value
 
-    def update(self, d: dict):
+    def update(self, d: dict[str, Any]) -> None:
         self.values.update(d)
 
 
 class Fn:
-    def __init__(self, interp, parms, body, env):
-        self.interp = interp
-        self.parms = []
-        for parm in parms:
-            check(is_symbol(parm))
-            self.parms.append(symbol(parm))
+    def __init__(
+        self,
+        interpreter: 'Interpreter',
+        params: list[tuple[str, str]],
+        body: Any,
+        env: Env
+    ):
+        self.interpreter = interpreter
+        self.params = []
+        for param in params:
+            check(is_symbol(param))
+            self.params.append(symbol(param))
         self.body = body
         self.env = env
 
-    def __call__(self, *args):
-        env = Env(values=dict(zip(self.parms, args)), parent=self.env)
-        return self.interp.eval(self.body, env)
+    def __call__(self, args, env):
+        new_env = Env(values=dict(zip(self.params, args)), parent=self.env)
+        return self.interpreter.eval(self.body, new_env)
 
 
-EvalFn = Callable[..., Any]
+EvalFn = Callable[[list[Any], Env], Any]
 
 
 class Interpreter:
@@ -189,26 +172,29 @@ class Interpreter:
             'fn': self.fexpr_fn,
             'if': self.fexpr_if,
         }
-        self.is_foreign = is_foreign
-        self.eval_foreign = eval_foreign
+        self.is_foreign = is_foreign or self._default_is_foreign
+        self.eval_foreign = eval_foreign or self._default_is_foreign
         if values:
             self.env.update(values)
         if fexprs:
             self.fexprs.update(fexprs)
 
-    def bound(self, key: str) -> bool:
-        return self.env.bound(key)
+    def _default_is_foreign(self, expr: Any, env: Env) -> Any:
+        del expr
+        del env
+        return False
 
-    def get(self, key: str, env: Optional[Env] = None) -> Any:
-        env = env or self.env
-        return env.get(key)
+    def _default_eval_foreign(self, expr: Any, env: Env) -> Any:
+        raise Error('eval_foreign called by mistake')
+
+    def define(self, name: str, expr: Any) -> None:
+        self.env.set(name, self.eval(expr))
 
     def eval(self, expr: Any, env: Optional[Env] = None) -> Any:
         env = env or self.env
         if is_atom(expr) or is_dict(expr):
             return expr
-        if self.is_foreign and self.is_foreign(expr, env):
-            assert self.eval_foreign is not None
+        if self.is_foreign(expr, env):
             return self.eval_foreign(expr, env)
         if is_symbol(expr):
             sym = symbol(expr)
@@ -221,35 +207,45 @@ class Interpreter:
         if is_symbol(first):
             sym = symbol(first)
             if sym in self.fexprs:
-                return self.fexprs[sym](*rest, env=env)
+                return self.fexprs[sym](rest, env)
         v = self.eval(first, env)
         if callable(v):
             args = [self.eval(expr, env) for expr in rest]
-            return v(*args)
+            return v(args, env)
         raise Error(f"Don't know how to evaluate `{expr}`")
 
-    def fexpr_if(self, cond, t_expr, f_expr, *, env):
+    def fexpr_if(self, args, env):
+        cond, t_expr, f_expr = args
         res = self.eval(cond, env)
         if res:
             return self.eval(t_expr, env)
         return self.eval(f_expr, env)
 
-    def fexpr_fn(self, params, body, *, env):
+    def fexpr_fn(self, args, env):
+        params, body = args
         return Fn(self, params, body, env)
 
-    def f_map(self, fn, exprs, sep=None):
-        check(is_list, exprs)
-        assert callable(fn)
-        if is_dict(exprs):
-            result = [fn(k, self.eval(v)) for k, v in exprs.items()]
+    def f_map(self, args, env):
+        if len(args) == 3:
+            fn, exprs, sep = args
         else:
-            result = [fn(expr) for expr in exprs]
+            fn, exprs = args
+            sep = '\n'
+        check(is_list(exprs) or is_dict(exprs))
+        check(callable(fn))
+        if is_dict(exprs):
+            result = [fn([k, self.eval(v, env)], env) for k, v in exprs.items()]
+        else:
+            result = [fn([expr], env) for expr in exprs]
         if sep is not None:
             return sep.join(result)
         return result
 
-    def f_list(self, *rest):
-        return list(rest)
+    def f_list(self, args, env):
+        del env
+        return list(args)
 
-    def f_strcat(self, first, second):
+    def f_strcat(self, args, env):
+        del env
+        first, second = args
         return first + second
