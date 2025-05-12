@@ -45,6 +45,7 @@ def load(
     object_hook: Optional[Callable[[Mapping[str, Any]], Any]] = None,
     parse_number: Optional[Callable[[str], Any]] = None,
     parse_numword: Optional[Callable[[str], Any]] = None,
+    parse_bareword: Optional[Callable[[str, bool], Any]] = None,
     object_pairs_hook: Optional[
         Callable[[Iterable[Tuple[str, Any]]], Any]
     ] = None,
@@ -98,6 +99,7 @@ def load(
         object_hook=object_hook,
         parse_number=parse_number,
         parse_numword=parse_numword,
+        parse_bareword=parse_bareword,
         object_pairs_hook=object_pairs_hook,
         allow_trailing=allow_trailing,
         allow_numwords=allow_numwords,
@@ -116,6 +118,7 @@ def loads(
     object_hook: Optional[Callable[[Mapping[str, Any]], Any]] = None,
     parse_number: Optional[Callable[[str], Any]] = None,
     parse_numword: Optional[Callable[[str], Any]] = None,
+    parse_bareword: Optional[Callable[[str, bool], Any]] = None,
     object_pairs_hook: Optional[
         Callable[[Iterable[Tuple[str, Any]]], Any]
     ] = None,
@@ -155,6 +158,7 @@ def loads(
         object_hook=object_hook,
         parse_number=parse_number,
         parse_numword=parse_numword,
+        parse_bareword=parse_bareword,
         object_pairs_hook=object_pairs_hook,
         allow_trailing=allow_trailing,
         allow_numwords=allow_numwords,
@@ -168,16 +172,17 @@ def loads(
 def parse(
     s: str,
     *,
+    allow_trailing: bool = False,
+    allow_numwords: bool = False,
     encoding: Optional[str] = None,
     cls: Any = None,
     object_hook: Optional[Callable[[Mapping[str, Any]], Any]] = None,
-    parse_number: Optional[Callable[[str], Any]] = None,
-    parse_numword: Optional[Callable[[str], Any]] = None,
     object_pairs_hook: Optional[
         Callable[[Iterable[Tuple[str, Any]]], Any]
     ] = None,
-    allow_trailing: bool = False,
-    allow_numwords: bool = False,
+    parse_number: Optional[Callable[[str], Any]] = None,
+    parse_numword: Optional[Callable[[str], Any]] = None,
+    parse_bareword: Optional[Callable[[str, bool], Any]] = None,
     start: Optional[int] = None,
 ):
     """Parse ```s``, returning positional information along with a value.
@@ -230,98 +235,181 @@ def parse(
         [1, 2, 3, 4]
 
     """
-    assert cls is None, 'Custom decoders are not supported'
-
-    if isinstance(s, bytes):
-        encoding = encoding or 'utf-8'
-        s = s.decode(encoding)
-
-    if not s:
-        raise ValueError('Empty strings are not legal Floyd datafiles')
-    start = start or 0
-    externs = {
-        'allow_trailing': allow_trailing,
-        'allow_numwords': allow_numwords,
-    }
-    ast, err, pos = parser.parse(s, '<string>', externs)
-    if err:
-        return None, err, pos
-
-    value = _convert(
-        ast,
+    cls = cls or Decoder
+    obj = cls()
+    return obj.parse(
+        s,
+        allow_numwords=allow_numwords,
+        allow_trailing=allow_trailing,
+        encoding=encoding,
         object_hook=object_hook,
+        object_pairs_hook=object_pairs_hook,
         parse_number=parse_number,
         parse_numword=parse_numword,
-        object_pairs_hook=object_pairs_hook,
+        parse_bareword=parse_bareword,
+        start=start,
     )
-    return value, None, pos
 
 
-def _convert(
-    ast,
-    object_hook,
-    parse_number,
-    parse_numword,
-    object_pairs_hook,
-):
-    def _dictify(pairs):
+class Decoder:
+    def __init__(self):
+        self._allow_trailing = False
+        self._allow_numwords = False
+        self._parse_number = None
+        self._parse_numword = None
+        self._parse_bareword = None
+        self._parse_object = None
+        self._parse_object_pairs = None
+
+    def parse(
+        self,
+        s: str,
+        *,
+        encoding: Optional[str] = None,
+        object_hook: Optional[Callable[[Mapping[str, Any]], Any]] = None,
+        object_pairs_hook: Optional[
+            Callable[[Iterable[Tuple[str, Any]]], Any]
+        ] = None,
+        parse_number: Optional[Callable[[str], Any]] = None,
+        parse_numword: Optional[Callable[[str], Any]] = None,
+        parse_bareword: Optional[Callable[[str, bool], Any]] = None,
+        allow_trailing=False,
+        allow_numwords=False,
+        start=0,
+    ) -> Tuple[Any, Optional[str], Optional[int]]:
+        self._allow_trailing = allow_trailing
+        self._allow_numwords = allow_numwords
+        self._parse_object = object_hook
+        self._parse_object_pairs = object_pairs_hook
+        self._parse_number = parse_number or self.parse_number
+        self._parse_numword = parse_numword or self.parse_numword
+        self._parse_bareword = parse_bareword or self.parse_bareword
+
+        if isinstance(s, bytes):
+            encoding = encoding or 'utf-8'
+            s = s.decode(encoding)
+
+        if not s:
+            raise ValueError('Empty strings are not legal Floyd datafiles')
+        start = start or 0
+        externs = {
+            'allow_trailing': self._allow_trailing,
+            'allow_numwords': self._allow_numwords,
+        }
+        ast, err, pos = parser.parse(s, '<string>', externs)
+        if err:
+            return None, err, pos
+
+        value = self._walk_ast(ast)
+        return value, None, pos
+
+    def parse_array(self, tag, objs):
+        if tag:
+            raise ValueError(f'Unsupported array tag {tag}')
+        return objs
+
+    def parse_number(self, s):
+        s = s.replace('_', '')
+        if s.startswith('0x'):
+            return int(s, base=16)
+        if s.startswith('0b'):
+            return int(s, base=2)
+        if s.startswith('0o'):
+            return int(s, base=8)
+        if '.' in s or 'e' in s or 'E' in s:
+            return float(s)
+        return int(s)
+
+    def parse_numword(self, s):
+        return s
+
+    def parse_bareword(self, s, as_key):
+        del as_key
+        i = 0
+        ret = []
+        while i < len(s):
+            if s[i] == '\\':
+                i, c = decode_escape(s, i)
+                ret.append(c)
+            else:
+                ret.append(s[i])
+                i += 1
+        return ''.join(ret)
+
+    def parse_string(self, tag, s, as_key):
+        del as_key
+        is_rstr = 'r' in tag
+        is_dstr = 'd' in tag
+        i = 0
+        ret = []
+        while i < len(s):
+            if s[i] == '\\' and not is_rstr:
+                i, c = decode_escape(s, i)
+                ret.append(c)
+            else:
+                ret.append(s[i])
+                i += 1
+        if is_dstr:
+            return dedent(''.join(ret))
+        return ''.join(ret)
+
+    def parse_string_list(self, tag, strs):
+        if tag:
+            raise ValueError(f'Unsupported string_list tag {tag}')
+        return ''.join(strs)
+
+    def parse_object_pairs(self, tag, pairs):
+        if tag:
+            raise ValueError(f'Unsupported object tag {tag}')
         keys = set()
         key_pairs = []
         for key_ast, val in pairs:
-            _, tag, s = key_ast
-            key = _decode_str(s, 'r' in tag, 'd' in tag)
+            ty, key_tag, s = key_ast
+            if ty == 'string':
+                key = self.parse_string(key_tag, s, as_key=True)
+            else:
+                assert ty == 'bareword'
+                key = self._parse_bareword(s, as_key=True)
             if key in keys:
                 raise ValueError(f'Duplicate key "{key}" found in object')
             keys.add(key)
             key_pairs.append((key, val))
-
-        if object_pairs_hook:
-            return object_pairs_hook(key_pairs)
-        if object_hook:
-            return object_hook(dict(key_pairs))
+        if self._parse_object_pairs:
+            return self._parse_object_pairs(key_pairs)
+        if self._parse_object:
+            return self._parse_object(dict(key_pairs))
         return dict(key_pairs)
 
-    return _walk_ast(
-        ast,
-        _dictify,
-        parse_number or _decode_number,
-        parse_numword or _decode_numword,
-    )
+    def _walk_ast(self, el):
+        ty, tag, v = el
+        if ty == 'true':
+            return True
+        if ty == 'false':
+            return False
+        if ty == 'null':
+            return None
+        if ty == 'number':
+            return self._parse_number(v)
+        if ty == 'numword':
+            return self._parse_numword(v)
+        if ty == 'bareword':
+            return self._parse_bareword(v, as_key=False)
+        if ty == 'string':
+            return self.parse_string(tag, v, as_key=False)
+        if ty == 'string_list':
+            r = [self._walk_ast(el) for el in v]
+            return self.parse_string_list(tag, r)
+        if ty == 'object':
+            pairs = []
+            for key, obj in v:
+                pairs.append((key, self._walk_ast(obj)))
+            return self.parse_object_pairs(tag, pairs)
+        if ty == 'array':
+            return self.parse_array(tag, [self._walk_ast(el) for el in v])
+        raise ValueError('unknown el: ' + el)  # pragma: no cover
 
 
-def _decode_number(v):
-    s = v.replace('_', '')
-    if s.startswith('0x'):
-        return int(s, base=16)
-    if s.startswith('0b'):
-        return int(s, base=2)
-    if s.startswith('0o'):
-        return int(s, base=8)
-    if '.' in s or 'e' in s or 'E' in s:
-        return float(s)
-    return int(s)
-
-
-def _decode_numword(v):
-    return v
-
-
-def _decode_str(s, is_rstr, is_dstr):
-    i = 0
-    ret = []
-    while i < len(s):
-        if s[i] == '\\' and not is_rstr:
-            i, c = _decode_escape(s, i)
-            ret.append(c)
-        else:
-            ret.append(s[i])
-            i += 1
-    if is_dstr:
-        return dedent(''.join(ret))
-    return ''.join(ret)
-
-
-def _decode_escape(s, i):
+def decode_escape(s, i):
     c = s[i + 1]
     if c == 'n':
         return i + 2, '\n'
@@ -346,21 +434,21 @@ def _decode_escape(s, i):
     if c == '\\':
         return i + 2, '\\'
     if c == 'x':
-        if _check(s, i + 2, 2, _ishex):
+        if _check(s, i + 2, 2, ishex):
             return i + 4, chr(int(s[i + 2 : i + 4], base=16))
     if c == 'u':
-        if _check(s, i + 2, 4, _ishex):
+        if _check(s, i + 2, 4, ishex):
             return i + 6, chr(int(s[i + 2 : i + 6], base=16))
     if c == 'U':
-        if _check(s, i + 2, 8, _ishex):
+        if _check(s, i + 2, 8, ishex):
             return i + 10, chr(int(s[i + 2 : i + 10], base=16))
-    if len(s) > i + 1 and _isoct(s[i + 1]):
+    if len(s) > i + 1 and isoct(s[i + 1]):
         x = int(s[i + 1], base=8)
         j = 2
-        if len(s) > i + 2 and _isoct(s[i + 2]):
+        if len(s) > i + 2 and isoct(s[i + 2]):
             x = x * 8 + int(s[i + 2], base=8)
             j += 1
-        if len(s) > i + 3 and _isoct(s[i + 3]):
+        if len(s) > i + 3 and isoct(s[i + 3]):
             x = x * 8 + int(s[i + 2], base=8)
             j += 1
         return j, chr(x)
@@ -373,11 +461,11 @@ def _check(s, i, n, fn):
     return all(fn(s[j]) for j in range(i, i + n))
 
 
-def _ishex(ch):
+def ishex(ch):
     return ch in '0123456789abcdefABCDEF'
 
 
-def _isoct(ch):
+def isoct(ch):
     return '0' <= ch <= '7'
 
 
@@ -401,41 +489,6 @@ def dedent(s):
     else:
         r = ''
     return r + '\n'.join(line[min_indent:] for line in lines[1:]) + '\n'
-
-
-def _walk_ast(
-    el,
-    dictify: Callable[[Iterable[Tuple[str, Any]]], Any],
-    parse_number,
-    parse_numword,
-):
-    ty, tag, v = el
-    if ty == 'true':
-        return True
-    if ty == 'false':
-        return False
-    if ty == 'null':
-        return None
-    if ty == 'number':
-        return parse_number(v)
-    if ty == 'numword':
-        return parse_numword(v)
-    if ty == 'string':
-        return _decode_str(v, 'r' in tag, 'd' in tag)
-    if ty == 'string_list':
-        r = [_walk_ast(el, dictify, parse_number, parse_numword) for el in v]
-        return ''.join(r)
-    if ty == 'object':
-        pairs = []
-        for key, val_expr in v:
-            val = _walk_ast(val_expr, dictify, parse_number, parse_numword)
-            pairs.append((key, val))
-        return dictify(pairs)
-    if ty == 'array':
-        return [
-            _walk_ast(el, dictify, parse_number, parse_numword) for el in v
-        ]
-    raise ValueError('unknown el: ' + el)  # pragma: no cover
 
 
 def dump(

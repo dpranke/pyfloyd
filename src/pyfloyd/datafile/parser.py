@@ -31,7 +31,7 @@ class Result(NamedTuple):
 
 
 def parse(
-    text: str, path: str = '<string>', externs: Externs = None
+    text: str, path: str = '<string>', externs: Externs = None, start: int = 0
 ) -> Result:
     """Parse a given text and return the result.
 
@@ -47,7 +47,7 @@ def parse(
     messages to indicate the path to the filename containing the given
     text.
     """
-    return _Parser(text, path).parse(externs)
+    return _Parser(text, path).parse(externs, start)
 
 
 class _Parser:
@@ -69,7 +69,8 @@ class _Parser:
         self._regexps = {}
         self._scopes = []
 
-    def parse(self, externs: Externs = None):
+    def parse(self, externs: Externs = None, start: int = 0):
+        self._pos = start
         errors = ''
         if externs:
             for k, v in externs.items():
@@ -99,7 +100,7 @@ class _Parser:
         if not self._failed:
             return
         self._rewind(p)
-        self._s_grammar_4()
+        self._s_grammar_3()
 
     def _s_grammar_1(self):
         self._s_grammar_2()
@@ -109,7 +110,9 @@ class _Parser:
         if self._failed:
             return
         self._memoize('r__filler', self._r__filler)
-        self._s_grammar_3()
+        self._memoize('r_trailing', self._r_trailing)
+        if self._failed:
+            return
         self._succeed(['object', '', v__1])
 
     def _s_grammar_2(self):
@@ -128,14 +131,6 @@ class _Parser:
         self._succeed(vs)
 
     def _s_grammar_3(self):
-        p = self._pos
-        self._memoize('r_trailing', self._r_trailing)
-        if self._failed:
-            self._succeed([], p)
-        else:
-            self._succeed([self._val])
-
-    def _s_grammar_4(self):
         self._memoize('r_value', self._r_value)
         if self._failed:
             return
@@ -143,18 +138,26 @@ class _Parser:
         if self._failed:
             return
         self._memoize('r__filler', self._r__filler)
-        self._s_grammar_5()
-        self._succeed(v__1)
-
-    def _s_grammar_5(self):
-        p = self._pos
         self._memoize('r_trailing', self._r_trailing)
         if self._failed:
-            self._succeed([], p)
-        else:
-            self._succeed([self._val])
+            return
+        self._succeed(v__1)
 
     def _r_trailing(self):
+        p = self._pos
+        self._s_trailing_1()
+        if not self._failed:
+            return
+        self._rewind(p)
+        v = self._externs['allow_trailing']
+        if v is True:
+            self._succeed(v)
+        elif v is False:
+            self._fail()
+        else:
+            raise _ParsingRuntimeError('Bad predicate value')
+
+    def _s_trailing_1(self):
         v = not self._externs['allow_trailing']
         if v is True:
             self._succeed(v)
@@ -620,11 +623,11 @@ class _Parser:
         v__1 = self._val
         if self._failed:
             return
-        self._succeed(['string', '', v__1])
+        self._succeed(['bareword', '', v__1])
 
     def _s_string_6(self):
         self._memoize('r__filler', self._r__filler)
-        self._memoize('r_bare_word', self._r_bare_word)
+        self._memoize('r_bareword', self._r_bareword)
 
     def _r_string_list(self):
         self._memoize('r_string_tag', self._r_string_tag)
@@ -782,22 +785,22 @@ class _Parser:
 
     def _s_tag_1(self):
         self._memoize('r__filler', self._r__filler)
-        self._memoize('r_bare_word', self._r_bare_word)
+        self._memoize('r_bareword', self._r_bareword)
 
     def _s_tag_2(self):
         self._memoize('r__filler', self._r__filler)
         self._succeed('')
 
-    def _r_bare_word(self):
-        self._s_bare_word_1()
+    def _r_bareword(self):
+        self._s_bareword_1()
         if self._failed:
             return
-        self._s_bare_word_3()
+        self._s_bareword_3()
 
-    def _s_bare_word_1(self):
+    def _s_bareword_1(self):
         p = self._pos
         errpos = self._errpos
-        self._s_bare_word_2()
+        self._s_bareword_2()
         if self._failed:
             self._succeed(None, p)
         else:
@@ -805,7 +808,7 @@ class _Parser:
             self._errpos = errpos
             self._fail()
 
-    def _s_bare_word_2(self):
+    def _s_bareword_2(self):
         p = self._pos
         self._str('true')
         if not self._failed:
@@ -821,19 +824,19 @@ class _Parser:
         self._rewind(p)
         self._memoize('r_number', self._r_number)
 
-    def _s_bare_word_3(self):
+    def _s_bareword_3(self):
         start = self._pos
-        self._s_bare_word_4()
+        self._s_bareword_4()
         if self._failed:
             return
         end = self._pos
         self._val = self._text[start:end]
 
-    def _s_bare_word_4(self):
+    def _s_bareword_4(self):
         vs = []
         p = self._pos
         errpos = self._errpos
-        self._s_bare_word_5()
+        self._s_bareword_5()
         if self._failed:
             self._succeed(None, p)
         else:
@@ -849,7 +852,7 @@ class _Parser:
             p = self._pos
             p = self._pos
             errpos = self._errpos
-            self._s_bare_word_5()
+            self._s_bareword_5()
             if self._failed:
                 self._succeed(None, p)
             else:
@@ -864,7 +867,7 @@ class _Parser:
             vs.append(self._val)
         self._succeed(vs)
 
-    def _s_bare_word_5(self):
+    def _s_bareword_5(self):
         p = self._pos
         self._memoize('r_punct', self._r_punct)
         if not self._failed:

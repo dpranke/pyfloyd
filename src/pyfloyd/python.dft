@@ -1,11 +1,12 @@
+
 generate: '''
-@if[generator_options.main main_header default_header]
-@if[grammar.exception_needed parsing_runtime_exception_class '']
-@if[grammar.operators operator_state_class '']
+@if[generator_options.main [main_header] [default_header]]
+@if[grammar.exception_needed [parsing_runtime_exception_class] '']
+@if[grammar.operators [operator_state_class] '']
 @result_class
 @parse_function
 @parser_class
-@if[generator_options.main main_footer default_footer]
+@if[generator_options.main [main_footer] [default_footer]]
 '''
 
 #
@@ -82,7 +83,12 @@ def main(
 '''  # main_header
 
 imports: '''
-@if[generator_options.main 'import argparse\nimport json\nimport os\nimport sys\n' '']
+@if[generator_options.main '
+import argparse
+import json
+import os
+import sys
+' '']
 @if[grammar.re_needed 'import re' '']
 from typing import Any, Dict, NamedTuple, Optional
 @if[grammar.unicodedata_needed 'import unicodedata' '']
@@ -195,24 +201,18 @@ operator_state: '# operator state'
 
 parser_methods: '''
 @parse_method
-
-@map[[method]
-     [invoke [strcat 'o_' method]]
-     grammar.needed_operators
-     '\n']
-@map[[rule node] [rule_method rule node] grammar.rules '\n']
-
+@map[[fn [name] [invoke [strcat 'o_' name]]] grammar.needed_operators '\n']
+@map[[fn [rule node] [rule_method rule node]] grammar.rules '\n']
 @if[generator_options.memoize o_operator '']
 @if[grammar.needed_builtin_functions '\n' '']
-@map[[method]
-     [invoke [strcat 'fn_' method]]
+@map[[fn [name] [invoke [strcat 'fn_' name]]]
      grammar.needed_builtin_functions
-     '\n'
-    ]
+     '\n']
 '''
 
 parse_method: '''
 @if[grammar.exception_needed parse_with_exception parse_without_exception]
+
 '''
 
 parse_with_exception: '''
@@ -254,15 +254,12 @@ def parse(self, externs: Externs = None):
     return Result(self._val, None, self._pos)
 '''
 
-# params 'rule', 'node'
-rule_method: '''
-
+rule_method: [at [rule node] '''
 def _@rule(self):
     @invoke[[strcat 'n_' node.t]]
-'''
+''']
 
-# params 'arg_1'
-rulename: 'self._@arg_1'
+rulename: [at [name] 'self._@name']
 
 end: ''
 
@@ -274,7 +271,7 @@ n_action: '''
 @hlist[[saw [strcat [rulename 'succeed'] '(']
             'True'
             ')']
-       end]
+       [end]]
 '''
    
 

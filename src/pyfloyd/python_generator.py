@@ -226,7 +226,7 @@ class PythonGenerator(HardCodedGenerator):
     def _gen_parse_function(self) -> FormatObj:
         return self._defmt("""\
             def parse(
-                text: str, path: str = '<string>', externs: Externs = None
+                text: str, path: str = '<string>', externs: Externs = None, start: int = 0
             ) -> Result:
                 \"\"\"Parse a given text and return the result.
 
@@ -242,7 +242,7 @@ class PythonGenerator(HardCodedGenerator):
                 messages to indicate the path to the filename containing the given
                 text.
                 \"\"\"
-                return _Parser(text, path).parse(externs)
+                return _Parser(text, path).parse(externs, start)
            """)
 
     def _gen_parser_class(self) -> FormatObj:
@@ -341,7 +341,8 @@ class PythonGenerator(HardCodedGenerator):
         if exception_needed:
             return self._defmt(
                 f"""\
-                def parse(self, externs: Externs = None):
+                def parse(self, externs: Externs = None, start: int = 0):
+                    self._pos = start
                     errors = ''
                     if externs:
                         for k, v in externs.items():
@@ -368,7 +369,8 @@ class PythonGenerator(HardCodedGenerator):
             )
         return self._defmt(
             f"""\
-            def parse(self, externs: Externs = None):
+            def parse(self, externs: Externs = None, start: int = 0):
+                self._pos = start
                 if externs:
                     for k, v in externs.items():
                         self._externs[k] = v

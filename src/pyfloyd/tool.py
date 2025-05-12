@@ -37,6 +37,7 @@ if (
 
 # pylint: disable=wrong-import-position
 import pyfloyd
+from pyfloyd import datafile
 from pyfloyd import generator
 from pyfloyd.support import Host
 
@@ -56,8 +57,13 @@ def main(argv=None, host=None):
 
         externs = {}
         for d in args.define:
-            k, v = d.split('=', 1)
-            externs[k] = json.loads(v)
+            vs = datafile.loads(d)
+            externs.update(vs)
+
+        generator_defines = {}
+        for d in args.generator_option:
+            vs = datafile.loads(d)
+            generator_defines.update(vs)
 
         if args.ast or args.full_ast:
             ast, err = pyfloyd.dump_ast(
@@ -82,6 +88,7 @@ def main(argv=None, host=None):
             options = pyfloyd.GeneratorOptions(
                 language=args.language, main=args.main, memoize=args.memoize
             )
+            options.defines = generator_defines
             contents, err, _ = pyfloyd.generate(
                 grammar, path=args.grammar, options=options
             )
@@ -92,7 +99,7 @@ def main(argv=None, host=None):
             host.print(err, file=host.stderr)
             return 1
         _write(host, args.output, contents)
-        if args.compile and args.main:
+        if args.compile and args.main and args.output != '-':
             host.make_executable(args.output)
         return 0
 
@@ -100,8 +107,11 @@ def main(argv=None, host=None):
         host.print('Interrupted, exiting.', file=host.stderr)
         return 130  # SIGINT
     except Exception as e:
-        print(f'Exception raised: {repr(e)}')
-        pdb.post_mortem()
+        print(e)
+        if args.post_mortem:
+            pdb.post_mortem()
+        else:
+            raise
         return 1
 
 
@@ -129,9 +139,17 @@ def _parse_args(host, argv):
         '-D',
         '--define',
         action='append',
-        metavar='var=val',
+        metavar='datafile-string',
         default=[],
-        help='Define an external var=value',
+        help='Define external vars for the grammar',
+    )
+    ap.add_argument(
+        '-G',
+        '--generator-option',
+        action='append',
+        metavar='datafile-string',
+        default=[],
+        help='Set options for the generator',
     )
     ap.add_argument(
         '-o', '--output', metavar='path', help='path to write output to'

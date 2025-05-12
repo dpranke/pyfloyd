@@ -5,7 +5,7 @@ ws      =  /[ \t\n]+/
 at_expr = '@' opt_id list braces           -> concat(cons($2, $3), [$4])
         | '@' opt_id list                  -> cons($2, $3)
         | '@' opt_id braces                -> [$2, $3]
-        | '@' id                           -> [$2]
+        | '@' id                           -> $2
         | '@' string                       -> $2
 
 opt_id  = id

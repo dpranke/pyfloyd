@@ -27,7 +27,7 @@ class Result(NamedTuple):
 
 
 def parse(
-    text: str, path: str = '<string>', externs: Externs = None
+    text: str, path: str = '<string>', externs: Externs = None, start: int = 0
 ) -> Result:
     """Parse a given text and return the result.
 
@@ -43,7 +43,7 @@ def parse(
     messages to indicate the path to the filename containing the given
     text.
     """
-    return _Parser(text, path).parse(externs)
+    return _Parser(text, path).parse(externs, start)
 
 
 class _Parser:
@@ -59,7 +59,8 @@ class _Parser:
         self._cache = {}
         self._regexps = {}
 
-    def parse(self, externs: Externs = None):
+    def parse(self, externs: Externs = None, start: int = 0):
+        self._pos = start
         if externs:
             for k, v in externs.items():
                 self._externs[k] = v
@@ -177,7 +178,7 @@ class _Parser:
         v__2 = self._val
         if self._failed:
             return
-        self._succeed([v__2])
+        self._succeed(v__2)
 
     def _s_at_expr_5(self):
         self._ch('@')

@@ -1,0 +1,5 @@
+generate: '''
+@rule_method['foo' 'bar']
+'''
+
+rule_method: [fn [a b] [strcat a b]]

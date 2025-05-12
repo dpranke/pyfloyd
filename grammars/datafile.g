@@ -3,7 +3,7 @@
 %comment     = ('#'|'//') ^eol*
              | '/*' ^.'*/'
 
-%tokens      = number | str | raw_str | bare_word | numword | eol
+%tokens      = number | str | raw_str | bareword | numword | eol
 
 // allow_trailing is used to indicate whether parsing should stop
 // once a value (and any trailing filler) has been reached; by default
@@ -15,10 +15,11 @@
              | unicode                                -> true
              | unicode_names                          -> true
 
-grammar      = member+ %filler trailing?              -> ['object', '', $1]
-             | value %filler trailing?                -> $1
+grammar      = member+ %filler trailing               -> ['object', '', $1]
+             | value %filler trailing                 -> $1
 
 trailing     = ?{!allow_trailing} end
+             | ?{allow_trailing}
 
 eol          = '\r\n' | '\r' | '\n'
 
@@ -64,7 +65,7 @@ hex          = [0-9a-fA-F]
 string       = raw_str_tag raw_str                    -> ['string', $1, $2]
              | string_tag str                         -> ['string', $1, $2]
              | string_list
-             | bare_word                              -> ['string', '', $1]
+             | bareword                               -> ['bareword', '', $1]
 
 string_list  = string_tag
                '(' string (','? string)* ')'          -> ['string_list', $1,
@@ -74,10 +75,10 @@ raw_str_tag  = ('r' | 'rd' | 'dr')
 
 string_tag   = ('d' | tag) ~(%whitespace | %comment)  -> $1
 
-tag          = bare_word
+tag          = bareword
              | %filler                                -> ''
 
-bare_word    = ~('true' | 'false' | 'null' | number)
+bareword     = ~('true' | 'false' | 'null' | number)
                <(^(punct | %whitespace))+>
 
 numword      = <number (^(punct | %whitespace))+>     -> ['numword', '', $1]

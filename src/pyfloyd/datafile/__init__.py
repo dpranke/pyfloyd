@@ -24,7 +24,18 @@ possible. It provides the following functions:
 - `parse()` - Parse an object from a string, returning positional information.
 """
 
-from .api import dump, dumps, load, loads, parse
+from .api import (
+    decode_escape,
+    dedent,
+    dump,
+    dumps,
+    ishex,
+    isoct,
+    load,
+    loads,
+    parse,
+    Decoder,
+)
 from .tool import main
 
 
@@ -33,10 +44,15 @@ __version__ = '0.1.0.dev0'
 
 __all__ = [
     '__version__',
-    'load',
-    'loads',
+    'decode_escape',
+    'dedent',
     'dump',
     'dumps',
+    'ishex',
+    'isoct',
+    'load',
+    'loads',
     'main',
     'parse',
+    'Decoder',
 ]

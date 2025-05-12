@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Set
+from typing import Any, Optional, Set
 
+from pyfloyd import ast
 from pyfloyd import at_expr
 from pyfloyd import datafile
 from pyfloyd.analyzer import Grammar
@@ -26,33 +27,44 @@ from pyfloyd.formatter import (
     Saw,
     VList,
 )
-
 from pyfloyd.generator import Generator, GeneratorOptions
-
-
-class _DFTError(Exception):
-    pass
+from pyfloyd import lisp
 
 
 class DatafileGenerator(Generator):
     def __init__(self, host, grammar: Grammar, options: GeneratorOptions):
         super().__init__(host, grammar, options)
         self._local_vars: dict[str, Any] = {}
-        self._global_vars: dict[str, Any] = {}
-        self._scopes: list[dict[str, Any]] = []
 
         self._derive_memoize()
         self._derive_local_vars()
 
-        fname = host.join(host.dirname(__file__), 'python.dft')
-        df_str = host.read_text_file(fname)
-        self._templates = datafile.loads(df_str)
-        for t, v in self._templates.items():
-            # TODO: Fix dedenting properly.
-            if isinstance(v, str) and v.startswith('\n'):
-                self._templates[t] = v[1:]
+        self._interpreter = lisp.Interpreter(
+            values={
+                'grammar': grammar,
+                'generator_options': options,
+                'at_expr': self.f_at_expr,
+                'comma': self.f_comma,
+                'hlist': self.f_hlist,
+                'indent': self.f_indent,
+                'invoke': self.f_invoke,
+                'saw': self.f_saw,
+                'template': self.f_template,
+                'vlist': self.f_vlist,
+            },
+            fexprs={
+                'at': self.fexpr_at,
+            },
+            is_foreign=self.is_foreign,
+            eval_foreign=self.eval_foreign,
+        )
 
-        self._indent = self._templates.get('indent', '    ')
+        self._host = host
+        if 'file' in options.defines:
+            fname = options.defines.get('file')
+        else:
+            fname = self._host.join(host.dirname(__file__), 'python.dft')
+        self._process_template_file(fname)
 
     def _derive_memoize(self):
         def _walk(node):
@@ -82,38 +94,69 @@ class DatafileGenerator(Generator):
         for _, node in self._grammar.rules.items():
             node.local_vars = _walk(node)
 
+    def _process_template_file(self, fname):
+        df_str = self._host.read_text_file(fname)
+
+        def _parse_bareword(s: str, as_key: bool) -> Any:
+            if as_key:
+                return s
+            return ['symbol', s]
+
+        templates = datafile.loads(df_str, parse_bareword=_parse_bareword)
+        for t, v in templates.items():
+            if isinstance(v, str):
+                # TODO: Fix dedenting properly.
+                if v.startswith('\n'):
+                    v = v[1:]
+                expr = [['symbol', 'fn'], [], [['symbol', 'at_expr'], v]]
+                self._interpreter.env.set(t, self.eval(expr))
+            else:
+                lisp.check(lisp.is_list(v))
+                if v[0] == ['symbol', 'fn'] or v[0] == ['symbol', 'at']:
+                    self._interpreter.env.set(t, self.eval(v))
+                else:
+                    expr = [['symbol', 'fn'], [], v]
+                    self._interpreter.env.set(t, self.eval(expr))
+        if 'indent' in templates:
+            self._indent = templates['indent']
+
+    def is_foreign(self, expr: Any, env: lisp.Env) -> bool:
+        del env
+        return isinstance(expr, ast.Node)
+
+    def eval_foreign(self, expr: Any, env: lisp.Env) -> Any:
+        assert self.is_foreign(expr, env)
+        return expr
+
     def generate(self) -> str:
-        self._global_vars['grammar'] = self._grammar
-        self._global_vars['generator_options'] = self._options
-        return self._eval_template('generate')
+        s = self._interpreter.eval([['symbol', 'generate']])
+        lines = s.splitlines()
+        res = ['' if line.isspace() else line for line in lines]
+        return '\n'.join(res) + '\n'
 
-    def _eval_template(self, template, args=None) -> str:
-        args = args or []
-        if args:
-            self._scopes.insert(0, {})
-            for i, arg in enumerate(args, start=1):
-                self._scopes[0][f'arg_{i}'] = self._eval_expr(arg)
-        v = self._templates[template]
-        if isinstance(v, str):
-            res = self._eval_text(v, [])
+    def f_template(self, name: str) -> str:
+        tmpl = self._interpreter.get(name)
+        lisp.check(lisp.is_fn(tmpl))
+        return tmpl()
+
+    # pylint: disable=too-many-statements
+    def f_at_expr(self, *args) -> Any:
+        if len(args) > 1:
+            env = lisp.Env(parent=self._interpreter.env)
+            names = args[0]
+            for i, name in enumerate(names):
+                env.set(name, args[i + 1])
         else:
-            assert isinstance(v, list), f'Unexpected template type f{v}'
-            res = self._eval_list(v, [])
-        if args:
-            self._scopes.pop(0)
-        return res
-
-    def _eval_text(self, text, args) -> str:
-        v, err, pos = at_expr.parse(text, '-')
+            env = None
+        text = args[-1]
+        lisp.check(lisp.is_str, text)
+        exprs, err, pos = at_expr.parse(text, '-')
         if err:
-            raise _DFTError('unexpected at-expr parse error: ' + err)
+            raise lisp.Error('unexpected at-expr parse error: ' + err)
         if pos != len(text):
-            raise _DFTError('at-expr parse did not consume everything')
-        assert isinstance(v, list)
-        r = self._eval_exprs(v, args)
-        return r
+            raise lisp.Error('at-expr parse did not consume everything')
+        assert isinstance(exprs, list)
 
-    def _eval_exprs(self, exprs, args):
         def _is_blank(s):
             i = len(s) - 1
             indent = 0
@@ -137,7 +180,20 @@ class DatafileGenerator(Generator):
                     continue
                 s += expr
                 continue
-            res = self._eval_list(expr, args)
+
+            res = self._interpreter.eval(expr, env)
+            while (
+                lisp.is_list(res)
+                and lisp.length(res)
+                and res[0] == ['symbol', 'at_expr']
+            ):
+                res = self._interpreter.eval(res, env)
+
+            # If `@foo` resolves to a lambda with no parameters,
+            # evaluate that.
+            if lisp.is_fn(res) and len(res.parms) == 0:
+                r = res
+                res = r()
 
             is_blank, indent = _is_blank(s)
             if (
@@ -166,6 +222,8 @@ class DatafileGenerator(Generator):
                     for line in lines[1:]:
                         s += '\n' + ' ' * indent + line
                     continue
+                if isinstance(res, list):
+                    res = self.eval(res, env)
                 s += res
             if (
                 res.endswith('\n')
@@ -176,152 +234,37 @@ class DatafileGenerator(Generator):
 
         return s
 
-    def _eval_expr(self, expr):
-        if isinstance(expr, str):
-            return expr
-        return self._eval_list(expr)
+    # pylint: enable=too-many-statements
 
-    def _eval_list(self, expr, args=None):
-        del args  # TODO: do we need args?
-        assert isinstance(expr, list)
-        if (
-            isinstance(expr[0], list)
-            and len(expr[0]) > 0
-            and expr[0][0] == 'symbol'
-        ):
-            return self._eval_symbol(expr[0][1], expr[1:])
-        if isinstance(expr, list) and expr[0] == 'symbol':
-            return self._eval_symbol(expr[1])
-        assert False, f'Unknown expr {expr}'
-
-    def _eval_if(self, args):
-        assert len(args) == 3, (
-            f'Wrong number of args passed to `if`: {repr(args)}'
-        )
-        v = self._eval_expr(args[0])
-        if v:
-            return self._eval_expr(args[1])
-        return self._eval_expr(args[2])
-
-    def _eval_comma(self, args):
-        return Comma([self._eval_expr(arg) for arg in args])
-
-    def _eval_hlist(self, args):
-        return HList([self._eval_expr(arg) for arg in args])
-
-    def _eval_indent(self, args):
-        return Indent(self._eval_expr(args[0]))
-
-    def _eval_vlist(self, args):
-        return VList([self._eval_expr(arg) for arg in args])
-
-    def _eval_saw(self, args):
-        return Saw(
-            self._eval_expr(args[0]),
-            self._eval_expr(args[1]),
-            self._eval_expr(args[2]),
+    def fexpr_at(self, params, text, env) -> Any:
+        names = [p[1] for p in params]
+        return lisp.Fn(
+            self,
+            params,
+            [['symbol', 'at_expr']]
+            + [[['symbol', 'list']] + names]
+            + params
+            + [text],
+            env,
         )
 
-    def _eval_invoke(self, args):
-        assert len(args) > 0, f'No args passed to `invoke`: {repr(args)}'
-        s = self._eval_expr(args[0])
-        assert isinstance(s, str)
-        if s in self._templates:
-            return self._eval_template(s, args[1:])
-        raise _DFTError(f'Unknown symbol "{s}"')
+    def eval(self, expr: Any, env: Optional[lisp.Env] = None) -> Any:
+        return self._interpreter.eval(expr, env=env)
 
-    def _eval_map(self, args):
-        assert len(args) in (3, 4)
-        if len(args) == 4:
-            sep = self._eval_expr(args[3])
-        else:
-            sep = ''
+    def f_comma(self, *args) -> Any:
+        return Comma(args)
 
-        assert isinstance(args[0], list)
-        names = []
-        for _, name in args[0]:
-            names.append(name)
+    def f_hlist(self, *args) -> Any:
+        return HList(args)
 
-        scope = {}
-        self._scopes.insert(0, scope)
-        v = self._eval_expr(args[2])
-        if isinstance(v, (list, set)):
-            assert len(names) == 1
-            r = []
-            for el in v:
-                vals = [el]
-                for j, name in enumerate(names):
-                    self._scopes[0][names[j]] = vals[j]
-                r.append(self._eval_expr(args[1]))
-            self._scopes.pop(0)
-            return sep.join(r)
-        assert isinstance(v, dict)
-        assert len(names) == 2
-        r = []
-        for k, el in v.items():
-            vals = [k, el]
-            for j, name in enumerate(names):
-                self._scopes[-1][names[j]] = vals[j]
-            r.append(self._eval_expr(args[1]))
-        self._scopes.pop()
-        return sep.join(r)
+    def f_indent(self, arg) -> Any:
+        return Indent(arg)
 
-    def _eval_strcat(self, args):
-        assert len(args) == 2, (
-            f'Wrong number of args passed to `strcat`: {repr(args)}'
-        )
-        first = self._eval_expr(args[0])
-        second = self._eval_expr(args[1])
-        assert isinstance(first, str), (
-            f'First arg did not evaluate to string in `strcat`: {repr(args[0])}'
-        )
-        assert isinstance(second, str), (
-            f'Second arg did not evaluate to string in `strcat`: {repr(args[1])}'
-        )
-        return first + second
+    def f_vlist(self, *args) -> Any:
+        return VList(args)
 
-    def _eval_symbol(self, symbol, args=None):
-        args = args or []
-        fns = {
-            'comma': self._eval_comma,
-            'indent': self._eval_indent,
-            'hlist': self._eval_hlist,
-            'if': self._eval_if,
-            'invoke': self._eval_invoke,
-            'map': self._eval_map,
-            'strcat': self._eval_strcat,
-            'vlist': self._eval_vlist,
-            'saw': self._eval_saw,
-        }
-        if symbol in fns:
-            return fns[symbol](args)
+    def f_saw(self, start, mid, end) -> Any:
+        return Saw(start, mid, end)
 
-        found, v = self._lookup(symbol)
-        if found:
-            if symbol in self._templates:
-                return self._eval_template(symbol, args)
-            return v
-        raise _DFTError(f'Unknown symbol "{symbol}"')
-
-    def _lookup(self, symbol):
-        if symbol == 'true':
-            return True, True
-        if symbol == 'false':
-            return True, False
-        symbols = symbol.split('.')
-        for scope in self._scopes:
-            if symbols[0] in scope:
-                v = scope[symbols[0]]
-                for attr in symbols[1:]:
-                    v = getattr(v, attr)
-                return True, v
-
-        if symbols[0] in self._templates:
-            return True, self._templates[symbols[0]]
-
-        if symbols[0] in self._global_vars:
-            v = self._global_vars[symbols[0]]
-            for attr in symbols[1:]:
-                v = getattr(v, attr)
-            return True, v
-        return False, None
+    def f_invoke(self, symbol, *args) -> Any:
+        return self.eval([['symbol', symbol]] + list(args))
