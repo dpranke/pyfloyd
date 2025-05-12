@@ -88,15 +88,14 @@ class DatafileGenerator(Generator):
         for _, node in self._grammar.rules.items():
             node.local_vars = _walk(node)
 
+    def _parse_bareword(self, s: str, as_key: bool) -> Any:
+        if as_key:
+            return s
+        return ['symbol', s]
+
     def _process_template_file(self, fname):
         df_str = self._host.read_text_file(fname)
-
-        def _parse_bareword(s: str, as_key: bool) -> Any:
-            if as_key:
-                return s
-            return ['symbol', s]
-
-        templates = datafile.loads(df_str, parse_bareword=_parse_bareword)
+        templates = datafile.loads(df_str, parse_bareword=self._parse_bareword)
         for t, v in templates.items():
             if isinstance(v, str):
                 # TODO: Fix dedenting properly.
@@ -111,9 +110,9 @@ class DatafileGenerator(Generator):
                 else:
                     expr = [['symbol', 'fn'], [], v]
                     self._interpreter.define(t, expr)
-        if 'indent' in templates:
-            self._indent = templates['indent']
 
+    # TODO: this should really be a check for whether you can handle
+    # this data type, not whether it is foreign.
     def is_foreign(self, expr: Any, env: lisp.Env) -> bool:
         if isinstance(expr, ast.Node):
             return True
@@ -142,88 +141,52 @@ class DatafileGenerator(Generator):
         text = args[-1]
         lisp.check(lisp.is_str(text))
         exprs, err, pos = at_expr.parse(text, '-')
-        if err:
-            raise lisp.Error('unexpected at-expr parse error: ' + err)
+        lisp.check(err is None, f'Unexpected at-exp parse error: {err}')
         if pos != len(text):
-            raise lisp.Error('at-expr parse did not consume everything')
+            lisp.check(
+                pos == len(text), 'at-expr parse did not consume everything'
+            )
         assert isinstance(exprs, list)
 
-        def _is_blank(s):
-            i = len(s) - 1
-            indent = 0
-            while i >= 0:
-                if s[i] == ' ':
-                    i -= 1
-                    indent += 1
-                    continue
-                if s[i] == '\n':
-                    return True, indent
-                return False, 0
-            return False, 0
-
         s = ''
-        skip_newline = False
         for i, expr in enumerate(exprs):
-            if isinstance(expr, str):
-                if expr.startswith('\n') and skip_newline:
-                    skip_newline = False
-                    s += expr[1:]
-                    continue
-                s += expr
-                continue
-
-            res = self._interpreter.eval(expr, env)
-            while (
-                lisp.is_list(res)
-                and len(res) > 0
-                and res[0] == ['symbol', 'at_expr']
-            ):
-                res = self._interpreter.eval(res, env)
+            obj = self._interpreter.eval(expr, env)
 
             # If `@foo` resolves to a lambda with no parameters,
             # evaluate that.
-            if lisp.is_fn(res) and len(res.params) == 0:
-                r = res
-                res = r.call([], env)
+            if lisp.is_fn(obj) and len(obj.params) == 0:
+                obj = obj.call([], env)
 
-            is_blank, indent = _is_blank(s)
-            if (
-                i < len(exprs) - 1
-                and exprs[i + 1].startswith('\n')
-                and is_blank
-            ):
-                # If the expr is on a line of its own, if it evalues to
+            if isinstance(obj, FormatObj):
+                obj = '\n'.join(flatten(obj, 80))
+
+            lisp.check(
+                lisp.is_str(obj), f'Unexpected at-exp result `{repr(obj)}`'
+            )
+
+            nl_is_next = newline_is_next(exprs, i)
+
+            is_blank, num_spaces = ends_blank(s)
+            num_to_chomp, res = self._format(
+                obj, is_blank, num_spaces, nl_is_next
+            )
+
+            if num_to_chomp:
+                s = s[:-num_to_chomp]
+            s += res
+        return s
+
+    def _format(self, s, is_blank, num_spaces, nl_is_next) -> tuple[int, str]:
+        if nl_is_next:
+            if is_blank and s == '':
+                # If the expr is on a line of its own, and it evalues to
                 # '', trim the whole line. Otherwise, splice the result
                 # into the string, indenting each line as appropriate.
-                if res == '':
-                    skip_newline = True
-                    if indent:
-                        s = s[:-indent]
-                    continue
-                lines = res.splitlines()
-                s += lines[0]
-                for line in lines[1:]:
-                    s += '\n' + ' ' * indent + line
-                if res.endswith('\n'):
-                    s += '\n'
-            else:
-                if isinstance(res, FormatObj):
-                    lines = flatten(res, 80)
-                    s += lines[0]
-                    for line in lines[1:]:
-                        s += '\n' + ' ' * indent + line
-                    continue
-                if isinstance(res, list):
-                    res = self._interpreter.eval(res, env)
-                s += res
-            if (
-                res.endswith('\n')
-                and i < len(exprs)
-                and exprs[i + 1].startswith('\n')
-            ):
-                skip_newline = True
+                return num_spaces + 1, ''
 
-        return s
+            s = indent(s, num_spaces, nl_is_next)
+
+        return 0, s
 
     def f_comma(self, args, env) -> Any:
         del env
@@ -263,3 +226,35 @@ class DatafileGenerator(Generator):
             env,
             is_fexpr=False,
         )
+
+
+def ends_blank(s):
+    """Returns whether the string ends in a newline followed by a number
+    of spaces and how many spaces that is."""
+    i = len(s) - 1
+    num_spaces = 0
+    while i >= 0 and s[i] == ' ':
+        i -= 1
+        num_spaces += 1
+    return (i >= 0 and s[i] == '\n'), num_spaces
+
+
+def newline_is_next(exprs, i):
+    if i < len(exprs) - 1:
+        return lisp.is_str(exprs[i + 1]) and exprs[i + 1].startswith('\n')
+    return False
+
+
+def indent(s, num_spaces, nl_is_next):
+    """Returns a string with all but the first line indented `num_spaces`."""
+    if not s:
+        return ''
+
+    res = ''
+    lines = s.splitlines()
+    res += lines[0]
+    for line in lines[1:]:
+        res += '\n' + ' ' * num_spaces + line
+    if s.endswith('\n') and not nl_is_next:
+        res += '\n'
+    return res

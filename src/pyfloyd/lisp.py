@@ -42,6 +42,7 @@ def is_dict(el: Any) -> bool:
 def is_fn(el: Any) -> bool:
     return isinstance(el, Fn)
 
+
 def is_foreign(el: Any, env: 'Env') -> bool:
     del env
     return not (is_atom(el) or is_list(el) or is_dict(el) or is_fn(el))
@@ -99,12 +100,9 @@ class Env:
         self.values = values or {}
 
     def __repr__(self):
-        inner_keys = sorted(self.values.keys())
-        if self.parent:
-            inner_keys = self.parent.keys()
-        else:
-            outer_keys = []
-        return f'Env<inner={repr(inner_keys)}, outer={repr(outer_keys)}>'
+        inner = sorted(self.values.keys())
+        outer = self.parent.keys() if self.parent else []
+        return f'Env<inner={repr(inner)}, outer={repr(outer)}>'
 
     def keys(self) -> list[str]:
         ks = list(self.values.keys())
@@ -140,6 +138,7 @@ class Env:
             return v
         if key in self.values:
             return self.values[key]
+        assert self.parent is not None
         return self.parent.get(key)
 
     def set(self, key: str, value: Any) -> None:
@@ -207,9 +206,6 @@ class Interpreter:
         self.define_native_fn('fn', self.fexpr_fn, is_fexpr=True)
         self.define_native_fn('if', self.fexpr_if, is_fexpr=True)
 
-    def _default_is_foreign(self, expr: Any, env: Env) -> Any:
-        del env
-
     def _default_eval_foreign(self, expr: Any, env: Env) -> Any:
         raise InterpreterError('eval_foreign called by mistake')
 
@@ -241,8 +237,8 @@ class Interpreter:
             # Don't evaluate the args when calling an fexpr.
             return fn.call(rest, env)
         args = []
-        for expr in rest:
-            args.append(self.eval(expr, env))
+        for r in rest:
+            args.append(self.eval(r, env))
         return fn.call(args, env)
 
     def f_map(self, args, env):
@@ -253,8 +249,10 @@ class Interpreter:
             fn, exprs = args
             sep = '\n'
         check(is_fn(fn), f"First arg to map isn't a function: `{fn}`")
-        check(is_list(exprs) or is_dict(exprs),
-              f"Second arg to map isn't a list or a dict: `{exprs}`")
+        check(
+            is_list(exprs) or is_dict(exprs),
+            f"Second arg to map isn't a list or a dict: `{exprs}`",
+        )
         results = []
         if is_dict(exprs):
             for k, v in exprs.items():
