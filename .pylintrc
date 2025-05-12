@@ -40,6 +40,7 @@ disable=
     missing-docstring,
     # no-self-use,  # Pylint generates a 'useless option value' warning for this
     too-many-arguments,
+    too-many-positional-arguments,
     too-few-public-methods,
     too-many-branches,
     too-many-instance-attributes,
@@ -73,3 +74,7 @@ argument-rgx=[a-z_][a-z0-9_]{0,30}$
 # By default, pylint wants all variable names to be at least two chars long,
 # but we want to allow single-char variable names as well.
 variable-rgx=[a-z_][a-z0-9_]{0,30}$
+
+max-positional-arguments=7
+
+max-statements=65

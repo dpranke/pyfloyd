@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Optional, Set
+from typing import Any, Set
 
 from pyfloyd import ast
 from pyfloyd import at_expr
@@ -39,25 +39,19 @@ class DatafileGenerator(Generator):
         self._derive_memoize()
         self._derive_local_vars()
 
-        self._interpreter = lisp.Interpreter(
-            values={
-                'grammar': grammar,
-                'generator_options': options,
-                'at_expr': self.f_at_expr,
-                'comma': self.f_comma,
-                'hlist': self.f_hlist,
-                'indent': self.f_indent,
-                'invoke': self.f_invoke,
-                'saw': self.f_saw,
-                'template': self.f_template,
-                'vlist': self.f_vlist,
-            },
-            fexprs={
-                'at': self.fexpr_at,
-            },
-            is_foreign=self.is_foreign,
-            eval_foreign=self.eval_foreign,
-        )
+        self._interpreter = interp = lisp.Interpreter()
+        interp.env.set('grammar', grammar)
+        interp.env.set('generator_options', options)
+        interp.define_native_fn('at_expr', self.f_at_expr, is_fexpr=False)
+        interp.define_native_fn('comma', self.f_comma, is_fexpr=False)
+        interp.define_native_fn('hlist', self.f_hlist, is_fexpr=False)
+        interp.define_native_fn('indent', self.f_indent, is_fexpr=False)
+        interp.define_native_fn('invoke', self.f_invoke, is_fexpr=False)
+        interp.define_native_fn('saw', self.f_saw, is_fexpr=False)
+        interp.define_native_fn('vlist', self.f_vlist, is_fexpr=False)
+        interp.define_native_fn('at', self.fexpr_at, is_fexpr=True)
+        interp.is_foreign = self.is_foreign
+        interp.eval_foreign = self.eval_foreign
 
         self._host = host
         if 'file' in options.defines:
@@ -111,7 +105,7 @@ class DatafileGenerator(Generator):
                 expr = [['symbol', 'fn'], [], [['symbol', 'at_expr'], v]]
                 self._interpreter.define(t, expr)
             else:
-                lisp.check(lisp.is_list(v))
+                lisp.check(lisp.is_list(v), f"{v} isn't a list")
                 if v[0] == ['symbol', 'fn'] or v[0] == ['symbol', 'at']:
                     self._interpreter.define(t, v)
                 else:
@@ -121,8 +115,9 @@ class DatafileGenerator(Generator):
             self._indent = templates['indent']
 
     def is_foreign(self, expr: Any, env: lisp.Env) -> bool:
-        del env
-        return isinstance(expr, ast.Node)
+        if isinstance(expr, ast.Node):
+            return True
+        return lisp.is_foreign(expr, env)
 
     def eval_foreign(self, expr: Any, env: lisp.Env) -> Any:
         assert self.is_foreign(expr, env)
@@ -134,12 +129,7 @@ class DatafileGenerator(Generator):
         res = ['' if line.isspace() else line for line in lines]
         return '\n'.join(res) + '\n'
 
-    def f_template(self, name: str) -> str:
-        tmpl = self._interpreter.env.get(name)
-        lisp.check(lisp.is_fn(tmpl))
-        return tmpl()
-
-    # pylint: disable=too-many-statements
+    # TODO: Refactor this.
     def f_at_expr(self, args, env) -> Any:
         del env
         if len(args) > 1:
@@ -194,7 +184,7 @@ class DatafileGenerator(Generator):
             # evaluate that.
             if lisp.is_fn(res) and len(res.params) == 0:
                 r = res
-                res = r([], env)
+                res = r.call([], env)
 
             is_blank, indent = _is_blank(s)
             if (
@@ -235,21 +225,6 @@ class DatafileGenerator(Generator):
 
         return s
 
-    # pylint: enable=too-many-statements
-
-    def fexpr_at(self, args: list[Any], env: lisp.Env) -> Any:
-        params, text = args
-        names = [p[1] for p in params]
-        return lisp.Fn(
-            self._interpreter,
-            params,
-            [['symbol', 'at_expr']]
-            + [[['symbol', 'list']] + names]
-            + params
-            + [text],
-            env,
-        )
-
     def f_comma(self, args, env) -> Any:
         del env
         return Comma(args)
@@ -262,15 +237,29 @@ class DatafileGenerator(Generator):
         del env
         return Indent(args[0])
 
-    def f_vlist(self, args, env) -> Any:
-        del env
-        return VList(args)
+    def f_invoke(self, args, env) -> Any:
+        exprs = [['symbol', args[0]]] + args[1:]
+        return self._interpreter.eval(exprs, env)
 
     def f_saw(self, args, env) -> Any:
         del env
         start, mid, end = args
         return Saw(start, mid, end)
 
-    def f_invoke(self, args, env) -> Any:
-        exprs = [['symbol', args[0]]] + args[1:]
-        return self._interpreter.eval(exprs, env)
+    def f_vlist(self, args, env) -> Any:
+        del env
+        return VList(args)
+
+    def fexpr_at(self, args: list[Any], env: lisp.Env) -> Any:
+        params, text = args
+        names = [p[1] for p in params]
+        return lisp.UserFn(
+            self._interpreter,
+            names,
+            [['symbol', 'at_expr']]
+            + [[['symbol', 'list']] + names]
+            + params
+            + [text],
+            env,
+            is_fexpr=False,
+        )

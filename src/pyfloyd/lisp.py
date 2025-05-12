@@ -17,13 +17,18 @@ from collections.abc import Callable, Sequence
 from typing import Any, Optional
 
 
-class Error(Exception):
+class InterpreterError(Exception):
     pass
 
 
 def check(flag: bool, msg: str = ''):
+    """Check a condition and raise a lisp.InterpreterError if false
+
+    This is like the assert statement, but it raises an InterpreterError
+    instead of an AssertionError.
+    """
     if not flag:
-        raise Error(msg)
+        raise InterpreterError(msg)
 
 
 def is_atom(el: Any) -> bool:
@@ -36,6 +41,10 @@ def is_dict(el: Any) -> bool:
 
 def is_fn(el: Any) -> bool:
     return isinstance(el, Fn)
+
+def is_foreign(el: Any, env: 'Env') -> bool:
+    del env
+    return not (is_atom(el) or is_list(el) or is_dict(el) or is_fn(el))
 
 
 def is_list(el: Any) -> bool:
@@ -51,7 +60,7 @@ def is_symbol(el: Any) -> bool:
 
 
 def symbol(el: Any) -> str:
-    check(is_symbol(el))
+    check(is_symbol(el), f"{el} isn't a symbol")
     return el[1]
 
 
@@ -90,7 +99,18 @@ class Env:
         self.values = values or {}
 
     def __repr__(self):
-        return f'Env(parent={repr(self.parent)}, values={repr(self.values)})'
+        inner_keys = sorted(self.values.keys())
+        if self.parent:
+            inner_keys = self.parent.keys()
+        else:
+            outer_keys = []
+        return f'Env<inner={repr(inner_keys)}, outer={repr(outer_keys)}>'
+
+    def keys(self) -> list[str]:
+        ks = list(self.values.keys())
+        if self.parent:
+            ks.extend(self.parent.keys())
+        return sorted(set(ks))
 
     def bound(self, key: str) -> bool:
         if '.' in key:
@@ -111,6 +131,7 @@ class Env:
         return False
 
     def get(self, key: str) -> Any:
+        check(self.bound(key), f"Unbound symbol '{key}'")
         if '.' in key:
             symbols = key.split('.')
             v = self.get(symbols[0])
@@ -119,73 +140,83 @@ class Env:
             return v
         if key in self.values:
             return self.values[key]
-        assert self.parent
         return self.parent.get(key)
 
     def set(self, key: str, value: Any) -> None:
         self.values[key] = value
 
-    def update(self, d: dict[str, Any]) -> None:
-        self.values.update(d)
-
-
-class Fn:
-    def __init__(
-        self,
-        interpreter: 'Interpreter',
-        params: list[tuple[str, str]],
-        body: Any,
-        env: Env
-    ):
-        self.interpreter = interpreter
-        self.params = []
-        for param in params:
-            check(is_symbol(param))
-            self.params.append(symbol(param))
-        self.body = body
-        self.env = env
-
-    def __call__(self, args, env):
-        new_env = Env(values=dict(zip(self.params, args)), parent=self.env)
-        return self.interpreter.eval(self.body, new_env)
-
 
 EvalFn = Callable[[list[Any], Env], Any]
 
 
-class Interpreter:
+class Fn:
+    def __init__(self, interpreter: 'Interpreter', env: Env, is_fexpr: bool):
+        self.interpreter = interpreter
+        self.env = env
+        self.is_fexpr = is_fexpr
+
+    def call(self, args, env):
+        raise NotImplementedError
+
+
+class NativeFn(Fn):
     def __init__(
         self,
-        values: Optional[dict[str, Any]] = None,
-        fexprs: Optional[dict[str, Any]] = None,
-        is_foreign: Optional[EvalFn] = None,
-        eval_foreign: Optional[EvalFn] = None,
+        interpreter: 'Interpreter',
+        func: EvalFn,
+        env: Env,
+        is_fexpr: bool,
     ):
-        self.env = Env(
-            values={
-                'map': self.f_map,
-                'list': self.f_list,
-                'strcat': self.f_strcat,
-            }
-        )
-        self.fexprs: dict[str, EvalFn] = {
-            'fn': self.fexpr_fn,
-            'if': self.fexpr_if,
-        }
-        self.is_foreign = is_foreign or self._default_is_foreign
-        self.eval_foreign = eval_foreign or self._default_is_foreign
-        if values:
-            self.env.update(values)
-        if fexprs:
-            self.fexprs.update(fexprs)
+        super().__init__(interpreter, env, is_fexpr)
+        self.func = func
+
+    def call(self, args, env):
+        return self.func(args, env)
+
+
+class UserFn(Fn):
+    def __init__(
+        self,
+        interpreter: 'Interpreter',
+        params: list[str],
+        body: Any,
+        env: Env,
+        is_fexpr: bool,
+    ):
+        super().__init__(interpreter, env, is_fexpr)
+        self.params: list[str] = []
+        for param in params:
+            check(is_str(param))
+            self.params.append(param)
+        self.body = body
+
+    def call(self, args: list[Any], env: Env):
+        new_env = Env(values=dict(zip(self.params, args)), parent=self.env)
+        return self.interpreter.eval(self.body, new_env)
+
+
+class Interpreter:
+    def __init__(self):
+        self.env = Env()
+        self.is_foreign = is_foreign
+        self.eval_foreign = self._default_eval_foreign
+
+        self.define_native_fn('map', self.f_map, is_fexpr=False)
+        self.define_native_fn('list', self.f_list, is_fexpr=False)
+        self.define_native_fn('strcat', self.f_strcat, is_fexpr=False)
+        self.define_native_fn('fn', self.fexpr_fn, is_fexpr=True)
+        self.define_native_fn('if', self.fexpr_if, is_fexpr=True)
 
     def _default_is_foreign(self, expr: Any, env: Env) -> Any:
-        del expr
         del env
-        return False
 
     def _default_eval_foreign(self, expr: Any, env: Env) -> Any:
-        raise Error('eval_foreign called by mistake')
+        raise InterpreterError('eval_foreign called by mistake')
+
+    def define_native_fn(
+        self, name: str, func: EvalFn, is_fexpr: bool
+    ) -> None:
+        self.env.set(name, NativeFn(self, func, self.env, is_fexpr))
 
     def define(self, name: str, expr: Any) -> None:
         self.env.set(name, self.eval(expr))
@@ -198,48 +229,42 @@ class Interpreter:
             return self.eval_foreign(expr, env)
         if is_symbol(expr):
             sym = symbol(expr)
-            if env.bound(sym):
-                return env.get(sym)
-            raise Error(f'Unbound symbol "{sym}"')
-        check(is_list(expr))
+            check(env.bound(sym), f"Unbound symbol '{sym}'")
+            return env.get(sym)
+
+        check(is_list(expr), f"Don't know how to evaluate `{expr}`")
         first = expr[0]
         rest = expr[1:]
-        if is_symbol(first):
-            sym = symbol(first)
-            if sym in self.fexprs:
-                return self.fexprs[sym](rest, env)
-        v = self.eval(first, env)
-        if callable(v):
-            args = [self.eval(expr, env) for expr in rest]
-            return v(args, env)
-        raise Error(f"Don't know how to evaluate `{expr}`")
-
-    def fexpr_if(self, args, env):
-        cond, t_expr, f_expr = args
-        res = self.eval(cond, env)
-        if res:
-            return self.eval(t_expr, env)
-        return self.eval(f_expr, env)
-
-    def fexpr_fn(self, args, env):
-        params, body = args
-        return Fn(self, params, body, env)
+        fn = self.eval(first, env)
+        check(is_fn(fn), f"Don't know how to evaluate `{expr}`")
+        if fn.is_fexpr:
+            # Don't evaluate the args when calling an fexpr.
+            return fn.call(rest, env)
+        args = []
+        for expr in rest:
+            args.append(self.eval(expr, env))
+        return fn.call(args, env)
 
     def f_map(self, args, env):
         if len(args) == 3:
             fn, exprs, sep = args
+            check(is_str(sep), f"Third arg to map isn't a string: `{sep}`")
         else:
             fn, exprs = args
             sep = '\n'
-        check(is_list(exprs) or is_dict(exprs))
-        check(callable(fn))
+        check(is_fn(fn), f"First arg to map isn't a function: `{fn}`")
+        check(is_list(exprs) or is_dict(exprs),
+              f"Second arg to map isn't a list or a dict: `{exprs}`")
+        results = []
         if is_dict(exprs):
-            result = [fn([k, self.eval(v, env)], env) for k, v in exprs.items()]
+            for k, v in exprs.items():
+                results.append(fn.call([k, v], env))
         else:
-            result = [fn([expr], env) for expr in exprs]
+            for expr in exprs:
+                results.append(fn.call([expr], env))
         if sep is not None:
-            return sep.join(result)
-        return result
+            return sep.join(results)
+        return results
 
     def f_list(self, args, env):
         del env
@@ -249,3 +274,17 @@ class Interpreter:
         del env
         first, second = args
         return first + second
+
+    def fexpr_fn(self, args, env):
+        param_symbols, body = args
+        names = []
+        for expr in param_symbols:
+            names.append(symbol(expr))
+        return UserFn(self, names, body, env, is_fexpr=False)
+
+    def fexpr_if(self, args, env):
+        cond, t_expr, f_expr = args
+        res = self.eval(cond, env)
+        if res:
+            return self.eval(t_expr, env)
+        return self.eval(f_expr, env)
