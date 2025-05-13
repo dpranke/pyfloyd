@@ -11,278 +11,98 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""A bare-bones Lisp interpreter."""
+
+import argparse
+import sys
+from typing import Any
+
+from pyfloyd import lisp_interpreter
+from pyfloyd import lisp_parser
 
 
-from collections.abc import Callable, Sequence
-from typing import Any, Optional
+def main(argv=None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-c', '--code')
+    parser.add_argument('file', nargs='?')
+    args = parser.parse_args(argv)
 
-
-class InterpreterError(Exception):
-    pass
-
-
-def check(flag: bool, msg: str = ''):
-    """Check a condition and raise a lisp.InterpreterError if false
-
-    This is like the assert statement, but it raises an InterpreterError
-    instead of an AssertionError.
-    """
-    if not flag:
-        raise InterpreterError(msg)
-
-
-def is_atom(el: Any) -> bool:
-    return isinstance(el, (bool, int, float, str))
-
-
-def is_dict(el: Any) -> bool:
-    return isinstance(el, dict)
-
-
-def is_fn(el: Any) -> bool:
-    return isinstance(el, Fn)
-
-
-def is_foreign(el: Any, env: 'Env') -> bool:
-    del env
-    return not (is_atom(el) or is_list(el) or is_dict(el) or is_fn(el))
-
-
-def is_list(el: Any) -> bool:
-    return isinstance(el, Sequence)
-
-
-def is_str(el: Any) -> bool:
-    return isinstance(el, str)
-
-
-def is_symbol(el: Any) -> bool:
-    return is_list(el) and len(el) == 2 and el[0] == 'symbol' and is_str(el[1])
-
-
-def symbol(el: Any) -> str:
-    check(is_symbol(el), f"{el} isn't a symbol")
-    return el[1]
-
-
-def typecheck(
-    name, types: list[tuple[Callable[[Any], bool], str]], args: list[Any]
-):
-    check(
-        len(types) == len(args),
-        (
-            f'Wrong number of arguments passed to `{name}`: '
-            f'expected {len(types)}, got {len(args)}'
-        ),
-    )
-    for i, ty in enumerate(types):
-        ty_fn, ty_name = ty
-        check(
-            ty_fn(args[i]),
-            (
-                f'f{name} arg #{i} ({repr(args[i])}) passed to `{name}`'
-                f'is not a {ty_name}'
-            ),
-        )
-
-
-TY_STR = [is_str, 'string']
-
-
-class Env:
-    def __init__(
-        self,
-        *,
-        parent: Optional['Env'] = None,
-        values: Optional[dict[str, Any]] = None,
-    ):
-        self.parent = parent
-        self.values = values or {}
-
-    def __repr__(self):
-        inner = sorted(self.values.keys())
-        outer = self.parent.keys() if self.parent else []
-        return f'Env<inner={repr(inner)}, outer={repr(outer)}>'
-
-    def keys(self) -> list[str]:
-        ks = list(self.values.keys())
-        if self.parent:
-            ks.extend(self.parent.keys())
-        return sorted(set(ks))
-
-    def bound(self, key: str) -> bool:
-        if '.' in key:
-            symbols = key.split('.')
-            if not self.bound(symbols[0]):
-                return False
-            v = self.get(symbols[0])
-            for sym in symbols[1:]:
-                if not hasattr(v, sym):
-                    return False
-                v = getattr(v, sym)
-            return True
-
-        if key in self.values:
-            return True
-        if self.parent:
-            return self.parent.bound(key)
-        return False
-
-    def get(self, key: str) -> Any:
-        check(self.bound(key), f"Unbound symbol '{key}'")
-        if '.' in key:
-            symbols = key.split('.')
-            v = self.get(symbols[0])
-            for sym in symbols[1:]:
-                v = getattr(v, sym)
-            return v
-        if key in self.values:
-            return self.values[key]
-        assert self.parent is not None
-        return self.parent.get(key)
-
-    def set(self, key: str, value: Any) -> None:
-        self.values[key] = value
-
-
-EvalFn = Callable[[list[Any], Env], Any]
-
-
-class Fn:
-    def __init__(self, interpreter: 'Interpreter', env: Env, is_fexpr: bool):
-        self.interpreter = interpreter
-        self.env = env
-        self.is_fexpr = is_fexpr
-
-    def call(self, args, env):
-        raise NotImplementedError
-
-
-class NativeFn(Fn):
-    def __init__(
-        self,
-        interpreter: 'Interpreter',
-        func: EvalFn,
-        env: Env,
-        is_fexpr: bool,
-    ):
-        super().__init__(interpreter, env, is_fexpr)
-        self.func = func
-
-    def call(self, args, env):
-        return self.func(args, env)
-
-
-class UserFn(Fn):
-    def __init__(
-        self,
-        interpreter: 'Interpreter',
-        params: list[str],
-        body: Any,
-        env: Env,
-        is_fexpr: bool,
-    ):
-        super().__init__(interpreter, env, is_fexpr)
-        self.params: list[str] = []
-        for param in params:
-            check(is_str(param))
-            self.params.append(param)
-        self.body = body
-
-    def call(self, args: list[Any], env: Env):
-        new_env = Env(values=dict(zip(self.params, args)), parent=self.env)
-        return self.interpreter.eval(self.body, new_env)
-
-
-class Interpreter:
-    def __init__(self):
-        self.env = Env()
-        self.is_foreign = is_foreign
-        self.eval_foreign = self._default_eval_foreign
-
-        self.define_native_fn('map', self.f_map, is_fexpr=False)
-        self.define_native_fn('list', self.f_list, is_fexpr=False)
-        self.define_native_fn('strcat', self.f_strcat, is_fexpr=False)
-        self.define_native_fn('fn', self.fexpr_fn, is_fexpr=True)
-        self.define_native_fn('if', self.fexpr_if, is_fexpr=True)
-
-    def _default_eval_foreign(self, expr: Any, env: Env) -> Any:
-        raise InterpreterError('eval_foreign called by mistake')
-
-    def define_native_fn(
-        self, name: str, func: EvalFn, is_fexpr: bool
-    ) -> None:
-        self.env.set(name, NativeFn(self, func, self.env, is_fexpr))
-
-    def define(self, name: str, expr: Any) -> None:
-        self.env.set(name, self.eval(expr))
-
-    def eval(self, expr: Any, env: Optional[Env] = None) -> Any:
-        env = env or self.env
-        if is_atom(expr) or is_dict(expr):
-            return expr
-        if self.is_foreign(expr, env):
-            return self.eval_foreign(expr, env)
-        if is_symbol(expr):
-            sym = symbol(expr)
-            check(env.bound(sym), f"Unbound symbol '{sym}'")
-            return env.get(sym)
-
-        check(is_list(expr), f"Don't know how to evaluate `{expr}`")
-        first = expr[0]
-        rest = expr[1:]
-        fn = self.eval(first, env)
-        check(is_fn(fn), f"Don't know how to evaluate `{expr}`")
-        if fn.is_fexpr:
-            # Don't evaluate the args when calling an fexpr.
-            return fn.call(rest, env)
-        args = []
-        for r in rest:
-            args.append(self.eval(r, env))
-        return fn.call(args, env)
-
-    def f_map(self, args, env):
-        if len(args) == 3:
-            fn, exprs, sep = args
-            check(is_str(sep), f"Third arg to map isn't a string: `{sep}`")
+    interp = lisp_interpreter.Interpreter()
+    if args.code:
+        text = args.code
+        source = '<code>'
+        repl = False
+    elif args.file:
+        if args.file == '-':
+            text = sys.stdin.read()
+            source = '<stdin>'
         else:
-            fn, exprs = args
-            sep = '\n'
-        check(is_fn(fn), f"First arg to map isn't a function: `{fn}`")
-        check(
-            is_list(exprs) or is_dict(exprs),
-            f"Second arg to map isn't a list or a dict: `{exprs}`",
-        )
-        results = []
-        if is_dict(exprs):
-            for k, v in exprs.items():
-                results.append(fn.call([k, v], env))
-        else:
+            with open(args.file, encoding='utf-8') as fp:
+                text = fp.read()
+            source = args.file
+        repl = False
+    else:
+        repl = True
+        source = '<repl>'
+        print('> ', end='')
+        try:
+            text = input()
+        except KeyboardInterrupt:
+            print('interrupted, exiting', file=sys.stderr)
+            return 130
+        except EOFError:
+            return 0
+
+    while True:
+        if not text:
+            break
+
+        exprs, err, _ = lisp_parser.parse(text, source)
+        if err:
+            print(err, file=sys.stderr)
+            return 1
+        try:
             for expr in exprs:
-                results.append(fn.call([expr], env))
-        if sep is not None:
-            return sep.join(results)
-        return results
+                v = interp.eval(expr)
+                print(schemestr(v))
 
-    def f_list(self, args, env):
-        del env
-        return list(args)
+            if not repl:
+                break
 
-    def f_strcat(self, args, env):
-        del env
-        first, second = args
-        return first + second
+            print('> ', end='')
+            text = input()
+        except lisp_interpreter.InterpreterError as e:
+            print(e, file=sys.stderr)
+            return 1
+        except KeyboardInterrupt:
+            print('interrupted, exiting', file=sys.stderr)
+            return 130
+        except EOFError:
+            pass
 
-    def fexpr_fn(self, args, env):
-        param_symbols, body = args
-        names = []
-        for expr in param_symbols:
-            names.append(symbol(expr))
-        return UserFn(self, names, body, env, is_fexpr=False)
+    return 0
 
-    def fexpr_if(self, args, env):
-        cond, t_expr, f_expr = args
-        res = self.eval(cond, env)
-        if res:
-            return self.eval(t_expr, env)
-        return self.eval(f_expr, env)
+
+def schemestr(val: Any) -> str:
+    if val is True:
+        return '#t'
+    if val is False:
+        return '#f'
+    if isinstance(val, (int, float)):
+        return str(val)
+    if isinstance(val, str):
+        return f'"{val}"'
+    assert isinstance(val, list)
+    if len(val) and val[0] == 'symbol':
+        return val[1]
+    s = "'("
+    for i, v in enumerate(val):
+        s += schemestr(v)
+        if i < len(val) - 1:
+            s += ' '
+    s += ')'
+    return s
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv))

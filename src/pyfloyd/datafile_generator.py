@@ -28,7 +28,7 @@ from pyfloyd.formatter import (
     VList,
 )
 from pyfloyd.generator import Generator, GeneratorOptions
-from pyfloyd import lisp
+from pyfloyd import lisp_interpreter as lisp
 
 
 class DatafileGenerator(Generator):

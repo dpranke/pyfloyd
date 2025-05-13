@@ -26,6 +26,7 @@ class Runner:
             'grammars/floyd.g': f'{self.top}/parser.py',
             'grammars/datafile.g': f'{self.top}/datafile/parser.py',
             'grammars/at_expr.g': f'{self.top}/at_expr.py',
+            'grammars/lisp.g': f'{self.top}/lisp_parser.py',
         }
         self.run_cmd = None
         self.subps = None
@@ -348,8 +349,11 @@ class Runner:
     def run_regen(self):
         for grammar, parser_file in self.grammars.items():
             new_file = f'{parser_file}.new'
-            with open(parser_file, encoding='utf-8') as fp:
-                old = fp.read()
+            if os.path.exists(parser_file):
+                with open(parser_file, encoding='utf-8') as fp:
+                    old = fp.read()
+            else:
+                old = ''
             self._gen_parser(grammar, parser_file)
             if self.args.no_execute:
                 if self.args.check:
