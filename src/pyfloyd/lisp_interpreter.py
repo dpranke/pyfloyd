@@ -81,7 +81,7 @@ _typecheckers: dict[str, tuple[Callable[[Any], bool], str]] = {
     'dict': (is_dict, 'dict'),
     'fn': (is_fn, 'function'),
     'list': (is_list, 'list'),
-    'number': (is_number, 'number'),
+    'num': (is_number, 'number'),
     'str': (is_str, 'string'),
     'sym': (is_symbol, 'symbol'),
 }
@@ -243,12 +243,25 @@ class Interpreter:
         self.eval_foreign = self._default_eval_foreign
 
         self.define_native_fn('if', self.fexpr_if, is_fexpr=True)
+        self.define_native_fn('is_empty', self.f_is_empty, types=['list'])
+
         self.define_native_fn('fn', self.fexpr_fn, is_fexpr=True)
+        self.define_native_fn(
+            'getattr', self.fexpr_getitem, types=['any', 'str']
+        )
+        self.define_native_fn(
+            'getitem', self.fexpr_getitem, types=['list', 'num']
+        )
         self.define_native_fn('join', self.f_join, types=['str', 'list'])
+        self.define_native_fn('keys', self.f_keys)
         self.define_native_fn('list', self.f_list)
         self.define_native_fn('map', self.f_map)
+        self.define_native_fn('map_items', self.f_map_items)
         self.define_native_fn('quote', self.fexpr_quote, is_fexpr=True)
-        self.define_native_fn('strcat', self.f_strcat, types=['str', 'str'])
+        self.define_native_fn(
+            'slice', self.f_slice, types=['list', 'num', 'num']
+        )
+        self.define_native_fn('strcat', self.f_strcat)
 
     def _default_eval_foreign(self, expr: Any, env: Env) -> Any:
         raise InterpreterError('eval_foreign called by mistake')
@@ -290,11 +303,29 @@ class Interpreter:
             args.append(self.eval(r, env))
         return fn.call(args, env)
 
+    def f_first(self, args, env):
+        return args[0][0]
+
+    def f_getattr(self, args, env):
+        del env
+        return getattr(args[0], args[1])
+
+    def f_getitem(self, args, env):
+        del env
+        return args[0][args[1]]
+
+    def f_is_empty(self, args, env):
+        return len(args[0]) == 0
+
     def f_join(self, args, env):
         del env
         sep = args[0]
         rest = args[1]
         return sep.join(rest)
+
+    def f_keys(self, args, env):
+        del env
+        return args[0].keys()
 
     def f_map(self, args, env):
         if len(args) == 3:
@@ -304,17 +335,28 @@ class Interpreter:
             fn, exprs = args
             sep = '\n'
         check(is_fn(fn), f"First arg to map isn't a function: `{fn}`")
-        check(
-            is_list(exprs) or is_dict(exprs),
-            f"Second arg to map isn't a list or a dict: `{exprs}`",
-        )
+        check(is_list(exprs), f"Second arg to map isn't a list: `{exprs}`")
         results = []
-        if is_dict(exprs):
-            for k, v in exprs.items():
-                results.append(fn.call([k, v], env))
+        for expr in exprs:
+            results.append(fn.call([expr], env))
+        if sep is not None:
+            return sep.join(results)
+        return results
+
+    def f_map_items(self, args, env):
+        if len(args) == 3:
+            fn, d, sep = args
+            check(
+                is_str(sep), f"Third arg to map_items isn't a string: `{sep}`"
+            )
         else:
-            for expr in exprs:
-                results.append(fn.call([expr], env))
+            fn, d = args
+            sep = '\n'
+        check(is_fn(fn), f"First arg to map_items isn't a function: `{fn}`")
+        check(is_dict(d), f"Second arg to map_items isn't a dict: `{fn}`")
+        results = []
+        for k, v in d.items():
+            results.append(fn.call([k, v], env))
         if sep is not None:
             return sep.join(results)
         return results
@@ -323,10 +365,17 @@ class Interpreter:
         del env
         return list(args)
 
+    def f_slice(self, args, env):
+        del env
+        lis, start, stop = args
+        return lis[start:stop]
+
+    def f_sort(self, args, env):
+        return sorted(args[0])
+
     def f_strcat(self, args, env):
         del env
-        first, second = args
-        return first + second
+        return ''.join(args)
 
     def fexpr_fn(self, args, env):
         param_symbols, body = args

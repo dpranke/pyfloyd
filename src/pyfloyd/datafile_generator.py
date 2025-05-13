@@ -44,11 +44,13 @@ class DatafileGenerator(Generator):
         interp.env.set('generator_options', options)
         interp.define_native_fn('at_exp', self.f_at_exp)
         interp.define_native_fn('comma', self.f_comma)
-        interp.define_native_fn('hlist', self.f_hlist)
-        interp.define_native_fn('indent', self.f_indent)
+        interp.define_native_fn('hl', self.f_hl)
+        interp.define_native_fn('hl_l', self.f_hl_l, types=['list'])
+        interp.define_native_fn('ind', self.f_ind)
+        interp.define_native_fn('ind_l', self.f_ind_l, types=['list'])
         interp.define_native_fn('invoke', self.f_invoke)
         interp.define_native_fn('saw', self.f_saw)
-        interp.define_native_fn('vlist', self.f_vlist)
+        interp.define_native_fn('vl', self.f_vl)
         interp.is_foreign = self.is_foreign
         interp.eval_foreign = self.eval_foreign
 
@@ -213,15 +215,28 @@ class DatafileGenerator(Generator):
         del env
         return Comma(args)
 
-    def f_hlist(self, args, env) -> Any:
+    def f_hl(self, args, env) -> Any:
+        """Returns an HList of the args passed to the function."""
         del env
         return HList(args)
 
-    def f_indent(self, args, env) -> Any:
+    def f_hl_l(self, args, env) -> Any:
+        """Returns an Hlist of the list in the first arg."""
         del env
-        return Indent(args[0])
+        return HList(args[0])
+
+    def f_ind(self, args, env) -> Any:
+        """Returns an indented VList of the args passed to the function."""
+        del env
+        return Indent(VList(args))
+
+    def f_ind_l(self, args, env) -> Any:
+        """Returns an indented VList of the list in the first arg."""
+        del env
+        return Indent(VList(args[0]))
 
     def f_invoke(self, args, env) -> Any:
+        """Invoke the template named in arg 1, passing it the remaining args."""
         exprs = [['symbol', args[0]]] + args[1:]
         return self._interpreter.eval(exprs, env)
 
@@ -230,7 +245,7 @@ class DatafileGenerator(Generator):
         start, mid, end = args
         return Saw(start, mid, end)
 
-    def f_vlist(self, args, env) -> Any:
+    def f_vl(self, args, env) -> Any:
         del env
         return VList(args)
 

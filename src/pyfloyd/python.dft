@@ -1,4 +1,42 @@
 
+#
+# Helper rules
+#
+
+expr:      [fn [node] [invoke [node_name node.t] [node]]]
+
+stmts:     [fn [node] [invoke [node_name node.t] [node]]]
+
+rule_method: [fn [rule node] [at_exp '''
+def _@rule(self):
+    @invoke[[node_name node.t] [node]]
+''']]
+
+# returns the method name corresponding to different kinds of functions
+node_name: [fn [name] [strcat 'n_' name]]
+op_name:   [fn [name] [strcat 'o_' name]]
+fn_name:   [fn [name] [strcat 'fn_' name]]
+rule_name: [fn [name] [strcat 'r_' name]]
+
+# invokes a method generically.
+call:      [fn [name args] [saw [strcat 'self._' name '('] [comma args] ')']]
+
+# invoke different specific kinds of functions
+call_node: [fn [name args] [call [node_name name] args]]
+call_op:   [fn [name args] [call [node_name name] args]]
+call_rule: [fn [name args] [call [rule_name name] args]]
+call_fn:   [fn [name args] [call [fn_name name] args]]
+
+# various constants
+bool_t:   'True'
+bool_f:   'False'
+end:      ''  # statement terminator
+
+#
+# Main / starting rule
+#
+
+# 'generate' is invoked to generate the file from the AST.
 generate: '''
 @if[generator_options.main [main_header] [default_header]]
 @if[grammar.exception_needed [parsing_runtime_exception_class] '']
@@ -110,7 +148,7 @@ class Result(NamedTuple):
     val: Any = None
     err: Optional[str] = None
     pos: Optional[int] = None
-'''
+'''  # result_class
 
 parsing_runtime_exception_class: '''
 
@@ -131,7 +169,7 @@ class _OperatorState:
         self.precs = []
         self.rassoc = set()
         self.choices = {}
-'''
+'''  # operator_state_class
 
 parse_function: '''
 
@@ -187,28 +225,71 @@ def __init__(self, text, path):
     self._path = path
     self._pos = 0
     self._val = None
-    self._externs = {}
-
+    @if[[is_empty grammar.externs] [vl 'self._externs = {}'] [externs]]
     @if[generator_options.memoize 'self._cache = {}' '']
     @if[grammar.seeds_needed 'self._seeds = {}' '']
     @if[grammar.leftrec_needed 'self._blocked = set()' '']
     @if[grammar.re_needed 'self._regexps = {}' '']
     @if[grammar.lookup_needed 'self._scopes = []' '']
-    @if[grammar.operator_needed operator_state '']
-'''
+    @if[grammar.operator_needed
+        [vl 'self._operators = {}'
+            [map_items operator_state grammar.operators]]
+        [vl]]
+'''  # parse_constructor
 
-operator_state: '# operator state'
+externs = [vl 'self._externs = {'
+              [ind [map_items [fn [k v] [at_exp "    '@k': @v,"]]
+                              grammar.externs]]
+              '}']
+
+operator_state: [fn [rule o]
+                    [vl 'o = _OperatorState()'
+                        'o.prec_ops = {'
+                        [operator_prec o]
+                        '}'
+                        'o.precs = sorted(o.prec_ops, reverse=True)'
+                        [operator_rassoc o]
+                        'o.choices = {'
+                        [ind_l [operator_choices o]]
+                        '}'
+                        [at_exp "self._operators['@rule'] = o"]]]
+
+operator_prec: [fn [o]
+                   [ind [map [fn [prec]
+                                 [hl prec
+                                     ': ['
+                                     [hl_l [map [fn [op] [strcat "'" op "'"]
+                                                [getitem o.prec_ops prec]]
+                                                ', ']]
+                                     '],']]
+                             [sort [keys o.prec_ops]]]]]
+
+operator_rassoc: [fn [o]
+                     [hl 'o.rassoc = set(['
+                         [comma  [map [fn [op]
+                                          [strcat "'" op "'"]]
+                                 o.rassoc]]
+                         '])']]
+
+operator_choices: [fn [o]
+                      [map_items [fn [op meth]
+                                     [at_exp "'@op': self._@meth,"]]
+                                 o.choices]]
 
 parser_methods: '''
 @parse_method
-@map[[fn [name] [invoke [strcat 'o_' name]]] grammar.needed_operators '\n']
-@map[[fn [rule node] [rule_method rule node]] grammar.rules '\n']
+@map[[fn [name] [invoke [op_name name]]]
+     grammar.needed_operators
+     '\n']
+@map[[fn [rule node] [rule_method rule node]]
+     grammar.rules
+     '\n']
 @if[generator_options.memoize o_operator '']
 @if[grammar.needed_builtin_functions '\n' '']
-@map[[fn [name] [invoke [strcat 'fn_' name]]]
+@map[[fn [name] [invoke [fn_name name]]]
      grammar.needed_builtin_functions
      '\n']
-'''
+'''  # parser_methods
 
 parse_method: '''
 @if[grammar.exception_needed parse_with_exception parse_without_exception]
@@ -230,10 +311,10 @@ def parse(self, externs: Externs = None):
         self._r_@grammar.starting_rule()
 
         if self._failed:
-            return Result(None, self._error(), self._errpos)
+            return Result(None, self._o_error(), self._errpos)
         return Result(self._val, None, self._pos)
     except _ParsingRuntimeError as e:  # pragma: no cover
-        lineno, _ = self._offsets(self._errpos)
+        lineno, _ = self._o_offsets(self._errpos)
         return Result(
             None,
             self._path + ':' + str(lineno) + ' ' + str(e),
@@ -250,71 +331,53 @@ def parse(self, externs: Externs = None):
     self._r_@grammar.starting_rule()
 
     if self._failed:
-        return Result(None, self._error(), self._errpos)
+        return Result(None, self._o_error(), self._errpos)
     return Result(self._val, None, self._pos)
 '''
-
-#
-# helper methods
-#
-
-expr: [fn [node] [invoke [strcat 'n_' node.t] [node]]
-
-stmts: [fn [node] [invoke [strcat 'n_' node.t] [node]]]
-
-rule_method: [fn [rule node] [at_exp '''
-def _@rule(self):
-    @invoke[[strcat 'n_' node.t]]
-''']]
-
-rulename: [fn [name] [at_exp 'self._@name']]
-
-invoke_rule: [fn [name args]
-                 [saw [join ['self._' name '(']] [comma args] ')']]
-
-end: ''
 
 #
 # Rules for each node in the AST
 #
 
 n_action: [fn [node]
-              [hlist ['o_succeed(' [expr node.child]] ')' [end]]]
-   
-n_apply: [fn [node] [hlist [[invoke_rule node.rule_name []]] end]]
+              [hl 'o_succeed(' [expr node.child]] ')' end]
 
-n_choice: [fn [node] [vlist [['p = self._pos'] 
-                             [map [c] [vlist [[stmts c]
-                                              'if not self._failed:'
-                                              '    return'
-                                              'self._o_rewind(p)']]]
-                             [stmts [index -1 node.ch]]]]]
+n_apply: [fn [node] [hl [call_rule node.rule_name []] end]]
 
-n_count: [fn [node] [vlist [['vs = []'
-                             'i = 0'
-                             [strcat 'cmin, cmax = ' node.v]
-                             'while i < cmax:'
-                             [indent [vlist [[stmts node.child]
-                                             'if self._failed:'
-                                             '    if i > cmin:'
-                                             '        self._o_succeed(vs)'
-                                             '        return'
-                                             '    return'
-                                             'vs.append(self.val)'
-                                             'i += 1']]]
-                             'self._o_succeed(vs)']]]]
+n_choice: [fn [node] [vl 'p = self._pos'
+                     [map [fn [c] [vl [stmts c]
+                                      'if not self._failed:'
+                                      '    return'
+                                      'self._o_rewind(p)']]
+                          [slice node.ch 0 -1]]
+                     [stmts [getitem node.ch -1]]]]
+
+n_count: [fn [node] [vl 'vs = []'
+                        'i = 0'
+                        [strcat 'cmin, cmax = ' node.v]
+                        'while i < cmax:'
+                        [ind [stmts node.child]
+                             'if self._failed:'
+                             '    if i > cmin:'
+                             '        self._o_succeed(vs)'
+                             '        return'
+                             '    return'
+                             'vs.append(self.val)'
+                             'i += 1']
+                        'self._o_succeed(vs)']]
 
 
 n_e_arr: [fn [node] [if [equal node.ch []]
-                        [lit '[]]
-                        [saw '[' [comma [map [fn [c] [expr c]] node.ch]]]]]]
+                        [lit '[]']
+                        [saw '['
+                             [comma [map [fn [c] [expr c]] node.ch]]]]]
 
 
 n_e_call: [fn [node] [saw '(' [comma [map [fn [c] [expr c]] node.ch]] ')']]
 
 n_e_const: [fn [node] [lit [invoke node.v]]]
 
-n_e_getitem: [fn [node] [saw '[' [expr node.ch] ']']
+n_e_getitem: [fn [node] [saw '[' [expr node.ch] ']']]
 
 n_e_lit: [fn [node] [lit node.v]]
 
@@ -328,153 +391,166 @@ n_e_paren: [fn [node] [expr node.child]]
 
 n_e_plus: [fn [node] [tree [expr node.left] '+' [expr node.right]]]
 
-n_e_qual: "# TODO: e_qual"
+n_e_qual: [fn [node]
+              [hl '# TODO e_qual'
+                  [saw [expr [getitem 1 node.ch]]]]]
 
 n_e_var: [fn [node] [if node.outer_scope
-                        [invoke_rule 'o_lookup' [join ["'" node.v "'"]]]
+                        [call_op 'lookup' [strcat "'" node.v "'"]]
                         [if [in node.v grammar.externs]
                             [lit [extern node.v]]
                             [lit [varname node.v]]]]]
 
 
-n_empty: [fn [node] [hlist [invoke_rule 'o_succeed' [null]] end]]
+n_empty: [fn [node] [hl [call_op 'succeed' [null]] end]]
 
-n_equals: [fn [node] [hlist [invoke_rule 'o_str' [expr node.child]] end]]
+n_equals: [fn [node] [hl [call_op 'str' [expr node.child]] end]]
 
-n_label: [fn [node] [vlist [[stmts node.child]
-                            [@if node.child.can_fail
-                                 [vlist [['if self._failed:' '    return']]]
-                                 [vlist []]]
-                            [@if node.outer_scope
-                                 [vlist [[join '' ['self._scopes[-1]['
-                                                   node.name
-                                                   '] = self._val']]]]
-                                 [vlist [[strcat [varname node.name]
-                                                 ' = self._val']]]]]]]
-                                                  
-n_ends_in: '# TODO: ends_in'
+n_label: [fn [node] [vl [stmts node.child]
+                        [@if node.child.can_fail
+                             [vl 'if self._failed:' '    return']
+                             [vl]
+                        [@if node.outer_scope
+                             [vl [strcat 'self._scopes[-1]['
+                                         node.name
+                                         ' = self._val']]]
+                             [vl [strcat [varname node.name]
+                                         ' = self._val']]]]]
 
-n_leftrec: [fn [node] [hlist [invoke_rule 'o_leftrec'
-                                          [rulename node.child.v]
-                                          [join ["'" node.v "'"]]
-                                          [@if node.left_assoc [true] [false]]]
-                             [end]]]
+n_ends_in: [fn [node] [vl 'while True:'
+                          [ind [stmts node.child]]
+                          [if node.can_fail
+                              [ind 'if not self._failed:'
+                                   '    break']
+                              '']
+                          [ind [call_rule 'any' []]
+                               'if self._failed:'
+                               '    break']]]
 
-n_lit: [fn [node] [hlist [[invoke_rule 'o_str' [lit node.v]] end]
 
-n_not: [fn [node] [vlist ['p = self._pos'
-                          'errpos = self._errpos'
-                          [stmts node.child]
-                          'if self._failed:'
-                          '    self._o_succeed(None, p)'
-                          'else:'
-                          '    self._o_rewind(p)'
-                          '    self._errpos = errpos'
-                          '    self._o_fail()']]]
 
-n_not_one: '# TODO: not_one'
+n_leftrec: [fn [node] [hl [call_op 'leftrec'
+                                   [[rule_name node.child.v]
+                                    [strcat "'" node.v "'"]]
+                                    [@if node.left_assoc bool_t bool_f]]
+                           end]]
 
-n_operator: [fn [node] [hlist [[invoke_rule 'o_operator'
-                                            [join ["'" node.v "'"]]]]]]
+n_lit: [fn [node] [hl [call_op 'str' [[lit node.v]]] end]]
 
-n_opt: [fn [node] [vlist ['p = self._pos'
-                          [stmts node.child]
-                          'if self._failed:'
-                          '    self._succeed([], p)'
-                          'else:'
-                          '    self._succeed([self._val])']]]
+n_not: [fn [node] [vl 'p = self._pos'
+                      'errpos = self._errpos'
+                      [stmts node.child]
+                      'if self._failed:'
+                      '    self._o_succeed(None, p)'
+                      'else:'
+                      '    self._o_rewind(p)'
+                      '    self._errpos = errpos'
+                      '    self._o_fail()']]
+
+n_not_one: [fn [node] [vl [n_not node]
+                          'if not self._failed:'
+                          [ind [call_rule 'any' []]]]]
+
+n_operator: [fn [node] [hl [call_op 'operator'
+                                    [[strcat "'" node.v "'"]]]]]
+
+n_opt: [fn [node] [vl 'p = self._pos'
+                         [stmts node.child]
+                         'if self._failed:'
+                         '    self._o_succeed([], p)'
+                         'else:'
+                         '    self._o_succeed([self._val])']]
 
 
 n_paren: [fn [node] [stmts node.child]]
 
 n_plus: [fn [node]
-            [vlist ['vs = []'
-                    [stmts node.child]
-                    'if self._failed:'
-                    '    return'
-                    'vs.append(self._val)'
-                    'while True:'
-                    [indent [vlist ['p = self._pos'
-                                    [stmts node.child]
-                                    'if self._failed or self._pos == p:'
-                                    '    self._rewind(p)'
-                                    '        break'
-                                    '    vs.append(self._val)']]]
-                    'self._succeed(vs)']]]
+            [vl 'vs = []'
+                [stmts node.child]
+                'if self._failed:'
+                '    return'
+                'vs.append(self._val)'
+                'while True:'
+                [ind 'p = self._pos'
+                        [stmts node.child]
+                        'if self._failed or self._pos == p:'
+                        '    self._o_rewind(p)'
+                        '        break'
+                        '    vs.append(self._val)']
+                'self._o_succeed(vs)']]
 
 n_pred: [fn [node]
-            [vlist [[hlist ['v = ', [expr node.child]]]
-                    'if v is True:'
-                    '    self._o_succeed(v)'
-                    'elif v is False:'
-                    '    self._o_fail()'
-                    'else:'
-                    "    raise _ParsingRuntimeError("Bad predicate value')"]]]
+            [vl [hl 'v = ' [expr node.child]]
+                'if v is True:'
+                '    self._o_succeed(v)'
+                'elif v is False:'
+                '    self._o_fail()'
+                'else:'
+                "    raise _ParsingRuntimeError('Bad predicate value')"]]
 
-n_range: [fn [node] [hlist [[invoke_rule 'o_range' 
-                                         [[lit node.start] [lit node.stop]]]
-                            end]]]
+n_range: [fn [node] [hl [call_op 'range'
+                                 [[lit node.start] [lit node.stop]]]
+                        end]]
 
-n_regexp: [fn [node] 
-              [vlist [[strcat 'p =' [lit node.v]]
-                      'if p not in self._regexps'
-                      '    self._regexps[p] = re.compile(p)'
-                      'm = self._regexps[p].match(self._text, self._pos)' 
-                      'if m:'
-                      '    self._o_succeed(m.group(o), m.end())'
-                      '    return'
-                      'self._o_fail()']]]
+n_regexp: [fn [node]
+              [vl [strcat 'p = ' [lit node.v]]
+                  'if p not in self._regexps'
+                  '    self._regexps[p] = re.compile(p)'
+                  'm = self._regexps[p].match(self._text, self._pos)'
+                  'if m:'
+                  '    self._o_succeed(m.group(o), m.end())'
+                  '    return'
+                  'self._o_fail()']]
 
-n_run: [fn [node] 
-           [vlist ['start = self._pos'
-                   [stmts node.child]
-                   [@if node.child.can_fail
-                        [vlist ['if self._failed:' 
-                                '    return']]
-                        [vlist []]]
-                   'end = self._pos'
-                   'self._val = self._text[start:end]']]]
+n_run: [fn [node]
+           [vl 'start = self._pos'
+               [stmts node.child]
+               [@if node.child.can_fail
+                    [vl ['if self._failed:'
+                            '    return']]
+                    [vl []]]
+               'end = self._pos'
+               'self._val = self._text[start:end]']]
 
-n_scope: [fn [node] [hlist [invoke_rule 'o_unicat', [[lit node.v]]] end]
+n_scope: [fn [node] [hl [call_op 'unicat', [[lit node.v]]] end]]
 
-n_set: [fn [node] 
-           [vlist [[strcat 'p =' [lit node.v]]
-                   'if p not in self._regexps'
-                   '    self._regexps[p] = re.compile(p)'
-                   'm = self._regexps[p].match(self._text, self._pos)' 
-                   'if m:'
-                   '    self._o_succeed(m.group(o), m.end())'
-                   '    return'
-                   'self._o_fail()']]]
+n_set: [fn [node]
+           [vl [strcat 'p =' [lit node.v]]
+               'if p not in self._regexps:'
+               '    self._regexps[p] = re.compile(p)'
+               'm = self._regexps[p].match(self._text, self._pos)'
+               'if m:'
+               '    self._o_succeed(m.group(o), m.end())'
+               '    return'
+               'self._o_fail()']]
 
-n_seq: [fn [node] 
-           [vlist [[stmts [index node.ch 0]]
-                   [if [get [index node.ch 0] 'can_fail']
-                       [vlist [['if self._failed:'
-                                '    return']]
-                       []]]
-                   [vlist [map [fn [c] [vlist [[stmts c]
-                                               [if c.can_fail
-                                                   [vlist ['if self.failed:'
-                                                           '    return']]
-                                                   []]]]]
-                               [slice node.ch 1 -1]]]
-                   [stmts [index node.ch -1]]]]]
-                                   
-                          
+n_seq: [fn [node]
+           [vl [stmts [getitem node.ch 0]]
+               [if [getattr [getitem node.ch 0] 'can_fail']
+                   [vl 'if self._failed:'
+                       '    return']
+                   []]]
+               [vl [map [fn [c] [vl [stmts c]
+                                    [if c.can_fail
+                                        [vl 'if self.failed:'
+                                            '    return']
+                                        []]]]
+                        [slice node.ch 1 -1]]]
+               [stmts [getitem node.ch -1]]]
+
 n_star: [fn [node]
-            [vlist [[stmts node.child]
-                    'vs = []'
-                    'while True:'
-                    '    p = self._pos'
-                    [indent [vlist [[stmts node.child]]
-                                    'if self._failed or self._pos == p:'
-                                    '    self._o_rewind(p)'
-                                    '    break'
-                                    'vs.append(self._val)']]
-                    'self._o_succeed(self._val)']]]
+            [vl [stmts node.child]
+                'vs = []'
+                'while True:'
+                '    p = self._pos'
+                [ind [stmts node.child]
+                     'if self._failed or self._pos == p:'
+                     '    self._o_rewind(p)'
+                     '    break'
+                     'vs.append(self._val)']
+                'self._o_succeed(self._val)']]
 
-n_unicat: [fn [node] [hlist [[invoke_rule 'o_unicat' [[lit node.v]]] end]]
+n_unicat: [fn [node] [hl [call_op 'unicat' [[lit node.v]]] end]]
 
 #
 # Built-in operators and rules
@@ -484,9 +560,9 @@ o_ch: '''
 def _ch(self, ch):
     p = self._pos
     if p < self._end and self._text[p] == ch:
-        self._succeed(ch, self._pos + 1)
+        self._o_succeed(ch, self._pos + 1)
     else:
-        self._fail()
+        self._o_fail()
 '''
 
 o_offsets: '''
@@ -504,7 +580,7 @@ def _offsets(self, pos):
 
 o_error: '''
 def _error(self):
-    lineno, colno = self._offsets(self._errpos)
+    lineno, colno = self._o_offsets(self._errpos)
     if self._errpos == len(self._text):
         thing = 'end of input'
     else:
@@ -608,7 +684,7 @@ def _operator(self, rule_name):
                 self._seeds[key] = current
                 repeat = True
                 break
-            self._rewind(pos)
+            self._o_rewind(pos)
         if not repeat:
             i += 1
 
@@ -623,20 +699,20 @@ o_range: '''
 def _range(self, i, j):
     p = self._pos
     if p != self._end and ord(i) <= ord(self._text[p]) <= ord(j):
-        self._succeed(self._text[p], self._pos + 1)
+        self._o_succeed(self._text[p], self._pos + 1)
     else:
-        self._fail()
+        self._o_fail()
 '''
 
 o_rewind: '''
 def _rewind(self, newpos):
-    self._succeed(None, newpos)
+    self._o_succeed(None, newpos)
 '''
 
 o_str: '''
 def _str(self, s):
     for ch in s:
-        self._ch(ch)
+        self._o_ch(ch)
         if self._failed:
             return
     self._val = s
@@ -654,25 +730,25 @@ o_unicat: '''
 def _unicat(self, cat):
     p = self._pos
     if p < self._end and unicodedata.category(self._text[p]) == cat:
-        self._succeed(self._text[p], self._pos + 1)
+        self._o_succeed(self._text[p], self._pos + 1)
     else:
-        self._fail()
+        self._o_fail()
 '''
 
 r_any: '''
 def _r_any(self):
     if self._pos < self._end:
-        self._succeed(self._text[self._pos], self._pos + 1)
+        self._o_succeed(self._text[self._pos], self._pos + 1)
     else:
-        self._fail()
+        self._o_fail()
 '''
 
 r_end: '''
 def _r_end(self):
     if self._pos == self._end:
-        self._succeed(None)
+        self._o_succeed(None)
     else:
-        self._fail()
+        self._o_fail()
 '''
 
 #
@@ -716,7 +792,7 @@ def _fn_dedent(self, s):
     return s
 '''
 
-fn_dict: ''' 
+fn_dict: '''
 def _fn_dict(self, pairs):
     return dict(pairs)
 '''
