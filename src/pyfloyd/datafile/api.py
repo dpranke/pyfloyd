@@ -32,6 +32,8 @@ from typing import (
 from . import parser
 
 
+quote_tokens = ("```", '"""', "'''", '`', '"', "'")
+
 _bare_word_re = re.compile(r'^[^\\\s\[\]\(\)\{\}:\'"`]+$')
 
 _long_str_re = re.compile(r"^l'=+'")
@@ -363,13 +365,7 @@ class Decoder:
             raise ValueError(f'Unsupported object tag {tag}')
         keys = set()
         key_pairs = []
-        for key_ast, val in pairs:
-            ty, key_tag, s = key_ast
-            if ty == 'string':
-                key = self.parse_string(key_tag, s, as_key=True)
-            else:
-                assert ty == 'bareword'
-                key = self._parse_bareword(s, as_key=True)
+        for key, val in pairs:
             if key in keys:
                 raise ValueError(f'Duplicate key "{key}" found in object')
             keys.add(key)
@@ -401,8 +397,15 @@ class Decoder:
             return self.parse_string_list(tag, r)
         if ty == 'object':
             pairs = []
-            for key, obj in v:
-                pairs.append((key, self._walk_ast(obj)))
+            for key_ast, obj in v:
+                ty, key_tag, s = key_ast
+                if ty == 'string':
+                    key = self.parse_string(key_tag, s, as_key=True)
+                else:
+                    assert ty == 'bareword'
+                    key = self._parse_bareword(s, as_key=True)
+                v = self._walk_ast(obj)
+                pairs.append((key, v))
             return self.parse_object_pairs(tag, pairs)
         if ty == 'array':
             return self.parse_array(tag, [self._walk_ast(el) for el in v])
@@ -488,7 +491,11 @@ def dedent(s):
         r = line0 + '\n'
     else:
         r = ''
-    return r + '\n'.join(line[min_indent:] for line in lines[1:]) + '\n'
+    r += '\n'.join(line[min_indent:] for line in lines[1:-1]) + '\n'
+    if not lines[-1].isspace():
+        r += line[-1][min_indent:]
+    return r
+
 
 
 def dump(
@@ -692,7 +699,9 @@ class Encoder:
 
     def _encode_quoted_str(self, s: str) -> str:
         """Returns a quoted string with a minimal number of escaped quotes."""
-        quote_map = {"'": 0, '"': 0, '`': 0, "'''": 0, '"""': 0, '```': 0}
+        quote_map = {}
+        for token in quote_tokens:
+            quote_map[token] = 0
         lstrs: dict[int, bool] = {}
 
         i = 0
@@ -712,7 +721,11 @@ class Encoder:
                 else:
                     i += 1
 
-        quote = sorted(quote_map.keys(), key=lambda k: quote_map[k])[0]
+        m = min(quote_map.values())
+        for tok in reversed(quote_tokens):
+            if quote_map[tok] == m:
+                quote = tok
+                break
         if quote_map[quote]:
             i = 1
             while True:
@@ -742,6 +755,8 @@ class Encoder:
             else:
                 ret.append(self._escape_ch(ch))
             i += 1
+        ret = ['\n' if r == '\\n' else r for r in ret]
+
         return quote + ''.join(ret) + quote
 
     def _escape_ch(self, ch: str) -> str:
@@ -795,7 +810,7 @@ class Encoder:
             max_len = 80
         if isinstance(obj, collections.abc.Mapping):
             s = self._encode_dict(obj, seen, level + 1, oneline=True)
-            if len(s) > max_len or '\n' in s:
+            if len(s) > max_len and (not '\n' in s):
                 s = self._encode_dict(obj, seen, level + 1, oneline=False)
         elif isinstance(obj, collections.abc.Sequence):
             s = self._encode_array(obj, seen, level + 1, oneline=True)
@@ -818,7 +833,10 @@ class Encoder:
             return '{}'
 
         indent_str, end_str = self._spacers(level, False)
-        item_sep = self.item_separator + indent_str
+        if '\n' in indent_str:
+            item_sep = self.item_separator.strip() + indent_str
+        else:
+            item_sep = self.item_separator + indent_str
         kv_sep = self.kv_separator
 
         if self.sort_keys:
@@ -843,6 +861,22 @@ class Encoder:
                 s += item_sep
 
             val_str = self.encode(obj[key], seen, level, as_key=False)
+            if (
+                isinstance(obj[key], str)
+                and '\n' in obj[key] and
+                self.indent is not None
+            ):
+                if isinstance(self.indent, int):
+                    d_indent_str = indent_str + ' ' * self.indent
+                else:
+                    d_indent_str = indent_str + self.indent
+                lines = val_str.splitlines()
+                leading_quote = _get_leading_quote(lines[0])
+                val_str = 'd' + leading_quote
+                val_str += d_indent_str + lines[0][len(leading_quote):]
+                for line in lines[1:-1]:
+                    val_str += d_indent_str + line
+                val_str += d_indent_str + lines[-1]
             s += key_str + kv_sep + val_str
 
         s += end_str + '}'
@@ -886,6 +920,13 @@ class Encoder:
             end_str = ''
         return indent_str, end_str
 
+
+def _get_leading_quote(s):
+    for q in quote_tokens:
+        if s.startswith(q):
+            return q
+    m = _long_str_re.match(s)
+    return m.group(0)
 
 def _raise_type_error(obj) -> Any:
     raise TypeError(f'{repr(obj)} is not serializable as a Floyd datafile')
