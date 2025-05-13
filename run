@@ -25,7 +25,7 @@ class Runner:
         self.grammars = {
             'grammars/floyd.g': f'{self.top}/parser.py',
             'grammars/datafile.g': f'{self.top}/datafile/parser.py',
-            'grammars/at_expr.g': f'{self.top}/at_expr.py',
+            'grammars/at_exp.g': f'{self.top}/at_exp.py',
             'grammars/lisp.g': f'{self.top}/lisp_parser.py',
         }
         self.run_cmd = None

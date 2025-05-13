@@ -15,7 +15,7 @@
 from typing import Any, Set
 
 from pyfloyd import ast
-from pyfloyd import at_expr
+from pyfloyd import at_exp
 from pyfloyd import datafile
 from pyfloyd.analyzer import Grammar
 from pyfloyd.formatter import (
@@ -28,7 +28,7 @@ from pyfloyd.formatter import (
     VList,
 )
 from pyfloyd.generator import Generator, GeneratorOptions
-from pyfloyd import lisp_interpreter as lisp
+from pyfloyd import lisp_interpreter
 
 
 class DatafileGenerator(Generator):
@@ -39,17 +39,16 @@ class DatafileGenerator(Generator):
         self._derive_memoize()
         self._derive_local_vars()
 
-        self._interpreter = interp = lisp.Interpreter()
+        self._interpreter = interp = lisp_interpreter.Interpreter()
         interp.env.set('grammar', grammar)
         interp.env.set('generator_options', options)
-        interp.define_native_fn('at_expr', self.f_at_expr, is_fexpr=False)
-        interp.define_native_fn('comma', self.f_comma, is_fexpr=False)
-        interp.define_native_fn('hlist', self.f_hlist, is_fexpr=False)
-        interp.define_native_fn('indent', self.f_indent, is_fexpr=False)
-        interp.define_native_fn('invoke', self.f_invoke, is_fexpr=False)
-        interp.define_native_fn('saw', self.f_saw, is_fexpr=False)
-        interp.define_native_fn('vlist', self.f_vlist, is_fexpr=False)
-        interp.define_native_fn('at', self.fexpr_at, is_fexpr=True)
+        interp.define_native_fn('at_exp', self.f_at_exp)
+        interp.define_native_fn('comma', self.f_comma)
+        interp.define_native_fn('hlist', self.f_hlist)
+        interp.define_native_fn('indent', self.f_indent)
+        interp.define_native_fn('invoke', self.f_invoke)
+        interp.define_native_fn('saw', self.f_saw)
+        interp.define_native_fn('vlist', self.f_vlist)
         interp.is_foreign = self.is_foreign
         interp.eval_foreign = self.eval_foreign
 
@@ -96,16 +95,37 @@ class DatafileGenerator(Generator):
     def _process_template_file(self, fname):
         df_str = self._host.read_text_file(fname)
         templates = datafile.loads(df_str, parse_bareword=self._parse_bareword)
+        interp = self._interpreter
         for t, v in templates.items():
             if isinstance(v, str):
                 # TODO: Fix dedenting properly.
                 if v.startswith('\n'):
                     v = v[1:]
-                expr = [['symbol', 'fn'], [], [['symbol', 'at_expr'], v]]
-                self._interpreter.define(t, expr)
+                if v.startswith('@['):
+                    stop = v.index('{')
+                    exprs, err, _ = at_exp.parse(v[0:stop])
+                    lisp_interpreter.check(
+                        err is None, f'Failed to parse at-exp `{v}`'
+                    )
+                    lisp_interpreter.check(len(exprs) == 1)
+                    expr = exprs[0]
+                    lisp_interpreter.check(
+                        exprs[0][0] == ['symbol', 'list'],
+                        f'Unexpected at-exp parse result `{exprs}`',
+                    )
+                    names = [expr[1] for expr in exprs[0][1:]]
+                    body_text = v[stop + 1 : -1]
+                else:
+                    names = []
+                    body_text = v
+                body = [['symbol', 'at_exp'], body_text]
+                fn = lisp_interpreter.UserFn(interp, names, body)
+                self._interpreter.env.set(t, fn)
             else:
-                lisp.check(lisp.is_list(v), f"{v} isn't a list")
-                if v[0] == ['symbol', 'fn'] or v[0] == ['symbol', 'at']:
+                lisp_interpreter.check(
+                    lisp_interpreter.is_list(v), f"{v} isn't a list"
+                )
+                if v[0] == ['symbol', 'fn']:
                     self._interpreter.define(t, v)
                 else:
                     expr = [['symbol', 'fn'], [], v]
@@ -113,12 +133,12 @@ class DatafileGenerator(Generator):
 
     # TODO: this should really be a check for whether you can handle
     # this data type, not whether it is foreign.
-    def is_foreign(self, expr: Any, env: lisp.Env) -> bool:
+    def is_foreign(self, expr: Any, env: lisp_interpreter.Env) -> bool:
         if isinstance(expr, ast.Node):
             return True
-        return lisp.is_foreign(expr, env)
+        return lisp_interpreter.is_foreign(expr, env)
 
-    def eval_foreign(self, expr: Any, env: lisp.Env) -> Any:
+    def eval_foreign(self, expr: Any, env: lisp_interpreter.Env) -> Any:
         assert self.is_foreign(expr, env)
         return expr
 
@@ -128,40 +148,41 @@ class DatafileGenerator(Generator):
         res = ['' if line.isspace() else line for line in lines]
         return '\n'.join(res) + '\n'
 
-    # TODO: Refactor this.
-    def f_at_expr(self, args, env) -> Any:
-        del env
+    def f_at_exp(self, args, env) -> Any:
         if len(args) > 1:
-            env = lisp.Env(parent=self._interpreter.env)
+            new_env = lisp_interpreter.Env(parent=self._interpreter.env)
             names = args[0]
             for i, name in enumerate(names):
-                env.set(name, args[i + 1])
+                new_env.set(name, args[i + 1])
         else:
-            env = None
+            new_env = env
         text = args[-1]
-        lisp.check(lisp.is_str(text))
-        exprs, err, pos = at_expr.parse(text, '-')
-        lisp.check(err is None, f'Unexpected at-exp parse error: {err}')
-        if pos != len(text):
-            lisp.check(
-                pos == len(text), 'at-expr parse did not consume everything'
-            )
+        lisp_interpreter.check(lisp_interpreter.is_str(text))
+        exprs, err, _ = at_exp.parse(text, '-')
+        lisp_interpreter.check(
+            err is None, f'Unexpected at-exp parse error: {err}'
+        )
         assert isinstance(exprs, list)
 
         s = ''
         for i, expr in enumerate(exprs):
-            obj = self._interpreter.eval(expr, env)
+            obj = self._interpreter.eval(expr, new_env)
 
             # If `@foo` resolves to a lambda with no parameters,
             # evaluate that.
-            if lisp.is_fn(obj) and len(obj.params) == 0:
+            if lisp_interpreter.is_fn(obj) and len(obj.params) == 0:
                 obj = obj.call([], env)
 
             if isinstance(obj, FormatObj):
                 obj = '\n'.join(flatten(obj, 80))
 
-            lisp.check(
-                lisp.is_str(obj), f'Unexpected at-exp result `{repr(obj)}`'
+            if isinstance(obj, list):
+                # TODO: Is this the best thing to do here?
+                obj = ''.join(obj)
+
+            lisp_interpreter.check(
+                lisp_interpreter.is_str(obj),
+                f'Unexpected at-exp result `{repr(obj)}`',
             )
 
             nl_is_next = newline_is_next(exprs, i)
@@ -213,20 +234,6 @@ class DatafileGenerator(Generator):
         del env
         return VList(args)
 
-    def fexpr_at(self, args: list[Any], env: lisp.Env) -> Any:
-        params, text = args
-        names = [p[1] for p in params]
-        return lisp.UserFn(
-            self._interpreter,
-            names,
-            [['symbol', 'at_expr']]
-            + [[['symbol', 'list']] + names]
-            + params
-            + [text],
-            env,
-            is_fexpr=False,
-        )
-
 
 def ends_blank(s):
     """Returns whether the string ends in a newline followed by a number
@@ -241,7 +248,9 @@ def ends_blank(s):
 
 def newline_is_next(exprs, i):
     if i < len(exprs) - 1:
-        return lisp.is_str(exprs[i + 1]) and exprs[i + 1].startswith('\n')
+        return lisp_interpreter.is_str(exprs[i + 1]) and exprs[
+            i + 1
+        ].startswith('\n')
     return False
 
 

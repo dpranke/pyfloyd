@@ -254,12 +254,12 @@ def parse(self, externs: Externs = None):
     return Result(self._val, None, self._pos)
 '''
 
-rule_method: [at [rule node] '''
+rule_method: [fn [rule node] [at_exp '''
 def _@rule(self):
     @invoke[[strcat 'n_' node.t]]
-''']
+''']]
 
-rulename: [at [name] 'self._@name']
+rulename: [fn [name] [at_exp 'self._@name']]
 
 end: ''
 
