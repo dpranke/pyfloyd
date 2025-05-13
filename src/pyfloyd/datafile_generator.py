@@ -15,7 +15,7 @@
 from typing import Any, Set
 
 from pyfloyd import ast
-from pyfloyd import at_exp
+from pyfloyd import at_exp_parser
 from pyfloyd import datafile
 from pyfloyd.analyzer import Grammar
 from pyfloyd.formatter import (
@@ -103,7 +103,7 @@ class DatafileGenerator(Generator):
                     v = v[1:]
                 if v.startswith('@['):
                     stop = v.index('{')
-                    exprs, err, _ = at_exp.parse(v[0:stop])
+                    exprs, err, _ = at_exp_parser.parse(v[0:stop])
                     lisp_interpreter.check(
                         err is None, f'Failed to parse at-exp `{v}`'
                     )
@@ -158,7 +158,7 @@ class DatafileGenerator(Generator):
             new_env = env
         text = args[-1]
         lisp_interpreter.check(lisp_interpreter.is_str(text))
-        exprs, err, _ = at_exp.parse(text, '-')
+        exprs, err, _ = at_exp_parser.parse(text, '-')
         lisp_interpreter.check(
             err is None, f'Unexpected at-exp parse error: {err}'
         )

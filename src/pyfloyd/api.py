@@ -17,7 +17,7 @@
 from typing import Any, Dict, NamedTuple, Optional, Protocol, Tuple
 
 from pyfloyd import analyzer, ast
-from pyfloyd import parser
+from pyfloyd import grammar_parser
 from pyfloyd import generator
 from pyfloyd import support
 from pyfloyd.interpreter import Interpreter
@@ -26,7 +26,7 @@ from pyfloyd.datafile_generator import DatafileGenerator
 from pyfloyd.python_generator import PythonGenerator
 from pyfloyd.javascript_generator import JavaScriptGenerator
 
-Result = parser.Result
+Result = grammar_parser.Result
 
 Externs = Optional[Dict[str, Any]]
 
@@ -93,7 +93,7 @@ def compile(  # pylint: disable=redefined-builtin
     This routine parses the provided grammar and returns an object
     that can parse strings according to the grammar.
     """
-    result = parser.parse(grammar, path, externs)
+    result = grammar_parser.parse(grammar, path, externs)
     if result.err:
         return CompiledResult(err=result.err, pos=result.pos)
     try:
@@ -140,7 +140,7 @@ def generate(
     the result will describe the errors.
     """
 
-    result = parser.parse(grammar, path, externs)
+    result = grammar_parser.parse(grammar, path, externs)
     if result.err:
         return result
     try:
@@ -215,7 +215,7 @@ def pretty_print(
     any errors, if it wasn't. If one of the values in the tuple is non-None,
     the other will be None.
     """
-    result = parser.parse(grammar, path)
+    result = grammar_parser.parse(grammar, path)
     if result.err:
         return None, result.err
     return Printer(result.val).dumps(), None
@@ -230,7 +230,7 @@ def dump_ast(
 
     `rewrite_subrules` works as in the other methods.
     """
-    result = parser.parse(grammar, path)
+    result = grammar_parser.parse(grammar, path)
     if result.err:
         return None, result.err
 

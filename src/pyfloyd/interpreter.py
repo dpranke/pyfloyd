@@ -16,7 +16,7 @@ import re
 import unicodedata
 
 from pyfloyd.ast import Apply, EMinus, EPlus, Not, Regexp
-from pyfloyd import parser
+from pyfloyd import grammar_parser
 
 
 class _OperatorState:
@@ -52,7 +52,7 @@ class Interpreter:
 
     def parse(
         self, text: str, path: str = '<string>', externs=None
-    ) -> parser.Result:
+    ) -> grammar_parser.Result:
         self._text = text
         self._path = path
         self._failed = False
@@ -71,12 +71,12 @@ class Interpreter:
                 else:
                     errors += f'Missing extern "{k}"\n'
         if errors:
-            return parser.Result(None, errors.strip(), 0)
+            return grammar_parser.Result(None, errors.strip(), 0)
 
         self._interpret(self._grammar.rules[self._grammar.starting_rule])
         if self._failed:
             return self._format_error()
-        return parser.Result(self._val, None, self._pos)
+        return grammar_parser.Result(self._val, None, self._pos)
 
     def _interpret(self, node):
         fn = getattr(self, f'_ty_{node.t}', None)
@@ -133,7 +133,7 @@ class Interpreter:
             self._errstr = 'Unexpected %s at column %d' % (thing, colno)
 
         msg = '%s:%d %s' % (self._path, lineno, self._errstr)
-        return parser.Result(None, msg, self._errpos)
+        return grammar_parser.Result(None, msg, self._errpos)
 
     def _r_any(self):
         if self._pos != self._end:
