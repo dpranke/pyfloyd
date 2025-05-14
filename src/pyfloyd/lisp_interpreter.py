@@ -242,22 +242,22 @@ class Interpreter:
         self.is_foreign = is_foreign
         self.eval_foreign = self._default_eval_foreign
 
+        self.define_native_fn('equal', self.f_equal, types=['any', 'any'])
         self.define_native_fn('if', self.fexpr_if, is_fexpr=True)
-        self.define_native_fn('is_empty', self.f_is_empty, types=['list'])
-
+        self.define_native_fn('in', self.f_in, types=['str', 'dict'])
+        self.define_native_fn('is_empty', self.f_is_empty)
         self.define_native_fn('fn', self.fexpr_fn, is_fexpr=True)
-        self.define_native_fn(
-            'getattr', self.fexpr_getitem, types=['any', 'str']
-        )
-        self.define_native_fn(
-            'getitem', self.fexpr_getitem, types=['list', 'num']
-        )
+        self.define_native_fn('getattr', self.f_getattr, types=['any', 'str'])
+        self.define_native_fn('getitem', self.f_getitem, types=['list', 'num'])
         self.define_native_fn('join', self.f_join, types=['str', 'list'])
         self.define_native_fn('keys', self.f_keys)
         self.define_native_fn('list', self.f_list)
         self.define_native_fn('map', self.f_map)
         self.define_native_fn('map_items', self.f_map_items)
         self.define_native_fn('quote', self.fexpr_quote, is_fexpr=True)
+        self.define_native_fn(
+            'replace', self.f_replace, types=['str', 'str', 'str']
+        )
         self.define_native_fn(
             'slice', self.f_slice, types=['list', 'num', 'num']
         )
@@ -303,8 +303,9 @@ class Interpreter:
             args.append(self.eval(r, env))
         return fn.call(args, env)
 
-    def f_first(self, args, env):
-        return args[0][0]
+    def f_equal(self, args, env):
+        del env
+        return args[0][0] == args[0][1]
 
     def f_getattr(self, args, env):
         del env
@@ -314,7 +315,14 @@ class Interpreter:
         del env
         return args[0][args[1]]
 
+    def f_in(self, args, env):
+        del env
+        key, d = args
+        return key in d
+
     def f_is_empty(self, args, env):
+        del env
+        check(is_list(args[0]) or is_dict(args[0]))
         return len(args[0]) == 0
 
     def f_join(self, args, env):
@@ -333,13 +341,18 @@ class Interpreter:
             check(is_str(sep), f"Third arg to map isn't a string: `{sep}`")
         else:
             fn, exprs = args
-            sep = '\n'
+            sep = None
         check(is_fn(fn), f"First arg to map isn't a function: `{fn}`")
         check(is_list(exprs), f"Second arg to map isn't a list: `{exprs}`")
         results = []
         for expr in exprs:
             results.append(fn.call([expr], env))
         if sep is not None:
+            for i, result in enumerate(results):
+                check(
+                    is_str(result),
+                    f'Arg #{i} to map is not a string: {repr(result)}',
+                )
             return sep.join(results)
         return results
 
@@ -351,13 +364,18 @@ class Interpreter:
             )
         else:
             fn, d = args
-            sep = '\n'
+            sep = None
         check(is_fn(fn), f"First arg to map_items isn't a function: `{fn}`")
         check(is_dict(d), f"Second arg to map_items isn't a dict: `{fn}`")
         results = []
         for k, v in d.items():
             results.append(fn.call([k, v], env))
         if sep is not None:
+            for i, result in enumerate(results):
+                check(
+                    is_str(result),
+                    f'Arg #{i} to map_items is not a string: {repr(result)}',
+                )
             return sep.join(results)
         return results
 
@@ -365,12 +383,18 @@ class Interpreter:
         del env
         return list(args)
 
+    def f_replace(self, args, env):
+        del env
+        s, old, new = args
+        return s.replace(old, new)
+
     def f_slice(self, args, env):
         del env
         lis, start, stop = args
         return lis[start:stop]
 
     def f_sort(self, args, env):
+        del env
         return sorted(args[0])
 
     def f_strcat(self, args, env):

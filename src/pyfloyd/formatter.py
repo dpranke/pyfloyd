@@ -179,9 +179,9 @@ class Saw(MultipleObj):
     parts may be on one or more lines.
     """
 
-    def __init__(self, start: str, mid: El, end: El):
+    def __init__(self, start: El, mid: El, end: El):
         super().__init__()
-        self.start: str = start
+        self.start: El = start
         self.mid: El = mid
         self.end: El = end
 
@@ -190,14 +190,14 @@ class Saw(MultipleObj):
 
     def fmt_one(self, length: int, indent: str) -> list[str]:
         s = (
-            self.start
+            _fmt_one(self.start, length, indent)
             + _fmt_one(self.mid, length, indent)
             + _fmt_one(self.end, length, indent)
         )
         return [s]
 
     def fmt_multiple(self, length: int, indent: str) -> list[str]:
-        lines = [self.start]
+        lines = _fmt(self.start, length, indent)
         new_length = length - len(indent)
         for line in _fmt(self.mid, length, indent):
             lines.append(indent + line)

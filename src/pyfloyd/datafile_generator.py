@@ -24,6 +24,7 @@ from pyfloyd.formatter import (
     FormatObj,
     HList,
     Indent,
+    Lit,
     Saw,
     VList,
 )
@@ -49,8 +50,10 @@ class DatafileGenerator(Generator):
         interp.define_native_fn('ind', self.f_ind)
         interp.define_native_fn('ind_l', self.f_ind_l, types=['list'])
         interp.define_native_fn('invoke', self.f_invoke)
+        interp.define_native_fn('lit', self.f_lit)
         interp.define_native_fn('saw', self.f_saw)
         interp.define_native_fn('vl', self.f_vl)
+        interp.define_native_fn('vl_l', self.f_vl_l)
         interp.is_foreign = self.is_foreign
         interp.eval_foreign = self.eval_foreign
 
@@ -120,9 +123,12 @@ class DatafileGenerator(Generator):
                 else:
                     names = []
                     body_text = v
-                body = [['symbol', 'at_exp'], body_text]
-                fn = lisp_interpreter.UserFn(interp, names, body)
-                self._interpreter.env.set(t, fn)
+                if '@' not in body_text:
+                    self._interpreter.env.set(t, v)
+                else:
+                    body = [['symbol', 'at_exp'], body_text]
+                    fn = lisp_interpreter.UserFn(interp, names, body)
+                    self._interpreter.env.set(t, fn)
             else:
                 lisp_interpreter.check(
                     lisp_interpreter.is_list(v), f"{v} isn't a list"
@@ -213,7 +219,7 @@ class DatafileGenerator(Generator):
 
     def f_comma(self, args, env) -> Any:
         del env
-        return Comma(args)
+        return Comma(args[0])
 
     def f_hl(self, args, env) -> Any:
         """Returns an HList of the args passed to the function."""
@@ -237,8 +243,15 @@ class DatafileGenerator(Generator):
 
     def f_invoke(self, args, env) -> Any:
         """Invoke the template named in arg 1, passing it the remaining args."""
-        exprs = [['symbol', args[0]]] + args[1:]
-        return self._interpreter.eval(exprs, env)
+        first = self._interpreter.eval(args[0], env)
+        obj = env.get(first)
+        if lisp_interpreter.is_str(obj):
+            return obj
+        return self._interpreter.eval([['symbol', first]] + args[1:], env)
+
+    def f_lit(self, args, env) -> Any:
+        del env
+        return Lit(args[0])
 
     def f_saw(self, args, env) -> Any:
         del env
@@ -248,6 +261,10 @@ class DatafileGenerator(Generator):
     def f_vl(self, args, env) -> Any:
         del env
         return VList(args)
+
+    def f_vl_l(self, args, env) -> Any:
+        del env
+        return VList(args[0])
 
 
 def ends_blank(s):

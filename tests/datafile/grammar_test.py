@@ -21,6 +21,12 @@ class Grammar(unittest.TestCase):
     def check(self, s, obj, **kwargs):
         self.assertEqual(loads(s, **kwargs), obj)
 
+    def check_fail(self, s, ex, msg=None, **kwargs):
+        with self.assertRaises(ex) as cm:
+            return loads(s, **kwargs)
+        if msg is not None:
+            self.assertEqual(str(cm.exception), msg)
+
     def test_true(self):
         self.check('true', True)
 
@@ -72,10 +78,27 @@ class Grammar(unittest.TestCase):
 
     def test_d_str(self):
         self.check("d'foo'", 'foo')
-        self.check("d'foo\n  bar'", 'foo\nbar\n')
-        self.check("d'foo\n  bar\n    baz'", 'foo\nbar\n  baz\n')
-        self.check("d'\n  bar\n    baz'", 'bar\n  baz\n')
-        self.check("d'\n  \n    baz'", '\n  baz\n')
+
+        self.check("d'\n  bar\n    baz'", 'bar\n  baz')
+        self.check("d'\n  bar\n    baz\n  '", 'bar\n  baz\n')
+        self.check("d'\n  \n    baz\n'", '\n  baz\n')
+        self.check("d'\n  bar\n\n    baz\n'", 'bar\n\n  baz\n')
+
+        # TODO: See comments in the code for whether we should support this.
+        self.check("d'  foo  '", 'foo')
+
+        # TODO: See comments in the code about how to support this; for now
+        # these raise errors but we should fix this ASAP.
+        self.check_fail(
+            "d'foo\n  bar'",
+            ValueError,
+            msg=(
+                "Multiline strings can't have any text on the same line "
+                'as the opening quote'
+            ),
+        )
+        self.check_fail("d'  foo  \n  bar'", ValueError)
+        self.check_fail("d'foo\n  bar \n    baz'", ValueError)
 
     def test_str(self):
         self.check('"foo"', 'foo')

@@ -318,7 +318,7 @@ class HardCodedGenerator(Generator):
 
             saw = self._gen_expr(second)
             assert isinstance(saw, Saw), f'{second} did not return a Saw'
-            saw.start = start.s + saw.start
+            saw.start = HList([start.s, saw.start])
             i = 2
         else:
             # TODO: We need to do typechecking, and figure out a better
@@ -331,7 +331,7 @@ class HardCodedGenerator(Generator):
             new_saw = self._gen_expr(n)
             assert isinstance(new_saw, Saw), f'{n} did not return a Saw'
             assert isinstance(next_saw.end, str)
-            new_saw.start = next_saw.end + new_saw.start
+            new_saw.start = HList([next_saw.end, new_saw.start])
             next_saw.end = new_saw
             next_saw = new_saw
         return saw

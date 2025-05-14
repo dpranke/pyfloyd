@@ -32,7 +32,7 @@ from typing import (
 from . import parser
 
 
-quote_tokens = ("```", '"""', "'''", '`', '"', "'")
+quote_tokens = ('```', '"""', "'''", '`', '"', "'")
 
 _bare_word_re = re.compile(r'^[^\\\s\[\]\(\)\{\}:\'"`]+$')
 
@@ -474,7 +474,6 @@ def isoct(ch):
 
 def dedent(s):
     # TODO: Figure out what to do with tabs and other non-space whitespace.
-
     def _indent(s):
         i = 0
         while i < len(s) and s[i] == ' ':
@@ -483,19 +482,51 @@ def dedent(s):
 
     lines = s.splitlines()
     if len(lines) < 2:
-        return s
+        return s.strip()
 
-    line0 = lines[0]
-    min_indent = min(_indent(line) for line in lines[1:])
-    if line0.strip():
-        r = line0 + '\n'
-    else:
-        r = ''
-    r += '\n'.join(line[min_indent:] for line in lines[1:-1]) + '\n'
+    min_indent = min(_indent(line) for line in lines[1:] if line)
+
+    # TODO: It's not clear what the best thing to do with multiline strings
+    # with text on the first line is. Examples:
+    #
+    # one = d'foo
+    #   bar'
+    # two = d'  foo
+    #   bar'
+    # three = d'  foo
+    #           bar'
+    # four  = d'  foo  '
+    #
+    # The only one of these that seems really useful is three, if it evaluated
+    # to '  foo\nbar'; that would allow you to do indented first lines
+    # without having to use an extra line. The other two just seem kinda
+    # goofy. However, we can't currently implement three correctly because
+    # the AST doesn't contain the column number the string starts at.
+    #
+    # We support evaluating four to 'foo'; that would be reasonably
+    # consistent with other things, although it's not clear why you
+    # would want to dedent a single-line string at all.
+    #
+    # For now, just raise an error if there is ever non-blank text
+    # on the first line of a multiline string. We should try to fix this
+    # to support three before widely publicizing the format.
+    if lines[0] and not lines[0].isspace():
+        raise ValueError(
+            "Multiline strings can't have any text on the same "
+            'line as the opening quote'
+        )
+    r = ''
+    if lines[1:-1]:
+        r += (
+            '\n'.join(line[min_indent:].rstrip() for line in lines[1:-1])
+            + '\n'
+        )
     if not lines[-1].isspace():
-        r += line[-1][min_indent:]
-    return r
+        r += lines[-1][min_indent:]
+        if s.endswith('\n'):
+            r += '\n'
 
+    return r
 
 
 def dump(
@@ -699,7 +730,7 @@ class Encoder:
 
     def _encode_quoted_str(self, s: str) -> str:
         """Returns a quoted string with a minimal number of escaped quotes."""
-        quote_map = {}
+        quote_map: dict[str, int] = {}
         for token in quote_tokens:
             quote_map[token] = 0
         lstrs: dict[int, bool] = {}
@@ -721,9 +752,9 @@ class Encoder:
                 else:
                     i += 1
 
-        m = min(quote_map.values())
+        min_quote_count = min(quote_map.values())
         for tok in reversed(quote_tokens):
-            if quote_map[tok] == m:
+            if quote_map[tok] == min_quote_count:
                 quote = tok
                 break
         if quote_map[quote]:
@@ -810,7 +841,7 @@ class Encoder:
             max_len = 80
         if isinstance(obj, collections.abc.Mapping):
             s = self._encode_dict(obj, seen, level + 1, oneline=True)
-            if len(s) > max_len and (not '\n' in s):
+            if len(s) > max_len and ('\n' not in s):
                 s = self._encode_dict(obj, seen, level + 1, oneline=False)
         elif isinstance(obj, collections.abc.Sequence):
             s = self._encode_array(obj, seen, level + 1, oneline=True)
@@ -863,8 +894,8 @@ class Encoder:
             val_str = self.encode(obj[key], seen, level, as_key=False)
             if (
                 isinstance(obj[key], str)
-                and '\n' in obj[key] and
-                self.indent is not None
+                and '\n' in obj[key]
+                and self.indent is not None
             ):
                 if isinstance(self.indent, int):
                     d_indent_str = indent_str + ' ' * self.indent
@@ -873,7 +904,7 @@ class Encoder:
                 lines = val_str.splitlines()
                 leading_quote = _get_leading_quote(lines[0])
                 val_str = 'd' + leading_quote
-                val_str += d_indent_str + lines[0][len(leading_quote):]
+                val_str += d_indent_str + lines[0][len(leading_quote) :]
                 for line in lines[1:-1]:
                     val_str += d_indent_str + line
                 val_str += d_indent_str + lines[-1]
@@ -927,6 +958,7 @@ def _get_leading_quote(s):
             return q
     m = _long_str_re.match(s)
     return m.group(0)
+
 
 def _raise_type_error(obj) -> Any:
     raise TypeError(f'{repr(obj)} is not serializable as a Floyd datafile')
