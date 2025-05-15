@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import collections
 import math
 import re
@@ -30,6 +31,27 @@ from typing import (
 )
 
 from . import parser
+
+
+class ArgparseStoreAction(argparse.Action):
+    def __call__(self, *args, **kwargs):
+        _, namespace, text, flag = args
+        d = loads(text)
+        if not isinstance(d, dict):
+            raise ValueError(f'Bad option string for {flag}: {repr(text)}')
+        setattr(namespace, self.dest, d)
+
+
+class ArgparseAppendAction(argparse.Action):
+    def __call__(self, *args, **kwargs):
+        _, namespace, text, flag = args
+        opts = getattr(namespace, self.dest, {})
+        opts = opts or {}
+        d = loads(text)
+        if not isinstance(d, dict):
+            raise ValueError(f'Bad option string for {flag}: {repr(text)}')
+        opts.update(d)
+        setattr(namespace, self.dest, opts)
 
 
 quote_tokens = ('```', '"""', "'''", '`', '"', "'")

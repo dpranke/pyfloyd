@@ -45,8 +45,10 @@ from pyfloyd.support import Host
 def main(argv=None, host=None):
     host = host or Host()
 
+    args = None
     try:
         args, err = _parse_args(host, argv)
+
         if err is not None:
             return err
 
@@ -59,11 +61,6 @@ def main(argv=None, host=None):
         for d in args.define:
             vs = datafile.loads(d)
             externs.update(vs)
-
-        generator_defines = {}
-        for d in args.generator_option:
-            vs = datafile.loads(d)
-            generator_defines.update(vs)
 
         if args.ast or args.full_ast:
             ast, err = pyfloyd.dump_ast(
@@ -83,12 +80,9 @@ def main(argv=None, host=None):
         elif args.pretty_print:
             contents, err = pyfloyd.pretty_print(grammar, args.grammar)
         elif args.compile:
-            if not args.language:
-                args.language = pyfloyd.DEFAULT_LANGUAGE
-            options = pyfloyd.GeneratorOptions(
-                language=args.language, main=args.main, memoize=args.memoize
+            options = pyfloyd.generator_options_from_args(
+                args, argv, language=None
             )
-            options.defines = generator_defines
             contents, err, _ = pyfloyd.generate(
                 grammar, path=args.grammar, options=options
             )
@@ -108,7 +102,7 @@ def main(argv=None, host=None):
         return 130  # SIGINT
     except Exception as e:
         print(e)
-        if args.post_mortem:
+        if args and args.post_mortem:
             pdb.post_mortem()
         else:
             raise
@@ -117,7 +111,7 @@ def main(argv=None, host=None):
 
 def _parse_args(host, argv):
     ap = argparse.ArgumentParser(prog='pyfloyd')
-    generator.add_language_arguments(ap)
+    generator.add_arguments(ap)
     ap.add_argument(
         '--ast', action='store_true', help='dump the parsed AST of the grammar'
     )
@@ -141,15 +135,7 @@ def _parse_args(host, argv):
         action='append',
         metavar='datafile-string',
         default=[],
-        help='Define external vars for the grammar',
-    )
-    ap.add_argument(
-        '-G',
-        '--generator-option',
-        action='append',
-        metavar='datafile-string',
-        default=[],
-        help='Set options for the generator',
+        help='options for the grammar (specified as %%externs in the grammar)',
     )
     ap.add_argument(
         '-o', '--output', metavar='path', help='path to write output to'
@@ -177,22 +163,6 @@ def _parse_args(host, argv):
         help='print current version (%s)' % pyfloyd.__version__,
     )
     ap.add_argument(
-        '-M',
-        '--memoize',
-        action='store_true',
-        default=False,
-        help='memoize intermediate results (off by default)',
-    )
-    ap.add_argument('--no-memoize', dest='memoize', action='store_false')
-    ap.add_argument(
-        '-m',
-        '--main',
-        action='store_true',
-        default=False,
-        help='generate a main() wrapper (off by default)',
-    )
-    ap.add_argument('--no-main', dest='main', action='store_false')
-    ap.add_argument(
         'grammar',
         nargs='?',
         help='grammar file to interpret or compiled. '
@@ -213,18 +183,21 @@ def _parse_args(host, argv):
         host.print('You must specify a grammar.')
         return None, 2
 
+    if not args.language:
+        if args.output:
+            ext = os.path.splitext(args.output)[1]
+            args.language = generator.EXT_TO_LANG[ext].name
+        else:
+            args.language = generator.DEFAULT_LANGUAGE
+            ext = generator.LANGUAGE_MAP[args.language].ext
+    else:
+        ext = generator.LANGUAGE_MAP[args.language].ext
+
     if not args.output:
         if args.compile:
-            if not args.language:
-                args.language = generator.DEFAULT_LANGUAGE
-            ext = generator.LANG_TO_EXT[args.language]
-            args.output = host.splitext(args.grammar)[0] + ext
+            args.output = host.splitext(args.grammar)[0] + '.' + ext
         else:
             args.output = '-'
-    elif not args.language:
-        if not args.language:
-            ext = os.path.splitext(args.output)[1]
-            args.language = generator.EXT_TO_LANG[ext]
 
     return args, None
 

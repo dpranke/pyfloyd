@@ -34,6 +34,8 @@ from .api import (
     load,
     loads,
     parse,
+    ArgparseAppendAction,
+    ArgparseStoreAction,
     Decoder,
 )
 from .tool import main
@@ -54,5 +56,7 @@ __all__ = [
     'loads',
     'main',
     'parse',
+    'ArgparseAppendAction',
+    'ArgparseStoreAction',
     'Decoder',
 ]

@@ -80,7 +80,6 @@ class GrammarTestsMixin:
         self.assertMultiLineEqual(err, p_err)
 
     def test_action(self):
-        # self.check('grammar = end { true }', text='', out=True)
         self.check('grammar = end -> true', text='', out=True)
 
     def test_any_fails(self):

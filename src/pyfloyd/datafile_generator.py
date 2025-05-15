@@ -28,12 +28,12 @@ from pyfloyd.formatter import (
     Saw,
     VList,
 )
-from pyfloyd.generator import Generator, GeneratorOptions
+from pyfloyd.generator import Generator
 from pyfloyd import lisp_interpreter
 
 
 class DatafileGenerator(Generator):
-    def __init__(self, host, grammar: Grammar, options: GeneratorOptions):
+    def __init__(self, host, grammar: Grammar, options):
         super().__init__(host, grammar, options)
         self._local_vars: dict[str, Any] = {}
 
@@ -42,7 +42,7 @@ class DatafileGenerator(Generator):
 
         self._interpreter = interp = lisp_interpreter.Interpreter()
         interp.env.set('grammar', grammar)
-        interp.env.set('generator_options', options)
+        interp.env.set('options', self.options)
         interp.define_native_fn('at_exp', self.f_at_exp)
         interp.define_native_fn('comma', self.f_comma)
         interp.define_native_fn('hl', self.f_hl)
@@ -67,11 +67,11 @@ class DatafileGenerator(Generator):
     def _derive_memoize(self):
         def _walk(node):
             if node.t == 'apply':
-                if self._options.memoize and node.rule_name.startswith('r_'):
+                if self.options.memoize and node.rule_name.startswith('r_'):
                     name = node.rule_name[2:]
                     node.memoize = (
-                        name not in self._grammar.operators
-                        and name not in self._grammar.leftrec_rules
+                        name not in self.grammar.operators
+                        and name not in self.grammar.leftrec_rules
                     )
                 else:
                     node.memoize = False
@@ -79,7 +79,7 @@ class DatafileGenerator(Generator):
                 for c in node.ch:
                     _walk(c)
 
-        _walk(self._grammar.ast)
+        _walk(self.grammar.ast)
 
     def _derive_local_vars(self):
         def _walk(node) -> Set[str]:
@@ -89,7 +89,7 @@ class DatafileGenerator(Generator):
                 local_vars.update(_walk(c))
             return local_vars
 
-        for _, node in self._grammar.rules.items():
+        for _, node in self.grammar.rules.items():
             node.local_vars = _walk(node)
 
     def _parse_bareword(self, s: str, as_key: bool) -> Any:

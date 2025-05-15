@@ -14,7 +14,7 @@
 
 # pylint: disable=too-many-positional-arguments
 
-from typing import Any, Dict, NamedTuple, Optional, Protocol, Tuple
+from typing import Any, Dict, NamedTuple, Optional, Protocol, Tuple, Union
 
 from pyfloyd import analyzer, ast
 from pyfloyd import grammar_parser
@@ -34,6 +34,9 @@ Generator = generator.Generator
 GeneratorOptions = generator.GeneratorOptions
 DEFAULT_LANGUAGE = generator.DEFAULT_LANGUAGE
 SUPPORTED_LANGUAGES = generator.SUPPORTED_LANGUAGES
+add_generator_arguments = generator.add_arguments
+default_generator_options = generator.default_options
+generator_options_from_args = generator.options_from_args
 
 _generators = {
     'javascript': JavaScriptGenerator,
@@ -107,7 +110,9 @@ def compile(  # pylint: disable=redefined-builtin
 def generate(
     grammar: str,
     path: str = '<string>',
-    options: Optional[GeneratorOptions] = None,
+    options: Optional[
+        Union[generator.GeneratorOptions | dict[str, Any]]
+    ] = None,
     externs: Externs = None,
 ) -> Result:
     """Generate the source code of a parser.
@@ -151,9 +156,16 @@ def generate(
     except analyzer.AnalysisError as e:
         return Result(err=str(e))
 
-    options = options or GeneratorOptions()
+    if not options:
+        options = generator.default_options()
+    if not isinstance(options, GeneratorOptions):
+        assert isinstance(options, dict)
+        options = generator.default_options(**options)
+
+    assert isinstance(options, GeneratorOptions)
+
     gen: Generator
-    cls = _generators.get(options.language.lower())
+    cls = _generators.get(options.language)
     if cls:
         gen = cls(support.Host(), grammar_obj, options)
         text = gen.generate()
