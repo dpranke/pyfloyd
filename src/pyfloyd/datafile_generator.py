@@ -12,28 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Set
+from typing import Any
 
-from pyfloyd import ast
 from pyfloyd import at_exp_parser
 from pyfloyd import datafile
-from pyfloyd.analyzer import Grammar
-from pyfloyd.formatter import (
-    flatten,
-    Comma,
-    FormatObj,
-    HList,
-    Indent,
-    Lit,
-    Saw,
-    VList,
-)
-from pyfloyd.generator import Generator
+from pyfloyd import formatter
+from pyfloyd import generator
+from pyfloyd import grammar as gram
 from pyfloyd import lisp_interpreter
+from pyfloyd import support
 
 
-class DatafileGenerator(Generator):
-    def __init__(self, host, grammar: Grammar, options):
+class DatafileGenerator(generator.Generator):
+    name = 'datafile'
+    help_str = 'Generator code from a datafile template'
+
+    def __init__(
+        self,
+        host: support.Host,
+        grammar: gram.Grammar,
+        options: generator.GeneratorOptions,
+    ):
         super().__init__(host, grammar, options)
         self._local_vars: dict[str, Any] = {}
 
@@ -82,8 +81,8 @@ class DatafileGenerator(Generator):
         _walk(self.grammar.ast)
 
     def _derive_local_vars(self):
-        def _walk(node) -> Set[str]:
-            local_vars: Set[str] = set()
+        def _walk(node) -> set[str]:
+            local_vars: set[str] = set()
             local_vars.update(set(self._local_vars.get(node.t, [])))
             for c in node.ch:
                 local_vars.update(_walk(c))
@@ -142,7 +141,7 @@ class DatafileGenerator(Generator):
     # TODO: this should really be a check for whether you can handle
     # this data type, not whether it is foreign.
     def is_foreign(self, expr: Any, env: lisp_interpreter.Env) -> bool:
-        if isinstance(expr, ast.Node):
+        if isinstance(expr, gram.Node):
             return True
         return lisp_interpreter.is_foreign(expr, env)
 
@@ -181,8 +180,8 @@ class DatafileGenerator(Generator):
             if lisp_interpreter.is_fn(obj) and len(obj.params) == 0:
                 obj = obj.call([], env)
 
-            if isinstance(obj, FormatObj):
-                obj = '\n'.join(flatten(obj, 80))
+            if isinstance(obj, formatter.FormatObj):
+                obj = '\n'.join(formatter.flatten(obj, 80))
 
             if isinstance(obj, list):
                 # TODO: Is this the best thing to do here?
@@ -219,27 +218,27 @@ class DatafileGenerator(Generator):
 
     def f_comma(self, args, env) -> Any:
         del env
-        return Comma(args[0])
+        return formatter.Comma(args[0])
 
     def f_hl(self, args, env) -> Any:
         """Returns an HList of the args passed to the function."""
         del env
-        return HList(args)
+        return formatter.HList(args)
 
     def f_hl_l(self, args, env) -> Any:
         """Returns an Hlist of the list in the first arg."""
         del env
-        return HList(args[0])
+        return formatter.HList(args[0])
 
     def f_ind(self, args, env) -> Any:
         """Returns an indented VList of the args passed to the function."""
         del env
-        return Indent(VList(args))
+        return formatter.Indent(formatter.VList(args))
 
     def f_ind_l(self, args, env) -> Any:
         """Returns an indented VList of the list in the first arg."""
         del env
-        return Indent(VList(args[0]))
+        return formatter.Indent(formatter.VList(args[0]))
 
     def f_invoke(self, args, env) -> Any:
         """Invoke the template named in arg 1, passing it the remaining args."""
@@ -251,20 +250,20 @@ class DatafileGenerator(Generator):
 
     def f_lit(self, args, env) -> Any:
         del env
-        return Lit(args[0])
+        return formatter.Lit(args[0])
 
     def f_saw(self, args, env) -> Any:
         del env
         start, mid, end = args
-        return Saw(start, mid, end)
+        return formatter.Saw(start, mid, end)
 
     def f_vl(self, args, env) -> Any:
         del env
-        return VList(args)
+        return formatter.VList(args)
 
     def f_vl_l(self, args, env) -> Any:
         del env
-        return VList(args[0])
+        return formatter.VList(args[0])
 
 
 def ends_blank(s):

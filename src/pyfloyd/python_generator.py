@@ -14,29 +14,26 @@
 
 # pylint: disable=too-many-lines
 
-from pyfloyd.analyzer import Grammar, Node
-from pyfloyd.ast import Not, Label
 from pyfloyd import datafile
-from pyfloyd.formatter import (
-    Comma,
-    ElList,
-    FormatObj,
-    HList,
-    Indent,
-    ListObj,
-    Saw,
-    VList,
-)
-
+from pyfloyd import formatter
 from pyfloyd import generator
+from pyfloyd import grammar as gram
 from pyfloyd import hard_coded_generator
+from pyfloyd import support
 
 
-class PythonGenerator(
-    generator.Generator, hard_coded_generator.HardCodedGeneratorMixin
-):
+class PythonGenerator(hard_coded_generator.HardCodedGenerator):
+    name = 'Python'
+    ext = 'py'
+    line_length = 79
+    indent = 4
 
-    def __init__(self, host, grammar: Grammar, options):
+    def __init__(
+        self,
+        host: support.Host,
+        grammar: gram.Grammar,
+        options: generator.GeneratorOptions,
+    ):
         super().__init__(host, grammar, options)
         self._indent = '    '
         self._map = {
@@ -58,7 +55,7 @@ class PythonGenerator(
         self._local_vars = {}
 
     def generate(self) -> str:
-        vl = VList()
+        vl = formatter.VList()
         if self.options.main:
             vl += self._gen_main_header(
                 self.options.version, self.options.command_line
@@ -94,7 +91,7 @@ class PythonGenerator(
             vl += self._gen_default_footer()
         return self._fmt(vl)
 
-    def _gen_main_header(self, version, args) -> FormatObj:
+    def _gen_main_header(self, version, args) -> formatter.FormatObj:
         imports = self._fmt(self._gen_imports())
         return self._defmtf(
             """
@@ -164,7 +161,7 @@ class PythonGenerator(
             version=version,
         )
 
-    def _gen_default_header(self, version, args) -> FormatObj:
+    def _gen_default_header(self, version, args) -> formatter.FormatObj:
         imports = self._fmt(self._gen_imports())
         return self._defmtf(
             """
@@ -183,8 +180,8 @@ class PythonGenerator(
             args=args,
         )
 
-    def _gen_imports(self) -> FormatObj:
-        vl = VList()
+    def _gen_imports(self) -> formatter.FormatObj:
+        vl = formatter.VList()
         if self.options.main:
             vl += 'import argparse'
         if self.options.main:
@@ -199,13 +196,13 @@ class PythonGenerator(
             vl += 'import unicodedata'
         return vl
 
-    def _gen_parsing_runtime_exception_class(self) -> FormatObj:
+    def _gen_parsing_runtime_exception_class(self) -> formatter.FormatObj:
         return self._defmt("""
             class _ParsingRuntimeError(Exception):
                 pass
             """)
 
-    def _gen_operator_state_class(self) -> FormatObj:
+    def _gen_operator_state_class(self) -> formatter.FormatObj:
         return self._defmt("""
             class _OperatorState:
                 def __init__(self):
@@ -217,7 +214,7 @@ class PythonGenerator(
                     self.choices = {}
             """)
 
-    def _gen_result_class(self) -> FormatObj:
+    def _gen_result_class(self) -> formatter.FormatObj:
         return self._defmt("""
             class Result(NamedTuple):
                 \"\"\"The result returned from a `parse()` call.
@@ -234,7 +231,7 @@ class PythonGenerator(
                 pos: Optional[int] = None
             """)
 
-    def _gen_parse_function(self) -> FormatObj:
+    def _gen_parse_function(self) -> formatter.FormatObj:
         return self._defmt("""
             def parse(
                 text: str, path: str = '<string>', externs: Externs = None, start: int = 0
@@ -256,7 +253,7 @@ class PythonGenerator(
                 return _Parser(text, path).parse(externs, start)
             """)
 
-    def _gen_parser_class(self) -> FormatObj:
+    def _gen_parser_class(self) -> formatter.FormatObj:
         vl = self._defmt("""
             class _Parser:
             """)
@@ -264,11 +261,11 @@ class PythonGenerator(
         methods = self._gen_constructor()
         methods += ''
         methods += self._gen_methods()
-        vl += Indent(methods)
+        vl += formatter.Indent(methods)
         return vl
 
-    def _gen_constructor(self) -> VList:
-        obj = VList(['def __init__(self, text, path):'])
+    def _gen_constructor(self) -> formatter.VList:
+        obj = formatter.VList(['def __init__(self, text, path):'])
 
         vl = self._defmt("""
             self._text = text
@@ -300,11 +297,11 @@ class PythonGenerator(
             vl += 'self._scopes = []'
         if self.grammar.operator_needed:
             vl += self._gen_operator_state()
-        obj += Indent(vl)
+        obj += formatter.Indent(vl)
         return obj
 
-    def _gen_operator_state(self) -> FormatObj:
-        vl = VList()
+    def _gen_operator_state(self) -> formatter.FormatObj:
+        vl = formatter.VList()
         vl += 'self._operators = {}'
         for rule, o in self.grammar.operators.items():
             vl += 'o = _OperatorState()'
@@ -314,7 +311,7 @@ class PythonGenerator(
                 text += '    %d: [' % prec
                 text += ', '.join("'%s'" % op for op in o.prec_ops[prec])
                 text += '],\n'
-            vl += Indent(VList(text.splitlines()))
+            vl += formatter.Indent(formatter.VList(text.splitlines()))
             vl += '}'
             vl += 'o.precs = sorted(o.prec_ops, reverse=True)'
             vl += (
@@ -323,16 +320,16 @@ class PythonGenerator(
                 + '])'
             )
             vl += 'o.choices = {'
-            choices = VList()
+            choices = formatter.VList()
             for op in o.choices:
                 choices += "'%s': self._%s," % (op, o.choices[op])
-            vl += Indent(choices)
+            vl += formatter.Indent(choices)
             vl += '}'
             vl += "self._operators['%s'] = o" % rule
         return vl
 
-    def _gen_methods(self) -> FormatObj:
-        vobj = VList()
+    def _gen_methods(self) -> formatter.FormatObj:
+        vobj = formatter.VList()
         vobj += self._gen_parse_method(
             exception_needed=self.grammar.exception_needed,
             starting_rule=self.grammar.starting_rule,
@@ -350,7 +347,9 @@ class PythonGenerator(
 
         return vobj
 
-    def _gen_parse_method(self, exception_needed, starting_rule) -> VList:
+    def _gen_parse_method(
+        self, exception_needed, starting_rule
+    ) -> formatter.VList:
         if exception_needed:
             return self._defmt(
                 f"""
@@ -396,8 +395,8 @@ class PythonGenerator(
             """
         )
 
-    def _gen_rule_methods(self) -> VList:
-        obj = VList()
+    def _gen_rule_methods(self) -> formatter.VList:
+        obj = formatter.VList()
         for rule, node in self.grammar.rules.items():
             obj += ''
             obj += self._gen_method_text(rule, node)
@@ -410,11 +409,13 @@ class PythonGenerator(
                 )
         return obj
 
-    def _gen_method_text(self, method_name: str, node: Node) -> VList:
-        return VList(
+    def _gen_method_text(
+        self, method_name: str, node: gram.Node
+    ) -> formatter.VList:
+        return formatter.VList(
             [
-                HList(['def _', method_name, '(self):']),
-                Indent(self._gen_stmts(node)),
+                formatter.HList(['def _', method_name, '(self):']),
+                formatter.Indent(self._gen_stmts(node)),
             ]
         )
 
@@ -427,15 +428,15 @@ class PythonGenerator(
     def _gen_extern(self, name: str) -> str:
         return "self._externs['" + name + "']"
 
-    def _gen_invoke(self, fn, *args) -> Saw:
-        return Saw('self._' + fn + '(', Comma(args), ')')
+    def _gen_invoke(self, fn, *args) -> formatter.Saw:
+        return formatter.Saw('self._' + fn + '(', formatter.Comma(args), ')')
 
     #
     # Handlers for each non-host node in the glop AST follow.
     #
 
-    def _ty_choice(self, node: Node) -> ListObj:
-        vl = VList(['p = self._pos'])
+    def _ty_choice(self, node: gram.Node) -> formatter.ListObj:
+        vl = formatter.VList(['p = self._pos'])
         for subnode in node.ch[:-1]:
             vl += self._gen_stmts(subnode)
             vl += 'if not self._failed:'
@@ -444,8 +445,8 @@ class PythonGenerator(
         vl += self._gen_stmts(node.ch[-1])
         return vl
 
-    def _ty_count(self, node: Node) -> ListObj:
-        vl = VList(
+    def _ty_count(self, node: gram.Node) -> formatter.ListObj:
+        vl = formatter.VList(
             [
                 'vs = []',
                 'i = 0',
@@ -462,15 +463,15 @@ class PythonGenerator(
         svl += 'vs.append(self._val)'
         svl += 'i += 1'
 
-        vl += Indent(svl)
+        vl += formatter.Indent(svl)
         vl += 'self._succeed(vs)'
         return vl
 
-    def _ty_ends_in(self, node: Node) -> ListObj:
+    def _ty_ends_in(self, node: gram.Node) -> formatter.ListObj:
         sublines = self._gen_stmts(node.child)
         lines = [
             'while True:',
-        ] + [Indent(sublines)]
+        ] + [formatter.Indent(sublines)]
         if node.can_fail:
             lines.extend(['    if not self._failed:', '        break'])
         lines.extend(
@@ -480,11 +481,11 @@ class PythonGenerator(
                 '        break',
             ]
         )
-        return VList(lines)
+        return formatter.VList(lines)
 
-    def _ty_label(self, node: Node) -> ListObj:
-        assert isinstance(node, Label)
-        lines: ElList = [self._gen_stmts(node.child)]
+    def _ty_label(self, node: gram.Node) -> formatter.ListObj:
+        assert isinstance(node, gram.Label)
+        lines: formatter.ElList = [self._gen_stmts(node.child)]
         if node.child.can_fail:
             lines.extend(['if self._failed:', '    return'])
         if node.outer_scope:
@@ -495,9 +496,9 @@ class PythonGenerator(
                     f'{self._gen_varname(node.name)} = self._val',
                 ]
             )
-        return VList(lines)
+        return formatter.VList(lines)
 
-    def _ty_not(self, node: Node) -> ListObj:
+    def _ty_not(self, node: gram.Node) -> formatter.ListObj:
         sublines = self._gen_stmts(node.child)
         lines = (
             [
@@ -514,15 +515,17 @@ class PythonGenerator(
                 '    self._fail()',
             ]
         )
-        return VList(lines)
+        return formatter.VList(lines)
 
-    def _ty_not_one(self, node: Node) -> ListObj:
-        sublines = self._gen_stmts(self.grammar.node(Not, node.child))
-        return VList([sublines, 'if not self._failed:', '    self._r_any()'])
+    def _ty_not_one(self, node: gram.Node) -> formatter.ListObj:
+        sublines = self._gen_stmts(self.grammar.node(gram.Not, node.child))
+        return formatter.VList(
+            [sublines, 'if not self._failed:', '    self._r_any()']
+        )
 
-    def _ty_opt(self, node: Node) -> ListObj:
+    def _ty_opt(self, node: gram.Node) -> formatter.ListObj:
         sublines = self._gen_stmts(node.child)
-        return VList(
+        return formatter.VList(
             [
                 'p = self._pos',
             ]
@@ -535,10 +538,10 @@ class PythonGenerator(
             ]
         )
 
-    def _ty_paren(self, node: Node) -> ListObj:
+    def _ty_paren(self, node: gram.Node) -> formatter.ListObj:
         return self._gen_stmts(node.child)
 
-    def _ty_plus(self, node: Node) -> ListObj:
+    def _ty_plus(self, node: gram.Node) -> formatter.ListObj:
         sublines = self._gen_stmts(node.child)
         lines = (
             ['vs = []']
@@ -550,7 +553,7 @@ class PythonGenerator(
                 'while True:',
                 '    p = self._pos',
             ]
-            + [Indent(sublines)]
+            + [formatter.Indent(sublines)]
             + [
                 '    if self._failed or self._pos == p:',
                 '        self._rewind(p)',
@@ -560,13 +563,13 @@ class PythonGenerator(
             ]
         )
 
-        return VList(lines)
+        return formatter.VList(lines)
 
-    def _ty_pred(self, node: Node) -> ListObj:
+    def _ty_pred(self, node: gram.Node) -> formatter.ListObj:
         arg = self._gen_expr(node.child)
-        return VList(
+        return formatter.VList(
             [
-                HList(['v = ', arg]),
+                formatter.HList(['v = ', arg]),
                 'if v is True:',
                 '    self._succeed(v)',
                 'elif v is False:',
@@ -576,8 +579,8 @@ class PythonGenerator(
             ]
         )
 
-    def _ty_regexp(self, node: Node) -> ListObj:
-        return VList(
+    def _ty_regexp(self, node: gram.Node) -> formatter.ListObj:
+        return formatter.VList(
             [
                 f'p = {self._gen_lit(node.v)}',
                 'if p not in self._regexps:',
@@ -590,7 +593,7 @@ class PythonGenerator(
             ]
         )
 
-    def _ty_run(self, node: Node) -> VList:
+    def _ty_run(self, node: gram.Node) -> formatter.VList:
         sublines = self._gen_stmts(node.child)
         lines = ['start = self._pos'] + [sublines]
         if node.child.can_fail:
@@ -601,10 +604,10 @@ class PythonGenerator(
                 'self._val = self._text[start:end]',
             ]
         )
-        return VList(lines)
+        return formatter.VList(lines)
 
-    def _ty_scope(self, node: Node) -> VList:
-        return VList(
+    def _ty_scope(self, node: gram.Node) -> formatter.VList:
+        return formatter.VList(
             [
                 'self._scopes.append({})',
             ]
@@ -614,8 +617,8 @@ class PythonGenerator(
             ]
         )
 
-    def _ty_seq(self, node: Node) -> VList:
-        lines: ElList = [self._gen_stmts(node.ch[0])]
+    def _ty_seq(self, node: gram.Node) -> formatter.VList:
+        lines: formatter.ElList = [self._gen_stmts(node.ch[0])]
         if node.ch[0].can_fail:
             lines.extend(['if self._failed:', '    return'])
         for subnode in node.ch[1:-1]:
@@ -623,9 +626,9 @@ class PythonGenerator(
             if subnode.can_fail:
                 lines.extend(['if self._failed:', '    return'])
         lines.append(self._gen_stmts(node.ch[-1]))
-        return VList(lines)
+        return formatter.VList(lines)
 
-    def _ty_star(self, node: Node) -> VList:
+    def _ty_star(self, node: gram.Node) -> formatter.VList:
         sublines = self._gen_stmts(node.child)
         lines = (
             [
@@ -633,7 +636,7 @@ class PythonGenerator(
                 'while True:',
                 '    p = self._pos',
             ]
-            + [Indent(sublines)]
+            + [formatter.Indent(sublines)]
             + [
                 '    if self._failed or self._pos == p:',
                 '        self._rewind(p)',
@@ -642,9 +645,9 @@ class PythonGenerator(
                 'self._succeed(vs)',
             ]
         )
-        return VList(lines)
+        return formatter.VList(lines)
 
-    def _gen_main_footer(self) -> VList:
+    def _gen_main_footer(self) -> formatter.VList:
         return self._defmt("""
 
 
@@ -652,8 +655,8 @@ class PythonGenerator(
                 sys.exit(main())
             """)
 
-    def _gen_default_footer(self) -> VList:
-        return VList()
+    def _gen_default_footer(self) -> formatter.VList:
+        return formatter.VList()
 
 
 _BUILTINS = {

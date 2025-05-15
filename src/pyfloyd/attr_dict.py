@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 class AttrDict(dict):
     """A very simple subclass of dict that permits direct reference to keys.
 
@@ -27,5 +28,3 @@ class AttrDict(dict):
     def update(self, *args, **values):
         for k, v in dict(*args, **values).items():
             self[k] = v
-
-

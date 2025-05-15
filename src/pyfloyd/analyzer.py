@@ -12,28 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# pylint: disable=too-many-lines
-
-import collections
-from typing import Any, Dict, List, Optional, Set
-
-from pyfloyd.ast import (
-    Apply,
-    Choice,
-    Count,
-    Label,
-    Leftrec,
-    Node,
-    Op,
-    Operator,
-    Paren,
-    Regexp,
-    Rule,
-    Rules,
-    Scope,
-    Seq,
-    Star,
-)
+from pyfloyd import grammar as gram
 
 
 class AnalysisError(Exception):
@@ -49,169 +28,14 @@ class AnalysisError(Exception):
         return s
 
 
-class Grammar:
-    def __init__(self, ast: Any):
-        self.ast: Node = Node.to(ast)
-        self.comment: Optional[Rule] = None
-        self.rules: Dict[str, Rule] = collections.OrderedDict()
-        self.pragmas: List[Rule] = []
-        self.starting_rule: Optional[str] = None
-        self.tokens: Set[str] = set()
-        self.whitespace: Optional[Rule] = None
-        self.assoc: Dict[str, str] = {}
-        self.prec: Dict[str, int] = {}
-        self.exception_needed: bool = False
-        self.leftrec_needed: bool = False
-        self.lookup_needed: bool = False
-        self.operator_needed: bool = False
-        self.unicat_needed: bool = False
-        self.ch_needed: bool = False
-        self.str_needed: bool = False
-        self.range_needed: bool = False
-        self.re_needed: bool = False
-        self.needed_builtin_functions: List[str] = []
-        self.needed_builtin_rules: List[str] = []
-        self.needed_operators: List[str] = [
-            'error',
-            'fail',
-            'offsets',
-            'rewind',
-            'succeed',
-        ]
-        self.unicodedata_needed: bool = False
-        self.seeds_needed: bool = False
-
-        self.operators: Dict[str, OperatorState] = {}
-        self.leftrec_rules: Set[str] = set()
-        self.outer_scope_rules: Set[str] = set()
-        self.externs: Dict[str, bool] = {}
-
-        has_starting_rule = False
-        for rule in self.ast.rules:
-            if rule.name.startswith('%'):
-                self.pragmas.append(rule)
-            elif not has_starting_rule:
-                self.starting_rule = rule.name
-                has_starting_rule = True
-            self.rules[rule.name] = rule.child
-
-    def node(self, cls, *args, **kwargs) -> Node:
-        n = cls(*args, **kwargs)
-        return self.update_node(n)
-
-    def update_node(self, node: Node) -> Node:
-        self._set_can_fail(node)
-        return node
-
-    def _set_can_fail(self, node):
-        if node.can_fail_set():
-            return
-        for c in node.ch:
-            self._set_can_fail(c)
-        node.can_fail = self._can_fail(node)
-
-    def update_rules(self):
-        # Update grammar.rules to match grammar.ast for rules in
-        # grammar.ast and then append any new rules to grammar.ast.
-        rules = set()
-        for rule in self.ast.rules:
-            self.rules[rule.name] = rule.child
-            rules.add(rule.name)
-        for rule_name in self.rules:
-            if rule_name not in rules:
-                self.ast.rules.append(Rule(rule_name, self.rules[rule_name]))
-
-    # TODO: Figure out what to do with `inline`; it seems like there are
-    # might be places where it's safe to ignore if something can fail if
-    # inlined but not otherwise. See the commented-out lines below.
-    def _can_fail(self, node: Node, inline: bool = True) -> bool:
-        if node.can_fail_set():
-            return node.can_fail
-        if node.t in ('action', 'empty', 'opt', 'star'):
-            return False
-        if node.t == 'apply':
-            assert isinstance(node, Apply)
-            if node.rule_name in ('any', 'r_any', 'end', 'r_end'):
-                return True
-            # return self._can_fail(self.rules[node.rule_name], inline=False)
-            return self._can_fail(self.rules[node.rule_name], inline)
-        if node.t == 'label':
-            # When the code for a label is being inlined, if the child
-            # node can fail, its return will exit the outer method as well,
-            # so we don't have to worry about it. At that point, then
-            # we just have the label code itself, which can't fail.
-            # When the code isn't being inlined into the outer method,
-            # we do have to include the failure of the child node.
-            # TODO: This same reasoning may be true for other types of nodes.
-            # return False if inline else self._can_fail(node.child, inline)
-            return self._can_fail(node.child, inline)
-        if node.t in ('label', 'paren', 'rule', 'run'):
-            return self._can_fail(node.child, inline)
-        if node.t == 'count':
-            assert isinstance(node, Count)
-            return node.start != 0
-        if node.t in ('leftrec', 'operator', 'op'):
-            # TODO: Figure out if there's a way to tell if these can not fail.
-            return True
-        if node.t in ('choice', 'rules'):
-            r = all(self._can_fail(n, inline) for n in node.ch)
-            return r
-        if node.t == 'scope':
-            # TODO: is this right?
-            # return self._can_fail(node.ch[0], False)
-            return self._can_fail(node.ch[0], inline)
-        if node.t == 'seq':
-            r = any(self._can_fail(n, inline) for n in node.ch)
-            return r
-        if node.t.startswith('e_'):
-            return True
-
-        # You might think that if a not's child node can fail, then
-        # the not can't fail, but it doesn't work that way. If the
-        # child == ['lit', 'foo'], then it'll fail if foo isn't next,
-        # so it can fail, but ['not', [child]] can fail also (if
-        # foo is next).
-        # Note that some regexps might not fail, but to figure that
-        # out we'd have to analyze the regexp itself, which I don't want to
-        # do yet.
-        assert node.t in (
-            'ends_in',
-            'equals',
-            'lit',
-            'not',
-            'not_one',
-            'plus',
-            'pred',
-            'range',
-            'regexp',
-            'set',
-            'unicat',
-        )
-
-        return True
-
-
-class OperatorState:
-    def __init__(self):
-        # Map of precedence level to a list of operator literals that
-        # have that level, e.g. {0: ['+'], 2: ['*']}
-        self.prec_ops = {}  # Dict[int, List[str]]
-
-        # Set of operator literals that are right-associative.
-        self.rassoc = set()  # Set[str]
-
-        # Map of operator literals to corresponding subrule names.
-        self.choices = {}  # Dict[str, str]
-
-
-def analyze(ast, rewrite_subrules: bool) -> Grammar:
+def analyze(ast, rewrite_subrules: bool) -> gram.Grammar:
     """Analyze and optimize the AST.
 
     This runs any static analysis we can do over the grammars and
     optimizes what we can. Raises AnalysisError if there are any errors.
     """
 
-    g = Grammar(ast)
+    g = gram.Grammar(ast)
 
     # Find whatever errors we can.
     a = _Analyzer(g)
@@ -269,37 +93,8 @@ def analyze(ast, rewrite_subrules: bool) -> Grammar:
     return g
 
 
-BUILTIN_FUNCTIONS = (
-    'atof',
-    'atoi',
-    'atou',
-    'cat',
-    'concat',
-    'cons',
-    'dedent',
-    'dict',
-    'float',
-    'int',
-    'itou',
-    'join',
-    'otou',
-    'scat',
-    'scons',
-    'strcat',
-    'unicode_lookup',
-    'utoi',
-    'xtou',
-)
-
-
-BUILTIN_RULES = (
-    'any',
-    'end',
-)
-
-
 class _Analyzer:
-    def __init__(self, grammar):
+    def __init__(self, grammar: gram.Grammar):
         self.grammar = grammar
         assert self.grammar.ast.t == 'rules'
         self.errors = []
@@ -435,7 +230,7 @@ class _Analyzer:
         for i, c in enumerate(node.ch, start=1):
             name = f'${i}'
             if name in labels_needed:
-                node.ch[i - 1] = Label(name, c)
+                node.ch[i - 1] = gram.Label(name, c)
 
     def _check_positional_var_refs(self, node, current_index, labels_needed):
         if node.t == 'e_var':
@@ -463,7 +258,7 @@ class _Analyzer:
     def check_for_unknown_functions(self, node):
         if node.t == 'e_qual' and node.ch[1].t == 'e_call':
             function_name = node.ch[0].v
-            if function_name not in BUILTIN_FUNCTIONS:
+            if function_name not in gram.BUILTIN_FUNCTIONS:
                 self.errors.append(
                     f'Unknown function "{function_name}" called'
                 )
@@ -537,7 +332,7 @@ def _rewrite_scopes(grammar):
         for i, c in enumerate(node.ch):
             node.ch[i] = rewrite_node(c)
         if node.t == 'seq' and any(c.t == 'label' for c in node.ch):
-            return Scope([node])
+            return gram.Scope([node])
         return node
 
     for rule in grammar.ast.rules:
@@ -567,7 +362,7 @@ def _rewrite_recursion(grammar):
             if has_lr:
                 grammar.leftrec_rules.update(seen)
                 node_name = '%s#%d' % (name, i + 1)
-                choices[i] = Leftrec(
+                choices[i] = gram.Leftrec(
                     node_name,
                     choice,
                 )
@@ -588,27 +383,27 @@ def _check_operator(grammar, name, choices):
         assert choice.t == 'seq'
         if len(choice.ch) not in (3, 4):
             return None
-        if choice.ch[0] != Label('$1', Apply(name)) and choice.ch[0] != Apply(
-            name
-        ):
+        if choice.ch[0] != gram.Label(
+            '$1', gram.Apply(name)
+        ) and choice.ch[0] != gram.Apply(name):
             return None
         if choice.ch[1].t != 'lit' or choice.ch[1].v not in grammar.prec:
             return None
         operator = choice.ch[1].v
         prec = grammar.prec[operator]
-        if choice.ch[2] != Label('$3', Apply(name)) and choice.ch[2] != Apply(
-            name
-        ):
+        if choice.ch[2] != gram.Label(
+            '$3', gram.Apply(name)
+        ) and choice.ch[2] != gram.Apply(name):
             return None
         if len(choice.ch) == 4 and choice.ch[3].t != 'action':
             return None
         if has_scope:
-            choice = Scope([choice])
-        operators.append(Op(operator, prec, choice))
+            choice = gram.Scope([choice])
+        operators.append(gram.Op(operator, prec, choice))
     choice = choices[-1]
     if len(choice[2]) != 1:
         return None
-    return Choice([Operator(name, operators), choices[-1]])
+    return gram.Choice([gram.Operator(name, operators), choices[-1]])
 
 
 def _check_lr(rule_name, node, grammar, seen):
@@ -696,7 +491,7 @@ def _collect_tokens(grammar, node):
                 _collect_tokens(grammar, rule)
         return
 
-    if node.t == 'apply' and node.rule_name not in BUILTIN_RULES:
+    if node.t == 'apply' and node.rule_name not in gram.BUILTIN_RULES:
         grammar.tokens.add(node.rule_name)
 
     for c in node.ch:
@@ -711,23 +506,27 @@ def _add_filler_rules(grammar):
     filler = None
     if grammar.whitespace and grammar.comment:
         if grammar.whitespace.t == 'regexp' and grammar.comment.t == 'regexp':
-            filler = Regexp(
+            filler = gram.Regexp(
                 f'(({grammar.whitespace.v})|({grammar.comment.v}))*',
             )
         else:
-            filler = Star(Choice([Apply('%whitespace'), Apply('%comment')]))
+            filler = gram.Star(
+                gram.Choice(
+                    [gram.Apply('%whitespace'), gram.Apply('%comment')]
+                )
+            )
     elif grammar.comment:
         if grammar.comment.t == 'regexp':
-            filler = Regexp(f'({grammar.comment.v})*')
+            filler = gram.Regexp(f'({grammar.comment.v})*')
         else:
-            filler = Star(Apply('%comment'))
+            filler = gram.Star(gram.Apply('%comment'))
     elif grammar.whitespace:
         if grammar.whitespace.t == 'regexp':
-            filler = Regexp(f'({grammar.whitespace.v})*')
+            filler = gram.Regexp(f'({grammar.whitespace.v})*')
         else:
-            filler = Star(Apply('%whitespace'))
+            filler = gram.Star(gram.Apply('%whitespace'))
     if filler:
-        grammar.rules['%filler'] = Choice([filler])
+        grammar.rules['%filler'] = gram.Choice([filler])
 
 
 def _add_filler_nodes(grammar, node):
@@ -765,17 +564,17 @@ def _add_filler_nodes(grammar, node):
     if node.t == 'seq':
         children = []
         if len(children) == 1 and node.ch[0].t == 'action':
-            children.append(Apply('%filler'))
+            children.append(gram.Apply('%filler'))
         for c in node.ch:
             if should_fill(c):
-                children.append(Apply('%filler'))
+                children.append(gram.Apply('%filler'))
                 children.append(c)
             else:
                 sn = _add_filler_nodes(grammar, c)
                 children.append(sn)
-        return Seq(children)
+        return gram.Seq(children)
     if should_fill(node):
-        return Paren(Seq([Apply('%filler'), node]))
+        return gram.Paren(gram.Seq([gram.Apply('%filler'), node]))
 
     node.ch = [_add_filler_nodes(grammar, c) for c in node.ch]
     return node
@@ -827,8 +626,8 @@ class _SubRuleRewriter:
         self._grammar.rules = self._methods
         rules = []
         for rule in self._grammar.rules:
-            rules.append(Rule(rule, self._grammar.rules[rule]))
-        self._grammar.ast = Rules(rules)
+            rules.append(gram.Rule(rule, self._grammar.rules[rule]))
+        self._grammar.ast = gram.Rules(rules)
 
     def _subrule(self) -> str:
         self._counter += 1
@@ -880,12 +679,12 @@ class _SubRuleRewriter:
     def _make_subrule(self, child):
         subnode_rule = self._subrule()
         self._subrules[subnode_rule] = self._walk(child)
-        return Apply(subnode_rule)
+        return gram.Apply(subnode_rule)
 
     def _ty_apply(self, node):
         if node.rule_name in ('any', 'end'):
             self._grammar.needed_builtin_rules.append(node.rule_name)
-        return Apply(self._rule_fmt.format(rule_name=node.rule_name))
+        return gram.Apply(self._rule_fmt.format(rule_name=node.rule_name))
 
     def _ty_ends_in(self, node):
         self._grammar.needed_builtin_rules.append('any')
@@ -923,7 +722,7 @@ class _SubRuleRewriter:
     def _ty_operator(self, node):
         self._grammar.needed_operators.append('operator')
         self._grammar.operator_needed = True
-        o = OperatorState()
+        o = gram.OperatorState()
         prec_ops = {}
         for operator in node.ch:
             op, prec = operator.v
@@ -993,8 +792,8 @@ def _rewrite_pragma_rules(grammar):
 
 
 def _compute_local_vars(grammar):
-    def _walk(node) -> Set[str]:
-        vs: Set[str] = set()
+    def _walk(node) -> set[str]:
+        vs: set[str] = set()
         if node.t == 'seq':
             for c in node.ch:
                 vs.update(_walk(c))

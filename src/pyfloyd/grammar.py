@@ -13,173 +13,65 @@
 # limitations under the License.
 
 import collections
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Optional, Union
 
 
 class OperatorState:
     def __init__(self):
         # Map of precedence level to a list of operator literals that
         # have that level, e.g. {0: ['+'], 2: ['*']}
-        self.prec_ops = {}  # Dict[int, List[str]]
+        self.prec_ops: dict[int, list[str]] = {}
 
         # Set of operator literals that are right-associative.
-        self.rassoc = set()  # Set[str]
+        self.rassoc: set[str] = set()
 
         # Map of operator literals to corresponding subrule names.
-        self.choices = {}  # Dict[str, str]
+        self.choices: dict[str, str] = {}
 
 
-class Grammar:
-    def __init__(self, ast: Any):
-        self.ast: Node = Node.to(ast)
-        self.comment: Optional[Rule] = None
-        self.rules: Dict[str, Rule] = collections.OrderedDict()
-        self.pragmas: List[Rule] = []
-        self.starting_rule: Optional[str] = None
-        self.tokens: Set[str] = set()
-        self.whitespace: Optional[Rule] = None
-        self.assoc: Dict[str, str] = {}
-        self.prec: Dict[str, int] = {}
-        self.exception_needed: bool = False
-        self.leftrec_needed: bool = False
-        self.lookup_needed: bool = False
-        self.operator_needed: bool = False
-        self.unicat_needed: bool = False
-        self.ch_needed: bool = False
-        self.str_needed: bool = False
-        self.range_needed: bool = False
-        self.re_needed: bool = False
-        self.needed_builtin_functions: List[str] = []
-        self.needed_builtin_rules: List[str] = []
-        self.needed_operators: List[str] = [
-            'error',
-            'fail',
-            'offsets',
-            'rewind',
-            'succeed',
-        ]
-        self.unicodedata_needed: bool = False
-        self.seeds_needed: bool = False
+BUILTIN_FUNCTIONS = (
+    'atof',
+    'atoi',
+    'atou',
+    'cat',
+    'concat',
+    'cons',
+    'dedent',
+    'dict',
+    'float',
+    'int',
+    'itou',
+    'join',
+    'otou',
+    'scat',
+    'scons',
+    'strcat',
+    'unicode_lookup',
+    'utoi',
+    'xtou',
+)
 
-        self.operators: Dict[str, OperatorState] = {}
-        self.leftrec_rules: Set[str] = set()
-        self.outer_scope_rules: Set[str] = set()
-        self.externs: Dict[str, bool] = {}
 
-        has_starting_rule = False
-        for rule in self.ast.rules:
-            if rule.name.startswith('%'):
-                self.pragmas.append(rule)
-            elif not has_starting_rule:
-                self.starting_rule = rule.name
-                has_starting_rule = True
-            self.rules[rule.name] = rule.child
+BUILTIN_RULES = (
+    'any',
+    'end',
+)
 
-    def node(self, cls, *args, **kwargs) -> Node:
-        n = cls(*args, **kwargs)
-        return self.update_node(n)
 
-    def update_node(self, node: Node) -> Node:
-        self._set_can_fail(node)
-        return node
-
-    def _set_can_fail(self, node):
-        if node.can_fail_set():
-            return
-        for c in node.ch:
-            self._set_can_fail(c)
-        node.can_fail = self._can_fail(node)
-
-    def update_rules(self):
-        # Update grammar.rules to match grammar.ast for rules in
-        # grammar.ast and then append any new rules to grammar.ast.
-        rules = set()
-        for rule in self.ast.rules:
-            self.rules[rule.name] = rule.child
-            rules.add(rule.name)
-        for rule_name in self.rules:
-            if rule_name not in rules:
-                self.ast.rules.append(Rule(rule_name, self.rules[rule_name]))
-
-    # TODO: Figure out what to do with `inline`; it seems like there are
-    # might be places where it's safe to ignore if something can fail if
-    # inlined but not otherwise. See the commented-out lines below.
-    def _can_fail(self, node: Node, inline: bool = True) -> bool:
-        if node.can_fail_set():
-            return node.can_fail
-        if node.t in ('action', 'empty', 'opt', 'star'):
-            return False
-        if node.t == 'apply':
-            assert isinstance(node, Apply)
-            if node.rule_name in ('any', 'r_any', 'end', 'r_end'):
-                return True
-            # return self._can_fail(self.rules[node.rule_name], inline=False)
-            return self._can_fail(self.rules[node.rule_name], inline)
-        if node.t == 'label':
-            # When the code for a label is being inlined, if the child
-            # node can fail, its return will exit the outer method as well,
-            # so we don't have to worry about it. At that point, then
-            # we just have the label code itself, which can't fail.
-            # When the code isn't being inlined into the outer method,
-            # we do have to include the failure of the child node.
-            # TODO: This same reasoning may be true for other types of nodes.
-            # return False if inline else self._can_fail(node.child, inline)
-            return self._can_fail(node.child, inline)
-        if node.t in ('label', 'paren', 'rule', 'run'):
-            return self._can_fail(node.child, inline)
-        if node.t == 'count':
-            assert isinstance(node, Count)
-            return node.start != 0
-        if node.t in ('leftrec', 'operator', 'op'):
-            # TODO: Figure out if there's a way to tell if these can not fail.
-            return True
-        if node.t in ('choice', 'rules'):
-            r = all(self._can_fail(n, inline) for n in node.ch)
-            return r
-        if node.t == 'scope':
-            # TODO: is this right?
-            # return self._can_fail(node.ch[0], False)
-            return self._can_fail(node.ch[0], inline)
-        if node.t == 'seq':
-            r = any(self._can_fail(n, inline) for n in node.ch)
-            return r
-        if node.t.startswith('e_'):
-            return True
-
-        # You might think that if a not's child node can fail, then
-        # the not can't fail, but it doesn't work that way. If the
-        # child == ['lit', 'foo'], then it'll fail if foo isn't next,
-        # so it can fail, but ['not', [child]] can fail also (if
-        # foo is next).
-        # Note that some regexps might not fail, but to figure that
-        # out we'd have to analyze the regexp itself, which I don't want to
-        # do yet.
-        assert node.t in (
-            'ends_in',
-            'equals',
-            'lit',
-            'not',
-            'not_one',
-            'plus',
-            'pred',
-            'range',
-            'regexp',
-            'set',
-            'unicat',
-        )
-
-        return True
+#
+# AST node classes
+#
 
 
 class Node:
     v_alias: Optional[str] = None
-    v_aliases: List[str] = []
+    v_aliases: list[str] = []
     ch_alias: Optional[str] = None
-    ch_aliases: List[str] = []
-    derived_attrs: List[str] = []
+    ch_aliases: list[str] = []
+    derived_attrs: list[str] = []
 
     @classmethod
-    def to(cls, val: List[Any]) -> 'Node':
+    def to(cls, val: list[Any]) -> 'Node':
         assert len(val) == 3
         assert isinstance(val[0], str)
         assert isinstance(val[2], list)
@@ -269,10 +161,10 @@ class Node:
             case _:
                 raise ValueError(f'Unexpected AST node type "{val[0]}"')
 
-    def __init__(self, t: str, v: Any, ch: List['Node']):
+    def __init__(self, t: str, v: Any, ch: list['Node']):
         self.t: str = t
         self.v: Any = v
-        self.ch: List['Node'] = ch
+        self.ch: list['Node'] = ch
         self._can_fail: Optional[bool] = None
 
     def __getattr__(self, attr: str) -> Any:
@@ -302,7 +194,7 @@ class Node:
             attr = 'ch'
         super().__setattr__(attr, v)
 
-    def __getitem__(self, i: int) -> Union[str | Any | List['Node']]:
+    def __getitem__(self, i: int) -> Union[str | Any | list['Node']]:
         assert 0 <= i <= 2
         if i == 0:
             return self.t
@@ -350,12 +242,12 @@ class Node:
         return self._can_fail is not None
 
     @property
-    def attrs(self) -> Tuple[str, ...]:
+    def attrs(self) -> tuple[str, ...]:
         fn = self.__class__.__init__.__code__
         return fn.co_varnames[1 : fn.co_argcount]
 
     def to_json(self, include_derived=False) -> Any:
-        d: Dict[str, Any] = {}
+        d: dict[str, Any] = {}
         d['t'] = self.t
         attrs = list(self.attrs)
         child = 'child' in attrs
@@ -633,3 +525,145 @@ class Var(Node):
     @property
     def name(self):
         return self.v
+
+
+class Grammar:
+    def __init__(self, ast: Any):
+        self.ast: Node = Node.to(ast)
+        self.comment: Optional[Rule] = None
+        self.rules: dict[str, Rule] = collections.OrderedDict()
+        self.pragmas: list[Rule] = []
+        self.starting_rule: Optional[str] = None
+        self.tokens: set[str] = set()
+        self.whitespace: Optional[Rule] = None
+        self.assoc: dict[str, str] = {}
+        self.prec: dict[str, int] = {}
+        self.exception_needed: bool = False
+        self.leftrec_needed: bool = False
+        self.lookup_needed: bool = False
+        self.operator_needed: bool = False
+        self.unicat_needed: bool = False
+        self.ch_needed: bool = False
+        self.str_needed: bool = False
+        self.range_needed: bool = False
+        self.re_needed: bool = False
+        self.needed_builtin_functions: dict[str] = []
+        self.needed_builtin_rules: dict[str] = []
+        self.needed_operators: dict[str] = [
+            'error',
+            'fail',
+            'offsets',
+            'rewind',
+            'succeed',
+        ]
+        self.unicodedata_needed: bool = False
+        self.seeds_needed: bool = False
+
+        self.operators: dict[str, OperatorState] = {}
+        self.leftrec_rules: set[str] = set()
+        self.outer_scope_rules: set[str] = set()
+        self.externs: dict[str, bool] = {}
+
+        has_starting_rule = False
+        for rule in self.ast.rules:
+            if rule.name.startswith('%'):
+                self.pragmas.append(rule)
+            elif not has_starting_rule:
+                self.starting_rule = rule.name
+                has_starting_rule = True
+            self.rules[rule.name] = rule.child
+
+    def node(self, cls, *args, **kwargs) -> Node:
+        n = cls(*args, **kwargs)
+        return self.update_node(n)
+
+    def update_node(self, node: Node) -> Node:
+        self._set_can_fail(node)
+        return node
+
+    def _set_can_fail(self, node):
+        if node.can_fail_set():
+            return
+        for c in node.ch:
+            self._set_can_fail(c)
+        node.can_fail = self._can_fail(node)
+
+    def update_rules(self):
+        # Update grammar.rules to match grammar.ast for rules in
+        # grammar.ast and then append any new rules to grammar.ast.
+        rules = set()
+        for rule in self.ast.rules:
+            self.rules[rule.name] = rule.child
+            rules.add(rule.name)
+        for rule_name in self.rules:
+            if rule_name not in rules:
+                self.ast.rules.append(Rule(rule_name, self.rules[rule_name]))
+
+    # TODO: Figure out what to do with `inline`; it seems like there are
+    # might be places where it's safe to ignore if something can fail if
+    # inlined but not otherwise. See the commented-out lines below.
+    def _can_fail(self, node: Node, inline: bool = True) -> bool:
+        if node.can_fail_set():
+            return node.can_fail
+        if node.t in ('action', 'empty', 'opt', 'star'):
+            return False
+        if node.t == 'apply':
+            assert isinstance(node, Apply)
+            if node.rule_name in ('any', 'r_any', 'end', 'r_end'):
+                return True
+            # return self._can_fail(self.rules[node.rule_name], inline=False)
+            return self._can_fail(self.rules[node.rule_name], inline)
+        if node.t == 'label':
+            # When the code for a label is being inlined, if the child
+            # node can fail, its return will exit the outer method as well,
+            # so we don't have to worry about it. At that point, then
+            # we just have the label code itself, which can't fail.
+            # When the code isn't being inlined into the outer method,
+            # we do have to include the failure of the child node.
+            # TODO: This same reasoning may be true for other types of nodes.
+            # return False if inline else self._can_fail(node.child, inline)
+            return self._can_fail(node.child, inline)
+        if node.t in ('label', 'paren', 'rule', 'run'):
+            return self._can_fail(node.child, inline)
+        if node.t == 'count':
+            assert isinstance(node, Count)
+            return node.start != 0
+        if node.t in ('leftrec', 'operator', 'op'):
+            # TODO: Figure out if there's a way to tell if these can not fail.
+            return True
+        if node.t in ('choice', 'rules'):
+            r = all(self._can_fail(n, inline) for n in node.ch)
+            return r
+        if node.t == 'scope':
+            # TODO: is this right?
+            # return self._can_fail(node.ch[0], False)
+            return self._can_fail(node.ch[0], inline)
+        if node.t == 'seq':
+            r = any(self._can_fail(n, inline) for n in node.ch)
+            return r
+        if node.t.startswith('e_'):
+            return True
+
+        # You might think that if a not's child node can fail, then
+        # the not can't fail, but it doesn't work that way. If the
+        # child == ['lit', 'foo'], then it'll fail if foo isn't next,
+        # so it can fail, but ['not', [child]] can fail also (if
+        # foo is next).
+        # Note that some regexps might not fail, but to figure that
+        # out we'd have to analyze the regexp itself, which I don't want to
+        # do yet.
+        assert node.t in (
+            'ends_in',
+            'equals',
+            'lit',
+            'not',
+            'not_one',
+            'plus',
+            'pred',
+            'range',
+            'regexp',
+            'set',
+            'unicat',
+        )
+
+        return True

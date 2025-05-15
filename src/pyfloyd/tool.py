@@ -38,12 +38,10 @@ if (
 # pylint: disable=wrong-import-position
 import pyfloyd
 from pyfloyd import datafile
-from pyfloyd import generator
-from pyfloyd.support import Host
 
 
 def main(argv=None, host=None):
-    host = host or Host()
+    host = host or pyfloyd.Host()
 
     args = None
     try:
@@ -111,7 +109,7 @@ def main(argv=None, host=None):
 
 def _parse_args(host, argv):
     ap = argparse.ArgumentParser(prog='pyfloyd')
-    generator.add_arguments(ap)
+    pyfloyd.add_generator_arguments(ap)
     ap.add_argument(
         '--ast', action='store_true', help='dump the parsed AST of the grammar'
     )
@@ -186,12 +184,12 @@ def _parse_args(host, argv):
     if not args.language:
         if args.output:
             ext = os.path.splitext(args.output)[1]
-            args.language = generator.EXT_TO_LANG[ext].name
+            args.language = pyfloyd.EXT_TO_LANG[ext].name
         else:
-            args.language = generator.DEFAULT_LANGUAGE
-            ext = generator.LANGUAGE_MAP[args.language].ext
+            args.language = pyfloyd.DEFAULT_LANGUAGE
+            ext = pyfloyd.LANGUAGE_MAP[args.language].ext
     else:
-        ext = generator.LANGUAGE_MAP[args.language].ext
+        ext = pyfloyd.LANGUAGE_MAP[args.language].ext
 
     if not args.output:
         if args.compile:

@@ -49,20 +49,40 @@ compile the parser ahead of time:
     >>>
 """
 
+from pyfloyd import (
+    analyzer,
+    attr_dict,
+    datafile,
+    datafile_generator,
+    generator,
+    grammar,
+    grammar_parser,
+    interpreter,
+    javascript_generator,
+    printer,
+    python_generator,
+    support,
+    version,
+)
+
 # pylint: disable=redefined-builtin
 from pyfloyd.api import (
     parse,
     compile,
     dump_ast,
-    default_generator_options,
-    generator_options_from_args,
+    add_generator_arguments,
     generate,
+    generator_options_from_args,
     pretty_print,
     CompiledResult,
-    DEFAULT_LANGUAGE,
     GeneratorOptions,
+    Host,
     ParserInterface,
     Result,
+    DEFAULT_LANGUAGE,
+    DEFAULT_TEMPLATE,
+    EXT_TO_LANG,
+    LANGUAGE_MAP,
     SUPPORTED_LANGUAGES,
 )
 from pyfloyd.version import __version__
@@ -73,11 +93,17 @@ __all__ = [
     '__version__',
     'compile',
     'dump_ast',
+    'add_generator_arguments',
+    'default_generator_options',
     'generate',
     'parse',
     'pretty_print',
     'CompiledResult',
+    'DEFAULT_LANGUAGE',
+    'EXT_TO_LANG',
     'GeneratorOptions',
+    'Host',
+    'LANGUAGE_MAP',
     'ParserInterface',
     'Result',
     'DEFAULT_LANGUAGE',

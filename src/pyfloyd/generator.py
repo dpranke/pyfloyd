@@ -12,32 +12,54 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Optional, Set, Union
+import argparse
+import shlex
+from typing import Optional, Sequence
 
-from pyfloyd.analyzer import Grammar, Node
-from pyfloyd import attr_dict
-from pyfloyd import datafile
-from pyfloyd import generator_options
-from pyfloyd import support
+import pyfloyd
+
+
+class GeneratorOptions(pyfloyd.attr_dict.AttrDict):
+    def __init__(self, *args, **kwargs):
+        self.argv = None
+        self.command_line = None
+        self.dialect = None
+        self.formatter_list = False
+        self.generator_options = None
+        self.indent = None
+        self.language = None
+        self.line_length = None
+        self.main = False
+        self.memoize = None
+        self.template = pyfloyd.DEFAULT_TEMPLATE
+        self.version = pyfloyd.__version__
+        self.unicodedata_needed = None
+        super().__init__(*args, **kwargs)
 
 
 class Generator:
-    def __init__(self, 
-        host: support.Host, 
-        grammar: analyzer.Grammar,
-        options: generator_options.GeneratorOptions
+    name: str = None
+    ext: str = None
+    indent: int | str = 2
+    line_length: int = 79
+    help_str: Optional[str] = None
+
+    def __init__(
+        self,
+        host: pyfloyd.support.Host,
+        grammar: pyfloyd.grammar.Grammar,
+        options: GeneratorOptions,
     ):
         self.host = host
         self.grammar = grammar
         self.options = options
 
         # Derive option values from the grammar if need be.
-        lang = LANGUAGE_MAP[self.options.language]
         if self.options.line_length is None:
-            self.options.line_length = lang.line_length
+            self.options.line_length = self.line_length
         if self.options.indent is None:
-            self.options.indent = lang.indent
-        elif isinstance(self.options.indent, int):
+            self.options.indent = self.indent
+        if isinstance(self.options.indent, int):
             self.options.indent = ' ' * self.options.indent
         self.options.unicodedata_needed = (
             grammar.unicat_needed
@@ -67,16 +89,132 @@ class Generator:
 
         _walk(self.grammar.ast)
 
-    def _derive_local_vars(self):
-        def _walk(node) -> Set[str]:
-            local_vars: Set[str] = set()
-            local_vars.update(set(self._local_vars.get(node.t, [])))
-            for c in node.ch:
-                local_vars.update(_walk(c))
-            return local_vars
-
-        for _, node in self.grammar.rules.items():
-            node.local_vars = _walk(node)
-
     def generate(self) -> str:
         raise NotImplementedError
+
+
+def add_arguments(
+    parser: argparse.ArgumentParser,
+    default_language: str, 
+    generators: Sequence[Generator]
+):
+    options = GeneratorOptions(language=default_language)
+    parser.add_argument(
+        '-l',
+        '--language',
+        action='store',
+        choices=[gen.name.lower() for gen in generators],
+        default=default_language,
+        help=(
+            'Language to generate (derived from the output '
+            'file extension if necessary)'
+        ),
+    )
+    for gen in generators:
+        if gen.name.lower() == default_language.lower():
+            def_str = ' (the default)'
+        else:
+            def_str = ''
+
+        if gen.help_str:
+            help_str = gen.help_str + def_str
+        else:
+            help_str = f'Generate {gen.name} code' + def_str
+        help_str += def_str
+        exts = ['--' + gen.name.lower()]
+        if gen.ext:
+            exts.append('--' + gen.ext)
+        parser.add_argument(
+            *exts,
+            action='store_const',
+            dest='language',
+            const=gen.name.lower(),
+            help=help_str,
+        )
+    parser.add_argument(
+        '--indent',
+        action='store',
+        default=options.indent,
+        help='indentation to use in output (default is language-specific)',
+    )
+    parser.add_argument(
+        '-L',
+        '--dialect',
+        action='store',
+        default=options.dialect,
+        help='Dialect (variant) of the language or template to use',
+    )
+    parser.add_argument(
+        '--generator-options',
+        '-G',
+        action=pyfloyd.datafile.ArgparseAppendAction,
+        metavar='DATAFILE-STRING',
+        help='Pass arbitrary options to the generator',
+    )
+    parser.add_argument(
+        '--formatter-list',
+        '--fl',
+        action='store_true',
+        default=options.formatter_list,
+        help=(
+            'Return the formatter tree as a list of objects of objects '
+            'instead of as a string'
+        ),
+    )
+    parser.add_argument(
+        '-T',
+        '--template',
+        '--datafile-template',
+        action='store',
+        default=options.template,
+        help='datafile template to use for code generation',
+    )
+    parser.add_argument(
+        '--line-length',
+        action='store',
+        default=options.line_length,
+        help='Line length to use (default is language-specific)',
+    )
+    parser.add_argument(
+        '--memoize',
+        dest='memoize',
+        action=argparse.BooleanOptionalAction,
+        default=options.memoize,
+        help=(
+            'Memoize parse results (default is grammar-specific, '
+            'off if not specified)'
+        ),
+    )
+    parser.add_argument(
+        '-m',
+        '--main',
+        action=argparse.BooleanOptionalAction,
+        default=options.main,
+        help=(
+            'include a main() function in the generated code if possible '
+            '(off by default)'
+        ),
+    )
+
+
+def options_from_args(
+    args: argparse.Namespace, argv: Sequence[str], language: str
+):
+    """Returns a dict containing the value of the generator args."""
+    d = GeneratorOptions(language=language)
+    vs = vars(args)
+    for name in d:
+        if name in vs:
+            d[name] = vs[name]
+    if hasattr(args, 'generator_options'):
+        if isinstance(args.generator_options, dict):
+            d.update(args.generator_options)
+        elif isinstance(args.generator_options, list):
+            for opt_str in args.generator_options:
+                opt_d = datafile.loads(opt_str)
+                d.update(opt_d)
+
+    d.argv = argv[1:] if argv else []
+    d.command_line = shlex.join(d['argv'])
+    return d
+
