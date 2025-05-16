@@ -1,4 +1,18 @@
 #!/usr/bin/env python3
+# Copyright 2025 Dirk Pranke. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""A simple top-level script for managing Python repositories."""
 
 import argparse
 import glob
@@ -10,28 +24,63 @@ import subprocess
 import sys
 
 try:
-    import pyfloyd
+    import tomllib
 except ModuleNotFoundError:
-    pass
+    tomllib = None
+
+#
+# The `grammars` global is the only thing in this file that should need
+# to be changed from project to project.
+#
+
+# An optional dict of grammars used in the package (grammar -> parser).
+grammars: dict[str, str] = {
+    'grammars/floyd.g':    'src/pyfloyd/grammar_parser.py',
+    'grammars/datafile.g': 'src/pyfloyd/datafile/parser.py',
+    'grammars/at_exp.g':   'src/pyfloyd/at_exp_parser.py',
+    'grammars/lisp.g':     'src/pyfloyd/lisp_parser.py',
+}
+
+#
+# Everything below this line should be unchanged from project to project.
+#
+
+def _read_package():
+    if tomllib:
+        with open('pyproject.toml', mode='rb') as fp:
+            return tomllib.load(fp)['project']['name']
+    with open('pyproject.toml', mode='rb') as fp:
+        lines = fp.read().decode('utf8').splitlines()
+        for line in lines:
+            m = re.match(r'name = "([^"]*)"', line)
+            if m:
+                return m.group(0)
+    return None
+
+
+package = _read_package()
+
+assert package is not None, 'Could not determine package name'
 
 
 class Runner:
     def __init__(self):
+        if os.path.exists(os.path.join('src', package + '.py')):
+            self.single_file = True
+            self.top = None
+        elif os.path.isdir(os.path.join('src', package)):
+            self.single_file = False
+            self.top = 'src' + os.path.sep + package
+
+        self.grammars = grammars
+
         self.arg_parser = None
         self.args = None
         self.remaining_args = None
-        self.package = 'pyfloyd'
-        self.top = f'src/{self.package}'
-        self.grammars = {
-            'grammars/floyd.g': f'{self.top}/grammar_parser.py',
-            'grammars/datafile.g': f'{self.top}/datafile/parser.py',
-            'grammars/at_exp.g': f'{self.top}/at_exp_parser.py',
-            'grammars/lisp.g': f'{self.top}/lisp_parser.py',
-        }
+        self.file = None
         self.run_cmd = None
         self.subps = None
         self.uv_path = None
-        self.version = None
 
     def add_parser(self, cmd, help):  # pylint: disable=redefined-builtin
         method = getattr(self, 'run_' + cmd.replace('-', '_'))
@@ -179,12 +228,13 @@ class Runner:
             help='Upload to the real PyPI instance.',
         )
 
-        subp = self.add_parser('regen', help='Regenerate parsers.')
-        subp.add_argument(
-            '--check',
-            action='store_true',
-            help='Just check to see if any files would be modified.',
-        )
+        if self.grammars:
+            subp = self.add_parser('regen', help='Regenerate parsers.')
+            subp.add_argument(
+                '--check',
+                action='store_true',
+                help='Just check to see if any files would be modified.',
+            )
 
         subp = self.add_parser('tests', help='Run the tests.')
         subp.add_argument(
@@ -333,10 +383,10 @@ class Runner:
             print('You must specify either --test or --prod to upload.')
             sys.exit(2)
 
-        self._get_version()
+        version = self._get_version()
         sep = os.path.sep
-        tgz = f'dist{sep}{self.package}-{self.version}.tar.gz'
-        wheel = f'dist{sep}{self.package}-{self.version}-py3-none-any.whl'
+        tgz = f'dist{sep}{package}-{version}.tar.gz'
+        wheel = f'dist{sep}{package}-{version}-py3-none-any.whl'
         if not os.path.exists(tgz) or not os.path.exists(wheel):
             print('Run `./run build` first')
             return
@@ -459,13 +509,15 @@ class Runner:
                     fp.write(new)
 
     def _files(self):
-        return (
-            ['run']
-            + glob.glob(f'{self.top}/*.py')
-            + glob.glob('tests/*.py')
-            + glob.glob(f'{self.top}/*/*.py')
-            + glob.glob('tests/*/*.py')
-        )
+        files = ['run']
+        if self.file:
+            files.append(self.file)
+        else:
+            files.extend(glob.glob(self.top))
+            files.extend(glob.glob(f'{self.top}/*/*.py'))
+        files.extend(glob.glob('tests/*.py'))
+        files.extend(glob.glob('tests/*/*.py'))
+        return files
 
     def _trim_test_glob(self, test):
         if test.startswith('^'):
@@ -479,21 +531,15 @@ class Runner:
         return test
 
     def _get_version(self):
-        if self.version is not None:
-            return
-        if 'pyfloyd' in sys.modules:
-            self.version = pyfloyd.__version__
-            return
-
         proc = self.call(
             self.run_cmd + ['-m', 'pyfloyd', '-V'], capture_output=True
         )
-        self.version = proc.stdout.decode('utf8').strip()
-
-        m = re.match(r'\d+\.\d+\.\d+(\.dev\d+)?', self.version)
+        version = proc.stdout.decode('utf8').strip()
+        m = re.match(r'\d+\.\d+\.\d+(\.dev\d+)?', version)
         if not m:
-            print(f'Unexpected version format: "{self.version}"')
+            print(f'Unexpected version format: "{version}"')
             sys.exit(1)
+        return version
 
 
 if __name__ == '__main__':
