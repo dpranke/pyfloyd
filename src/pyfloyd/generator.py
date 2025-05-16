@@ -14,6 +14,7 @@
 
 import argparse
 import shlex
+import sys
 from typing import Optional, Sequence
 
 import pyfloyd
@@ -205,6 +206,10 @@ def options_from_args(
     vs = vars(args)
     for name in d:
         if name in vs:
+            if name == 'version':
+                # This is the boolean flag to show the version, not
+                # the actual version string.
+                continue
             d[name] = vs[name]
     if hasattr(args, 'generator_options'):
         if isinstance(args.generator_options, dict):
@@ -214,7 +219,7 @@ def options_from_args(
                 opt_d = datafile.loads(opt_str)
                 d.update(opt_d)
 
-    d.argv = argv[1:] if argv else []
+    d.argv = argv[1:] if argv else sys.argv[1:]
     d.command_line = shlex.join(d['argv'])
     return d
 
