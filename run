@@ -35,15 +35,16 @@ except ModuleNotFoundError:
 
 # An optional dict of grammars used in the package (grammar -> parser).
 grammars: dict[str, str] = {
-    'grammars/floyd.g':    'src/pyfloyd/grammar_parser.py',
+    'grammars/floyd.g': 'src/pyfloyd/grammar_parser.py',
     'grammars/datafile.g': 'src/pyfloyd/datafile/parser.py',
-    'grammars/at_exp.g':   'src/pyfloyd/at_exp_parser.py',
-    'grammars/lisp.g':     'src/pyfloyd/lisp_parser.py',
+    'grammars/at_exp.g': 'src/pyfloyd/at_exp_parser.py',
+    'grammars/lisp.g': 'src/pyfloyd/lisp_parser.py',
 }
 
 #
 # Everything below this line should be unchanged from project to project.
 #
+
 
 def _read_package():
     if tomllib:
@@ -100,8 +101,13 @@ class Runner:
         subp.add_argument(
             '-v',
             '--verbose',
-            action='store_true',
-            help='Echo commands as they are run.',
+            action='count',
+            default=0,
+            help=(
+                'Echo commands as they are run (may be specified multiple '
+                'times; if specified N times, N-1 "-v"s will be passed to '
+                'the command if supported'
+            ),
         )
         subp.set_defaults(func=lambda _: method())
         return subp
@@ -152,9 +158,11 @@ class Runner:
             '-u', '--unit', action='store_true', help='Only run unit tests.'
         )
         subp.add_argument(
-            '-t', '--typ', action='store_true', help='Run tests with typ.'
+            '--typ',
+            action=argparse.BooleanOptionalAction,
+            default=True,
+            help='Run tests with typ instead of unittest (the default)',
         )
-        subp.add_argument('test', nargs='*', action='store')
 
         subp = self.add_parser(
             'devenv',
@@ -238,25 +246,20 @@ class Runner:
 
         subp = self.add_parser('tests', help='Run the tests.')
         subp.add_argument(
-            '-d',
-            '--durations',
-            metavar='N',
-            action='store',
-            help='show the N slowed test cases (N=0 for all)',
-        )
-        subp.add_argument(
             '-f',
             '--failfast',
             action='store_true',
             help='Stop on first fail or error',
         )
         subp.add_argument(
-            '-u', '--unit', action='store_true', help='Only run unit tests.'
+            '--typ',
+            action=argparse.BooleanOptionalAction,
+            default=True,
+            help='Run tests with typ instead of unittest (the default)',
         )
         subp.add_argument(
-            '-t', '--typ', action='store_true', help='Run tests with typ.'
+            '-u', '--unit', action='store_true', help='Only run unit tests.'
         )
-        subp.add_argument('test', nargs='*', action='store')
 
         self.args, self.remaining_args = self.arg_parser.parse_known_args(
             self._shuffle_argv(argv)
@@ -268,11 +271,11 @@ class Runner:
             sys.exit(2)
 
         if 'VIRTUAL_ENV' in os.environ:
-            self.run_cmd = ['python']
+            self.run_cmd = ['python3']
         elif self.args.quiet:
-            self.run_cmd = [self.uv_path, 'run', '--quiet', 'python']
+            self.run_cmd = [self.uv_path, 'run', '--quiet', 'python3']
         else:
-            self.run_cmd = [self.uv_path, 'run', 'python']
+            self.run_cmd = [self.uv_path, 'run', 'python3']
 
         self.args.func(self.args)
 
@@ -302,8 +305,7 @@ class Runner:
             env['TYP_SKIP'] = 'integration'
             self.args.omit = '*_test.py'
         if self.args.typ:
-            cmd = self.run_cmd + ['-m', 'typ', '-c']
-            cmd.extend(self.args.test)
+            cmd = self.run_cmd + ['-m', 'typ', '-TW', '-c']
         else:
             cmd = self.run_cmd + ['-m', 'coverage', 'run']
             if self.args.branch:
@@ -319,10 +321,9 @@ class Runner:
                     '*_test.py',
                 ],
             )
-            for test in self.args.test:
-                cmd.extend(['-k', self._trim_test_glob(test)])
         if self.args.verbose > 1:
             cmd.append('-' + 'v' * (self.args.verbose - 1))
+        cmd.extend(self.remaining_args)
         self.call(cmd, env=env)
         if not self.args.typ:
             cmd = self.run_cmd + ['-m', 'coverage', 'report', '--show-missing']
@@ -431,12 +432,9 @@ class Runner:
 
     def run_tests(self):
         if self.args.typ:
-            cmd = self.run_cmd + [
-                '-m',
-                'typ',
-            ]
+            cmd = self.run_cmd + ['-m', 'typ', '-TW']
             if self.args.failfast:
-                cmd.extend(['--typ-max-failures', '1'])
+                cmd.append('-F')
         else:
             cmd = self.run_cmd + [
                 '-m',
@@ -448,18 +446,11 @@ class Runner:
             ]
             if self.args.failfast:
                 cmd.append('-f')
+
         if self.args.quiet:
             cmd.append('-q')
         if self.args.verbose > 1:
             cmd.append('-' + 'v' * (self.args.verbose - 1))
-        if not self.args.typ and self.args.durations:
-            cmd.extend(['--durations', self.args.durations])
-
-        if self.args.typ:
-            cmd.extend(test for test in self.args.test)
-        else:
-            for test in self.args.test:
-                cmd.extend(['-k', self._trim_test_glob(test)])
         cmd.extend(self.remaining_args)
         env = os.environ.copy()
         if self.args.unit:
