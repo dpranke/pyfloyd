@@ -22,7 +22,7 @@ import pyfloyd
 from pyfloyd.generator import (
     add_arguments as add_generator_arguments,
     options_from_args as generator_options_from_args,
-    GeneratorOptions
+    GeneratorOptions,
 )
 
 
@@ -36,9 +36,9 @@ DEFAULT_LANGUAGE = 'python'
 
 DEFAULT_TEMPLATE = os.path.join(os.path.dirname(__file__), 'python.dft')
 
-EXT_TO_LANG = { gen.ext: gen.name for gen in _generators }
+EXT_TO_LANG = {gen.ext: gen.name for gen in _generators}
 
-LANGUAGE_MAP = { gen.name.lower(): gen for gen in _generators }
+LANGUAGE_MAP = {gen.name.lower(): gen for gen in _generators}
 
 SUPPORTED_LANGUAGES = tuple(gen.name.lower() for gen in _generators)
 
@@ -61,8 +61,11 @@ def add_generator_arguments(
     )
 
 
-def generator_options_from_args(args: argparse.Namespace, argv: Sequence[str],
-                                language: str = DEFAULT_LANGUAGE):
+def generator_options_from_args(
+    args: argparse.Namespace,
+    argv: Sequence[str],
+    language: str = DEFAULT_LANGUAGE,
+):
     return pyfloyd.generator.options_from_args(args, argv, language)
 
 
@@ -167,7 +170,9 @@ def generate(
     if result.err:
         return result
     try:
-        grammar_obj = pyfloyd.analyzer.analyze(result.val, rewrite_subrules=True)
+        grammar_obj = pyfloyd.analyzer.analyze(
+            result.val, rewrite_subrules=True
+        )
     except pyfloyd.analyzer.AnalysisError as e:
         return Result(err=str(e))
 
@@ -177,7 +182,6 @@ def generate(
         else:
             assert options is None or isinstance(options, dict)
             options = pyfloyd.generator.GeneratorOptions(**options)
-
 
     if options.language is None:
         options.language = DEFAULT_LANGUAGE

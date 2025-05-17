@@ -27,15 +27,14 @@ from pyfloyd import support
 class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
     name: str = 'JavaScript'
     ext: str = 'js'
-    indent: Optional[int|str] = 2
+    indent: Optional[int | str] = 2
     line_length: Optional[int] = 79
-
 
     def __init__(
         self,
         host: support.Host,
         grammar: gram.Grammar,
-        options: generator.GeneratorOptions
+        options: generator.GeneratorOptions,
     ):
         super().__init__(host, grammar, options)
         self.options.indent = '  '
@@ -228,7 +227,9 @@ class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
             vl += "this.operators['%s'] = o;" % rule
         return vl
 
-    def _gen_parse_method(self, exception_needed, starting_rule) -> formatter.VList:
+    def _gen_parse_method(
+        self, exception_needed, starting_rule
+    ) -> formatter.VList:
         if exception_needed:
             return self._defmt(f"""
                 parse(externs = null) {{

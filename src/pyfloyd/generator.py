@@ -96,8 +96,8 @@ class Generator:
 
 def add_arguments(
     parser: argparse.ArgumentParser,
-    default_language: str, 
-    generators: Sequence[Generator]
+    default_language: str,
+    generators: Sequence[Generator],
 ):
     options = GeneratorOptions(language=default_language)
     parser.add_argument(
@@ -222,4 +222,3 @@ def options_from_args(
     d.argv = argv[1:] if argv else sys.argv[1:]
     d.command_line = shlex.join(d['argv'])
     return d
-

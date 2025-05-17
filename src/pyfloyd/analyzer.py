@@ -383,17 +383,17 @@ def _check_operator(grammar, name, choices):
         assert choice.t == 'seq'
         if len(choice.ch) not in (3, 4):
             return None
-        if choice.ch[0] != gram.Label(
-            '$1', gram.Apply(name)
-        ) and choice.ch[0] != gram.Apply(name):
+        if choice.ch[0] != gram.Label('$1', gram.Apply(name)) and choice.ch[
+            0
+        ] != gram.Apply(name):
             return None
         if choice.ch[1].t != 'lit' or choice.ch[1].v not in grammar.prec:
             return None
         operator = choice.ch[1].v
         prec = grammar.prec[operator]
-        if choice.ch[2] != gram.Label(
-            '$3', gram.Apply(name)
-        ) and choice.ch[2] != gram.Apply(name):
+        if choice.ch[2] != gram.Label('$3', gram.Apply(name)) and choice.ch[
+            2
+        ] != gram.Apply(name):
             return None
         if len(choice.ch) == 4 and choice.ch[3].t != 'action':
             return None
