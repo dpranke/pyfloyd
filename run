@@ -46,20 +46,35 @@ grammars: dict[str, str] = {
 #
 
 
-def _read_package():
-    if tomllib:
+def _pyproject_value(val):
+    fields = val.split('.')
+    if tomllib and False:
         with open('pyproject.toml', mode='rb') as fp:
-            return tomllib.load(fp)['project']['name']
+            v = tomllib.load(fp)[fields[0]]
+            for field in fields[1:]:
+                if field in v:
+                    v = v[field]
+                else:
+                    return None
+            return v
+
     with open('pyproject.toml', mode='rb') as fp:
+        section = '.'.join(fields[:-1])
+        key = fields[-1]
         lines = fp.read().decode('utf8').splitlines()
+        found_section = False
         for line in lines:
-            m = re.match(r'name = "([^"]*)"', line)
-            if m:
-                return m.group(0)
+            if found_section:
+                m = re.match(rf'{key} = "([^"]*)"', line)
+                if m:
+                    return m.group(0)
+            else:
+                if line == f'[{section}]':
+                    found_section = True
     return None
 
 
-package = _read_package()
+package = _pyproject_value('project.name')
 
 assert package is not None, 'Could not determine package name'
 
@@ -86,6 +101,7 @@ class Runner:
     def add_parser(self, cmd, help):  # pylint: disable=redefined-builtin
         method = getattr(self, 'run_' + cmd.replace('-', '_'))
         subp = self.subps.add_parser(cmd, help=help)
+        subp.add_argument('-E', '--echo-real-command', action='store_true')
         subp.add_argument(
             '-n',
             '--no-execute',
@@ -112,10 +128,12 @@ class Runner:
         subp.set_defaults(func=lambda _: method())
         return subp
 
-    def call(self, *args, **kwargs):
-        cmd = shlex.join(*args)
+    def call(self, cmd, comment='', echo_cmd=None, **kwargs):
         if self.args.no_execute or self.args.verbose:
-            print(f'{cmd}')
+            if not self.args.echo_real_command and echo_cmd:
+                print(f'{shlex.join(echo_cmd)}{comment}')
+            else:
+                print(f'{shlex.join(cmd)}{comment}')
         if self.args.no_execute:
             return None
         capture_output = kwargs.get('capture_output', self.args.quiet)
@@ -123,7 +141,7 @@ class Runner:
             del kwargs['capture_output']
 
         proc = subprocess.run(
-            *args, capture_output=capture_output, check=False, **kwargs
+            cmd, capture_output=capture_output, check=False, **kwargs
         )
         if proc.returncode != 0:
             if self.args.quiet:
@@ -264,6 +282,8 @@ class Runner:
         self.args, self.remaining_args = self.arg_parser.parse_known_args(
             self._shuffle_argv(argv)
         )
+        if self.remaining_args and self.remaining_args[0] == '--':
+            self.remaining_args = self.remaining_args[1:]
 
         self.uv_path = shutil.which('uv')
         if self.uv_path is None:
@@ -286,7 +306,10 @@ class Runner:
         self.call(cmd)
 
     def run_check(self):
-        self.call(self.run_cmd + ['-m', 'ruff', 'check'])
+        self.call(
+            self.run_cmd + ['-m', 'ruff', 'check'],
+            comment='  # uses files from [tool.ruff].include',
+        )
 
     def run_checks(self):
         self.run_check()
@@ -351,7 +374,10 @@ class Runner:
         cmd = self.run_cmd + ['-m', 'ruff', 'format']
         if self.args.check:
             cmd.append('--check')
-        self.call(cmd)
+        if self.args.verbose > 1:
+            cmd.append('--verbose')
+        cmd.extend(self.remaining_args)
+        self.call(cmd, comment='  # uses files from [tool.ruff].include ')
 
     def run_help(self):
         if self.args.subcommand:
@@ -359,24 +385,40 @@ class Runner:
         self.main(['--help'])
 
     def run_lint(self):
-        self.call(self.run_cmd[:-1] + ['pylint', 'run'] + self._files())
+        cmd_pfx = self.run_cmd + ['-m', 'pylint']
+        if self.remaining_args:
+            self.call(cmd_pfx + self.remaining_args)
+        else:
+            self.call(
+                cmd_pfx + self._files()[1:],
+                echo_cmd=cmd_pfx,
+                comment='  # + files from [tool.ruff].include',
+            )
 
     def run_mypy(self):
-        self.call(self.run_cmd + ['-m', 'mypy'] + self._files())
+        cmd_pfx = self.run_cmd + ['-m', 'mypy']
+        if self.remaining_args:
+            self.call(cmd_pfx + self.remaining_args)
+        else:
+            self.call(
+                cmd_pfx + self._files()[1:],
+                echo_cmd=cmd_pfx,
+                comment='  # + files from [tool.ruff].include',
+            )
 
     def run_presubmit(self):
         self.args.check = True
-        print('# ./run regen --check')
+        print('# //run regen --check')
         self.run_regen()
-        print('# ./run format --check')
+        print('# //run format --check')
         self.run_format()
-        print('# ./run check')
+        print('# //run check')
         self.run_check()
-        print('# ./run lint')
+        print('# //run lint')
         self.run_lint()
-        print('# ./run mypy')
+        print('# //run mypy')
         self.run_mypy()
-        print('# ./run coverage')
+        print('# //run coverage')
         self.run_coverage()
 
     def run_publish(self):
@@ -389,7 +431,7 @@ class Runner:
         tgz = f'dist{sep}{package}-{version}.tar.gz'
         wheel = f'dist{sep}{package}-{version}-py3-none-any.whl'
         if not os.path.exists(tgz) or not os.path.exists(wheel):
-            print('Run `./run build` first')
+            print('Run `//run build` first')
             return
         if self.args.test:
             test = ['--publish-url', 'https://test.pypi.org/legacy/']
@@ -500,26 +542,16 @@ class Runner:
                     fp.write(new)
 
     def _files(self):
-        files = ['run']
-        if self.file:
-            files.append(self.file)
-        else:
-            files.extend(glob.glob(self.top))
-            files.extend(glob.glob(f'{self.top}/*/*.py'))
-        files.extend(glob.glob('tests/*.py'))
-        files.extend(glob.glob('tests/*/*.py'))
+        dirs = _pyproject_value('tool.ruff.include')
+        if not dirs:
+            dirs = ['pyproject.toml', '**/*.py']
+        extra_dirs = _pyproject_value('tool.ruff.extra_include')
+        if extra_dirs:
+            dirs.extend(extra_dirs)
+        files = []
+        for d in dirs:
+            files.extend(glob.glob(d, recursive=True))
         return files
-
-    def _trim_test_glob(self, test):
-        if test.startswith('^'):
-            test = test[1:]
-        else:
-            test = '*' + test
-        if test.endswith('$'):
-            test = test[:-1]
-        else:
-            test = test + '*'
-        return test
 
     def _get_version(self):
         proc = self.call(
