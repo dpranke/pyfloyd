@@ -16,18 +16,14 @@
 
 import json
 import os
-import pathlib
-import shutil
 import subprocess
-import sys
 import textwrap
 from typing import Optional, Dict
-import unittest
 
 import pyfloyd
 
 
-THIS_DIR = pathlib.Path(__file__).parent
+THIS_DIR = os.path.dirname(__file__)
 
 SKIP = os.environ.get('SKIP', '')
 
@@ -1154,15 +1150,6 @@ class GrammarTestsMixin:
         self.check(grammar, '" "', out=True)
 
 
-class Interpreter(unittest.TestCase, GrammarTestsMixin):
-    max_diff = None
-
-    def compile(self, grammar, path='<string>', memoize=False, externs=None):
-        return pyfloyd.compile_to_parser(
-            textwrap.dedent(grammar), path, memoize=memoize, externs=externs
-        )
-
-
 class _GeneratedParserWrapper:
     def __init__(self, cmd, ext, source_code):
         self.cmd = cmd
@@ -1221,26 +1208,3 @@ class GeneratorMixin:
             None,
             0,
         )
-
-
-class PythonGenerator(unittest.TestCase, GeneratorMixin, GrammarTestsMixin):
-    maxDiff = None
-    cmd = [sys.executable]
-    language = 'python'
-    ext = '.py'
-
-
-class JavaScriptGenerator(
-    unittest.TestCase, GeneratorMixin, GrammarTestsMixin
-):
-    cmd = [shutil.which('node')]
-    language = 'javascript'
-    ext = '.js'
-    floyd_externs = {'unicode_names': False}
-
-    @skip('integration')
-    def test_json5_special_floats(self):
-        # TODO: `Infinity` and `NaN` are legal Python values and legal
-        # JavaScript values, but they are not legal JSON values, and so
-        # we can't read them in from output that is JSON.
-        pass
