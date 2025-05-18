@@ -14,22 +14,27 @@
 
 import unittest
 
-from pyfloyd.formatter import flatten, Comma, Saw, Tree
+from pyfloyd import formatter
 
 
 class FormatterTests(unittest.TestCase):
     def test_str(self):
-        self.assertEqual(['foo'], flatten('foo'))
+        self.assertEqual(['foo'], formatter.flatten('foo'))
 
     def test_comma(self):
-        t = Comma(['1', '2', '3'])
-        self.assertEqual(['1, 2, 3'], flatten(t))
+        t = formatter.Comma(['1', '2', '3'])
+        self.assertEqual(['1, 2, 3'], formatter.flatten(t))
 
-        t = Comma(['1', Saw('[', Comma(['2']), ']')])
-        self.assertEqual(['1, [2]'], flatten(t))
+        t = formatter.Comma(
+            [
+                '1',
+                formatter.Saw('[', formatter.Comma(['2']), ']'),
+            ]
+        )
+        self.assertEqual(['1, [2]'], formatter.flatten(t))
 
         # This tests an array that needs to span multiple lines.
-        t = Comma(
+        t = formatter.Comma(
             [
                 'self._long_rule_1',
                 'self._long_rule_2',
@@ -46,14 +51,23 @@ class FormatterTests(unittest.TestCase):
                 'self._long_rule_4,',
                 'self._long_rule_5,',
             ],
-            flatten(t),
+            formatter.flatten(t),
         )
 
     def test_comma_repr(self):
-        self.assertEqual("Comma(['1', '2'])", repr(Comma(['1', '2'])))
+        self.assertEqual(
+            "Comma(['1', '2'])", repr(formatter.Comma(['1', '2']))
+        )
         self.assertEqual(
             "Comma(['1', Saw('[', Comma(['2']), ']')])",
-            repr(Comma(['1', Saw('[', Comma(['2']), ']')])),
+            repr(
+                formatter.Comma(
+                    [
+                        '1',
+                        formatter.Saw('[', formatter.Comma(['2']), ']'),
+                    ]
+                )
+            ),
         )
 
     def test_line_too_long(self):
@@ -61,20 +75,20 @@ class FormatterTests(unittest.TestCase):
             'this is a string line that stretches out for a'
             'really long time and will not fit on one line'
         )
-        self.assertEqual([long_str], flatten(long_str))
+        self.assertEqual([long_str], formatter.flatten(long_str))
 
     def test_mix(self):
-        lines = flatten(
-            Saw(
+        lines = formatter.flatten(
+            formatter.Saw(
                 'self._succeed(',
-                Saw(
+                formatter.Saw(
                     'self.xtou(',
-                    Comma(
+                    formatter.Comma(
                         [
-                            Tree(
+                            formatter.Tree(
                                 "self._get('long_variable_1')",
                                 '+',
-                                Tree(
+                                formatter.Tree(
                                     "self._get('long_variable_2')",
                                     '+',
                                     "self._get('long_variable_3')",
@@ -101,17 +115,17 @@ class FormatterTests(unittest.TestCase):
         )
 
     def test_saw(self):
-        t = Saw('foo(', "'bar'", ')')
-        self.assertEqual(["foo('bar')"], flatten(t))
+        t = formatter.Saw('foo(', "'bar'", ')')
+        self.assertEqual(["foo('bar')"], formatter.flatten(t))
 
-        t = Saw('foo(', "'bar'", Saw(')(', "'baz'", ')'))
-        self.assertEqual(["foo('bar')('baz')"], flatten(t))
+        t = formatter.Saw('foo(', "'bar'", formatter.Saw(')(', "'baz'", ')'))
+        self.assertEqual(["foo('bar')('baz')"], formatter.flatten(t))
 
         # Test that the right length of args can fit on a line of 75
         # chars by itself.
-        t = Saw(
+        t = formatter.Saw(
             'foo(',
-            Comma(
+            formatter.Comma(
                 [
                     'self._long_rule_1',
                     'self._long_rule_2',
@@ -128,11 +142,11 @@ class FormatterTests(unittest.TestCase):
                 'self._long4',
                 ')',
             ],
-            flatten(t, length=67),
+            formatter.flatten(t, length=67),
         )
-        t = Saw(
+        t = formatter.Saw(
             'foo(',
-            Comma(
+            formatter.Comma(
                 [
                     'self._long_rule_1',
                     'self._long_rule_2',
@@ -155,10 +169,10 @@ class FormatterTests(unittest.TestCase):
                 '    self._long_rule_6,',
                 ')',
             ],
-            flatten(t),
+            formatter.flatten(t),
         )
 
-        t2 = Saw(')[', '4', ']')
+        t2 = formatter.Saw(')[', '4', ']')
         t.end = t2
         self.assertEqual(
             [
@@ -171,22 +185,22 @@ class FormatterTests(unittest.TestCase):
                 '    self._long_rule_6,',
                 ')[4]',
             ],
-            flatten(t),
+            formatter.flatten(t),
         )
 
     def test_tree(self):
-        t = Tree('1', '+', '2')
-        self.assertEqual(['1 + 2'], flatten(t))
-        t = Tree(
+        t = formatter.Tree('1', '+', '2')
+        self.assertEqual(['1 + 2'], formatter.flatten(t))
+        t = formatter.Tree(
             "'long string 1'",
             '+',
-            Tree(
+            formatter.Tree(
                 "'long string 2'",
                 '+',
-                Tree(
+                formatter.Tree(
                     "'long string 3'",
                     '+',
-                    Tree("'long string 4'", '+', "'long string5'"),
+                    formatter.Tree("'long string 4'", '+', "'long string5'"),
                 ),
             ),
         )
@@ -198,12 +212,14 @@ class FormatterTests(unittest.TestCase):
                 "+ 'long string 4'",
                 "+ 'long string5'",
             ],
-            flatten(t),
+            formatter.flatten(t),
         )
 
     def test_tree_repr(self):
-        self.assertEqual("Tree('1', '+', '2')", repr(Tree('1', '+', '2')))
+        self.assertEqual(
+            "Tree('1', '+', '2')", repr(formatter.Tree('1', '+', '2'))
+        )
         self.assertEqual(
             "Tree('1', '+', Tree('2', '+', '3'))",
-            repr(Tree('1', '+', Tree('2', '+', '3'))),
+            repr(formatter.Tree('1', '+', formatter.Tree('2', '+', '3'))),
         )

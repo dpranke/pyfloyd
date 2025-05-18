@@ -18,18 +18,27 @@ import argparse
 import os
 from typing import Any, NamedTuple, Optional, Protocol, Sequence
 
-import pyfloyd
-from pyfloyd.generator import (
-    add_arguments as add_generator_arguments,
-    options_from_args as generator_options_from_args,
-    GeneratorOptions,
+from pyfloyd import (
+    analyzer,
+    datafile_generator,
+    generator,
+    interpreter as m_interpreter,
+    javascript_generator,
+    python_generator,
+    grammar as m_grammar,
+    grammar_parser,
+    printer,
+    support,
+    version,
 )
 
 
+__version__ = version.__version__
+
 _generators = (
-    pyfloyd.datafile_generator.DatafileGenerator,
-    pyfloyd.javascript_generator.JavaScriptGenerator,
-    pyfloyd.python_generator.PythonGenerator,
+    datafile_generator.DatafileGenerator,
+    javascript_generator.JavaScriptGenerator,
+    python_generator.PythonGenerator,
 )
 
 DEFAULT_LANGUAGE = 'python'
@@ -44,21 +53,19 @@ SUPPORTED_LANGUAGES = tuple(gen.name.lower() for gen in _generators)
 
 Externs = Optional[dict[str, Any]]
 
-GeneratorOptions = pyfloyd.generator.GeneratorOptions
+GeneratorOptions = generator.GeneratorOptions
 
-Grammar = pyfloyd.grammar.Grammar
+Grammar = m_grammar.Grammar
 
-Host = pyfloyd.support.Host
+Host = support.Host
 
-Result = pyfloyd.grammar_parser.Result
+Result = grammar_parser.Result
 
 
 def add_generator_arguments(
     parser: argparse.ArgumentParser, default_language=DEFAULT_LANGUAGE
 ):
-    return pyfloyd.generator.add_arguments(
-        parser, default_language, _generators
-    )
+    return generator.add_arguments(parser, default_language, _generators)
 
 
 def generator_options_from_args(
@@ -66,7 +73,7 @@ def generator_options_from_args(
     argv: Sequence[str],
     language: str = DEFAULT_LANGUAGE,
 ):
-    return pyfloyd.generator.options_from_args(args, argv, language)
+    return generator.options_from_args(args, argv, language)
 
 
 class ParserInterface(Protocol):
@@ -108,7 +115,7 @@ class CompiledResult(NamedTuple):
     pos: Optional[int] = None
 
 
-def compile(  # pylint: disable=redefined-builtin
+def compile_to_parser(  # pylint: disable=redefined-builtin
     grammar: str,
     path: str = '<string>',
     memoize: bool = False,
@@ -119,14 +126,14 @@ def compile(  # pylint: disable=redefined-builtin
     This routine parses the provided grammar and returns an object
     that can parse strings according to the grammar.
     """
-    result = pyfloyd.grammar_parser.parse(grammar, path, externs)
+    result = grammar_parser.parse(grammar, path, externs)
     if result.err:
         return CompiledResult(err=result.err, pos=result.pos)
     try:
-        g = pyfloyd.analyzer.analyze(result.val, rewrite_subrules=False)
-        interpreter = pyfloyd.interpreter.Interpreter(g, memoize=memoize)
+        g = analyzer.analyze(result.val, rewrite_subrules=False)
+        interpreter = m_interpreter.Interpreter(g, memoize=memoize)
         return CompiledResult(interpreter, None)
-    except pyfloyd.analyzer.AnalysisError as e:
+    except analyzer.AnalysisError as e:
         return CompiledResult(None, str(e))
 
 
@@ -166,29 +173,27 @@ def generate(
     the result will describe the errors.
     """
 
-    result = pyfloyd.grammar_parser.parse(grammar, path, externs)
+    result = grammar_parser.parse(grammar, path, externs)
     if result.err:
         return result
     try:
-        grammar_obj = pyfloyd.analyzer.analyze(
-            result.val, rewrite_subrules=True
-        )
-    except pyfloyd.analyzer.AnalysisError as e:
+        grammar_obj = analyzer.analyze(result.val, rewrite_subrules=True)
+    except analyzer.AnalysisError as e:
         return Result(err=str(e))
 
-    if not isinstance(options, pyfloyd.generator.GeneratorOptions):
+    if not isinstance(options, generator.GeneratorOptions):
         if options is None:
-            options = pyfloyd.generator.GeneratorOptions()
+            options = generator.GeneratorOptions()
         else:
             assert options is None or isinstance(options, dict)
-            options = pyfloyd.generator.GeneratorOptions(**options)
+            options = generator.GeneratorOptions(**options)
 
     if options.language is None:
         options.language = DEFAULT_LANGUAGE
 
     for cls in _generators:
         if options.language.lower() == cls.name.lower():
-            gen = cls(Host(), grammar_obj, options)
+            gen = cls(support.Host(), grammar_obj, options)
             text = gen.generate()
             return Result(text)
 
@@ -226,7 +231,7 @@ def parse(
     string where the parser stopped. If there is an error, `pos` will
     indicate where in the string the error occurred.
     """
-    result = compile(grammar, grammar_path, memoize=memoize)
+    result = compile_to_parser(grammar, grammar_path, memoize=memoize)
     if result.err:
         return Result(err='Error in grammar: ' + result.err, pos=result.pos)
     assert result.parser is not None
@@ -248,22 +253,22 @@ def pretty_print(
     any errors, if it wasn't. If one of the values in the tuple is non-None,
     the other will be None.
     """
-    result = pyfloyd.grammar_parser.parse(grammar, path)
+    result = grammar_parser.parse(grammar, path)
     if result.err:
         return None, result.err
-    return pyfloyd.printer.Printer(result.val).dumps(), None
+    return printer.Printer(result.val).dumps(), None
 
 
 def dump_ast(
     grammar: str,
     path: str = '<string>',
     rewrite_subrules: bool = False,
-) -> tuple[Optional[pyfloyd.grammar.Node], Optional[str]]:
+) -> tuple[Optional[m_grammar.Node], Optional[str]]:
     """Returns the parsed AST from the grammar. Possibly useful for debugging.
 
     `rewrite_subrules` works as in the other methods.
     """
-    result = pyfloyd.grammar_parser.parse(grammar, path)
+    result = grammar_parser.parse(grammar, path)
     if result.err:
         return None, result.err
 

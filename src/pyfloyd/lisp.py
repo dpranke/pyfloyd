@@ -17,8 +17,7 @@ import argparse
 import sys
 from typing import Any
 
-from pyfloyd import lisp_interpreter
-from pyfloyd import lisp_parser
+from pyfloyd import lisp_interpreter, lisp_parser
 
 
 def main(argv=None):

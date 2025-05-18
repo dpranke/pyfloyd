@@ -18,7 +18,6 @@ import textwrap
 import unittest
 
 import pyfloyd
-import pyfloyd.support
 
 
 THIS_DIR = pathlib.Path(__file__).parent
@@ -42,6 +41,11 @@ def skip(kind):
 
 class PrinterTest(unittest.TestCase):
     maxDiff = None
+
+    def _read(self, *comps):
+        path = os.path.join(*comps)
+        with open(path, 'r', encoding='utf8') as fp:
+            return fp.read()
 
     def test_actions(self):
         # TODO: Improve printer algorithm so that choices with actions
@@ -89,14 +93,12 @@ class PrinterTest(unittest.TestCase):
     def test_floyd(self):  # pragma: no cover
         # TODO: Improve printer algorithm enough for this to work
         # without requiring all the rules to be more than 80 chars wide.
-        host = pyfloyd.support.Host()
-        grammar = host.read_text_file(THIS_DIR / '../grammars/floyd.g')
+        grammar = self._read(THIS_DIR, '..', 'grammars', 'floyd.g')
         _ = pyfloyd.pretty_print(grammar)
 
     @skip('integration')
     def test_json5(self):
-        host = pyfloyd.support.Host()
-        grammar = host.read_text_file(THIS_DIR / '../grammars/json5.g')
+        grammar = self._read(THIS_DIR, '..', 'grammars', 'json5.g')
         out, err = pyfloyd.pretty_print(grammar)
         self.assertMultiLineEqual(grammar, out)
         self.assertIsNone(err)

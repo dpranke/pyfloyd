@@ -48,7 +48,7 @@ grammars: dict[str, str] = {
 
 def _pyproject_value(val):
     fields = val.split('.')
-    if tomllib and False:
+    if tomllib and False:  # pylint: disable=condition-evals-to-constant
         with open('pyproject.toml', mode='rb') as fp:
             v = tomllib.load(fp)[fields[0]]
             for field in fields[1:]:
@@ -65,9 +65,10 @@ def _pyproject_value(val):
         found_section = False
         for line in lines:
             if found_section:
-                m = re.match(rf'{key} = "([^"]*)"', line)
+                # m = re.match(rf'{key} = "([^"]*)"', line)
+                m = re.match(rf'{key} = (.*)', line)
                 if m:
-                    return m.group(0)
+                    return eval(m.group(1))  # pylint: disable=eval-used
             else:
                 if line == f'[{section}]':
                     found_section = True
@@ -543,8 +544,6 @@ class Runner:
 
     def _files(self):
         dirs = _pyproject_value('tool.ruff.include')
-        if not dirs:
-            dirs = ['pyproject.toml', '**/*.py']
         extra_dirs = _pyproject_value('tool.ruff.extra_include')
         if extra_dirs:
             dirs.extend(extra_dirs)

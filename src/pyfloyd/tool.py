@@ -37,11 +37,11 @@ if (
 
 # pylint: disable=wrong-import-position
 import pyfloyd
-from pyfloyd import datafile
+from pyfloyd import datafile, support
 
 
 def main(argv=None, host=None):
-    host = host or pyfloyd.Host()
+    host = host or support.Host()
 
     args = None
     try:

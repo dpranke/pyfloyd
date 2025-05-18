@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from pyfloyd import string_literal as lit
+from pyfloyd import string_literal
 
 
 class Printer:
@@ -145,7 +145,7 @@ class Printer:
         return self._proc(node[2][0])
 
     def _ty_lit(self, node):
-        return lit.encode(node[1])
+        return string_literal.encode(node[1])
 
     def _ty_not(self, node):
         return '~%s' % self._proc(node[2][0])
@@ -166,10 +166,13 @@ class Printer:
         return '?{ %s }' % self._proc(node[2][0])
 
     def _ty_range(self, node):
-        return '%s..%s' % (lit.encode(node[1][0]), lit.encode(node[1][1]))
+        return '%s..%s' % (
+            string_literal.encode(node[1][0]),
+            string_literal.encode(node[1][1]),
+        )
 
     def _ty_regexp(self, node):
-        return f'/{lit.escape(node[1], "/")}/'
+        return f'/{string_literal.escape(node[1], "/")}/'
 
     def _ty_run(self, node):
         return '<%s>' % self._proc(node[2][0])
@@ -181,7 +184,7 @@ class Printer:
         return ' '.join(self._proc(e) for e in node[2])
 
     def _ty_set(self, node):
-        return f'[{lit.escape(node[1], "]")}]'
+        return f'[{string_literal.escape(node[1], "]")}]'
 
     def _ty_star(self, node):
         return self._proc(node[2][0]) + '*'

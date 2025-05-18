@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from pyfloyd import grammar as gram
+from pyfloyd import grammar as m_grammar
 
 
 class AnalysisError(Exception):
@@ -28,14 +28,14 @@ class AnalysisError(Exception):
         return s
 
 
-def analyze(ast, rewrite_subrules: bool) -> gram.Grammar:
+def analyze(ast, rewrite_subrules: bool) -> m_grammar.Grammar:
     """Analyze and optimize the AST.
 
     This runs any static analysis we can do over the grammars and
     optimizes what we can. Raises AnalysisError if there are any errors.
     """
 
-    g = gram.Grammar(ast)
+    g = m_grammar.Grammar(ast)
 
     # Find whatever errors we can.
     a = _Analyzer(g)
@@ -94,7 +94,7 @@ def analyze(ast, rewrite_subrules: bool) -> gram.Grammar:
 
 
 class _Analyzer:
-    def __init__(self, grammar: gram.Grammar):
+    def __init__(self, grammar: m_grammar.Grammar):
         self.grammar = grammar
         assert self.grammar.ast.t == 'rules'
         self.errors = []
@@ -230,7 +230,7 @@ class _Analyzer:
         for i, c in enumerate(node.ch, start=1):
             name = f'${i}'
             if name in labels_needed:
-                node.ch[i - 1] = gram.Label(name, c)
+                node.ch[i - 1] = m_grammar.Label(name, c)
 
     def _check_positional_var_refs(self, node, current_index, labels_needed):
         if node.t == 'e_var':
@@ -258,7 +258,7 @@ class _Analyzer:
     def check_for_unknown_functions(self, node):
         if node.t == 'e_qual' and node.ch[1].t == 'e_call':
             function_name = node.ch[0].v
-            if function_name not in gram.BUILTIN_FUNCTIONS:
+            if function_name not in m_grammar.BUILTIN_FUNCTIONS:
                 self.errors.append(
                     f'Unknown function "{function_name}" called'
                 )
@@ -332,7 +332,7 @@ def _rewrite_scopes(grammar):
         for i, c in enumerate(node.ch):
             node.ch[i] = rewrite_node(c)
         if node.t == 'seq' and any(c.t == 'label' for c in node.ch):
-            return gram.Scope([node])
+            return m_grammar.Scope([node])
         return node
 
     for rule in grammar.ast.rules:
@@ -362,7 +362,7 @@ def _rewrite_recursion(grammar):
             if has_lr:
                 grammar.leftrec_rules.update(seen)
                 node_name = '%s#%d' % (name, i + 1)
-                choices[i] = gram.Leftrec(
+                choices[i] = m_grammar.Leftrec(
                     node_name,
                     choice,
                 )
@@ -383,27 +383,27 @@ def _check_operator(grammar, name, choices):
         assert choice.t == 'seq'
         if len(choice.ch) not in (3, 4):
             return None
-        if choice.ch[0] != gram.Label('$1', gram.Apply(name)) and choice.ch[
-            0
-        ] != gram.Apply(name):
+        if choice.ch[0] != m_grammar.Label(
+            '$1', m_grammar.Apply(name)
+        ) and choice.ch[0] != m_grammar.Apply(name):
             return None
         if choice.ch[1].t != 'lit' or choice.ch[1].v not in grammar.prec:
             return None
         operator = choice.ch[1].v
         prec = grammar.prec[operator]
-        if choice.ch[2] != gram.Label('$3', gram.Apply(name)) and choice.ch[
-            2
-        ] != gram.Apply(name):
+        if choice.ch[2] != m_grammar.Label(
+            '$3', m_grammar.Apply(name)
+        ) and choice.ch[2] != m_grammar.Apply(name):
             return None
         if len(choice.ch) == 4 and choice.ch[3].t != 'action':
             return None
         if has_scope:
-            choice = gram.Scope([choice])
-        operators.append(gram.Op(operator, prec, choice))
+            choice = m_grammar.Scope([choice])
+        operators.append(m_grammar.Op(operator, prec, choice))
     choice = choices[-1]
     if len(choice[2]) != 1:
         return None
-    return gram.Choice([gram.Operator(name, operators), choices[-1]])
+    return m_grammar.Choice([m_grammar.Operator(name, operators), choices[-1]])
 
 
 def _check_lr(rule_name, node, grammar, seen):
@@ -491,7 +491,7 @@ def _collect_tokens(grammar, node):
                 _collect_tokens(grammar, rule)
         return
 
-    if node.t == 'apply' and node.rule_name not in gram.BUILTIN_RULES:
+    if node.t == 'apply' and node.rule_name not in m_grammar.BUILTIN_RULES:
         grammar.tokens.add(node.rule_name)
 
     for c in node.ch:
@@ -506,27 +506,30 @@ def _add_filler_rules(grammar):
     filler = None
     if grammar.whitespace and grammar.comment:
         if grammar.whitespace.t == 'regexp' and grammar.comment.t == 'regexp':
-            filler = gram.Regexp(
+            filler = m_grammar.Regexp(
                 f'(({grammar.whitespace.v})|({grammar.comment.v}))*',
             )
         else:
-            filler = gram.Star(
-                gram.Choice(
-                    [gram.Apply('%whitespace'), gram.Apply('%comment')]
+            filler = m_grammar.Star(
+                m_grammar.Choice(
+                    [
+                        m_grammar.Apply('%whitespace'),
+                        m_grammar.Apply('%comment'),
+                    ]
                 )
             )
     elif grammar.comment:
         if grammar.comment.t == 'regexp':
-            filler = gram.Regexp(f'({grammar.comment.v})*')
+            filler = m_grammar.Regexp(f'({grammar.comment.v})*')
         else:
-            filler = gram.Star(gram.Apply('%comment'))
+            filler = m_grammar.Star(m_grammar.Apply('%comment'))
     elif grammar.whitespace:
         if grammar.whitespace.t == 'regexp':
-            filler = gram.Regexp(f'({grammar.whitespace.v})*')
+            filler = m_grammar.Regexp(f'({grammar.whitespace.v})*')
         else:
-            filler = gram.Star(gram.Apply('%whitespace'))
+            filler = m_grammar.Star(m_grammar.Apply('%whitespace'))
     if filler:
-        grammar.rules['%filler'] = gram.Choice([filler])
+        grammar.rules['%filler'] = m_grammar.Choice([filler])
 
 
 def _add_filler_nodes(grammar, node):
@@ -564,17 +567,19 @@ def _add_filler_nodes(grammar, node):
     if node.t == 'seq':
         children = []
         if len(children) == 1 and node.ch[0].t == 'action':
-            children.append(gram.Apply('%filler'))
+            children.append(m_grammar.Apply('%filler'))
         for c in node.ch:
             if should_fill(c):
-                children.append(gram.Apply('%filler'))
+                children.append(m_grammar.Apply('%filler'))
                 children.append(c)
             else:
                 sn = _add_filler_nodes(grammar, c)
                 children.append(sn)
-        return gram.Seq(children)
+        return m_grammar.Seq(children)
     if should_fill(node):
-        return gram.Paren(gram.Seq([gram.Apply('%filler'), node]))
+        return m_grammar.Paren(
+            m_grammar.Seq([m_grammar.Apply('%filler'), node])
+        )
 
     node.ch = [_add_filler_nodes(grammar, c) for c in node.ch]
     return node
@@ -626,8 +631,8 @@ class _SubRuleRewriter:
         self._grammar.rules = self._methods
         rules = []
         for rule in self._grammar.rules:
-            rules.append(gram.Rule(rule, self._grammar.rules[rule]))
-        self._grammar.ast = gram.Rules(rules)
+            rules.append(m_grammar.Rule(rule, self._grammar.rules[rule]))
+        self._grammar.ast = m_grammar.Rules(rules)
 
     def _subrule(self) -> str:
         self._counter += 1
@@ -679,12 +684,12 @@ class _SubRuleRewriter:
     def _make_subrule(self, child):
         subnode_rule = self._subrule()
         self._subrules[subnode_rule] = self._walk(child)
-        return gram.Apply(subnode_rule)
+        return m_grammar.Apply(subnode_rule)
 
     def _ty_apply(self, node):
         if node.rule_name in ('any', 'end'):
             self._grammar.needed_builtin_rules.append(node.rule_name)
-        return gram.Apply(self._rule_fmt.format(rule_name=node.rule_name))
+        return m_grammar.Apply(self._rule_fmt.format(rule_name=node.rule_name))
 
     def _ty_ends_in(self, node):
         self._grammar.needed_builtin_rules.append('any')
@@ -722,7 +727,7 @@ class _SubRuleRewriter:
     def _ty_operator(self, node):
         self._grammar.needed_operators.append('operator')
         self._grammar.operator_needed = True
-        o = gram.OperatorState()
+        o = m_grammar.OperatorState()
         prec_ops = {}
         for operator in node.ch:
             op, prec = operator.v

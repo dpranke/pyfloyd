@@ -12,19 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from pyfloyd import datafile
-from pyfloyd import generator
-from pyfloyd import grammar as gram
-from pyfloyd import formatter
-from pyfloyd import string_literal
-from pyfloyd import support
+from pyfloyd import (
+    datafile,
+    generator,
+    grammar as m_grammar,
+    formatter,
+    string_literal,
+    support,
+)
 
 
 class HardCodedGenerator(generator.Generator):
     def __init__(
         self,
         host: support.Host,
-        grammar: gram.Grammar,
+        grammar: m_grammar.Grammar,
         options: generator.GeneratorOptions,
     ):
         super().__init__(host, grammar, options)
@@ -87,11 +89,11 @@ class HardCodedGenerator(generator.Generator):
     def _gen_lit(self, lit: str) -> str:
         return string_literal.encode(lit)
 
-    def _gen_expr(self, node: gram.Node) -> formatter.FormatObj:
+    def _gen_expr(self, node: m_grammar.Node) -> formatter.FormatObj:
         fn = getattr(self, f'_ty_{node.t}')
         return fn(node)
 
-    def _gen_stmts(self, node: gram.Node) -> formatter.VList:
+    def _gen_stmts(self, node: m_grammar.Node) -> formatter.VList:
         fn = getattr(self, f'_ty_{node.t}')
         r = fn(node)
         if not isinstance(r, formatter.VList):
@@ -133,7 +135,7 @@ class HardCodedGenerator(generator.Generator):
     # Handlers for each non-host node in the glop AST follow.
     #
 
-    def _ty_action(self, node: gram.Node) -> formatter.ListObj:
+    def _ty_action(self, node: m_grammar.Node) -> formatter.ListObj:
         return formatter.HList(
             [
                 formatter.Saw(
@@ -145,8 +147,8 @@ class HardCodedGenerator(generator.Generator):
             ]
         )
 
-    def _ty_apply(self, node: gram.Node) -> formatter.ListObj:
-        assert isinstance(node, gram.Apply)
+    def _ty_apply(self, node: m_grammar.Node) -> formatter.ListObj:
+        assert isinstance(node, m_grammar.Apply)
         if node.memoize:
             return formatter.HList(
                 [
@@ -162,13 +164,13 @@ class HardCodedGenerator(generator.Generator):
             [self._gen_invoke(node.rule_name), self._map['end']]
         )
 
-    def _ty_e_arr(self, node: gram.Node) -> formatter.Lit | formatter.Saw:
+    def _ty_e_arr(self, node: m_grammar.Node) -> formatter.Lit | formatter.Saw:
         if len(node.ch) == 0:
             return formatter.Lit('[]')
         args = [self._gen_expr(c) for c in node.ch]
         return formatter.Saw('[', formatter.Comma(args), ']')
 
-    def _ty_e_call(self, node: gram.Node) -> formatter.Saw:
+    def _ty_e_call(self, node: m_grammar.Node) -> formatter.Saw:
         # There are no built-in functions that take no arguments, so make
         # sure we're not being called that way.
         # TODO: Figure out if we need this routine or not when we also
@@ -177,41 +179,41 @@ class HardCodedGenerator(generator.Generator):
         args = [self._gen_expr(c) for c in node.ch]
         return formatter.Saw('(', formatter.Comma(args), ')')
 
-    def _ty_e_const(self, node: gram.Node) -> formatter.Lit:
+    def _ty_e_const(self, node: m_grammar.Node) -> formatter.Lit:
         assert isinstance(node.v, str)
         return formatter.Lit(self._map[node.v])
 
-    def _ty_e_getitem(self, node: gram.Node) -> formatter.Saw:
+    def _ty_e_getitem(self, node: m_grammar.Node) -> formatter.Saw:
         return formatter.Saw('[', self._gen_expr(node.child), ']')
 
-    def _ty_e_lit(self, node: gram.Node) -> formatter.Lit:
+    def _ty_e_lit(self, node: m_grammar.Node) -> formatter.Lit:
         return formatter.Lit(self._gen_lit(node.v))
 
-    def _ty_e_minus(self, node: gram.Node) -> formatter.Tree:
-        assert isinstance(node, gram.EMinus)
+    def _ty_e_minus(self, node: m_grammar.Node) -> formatter.Tree:
+        assert isinstance(node, m_grammar.EMinus)
         return formatter.Tree(
             self._gen_expr(node.left), '-', self._gen_expr(node.right)
         )
 
-    def _ty_e_not(self, node: gram.Node) -> formatter.Tree:
+    def _ty_e_not(self, node: m_grammar.Node) -> formatter.Tree:
         return formatter.Tree(
             None, self._map['not'], self._gen_expr(node.child)
         )
 
-    def _ty_e_num(self, node: gram.Node) -> formatter.Lit:
+    def _ty_e_num(self, node: m_grammar.Node) -> formatter.Lit:
         assert isinstance(node.v, str)
         return formatter.Lit(node.v)
 
-    def _ty_e_paren(self, node: gram.Node) -> formatter.FormatObj:
+    def _ty_e_paren(self, node: m_grammar.Node) -> formatter.FormatObj:
         return self._gen_expr(node.child)
 
-    def _ty_e_plus(self, node: gram.Node) -> formatter.Tree:
-        assert isinstance(node, gram.EPlus)
+    def _ty_e_plus(self, node: m_grammar.Node) -> formatter.Tree:
+        assert isinstance(node, m_grammar.EPlus)
         return formatter.Tree(
             self._gen_expr(node.left), '+', self._gen_expr(node.right)
         )
 
-    def _ty_e_qual(self, node: gram.Node) -> formatter.Saw:
+    def _ty_e_qual(self, node: m_grammar.Node) -> formatter.Saw:
         first = node.ch[0]
         second = node.ch[1]
         start: formatter.Lit
@@ -255,8 +257,8 @@ class HardCodedGenerator(generator.Generator):
             next_saw = new_saw
         return saw
 
-    def _ty_e_var(self, node: gram.Node) -> formatter.FormatObj:
-        assert isinstance(node, gram.Var)
+    def _ty_e_var(self, node: m_grammar.Node) -> formatter.FormatObj:
+        assert isinstance(node, m_grammar.Var)
         if node.outer_scope:
             return self._gen_invoke('lookup', "'" + node.v + "'")
         if node.v in self.grammar.externs:
@@ -331,7 +333,7 @@ class HardCodedGenerator(generator.Generator):
         raise NotImplementedError
 
     def _ty_set(self, node) -> formatter.ListObj:
-        new_node = gram.Regexp('[' + node.v + ']')
+        new_node = m_grammar.Regexp('[' + node.v + ']')
         return self._ty_regexp(new_node)
 
     def _ty_unicat(self, node) -> formatter.ListObj:

@@ -21,7 +21,7 @@ class APITest(unittest.TestCase):
     maxDiff = None
 
     def test_compile(self):
-        parser, err, _ = pyfloyd.compile('grammar = "foo" "bar"')
+        parser, err, _ = pyfloyd.compile_to_parser('grammar = "foo" "bar"')
         self.assertIsNone(err)
 
         val, err, _ = parser.parse('baz')
@@ -29,7 +29,7 @@ class APITest(unittest.TestCase):
         self.assertEqual(err, '<string>:1 Unexpected "b" at column 1')
 
     def test_compile_bad_grammar(self):
-        parser, err, _ = pyfloyd.compile('xyz')
+        parser, err, _ = pyfloyd.compile_to_parser('xyz')
         self.assertIsNone(parser)
         self.assertEqual(err, '<string>:1 Unexpected end of input at column 4')
 

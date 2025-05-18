@@ -15,8 +15,10 @@
 import re
 import unicodedata
 
-from pyfloyd import grammar as gram
-from pyfloyd import grammar_parser
+from pyfloyd import (
+    grammar as m_grammar,
+    grammar_parser,
+)
 
 
 class _OperatorState:
@@ -30,7 +32,7 @@ class _OperatorState:
 
 
 class Interpreter:
-    def __init__(self, grammar: gram.Grammar, memoize: bool):
+    def __init__(self, grammar: m_grammar.Grammar, memoize: bool):
         self._memoize = memoize
         self._grammar = grammar
 
@@ -244,7 +246,7 @@ class Interpreter:
         self._succeed(node.v)
 
     def _ty_e_minus(self, node):
-        assert isinstance(node, gram.EMinus)
+        assert isinstance(node, m_grammar.EMinus)
         self._interpret(node.left)
         v1 = self._val
         self._interpret(node.right)
@@ -270,7 +272,7 @@ class Interpreter:
         self._interpret(node.child)
 
     def _ty_e_plus(self, node):
-        assert isinstance(node, gram.EPlus)
+        assert isinstance(node, m_grammar.EPlus)
         self._interpret(node.left)
         v1 = self._val
         self._interpret(node.right)
@@ -329,7 +331,7 @@ class Interpreter:
             self._interpret(node.child)
             if not self._failed:
                 return
-            self._ty_apply(self._grammar.node(gram.Apply, 'any'))
+            self._ty_apply(self._grammar.node(m_grammar.Apply, 'any'))
             if self._failed:
                 return
 
@@ -393,9 +395,9 @@ class Interpreter:
             self._fail(val)
 
     def _ty_not_one(self, node):
-        self._ty_not(self._grammar.node(gram.Not, node.child))
+        self._ty_not(self._grammar.node(m_grammar.Not, node.child))
         if not self._failed:
-            self._ty_apply(self._grammar.node(gram.Apply, 'any'))
+            self._ty_apply(self._grammar.node(m_grammar.Apply, 'any'))
 
     def _ty_operator(self, node):
         pos = self._pos
@@ -519,7 +521,7 @@ class Interpreter:
                 break
 
     def _ty_set(self, node):
-        new_node = self._grammar.node(gram.Regexp, '[' + node.v + ']')
+        new_node = self._grammar.node(m_grammar.Regexp, '[' + node.v + ']')
         self._interpret(new_node)
 
     def _ty_star(self, node):

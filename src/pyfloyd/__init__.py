@@ -49,34 +49,21 @@ compile the parser ahead of time:
     >>>
 """
 
-from pyfloyd import (
-    analyzer,
-    attr_dict,
-    datafile,
-    datafile_generator,
-    generator,
-    grammar,
-    grammar_parser,
-    interpreter,
-    javascript_generator,
-    printer,
-    python_generator,
-    support,
-    version,
-)
+from types import ModuleType
 
-# pylint: disable=redefined-builtin
-from pyfloyd.api import (
-    parse,
-    compile,
-    dump_ast,
+
+from pyfloyd.api import (  # noqa: F401 (unused-import)
     add_generator_arguments,
+    compile_to_parser,
+    dump_ast,
+    parse,
     generate,
     generator_options_from_args,
     pretty_print,
     CompiledResult,
+    Externs,
     GeneratorOptions,
-    Host,
+    Grammar,
     ParserInterface,
     Result,
     DEFAULT_LANGUAGE,
@@ -84,28 +71,11 @@ from pyfloyd.api import (
     EXT_TO_LANG,
     LANGUAGE_MAP,
     SUPPORTED_LANGUAGES,
+    __version__,
 )
-from pyfloyd.version import __version__
 
-# pylint: enable=redefined-builtin
 
-__all__ = [
-    '__version__',
-    'compile',
-    'dump_ast',
-    'add_generator_arguments',
-    'default_generator_options',
-    'generate',
-    'parse',
-    'pretty_print',
-    'CompiledResult',
-    'DEFAULT_LANGUAGE',
-    'EXT_TO_LANG',
-    'GeneratorOptions',
-    'Host',
-    'LANGUAGE_MAP',
-    'ParserInterface',
-    'Result',
-    'DEFAULT_LANGUAGE',
-    'SUPPORTED_LANGUAGES',
-]
+__all__ = []
+for _k in list(globals()):
+    if not isinstance(globals()[_k], ModuleType):
+        __all__.append(_k)

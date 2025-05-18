@@ -15,7 +15,7 @@
 import io
 import unittest
 
-from pyfloyd.support import Host
+from pyfloyd import support
 
 
 class HostTest(unittest.TestCase):
@@ -23,6 +23,6 @@ class HostTest(unittest.TestCase):
 
     def test_print(self):
         s = io.StringIO()
-        h = Host()
+        h = support.Host()
         h.print('hello, world', file=s)
         self.assertEqual('hello, world\n', s.getvalue())

@@ -18,9 +18,15 @@ import sys
 from typing import Optional, Sequence
 
 import pyfloyd
+from pyfloyd import (
+    attr_dict,
+    datafile,
+    grammar as m_grammar,
+    support,
+)
 
 
-class GeneratorOptions(pyfloyd.attr_dict.AttrDict):
+class GeneratorOptions(attr_dict.AttrDict):
     def __init__(self, *args, **kwargs):
         self.argv = None
         self.command_line = None
@@ -47,8 +53,8 @@ class Generator:
 
     def __init__(
         self,
-        host: pyfloyd.support.Host,
-        grammar: pyfloyd.grammar.Grammar,
+        host: support.Host,
+        grammar: m_grammar.Grammar,
         options: GeneratorOptions,
     ):
         self.host = host
@@ -148,7 +154,7 @@ def add_arguments(
     parser.add_argument(
         '--generator-options',
         '-G',
-        action=pyfloyd.datafile.ArgparseAppendAction,
+        action=datafile.ArgparseAppendAction,
         metavar='DATAFILE-STRING',
         help='Pass arbitrary options to the generator',
     )

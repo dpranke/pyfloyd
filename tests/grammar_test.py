@@ -25,7 +25,6 @@ from typing import Optional, Dict
 import unittest
 
 import pyfloyd
-import pyfloyd.support
 
 
 THIS_DIR = pathlib.Path(__file__).parent
@@ -1159,7 +1158,7 @@ class Interpreter(unittest.TestCase, GrammarTestsMixin):
     max_diff = None
 
     def compile(self, grammar, path='<string>', memoize=False, externs=None):
-        return pyfloyd.compile(
+        return pyfloyd.compile_to_parser(
             textwrap.dedent(grammar), path, memoize=memoize, externs=externs
         )
 

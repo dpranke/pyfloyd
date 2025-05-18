@@ -17,17 +17,16 @@ import sys
 import unittest
 
 import pyfloyd
-from pyfloyd.support import FakeHost, Host
-import pyfloyd.tool
+from pyfloyd import support, tool
 
 
 class ToolTest(unittest.TestCase):
     maxDiff = None
 
     def test_compile(self):
-        host = FakeHost()
+        host = support.FakeHost()
         host.write_text_file('grammar.g', 'grammar = "Hello" end -> true')
-        ret = pyfloyd.tool.main(['-c', 'grammar.g'], host=host)
+        ret = tool.main(['-c', 'grammar.g'], host=host)
         self.assertEqual(ret, 0)
         self.assertEqual(host.stdout.getvalue(), '')
         self.assertEqual(host.stderr.getvalue(), '')
@@ -41,9 +40,9 @@ class ToolTest(unittest.TestCase):
         self.assertEqual(result.pos, 5)
 
     def test_compile_error(self):
-        host = FakeHost()
+        host = support.FakeHost()
         host.write_text_file('grammar.g', 'xyz')
-        ret = pyfloyd.tool.main(['-c', 'grammar.g'], host=host)
+        ret = tool.main(['-c', 'grammar.g'], host=host)
         self.assertEqual(ret, 1)
         self.assertEqual(host.stdout.getvalue(), '')
         self.assertEqual(
@@ -65,12 +64,12 @@ class ToolTest(unittest.TestCase):
         # This does a full end-to-end test with pyfloyd writing the
         # compiled parser to the filesystem, loading the file from
         # filesystem, and using it to parse something.
-        host = Host()
+        host = support.Host()
         d = host.mkdtemp()
         try:
             path = d + '/grammar.g'
             host.write_text_file(path, "grammar = 'foo'* -> true\n")
-            ret = pyfloyd.tool.main(['-c', path], host)
+            ret = tool.main(['-c', path], host)
             f = host.read_text_file(d + '/grammar.py')
             scope = {}
             exec(f, scope)
@@ -87,7 +86,7 @@ class ToolTest(unittest.TestCase):
         # This does a full end-to-end test with pyfloyd writing the
         # compiled parser to the filesystem, loading the file from
         # filesystem, and using it to parse something.
-        host = Host()
+        host = support.Host()
         d = host.mkdtemp()
         try:
             path = d + '/grammar.g'
@@ -95,7 +94,7 @@ class ToolTest(unittest.TestCase):
 
             # This specifies a filename for `-o`; the other integration
             # test takes the default filename to cover both code paths.
-            pyfloyd.tool.main(['-c', '--main', '-o', d + '/foo.py', path])
+            tool.main(['-c', '--main', '-o', d + '/foo.py', path])
 
             host.write_text_file(d + '/foo.inp', 'foofoo')
             proc = subprocess.run(
@@ -113,7 +112,7 @@ class ToolTest(unittest.TestCase):
         # This does a full end-to-end test with pyfloyd writing the
         # compiled parser to the filesystem, loading the file from
         # filesystem, and using it to parse something.
-        host = Host()
+        host = support.Host()
         d = host.mkdtemp()
         try:
             path = d + '/grammar.g'
@@ -124,9 +123,7 @@ class ToolTest(unittest.TestCase):
             # doesn't have a main. It also omits the `-o` flag
             # to get coverage of the code path where we use the default
             # output path and extension.
-            pyfloyd.tool.main(
-                ['-c', '--memoize', '--language=javascript', path]
-            )
+            tool.main(['-c', '--memoize', '--language=javascript', path])
 
             host.write_text_file(d + '/foo.inp', 'foofoo')
 
@@ -146,29 +143,27 @@ class ToolTest(unittest.TestCase):
             host.rmtree(d)
 
     def test_interpret_file(self):
-        host = FakeHost()
+        host = support.FakeHost()
         host.write_text_file('grammar.g', 'grammar = "Hello" end -> true')
         host.write_text_file('input.txt', 'Hello')
-        self.assertEqual(
-            pyfloyd.tool.main(['grammar.g', 'input.txt'], host), 0
-        )
+        self.assertEqual(tool.main(['grammar.g', 'input.txt'], host), 0)
         self.assertEqual(host.stdout.getvalue(), 'true\n')
         self.assertEqual(host.stderr.getvalue(), '')
 
     def test_interpret(self):
-        host = FakeHost()
+        host = support.FakeHost()
         host.write_text_file('grammar.g', 'grammar = "Hello" end -> true')
         host.stdin.write('Hello')
         host.stdin.seek(0)
-        ret = pyfloyd.tool.main(['grammar.g'], host=host)
+        ret = tool.main(['grammar.g'], host=host)
         self.assertEqual(ret, 0)
         self.assertEqual(host.stderr.getvalue(), '')
         self.assertEqual(host.stdout.getvalue(), 'true\n')
 
     def test_interpret_grammar_error(self):
-        host = FakeHost()
+        host = support.FakeHost()
         host.write_text_file('grammar.g', 'xyz')
-        ret = pyfloyd.tool.main(['grammar.g'], host=host)
+        ret = tool.main(['grammar.g'], host=host)
         self.assertEqual(ret, 1)
         self.assertEqual(host.stdout.getvalue(), '')
         self.assertEqual(
@@ -178,11 +173,11 @@ class ToolTest(unittest.TestCase):
         )
 
     def test_interpret_input_error(self):
-        host = FakeHost()
+        host = support.FakeHost()
         host.write_text_file('grammar.g', 'grammar = "Hello" end -> true')
         host.stdin.write('Hell')
         host.stdin.seek(0)
-        self.assertEqual(pyfloyd.tool.main(['grammar.g'], host), 1)
+        self.assertEqual(tool.main(['grammar.g'], host), 1)
         self.assertEqual(host.stdout.getvalue(), '')
         self.assertEqual(
             host.stderr.getvalue(),
@@ -190,21 +185,21 @@ class ToolTest(unittest.TestCase):
         )
 
     def test_keyboard_interrupt(self):
-        host = FakeHost()
+        host = support.FakeHost()
         host.write_text_file('grammar.g', '')
 
         def _error_on_read(path):
             raise KeyboardInterrupt
 
         host.read_text_file = _error_on_read
-        self.assertEqual(pyfloyd.tool.main(['grammar.g'], host), 130)
+        self.assertEqual(tool.main(['grammar.g'], host), 130)
         self.assertEqual(host.stdout.getvalue(), '')
         self.assertEqual(host.stderr.getvalue(), 'Interrupted, exiting.\n')
 
     def test_main(self):
-        host = FakeHost()
+        host = support.FakeHost()
         host.write_text_file('grammar.g', 'grammar = "Hello" end -> true')
-        ret = pyfloyd.tool.main(['-c', '--main', 'grammar.g'], host=host)
+        ret = tool.main(['-c', '--main', 'grammar.g'], host=host)
         self.assertEqual(ret, 0)
         self.assertEqual(host.stdout.getvalue(), '')
         self.assertEqual(host.stderr.getvalue(), '')
@@ -215,9 +210,9 @@ class ToolTest(unittest.TestCase):
         self.assertIsNotNone(main_fn)
 
     def test_memoize(self):
-        host = FakeHost()
+        host = support.FakeHost()
         host.write_text_file('grammar.g', 'grammar = "Hello" end -> true')
-        ret = pyfloyd.tool.main(['-c', '--memoize', 'grammar.g'], host=host)
+        ret = tool.main(['-c', '--memoize', 'grammar.g'], host=host)
         self.assertEqual(ret, 0)
         self.assertEqual(host.stdout.getvalue(), '')
         self.assertEqual(host.stderr.getvalue(), '')
@@ -231,40 +226,40 @@ class ToolTest(unittest.TestCase):
         self.assertEqual(result.pos, 5)
 
     def test_missing_grammar(self):
-        host = FakeHost()
-        self.assertEqual(pyfloyd.tool.main(['grammar.g'], host), 1)
+        host = support.FakeHost()
+        self.assertEqual(tool.main(['grammar.g'], host), 1)
         self.assertEqual(host.stdout.getvalue(), '')
         self.assertEqual(
             host.stderr.getvalue(), 'Error: no such file: "grammar.g"\n'
         )
 
     def test_read_error(self):
-        host = FakeHost()
+        host = support.FakeHost()
         host.write_text_file('grammar.g', '')
 
         def _error_on_read(path):
             raise IOError('read error')
 
         host.read_text_file = _error_on_read
-        self.assertEqual(pyfloyd.tool.main(['grammar.g'], host), 1)
+        self.assertEqual(tool.main(['grammar.g'], host), 1)
         self.assertEqual(host.stdout.getvalue(), '')
         self.assertEqual(
             host.stderr.getvalue(), 'Error reading "grammar.g": read error\n'
         )
 
     def test_pretty_print(self):
-        host = FakeHost()
+        host = support.FakeHost()
         host.write_text_file('grammar.g', 'grammar = "Hello"    end -> true')
-        ret = pyfloyd.tool.main(['-p', 'grammar.g'], host=host)
+        ret = tool.main(['-p', 'grammar.g'], host=host)
         self.assertEqual(ret, 0)
         self.assertEqual(
             host.stdout.getvalue(), "grammar = 'Hello' end -> true\n"
         )
 
     def test_pretty_print_error(self):
-        host = FakeHost()
+        host = support.FakeHost()
         host.write_text_file('grammar.g', 'xyz')
-        ret = pyfloyd.tool.main(['-p', 'grammar.g'], host=host)
+        ret = tool.main(['-p', 'grammar.g'], host=host)
         self.assertEqual(ret, 1)
         self.assertEqual(host.stdout.getvalue(), '')
         self.assertEqual(
@@ -273,11 +268,11 @@ class ToolTest(unittest.TestCase):
         )
 
     def test_usage(self):
-        host = FakeHost()
+        host = support.FakeHost()
         # This should fail because we're not specifying a grammar.
-        self.assertEqual(pyfloyd.tool.main([], host=host), 2)
+        self.assertEqual(tool.main([], host=host), 2)
 
     def test_version(self):
-        host = FakeHost()
-        self.assertEqual(pyfloyd.tool.main(['--version'], host=host), 0)
+        host = support.FakeHost()
+        self.assertEqual(tool.main(['--version'], host=host), 0)
         self.assertEqual(host.stdout.getvalue(), pyfloyd.__version__ + '\n')

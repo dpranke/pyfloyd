@@ -14,7 +14,8 @@
 
 import os
 
-import pyfloyd.datafile
+import pyfloyd
+from pyfloyd import datafile, support
 
 
 class _Tests:
@@ -69,19 +70,19 @@ class _Tests:
         self.check(['--version'], out=str(pyfloyd.__version__) + '\n')
 
 
-class Inline(pyfloyd.support.InlineTestCase, _Tests):
-    main = pyfloyd.datafile.main
+class Inline(support.InlineTestCase, _Tests):
+    main = datafile.main
 
 
-class Module(pyfloyd.support.ModuleTestCase, _Tests):
+class Module(support.ModuleTestCase, _Tests):
     module = 'pyfloyd.datafile'
 
 
-class Script(pyfloyd.support.ScriptTestCase, _Tests):
+class Script(support.ScriptTestCase, _Tests):
     script = 'fdf'
 
 
-class Tool(pyfloyd.support.ScriptTestCase, _Tests):
+class Tool(support.ScriptTestCase, _Tests):
     script = os.path.join(
         os.path.dirname(__file__),
         '..',

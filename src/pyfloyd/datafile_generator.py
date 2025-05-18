@@ -14,13 +14,15 @@
 
 from typing import Any
 
-from pyfloyd import at_exp_parser
-from pyfloyd import datafile
-from pyfloyd import formatter
-from pyfloyd import generator
-from pyfloyd import grammar as gram
-from pyfloyd import lisp_interpreter
-from pyfloyd import support
+from pyfloyd import (
+    at_exp_parser,
+    datafile,
+    formatter,
+    generator,
+    grammar as m_grammar,
+    lisp_interpreter,
+    support,
+)
 
 
 class DatafileGenerator(generator.Generator):
@@ -30,7 +32,7 @@ class DatafileGenerator(generator.Generator):
     def __init__(
         self,
         host: support.Host,
-        grammar: gram.Grammar,
+        grammar: m_grammar.Grammar,
         options: generator.GeneratorOptions,
     ):
         super().__init__(host, grammar, options)
@@ -141,7 +143,7 @@ class DatafileGenerator(generator.Generator):
     # TODO: this should really be a check for whether you can handle
     # this data type, not whether it is foreign.
     def is_foreign(self, expr: Any, env: lisp_interpreter.Env) -> bool:
-        if isinstance(expr, gram.Node):
+        if isinstance(expr, m_grammar.Node):
             return True
         return lisp_interpreter.is_foreign(expr, env)
 
