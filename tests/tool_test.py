@@ -23,6 +23,8 @@ from pyfloyd import support, tool
 class ToolTest(unittest.TestCase):
     maxDiff = None
 
+    # pylint: disable=exec-used
+
     def test_compile(self):
         host = support.FakeHost()
         host.write_text_file('grammar.g', 'grammar = "Hello" end -> true')
@@ -231,20 +233,6 @@ class ToolTest(unittest.TestCase):
         self.assertEqual(host.stdout.getvalue(), '')
         self.assertEqual(
             host.stderr.getvalue(), 'Error: no such file: "grammar.g"\n'
-        )
-
-    def test_read_error(self):
-        host = support.FakeHost()
-        host.write_text_file('grammar.g', '')
-
-        def _error_on_read(path):
-            raise IOError('read error')
-
-        host.read_text_file = _error_on_read
-        self.assertEqual(tool.main(['grammar.g'], host), 1)
-        self.assertEqual(host.stdout.getvalue(), '')
-        self.assertEqual(
-            host.stderr.getvalue(), 'Error reading "grammar.g": read error\n'
         )
 
     def test_pretty_print(self):

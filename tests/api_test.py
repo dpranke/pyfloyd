@@ -37,7 +37,7 @@ class APITest(unittest.TestCase):
         txt, err, _ = pyfloyd.generate('grammar = "Hello" end -> true')
         self.assertIsNone(err)
         scope = {}
-        exec(txt, scope)
+        exec(txt, scope)  # pylint: disable=exec-used
         parse_fn = scope['parse']
         result = parse_fn('Hello', '<string>')
         self.assertIsNone(result.err)

@@ -49,6 +49,53 @@ pyfloyd = "pyfloyd.tool:main"
 line-length = 79
 skip-string-normalization = true
 
+[tool.pylint.basic]
+# By default, pylint wants method names to be at most 31 chars long,
+# but we want to allow up to 40 for regular names and 50 for test names.
+method-rgx = "((test_[a-zA-Z0-9_]{3,45})|([a-z_][a-zA-Z0-9_]{1,39}))$"
+
+# By default, pylint only allows UPPER_CASE constants, but we want to
+# allow snake_case as well in some situations.
+const-rgx = "[a-zA-Z_][a-zA-Z0-9_]{0,20}$"
+
+# By default, pylint wants all parameter names to be at least two chars long,
+# but we want to allow single-char parameter names as well.
+argument-rgx = "[a-z_][a-z0-9_]{0,19}$"
+
+# By default, pylint wants all variable names to be at least two chars long,
+# but we want to allow single-char variable names as well.
+variable-rgx = "[a-z_][a-z0-9_]{0,19}$"
+
+max-args = 8
+max-positional-arguments = 8
+
+# Recommend at most 65 statements per function/method
+max-statements = 65
+
+[tool.pylint.'messages control']
+
+disable = [
+   # Too much is duplicated between generated parsers and other AST walkers.
+   "duplicate-code",
+
+   # Don't want warnings for these.
+   "fixme",
+   "missing-docstring",
+
+   # These are violated too often in practice.
+   "too-few-public-methods",
+   "too-many-branches",
+   "too-many-instance-attributes",
+   "too-many-locals",
+   "too-many-return-statements",
+]
+
+[tool.pylint.reports]
+reports = false
+
+[tool.pylint.score]
+score = false
+
 [tool.ruff]
 include = ["pyproject.toml", "run", "src/**/*.py", "tests/**/*.py"]
 line-length = 79

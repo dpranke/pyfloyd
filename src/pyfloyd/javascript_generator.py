@@ -210,21 +210,19 @@ class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
             vl += 'o = new OperatorState();'
             vl += 'o.precOps = new Map();'
             for prec in o.prec_ops:
-                vl += 'o.precOps.set(%d, [' % prec
-                vl += ', '.join("'%s'" % op for op in o.prec_ops[prec])
+                vl += 'o.precOps.set(' + str(prec) + ', ['
+                vl += ', '.join("'" + op + "'" for op in o.prec_ops[prec])
                 vl += ']);'
             vl += 'o.precs = [...o.precOps.keys()].sort('
             vl += '(a, b) => b - a);'
             vl += 'o.rassoc = new Set(['
-            vl += ', '.join("'%s'" % op for op in o.rassoc)
+            vl += ', '.join("'" + op + "'" for op in o.rassoc)
             vl += ']);'
             vl += 'o.choices = new Map();'
             for op in o.choices:
-                vl += "o.choices.set('%s', this.%s);" % (
-                    op,
-                    o.choices[op],
-                )
-            vl += "this.operators['%s'] = o;" % rule
+                vl += "o.choices.set('" + op + "', "
+                vl += 'this.' + o.choices[op] + ');'
+            vl += "this.operators['" + rule + "'] = o;"
         return vl
 
     def _gen_parse_method(

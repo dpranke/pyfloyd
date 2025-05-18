@@ -269,11 +269,7 @@ class Tree(MultipleObj):
         assert self.left is not None or self.right is not None
 
     def __repr__(self):
-        return 'Tree(%s, %s, %s)' % (
-            repr(self.left),
-            repr(self.op),
-            repr(self.right),
-        )
+        return f'Tree({self.left!r}, {self.op!r}, {self.right!r})'
 
     def fmt_one(self, length: int, indent: str) -> list[str]:
         if self.left is None:

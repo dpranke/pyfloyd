@@ -98,12 +98,10 @@ def main(argv=None, host=None):
     except KeyboardInterrupt:
         host.print('Interrupted, exiting.', file=host.stderr)
         return 130  # SIGINT
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         print(e)
         if args and args.post_mortem:
             pdb.post_mortem()
-        else:
-            raise
         return 1
 
 
@@ -158,7 +156,7 @@ def _parse_args(host, argv):
         '-V',
         '--version',
         action='store_true',
-        help='print current version (%s)' % pyfloyd.__version__,
+        help=f'print current version ({pyfloyd.__version__})',
     )
     ap.add_argument(
         'grammar',
@@ -202,13 +200,10 @@ def _parse_args(host, argv):
 
 def _read_grammar(host, args):
     if not host.exists(args.grammar):
-        return None, 'Error: no such file: "%s"' % args.grammar
+        return None, f'Error: no such file: "{args.grammar}"'
 
-    try:
-        grammar_txt = host.read_text_file(args.grammar)
-        return grammar_txt, None
-    except Exception as e:
-        return None, 'Error reading "%s": %s' % (args.grammar, str(e))
+    grammar_txt = host.read_text_file(args.grammar)
+    return grammar_txt, None
 
 
 def _interpret_grammar(host, args, grammar, externs):

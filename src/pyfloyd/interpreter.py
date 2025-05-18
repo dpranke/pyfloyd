@@ -133,9 +133,9 @@ class Interpreter:
                 thing = 'end of input'
             else:
                 thing = repr(self._text[self._errpos]).replace("'", '"')
-            self._errstr = 'Unexpected %s at column %d' % (thing, colno)
+            self._errstr = f'Unexpected {thing} at column {colno}'
 
-        msg = '%s:%d %s' % (self._path, lineno, self._errstr)
+        msg = f'{self._path}:{lineno} {self._errstr}'
         return grammar_parser.Result(None, msg, self._errpos)
 
     def _r_any(self):

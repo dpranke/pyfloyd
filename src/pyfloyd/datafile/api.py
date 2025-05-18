@@ -60,6 +60,8 @@ _bare_word_re = re.compile(r'^[^\\\s\[\]\(\)\{\}:\'"`]+$')
 
 _long_str_re = re.compile(r"^l'=+'")
 
+# pylint: disable=too-many-arguments
+
 
 def load(
     fp: IO,

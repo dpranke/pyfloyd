@@ -57,12 +57,7 @@ class Printer:
         )
 
     def _format_rules(self, rules):
-        line_fmt = (
-            '%%-%ds' % self._max_rule_len
-            + ' %s '
-            + '%%-%ds' % self._max_choice_len
-            + ' %s'
-        )
+        line_fmt = f'%-{self._max_rule_len}s %s %-{self._max_choice_len}s %s'
         lines = []
         for rule_name, choices in rules:
             choice, act = choices[0]
@@ -81,7 +76,7 @@ class Printer:
     #
 
     def _ty_action(self, node):
-        return '-> %s' % self._proc(node[2][0])
+        return '-> ' + self._proc(node[2][0])
 
     def _ty_apply(self, node):
         return node[1]
@@ -95,22 +90,22 @@ class Printer:
         return '%s{%d,%d}' % (self._proc(node[2][0]), node[1][0], node[1][1])
 
     def _ty_e_arr(self, node):
-        return '[%s]' % ', '.join(self._proc(el) for el in node[2])
+        return '[' + ', '.join(self._proc(el) for el in node[2]) + ']'
 
     def _ty_e_call(self, node):
-        return '(%s)' % ', '.join(self._proc(arg) for arg in node[2])
+        return '(' + ', '.join(self._proc(arg) for arg in node[2]) + ')'
 
     def _ty_e_const(self, node):
         return node[1]
 
     def _ty_e_getitem(self, node):
-        return '[%s]' % self._proc(node[2][0])
+        return '[' + self._proc(node[2][0]) + ']'
 
     def _ty_e_lit(self, node):
         return self._ty_lit(node)
 
     def _ty_e_minus(self, node):
-        return '%s - %s' % (self._proc(node[2][0]), self._proc(node[2][1]))
+        return self._proc(node[2][0]) + ' - ' + self._proc(node[2][1])
 
     def _ty_e_not(self, node):
         return '!' + self._proc(node[2][0])
@@ -119,12 +114,12 @@ class Printer:
         return str(node[1])
 
     def _ty_e_plus(self, node):
-        return '%s + %s' % (self._proc(node[2][0]), self._proc(node[2][1]))
+        return self._proc(node[2][0]) + ' + ' + self._proc(node[2][1])
 
     def _ty_e_qual(self, node):
         _, _, ops = node
         v = self._proc(ops[0])
-        return '%s%s' % (v, ''.join(self._proc(op) for op in ops[1:]))
+        return v + ''.join(self._proc(op) for op in ops[1:])
 
     def _ty_e_var(self, node):
         return node[1]
@@ -138,8 +133,8 @@ class Printer:
 
     def _ty_label(self, node):
         if node[1].startswith('$'):
-            return '%s' % self._proc(node[2][0])
-        return '%s:%s' % (self._proc(node[2][0]), node[1])
+            return self._proc(node[2][0])
+        return self._proc(node[2][0]) + ':' + node[1]
 
     def _ty_leftrec(self, node):
         return self._proc(node[2][0])
@@ -148,10 +143,10 @@ class Printer:
         return string_literal.encode(node[1])
 
     def _ty_not(self, node):
-        return '~%s' % self._proc(node[2][0])
+        return '~' + self._proc(node[2][0])
 
     def _ty_not_one(self, node):
-        return '^%s' % self._proc(node[2][0])
+        return '^' + self._proc(node[2][0])
 
     def _ty_opt(self, node):
         return self._proc(node[2][0]) + '?'
@@ -163,19 +158,20 @@ class Printer:
         return self._proc(node[2][0]) + '+'
 
     def _ty_pred(self, node):
-        return '?{ %s }' % self._proc(node[2][0])
+        return '?{ ' + self._proc(node[2][0]) + ' }'
 
     def _ty_range(self, node):
-        return '%s..%s' % (
-            string_literal.encode(node[1][0]),
-            string_literal.encode(node[1][1]),
+        return (
+            string_literal.encode(node[1][0])
+            + '..'
+            + string_literal.encode(node[1][1])
         )
 
     def _ty_regexp(self, node):
-        return f'/{string_literal.escape(node[1], "/")}/'
+        return '/' + string_literal.escape(node[1], '/') + '/'
 
     def _ty_run(self, node):
-        return '<%s>' % self._proc(node[2][0])
+        return '<' + self._proc(node[2][0]) + '>'
 
     def _ty_scope(self, node):
         return self._proc(node[2][0])
@@ -184,10 +180,10 @@ class Printer:
         return ' '.join(self._proc(e) for e in node[2])
 
     def _ty_set(self, node):
-        return f'[{string_literal.escape(node[1], "]")}]'
+        return '[' + string_literal.escape(node[1], ']') + ']'
 
     def _ty_star(self, node):
         return self._proc(node[2][0]) + '*'
 
     def _ty_unicat(self, node):
-        return '\\p{%s}' % node[1]
+        return '\\p{' + node[1] + '}'

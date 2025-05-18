@@ -34,8 +34,8 @@ def _enc(ch, esc_ch):
     if 32 <= ord(ch) < 126:
         return ch
     if ord(ch) < 256:
-        return '\\x%02x' % ord(ch)
-    return '\\u%04x' % ord(ch)
+        return f'\\x{ord(ch):02x}'
+    return f'\\u{ord(ch):04x}'
 
 
 def escape(s, ch):

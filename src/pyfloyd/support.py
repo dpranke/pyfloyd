@@ -193,7 +193,6 @@ class _BaseTestCase(unittest.TestCase):
     def call(self, host, args, stdin):
         raise NotImplementedError
 
-    # pylint: disable=too-many-positional-arguments
     def check(
         self, args, stdin=None, files=None, returncode=0, out=None, err=None
     ):
@@ -221,8 +220,6 @@ class _BaseTestCase(unittest.TestCase):
             if tmpdir:
                 h.rmtree(tmpdir)
                 h.chdir(orig_wd)
-
-    # pylint: enable=too-many-positional-arguments
 
 
 class InlineTestCase(_BaseTestCase):
@@ -297,9 +294,7 @@ class ScriptTestCase(HostTestCase):
                 return [sys._base_executable, self.script]
             return [sys.executable, self.script]
         script = shutil.which(self.script)
-        self.assertIsNotNone(
-            script, 'Could not find `%s` in PATH' % self.script
-        )
+        self.assertIsNotNone(script, f'Could not find `{self.script}` in PATH')
         return [script]
 
 

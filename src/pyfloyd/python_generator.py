@@ -308,24 +308,24 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
             vl += 'o.prec_ops = {'
             text = ''
             for prec in sorted(o.prec_ops):
-                text += '    %d: [' % prec
-                text += ', '.join("'%s'" % op for op in o.prec_ops[prec])
+                text += '    ' + str(prec) + ': ['
+                text += ', '.join("'" + op + "'" for op in o.prec_ops[prec])
                 text += '],\n'
             vl += formatter.Indent(formatter.VList(text.splitlines()))
             vl += '}'
             vl += 'o.precs = sorted(o.prec_ops, reverse=True)'
             vl += (
                 'o.rassoc = set(['
-                + ', '.join("'%s'" % op for op in o.rassoc)
+                + ', '.join("'" + op + "'" for op in o.rassoc)
                 + '])'
             )
             vl += 'o.choices = {'
             choices = formatter.VList()
             for op in o.choices:
-                choices += "'%s': self._%s," % (op, o.choices[op])
+                choices += "'" + op + "': self._" + o.choices[op] + ','
             vl += formatter.Indent(choices)
             vl += '}'
-            vl += "self._operators['%s'] = o" % rule
+            vl += "self._operators['" + rule + "'] = o"
         return vl
 
     def _gen_methods(self) -> formatter.FormatObj:
@@ -700,13 +700,9 @@ _BUILTINS = {
             if self._errpos == len(self._text):
                 thing = 'end of input'
             else:
-                thing = repr(self._text[self._errpos]).replace("'", '"')
-            return '%s:%d Unexpected %s at column %d' % (
-                self._path,
-                lineno,
-                thing,
-                colno,
-            )
+                thing = '"' + self._text[self._errpos] + '"'
+            path = self._path
+            return f'{path}:{lineno} Unexpected {thing} at column {colno}'
         """,
     'fail': """
         def _fail(self):

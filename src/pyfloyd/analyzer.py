@@ -361,7 +361,7 @@ def _rewrite_recursion(grammar):
             has_lr = _check_lr(name, choice, grammar, seen)
             if has_lr:
                 grammar.leftrec_rules.update(seen)
-                node_name = '%s#%d' % (name, i + 1)
+                node_name = name + '#' + str(i + 1)
                 choices[i] = m_grammar.Leftrec(
                     node_name,
                     choice,
@@ -464,7 +464,7 @@ def _check_lr(rule_name, node, grammar, seen):
         'regexp',
         'set',
     ), (
-        'unexpected AST node type %s' % node.t  # pragma: no cover
+        'unexpected AST node type `{node.t}`'  # pragma: no cover
     )
     return False
 
@@ -642,9 +642,7 @@ class _SubRuleRewriter:
 
     def _subrule_key(self, s: str) -> int:
         return int(
-            s.replace(
-                's_{rule_name}_'.format(rule_name=self._rule_name), ''
-            ).replace('_', '')
+            s.replace('s_' + self._rule_name + '_', '').replace('_', '')
         )
 
     def _walk(self, node):

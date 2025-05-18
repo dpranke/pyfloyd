@@ -41,9 +41,18 @@ def skip(kind):
     return decorator
 
 
-class GrammarTestsMixin:
+class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
     max_diff = None
     floyd_externs: Optional[Dict[str, bool]] = None
+
+    def read_grammar(self, grammar):
+        path = os.path.join(THIS_DIR, '..', 'grammars', grammar)
+        with open(path, 'r', encoding='utf8') as fp:
+            return fp.read()
+
+    def compile_grammar(self, grammar, **kwargs):
+        contents = self.read_grammar(grammar)
+        return self.compile(contents, grammar, **kwargs)
 
     def check(
         self,
@@ -308,14 +317,12 @@ class GrammarTestsMixin:
 
     @skip('integration')
     def test_floyd(self):
-        h = pyfloyd.support.Host()
-        path = str(THIS_DIR / '../grammars/floyd.g')
-        grammar = h.read_text_file(path)
+        contents = self.read_grammar('floyd.g')
         p, err, _ = self.compile(
-            grammar, path, memoize=True, externs=self.floyd_externs
+            contents, 'floyd.g', memoize=True, externs=self.floyd_externs
         )
         self.assertIsNone(err)
-        out, err, _ = p.parse(grammar, '../grammars/floyd.g')
+        out, err, _ = p.parse(contents, 'floyd.g')
         # We don't check the actual output here because it is too long
         # and we don't want the test to be so sensitive to the AST for
         # the floyd grammar.
@@ -324,12 +331,12 @@ class GrammarTestsMixin:
 
     @skip('integration')
     def test_floyd_ws(self):
-        h = pyfloyd.support.Host()
-        path = str(THIS_DIR / '../grammars/floyd_ws.g')
-        grammar = h.read_text_file(path)
-        p, err, _ = self.compile(grammar, path, externs=self.floyd_externs)
+        contents = self.read_grammar('floyd_ws.g')
+        p, err, _ = self.compile(
+            contents, 'floyd_ws.g', externs=self.floyd_externs
+        )
         self.assertIsNone(err)
-        out, err, _ = p.parse(grammar, '../grammars/floyd.g')
+        out, err, _ = p.parse(contents, 'floyd_ws.g')
         # We don't check the actual output here because it is too long
         # and we don't want the test to be so sensitive to the AST for
         # the floyd grammar.
@@ -427,9 +434,7 @@ class GrammarTestsMixin:
 
     @skip('integration')
     def test_json(self):
-        h = pyfloyd.support.Host()
-        path = str(THIS_DIR / '../grammars/json.g')
-        p, err, _ = self.compile(h.read_text_file(path), path)
+        p, err, _ = self.compile_grammar('json.g')
         self.assertIsNone(err)
         self._common_json_checks(p, {})
 
@@ -441,9 +446,7 @@ class GrammarTestsMixin:
     @skip('integration')
     def test_json5(self):
         externs = {'strict': True}
-        h = pyfloyd.support.Host()
-        path = str(THIS_DIR / '../grammars/json5.g')
-        p, err, _ = self.compile(h.read_text_file(path), path)
+        p, err, _ = self.compile_grammar('json5.g')
         self.assertIsNone(err)
         self._common_json_checks(p, externs=externs)
         self._common_json5_checks(p, externs=externs)
@@ -451,9 +454,7 @@ class GrammarTestsMixin:
     @skip('integration')
     def test_json5_special_floats(self):
         externs = {'strict': True}
-        h = pyfloyd.support.Host()
-        path = str(THIS_DIR / '../grammars/json5.g')
-        p, err, _ = self.compile(h.read_text_file(path), path)
+        p, err, _ = self.compile_grammar('json5.g')
         self.assertIsNone(err)
 
         # TODO: Figure out what to do with 'Infinity' and 'NaN'.
@@ -508,9 +509,7 @@ class GrammarTestsMixin:
         # Check the sample file from pyjson5.
         # this skips the `'to': Infinity` pair because that can't
         # be marshalled in and out of JSON.
-        h = pyfloyd.support.Host()
-        path = str(THIS_DIR / '../grammars/json5.g')
-        p, err, _ = self.compile(h.read_text_file(path), path)
+        p, err, _ = self.compile_grammar('json5.g')
         self.assertIsNone(err)
         self.checkp(
             p,
@@ -563,10 +562,7 @@ class GrammarTestsMixin:
     @skip('integration')
     def test_json5_ws(self):
         externs = {'strict': False}
-        h = pyfloyd.support.Host()
-        path = str(THIS_DIR / '../grammars/json5_ws.g')
-        grammar = h.read_text_file(path)
-        p, err, _ = self.compile(grammar, path)
+        p, err, _ = self.compile_grammar('json5_ws.g')
         self.assertIsNone(err)
         self._common_json_checks(p, externs=externs)
         self._common_json5_checks(p, externs=externs)
