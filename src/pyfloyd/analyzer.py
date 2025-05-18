@@ -85,6 +85,7 @@ def analyze(ast, rewrite_subrules: bool) -> m_grammar.Grammar:
 
     g.needed_builtin_rules = sorted(set(g.needed_builtin_rules))
     g.needed_builtin_functions = sorted(set(g.needed_builtin_functions))
+    g.needed_operators = sorted(set(g.needed_operators))
     g.unicodedata_needed = (
         g.unicat_needed or 'unicode_lookup' in g.needed_builtin_functions
     )

@@ -28,16 +28,16 @@ from pyfloyd import (
 
 class GeneratorOptions(attr_dict.AttrDict):
     def __init__(self, *args, **kwargs):
-        self.argv = None
-        self.command_line = None
-        self.dialect = None
+        self.argv = []
+        self.command_line = ''
+        self.dialect = ''
         self.formatter_list = False
-        self.generator_options = None
+        self.generator_options = {}
         self.indent = None
         self.language = None
         self.line_length = None
         self.main = False
-        self.memoize = None
+        self.memoize = False
         self.template = pyfloyd.DEFAULT_TEMPLATE
         self.version = pyfloyd.__version__
         self.unicodedata_needed = None

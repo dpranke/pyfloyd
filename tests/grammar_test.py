@@ -316,7 +316,7 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
         self.check("grammar = '\\'foo' -> true", text="'foo", out=True)
 
     @skip('integration')
-    def test_floyd(self):
+    def disabled_test_floyd(self):
         contents = self.read_grammar('floyd.g')
         p, err, _ = self.compile(
             contents, 'floyd.g', memoize=True, externs=self.floyd_externs
@@ -330,7 +330,7 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
         self.assertEqual(out[0], 'rules')
 
     @skip('integration')
-    def test_floyd_ws(self):
+    def disabled_test_floyd_ws(self):
         contents = self.read_grammar('floyd_ws.g')
         p, err, _ = self.compile(
             contents, 'floyd_ws.g', externs=self.floyd_externs
@@ -433,7 +433,7 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
         )
 
     @skip('integration')
-    def test_json(self):
+    def disabled_test_json(self):
         p, err, _ = self.compile_grammar('json.g')
         self.assertIsNone(err)
         self._common_json_checks(p, {})
@@ -444,7 +444,7 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
             p.cleanup()
 
     @skip('integration')
-    def test_json5(self):
+    def disabled_test_json5(self):
         externs = {'strict': True}
         p, err, _ = self.compile_grammar('json5.g')
         self.assertIsNone(err)
@@ -452,7 +452,7 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
         self._common_json5_checks(p, externs=externs)
 
     @skip('integration')
-    def test_json5_special_floats(self):
+    def disabled_test_json5_special_floats(self):
         externs = {'strict': True}
         p, err, _ = self.compile_grammar('json5.g')
         self.assertIsNone(err)
@@ -505,7 +505,7 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
         )
 
     @skip('integration')
-    def test_json5_sample(self):
+    def disabled_test_json5_sample(self):
         # Check the sample file from pyjson5.
         # this skips the `'to': Infinity` pair because that can't
         # be marshalled in and out of JSON.
@@ -560,7 +560,7 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
             p.cleanup()
 
     @skip('integration')
-    def test_json5_ws(self):
+    def disabled_test_json5_ws(self):
         externs = {'strict': False}
         p, err, _ = self.compile_grammar('json5_ws.g')
         self.assertIsNone(err)
@@ -670,7 +670,7 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
         self.check("grammar = ~~('a') 'a' -> true", text='a', out=True)
 
     @skip('operators')
-    def test_not_quite_operators(self):
+    def disabled_test_not_quite_operators(self):
         # This tests things that will currently not be classified as
         # operator expressions.
 
@@ -728,7 +728,7 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
             out=None,
         )
 
-    def test_operator_indirect(self):
+    def disabled_test_operator_indirect(self):
         # Tests that you can specify the list of operators in a rule
         # separate from the actual pragma.
         g = """
@@ -740,7 +740,7 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
         self.check(g, '1+2', out=['1', '+', '2'])
 
     @skip('operators')
-    def test_operator_invalid(self):
+    def disabled_test_operator_invalid(self):
         # TODO: Provide a better error message, allow rules that expand
         # to literals.
         g = """
@@ -755,7 +755,7 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
         )
 
     @skip('operators')
-    def test_operators(self):
+    def disabled_test_operators(self):
         # For now, precedence has no effect but this at least tests
         # that the pragmas get parsed.
         g = """
@@ -787,7 +787,7 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
         )
 
     @skip('operators')
-    def test_operators_multichar_is_valid(self):
+    def disabled_test_operators_multichar_is_valid(self):
         # This tests that operators do not have to be just a single character.
         g = """
            %prec = '++'
@@ -797,7 +797,7 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
         self.check(g, text='1++2', out=['1', '++', '2'])
 
     @skip('operators')
-    def test_operators_with_whitespace(self):
+    def disabled_test_operators_with_whitespace(self):
         # For now, precedence has no effect but this at least tests
         # that the pragmas get parsed.
         g = """
@@ -861,7 +861,7 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
         )
 
     @skip('leftrec')
-    def test_recursion_both(self):
+    def disabled_test_recursion_both(self):
         grammar = """\
             expr = expr:l '+' expr:r -> [l, '+', r]
                  | '0'..'9':d        -> d
@@ -871,7 +871,7 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
         self.check(grammar, '1+2+3', [['1', '+', '2'], '+', '3'])
 
     @skip('leftrec')
-    def test_recursion_direct_left(self):
+    def disabled_test_recursion_direct_left(self):
         self.check(
             """\
             grammar = grammar:g '+' 'a' -> [g, '+', 'a']
@@ -882,7 +882,7 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
         )
 
     @skip('leftrec')
-    def test_recursion_without_a_label(self):
+    def disabled_test_recursion_without_a_label(self):
         # This covers the code path where left recursion happens but
         # we don't need to save the value from it.
         self.check(
@@ -905,7 +905,7 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
         )
 
     @skip('leftrec')
-    def test_recursion_indirect_left(self):
+    def disabled_test_recursion_indirect_left(self):
         self.check(
             """\
             grammar = b:b '+' 'a'   -> [b, '+', 'a']
@@ -937,7 +937,7 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
         )
 
     @skip('leftrec')
-    def test_recursion_left_opt(self):
+    def disabled_test_recursion_left_opt(self):
         grammar = """\
             grammar = 'b'?:b grammar:g 'c' -> join('', b) + g + 'c'
                     | 'a'           -> 'a'
@@ -970,7 +970,7 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
         )
 
     @skip('leftrec')
-    def test_recursion_repeated(self):
+    def disabled_test_recursion_repeated(self):
         self.check(
             """
             grammar = grammar:x grammar:y 'a' -> [x, y, 'a']

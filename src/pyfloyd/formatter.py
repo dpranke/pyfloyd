@@ -111,6 +111,8 @@ class ListObj(FormatObj):
         elif len(objs) == 1 and isinstance(objs[0], self.__class__):
             self.objs = objs[0].objs
         else:
+            if objs == [[]]:
+                import pdb; pdb.set_trace()
             self.objs = list(objs)
 
     def fmt(self, length: int, indent: str) -> list[str]:

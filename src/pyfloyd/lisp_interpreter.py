@@ -242,6 +242,9 @@ class Interpreter:
         self.is_foreign = is_foreign
         self.eval_foreign = self._default_eval_foreign
 
+        self.env.set('true', True)
+        self.env.set('false', False)
+        self.env.set('null', None)
         self.define_native_fn('equal', self.f_equal, types=['any', 'any'])
         self.define_native_fn('if', self.fexpr_if, is_fexpr=True)
         self.define_native_fn('in', self.f_in, types=['str', 'dict'])
@@ -258,6 +261,8 @@ class Interpreter:
         self.define_native_fn(
             'replace', self.f_replace, types=['str', 'str', 'str']
         )
+        self.define_native_fn(
+            'to_string', self.f_to_string, types=['num'])
         self.define_native_fn(
             'slice', self.f_slice, types=['list', 'num', 'num']
         )
@@ -305,7 +310,7 @@ class Interpreter:
 
     def f_equal(self, args, env):
         del env
-        return args[0][0] == args[0][1]
+        return args[0] == args[1]
 
     def f_getattr(self, args, env):
         del env
@@ -400,6 +405,10 @@ class Interpreter:
     def f_strcat(self, args, env):
         del env
         return ''.join(args)
+
+    def f_to_string(self, args, env):
+        del env
+        return f'{args[0]}'
 
     def fexpr_fn(self, args, env):
         param_symbols, body = args

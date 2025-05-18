@@ -21,6 +21,7 @@ from pyfloyd import (
     generator,
     grammar as m_grammar,
     lisp_interpreter,
+    string_literal,
     support,
 )
 
@@ -43,7 +44,7 @@ class DatafileGenerator(generator.Generator):
 
         self._interpreter = interp = lisp_interpreter.Interpreter()
         interp.env.set('grammar', grammar)
-        interp.env.set('options', self.options)
+        interp.env.set('generator_options', self.options)
         interp.define_native_fn('at_exp', self.f_at_exp)
         interp.define_native_fn('comma', self.f_comma)
         interp.define_native_fn('hl', self.f_hl)
@@ -53,17 +54,25 @@ class DatafileGenerator(generator.Generator):
         interp.define_native_fn('invoke', self.f_invoke)
         interp.define_native_fn('lit', self.f_lit)
         interp.define_native_fn('saw', self.f_saw)
+        interp.define_native_fn('tree', self.f_tree)
         interp.define_native_fn('vl', self.f_vl)
         interp.define_native_fn('vl_l', self.f_vl_l)
         interp.is_foreign = self.is_foreign
         interp.eval_foreign = self.eval_foreign
 
         self._host = host
-        if 'file' in options.defines:
-            fname = options.defines.get('file')
+        if 'file' in options.generator_options:
+            fname = options.generator_options.get('file')
         else:
             fname = self._host.join(host.dirname(__file__), 'python.dft')
         self._process_template_file(fname)
+
+        # TODO: figure out how to handle non-multi-char literals.
+        if grammar.ch_needed and not grammar.str_needed:
+            grammar.str_needed = True
+            grammar.needed_operators = sorted(
+                grammar.needed_operators + ['str']
+            )
 
     def _derive_memoize(self):
         def _walk(node):
@@ -128,7 +137,8 @@ class DatafileGenerator(generator.Generator):
                     self._interpreter.env.set(t, v)
                 else:
                     body = [['symbol', 'at_exp'], body_text]
-                    fn = lisp_interpreter.UserFn(interp, names, body)
+                    fn = lisp_interpreter.UserFn(interp, names, body,
+                                                 name=t)
                     self._interpreter.env.set(t, fn)
             else:
                 lisp_interpreter.check(
@@ -252,12 +262,17 @@ class DatafileGenerator(generator.Generator):
 
     def f_lit(self, args, env) -> Any:
         del env
-        return formatter.Lit(args[0])
+        return formatter.Lit(string_literal.encode(args[0]))
 
     def f_saw(self, args, env) -> Any:
         del env
         start, mid, end = args
         return formatter.Saw(start, mid, end)
+
+    def f_tree(self, args, env) -> Any:
+        del env
+        left, op, right = args
+        return formatter.Tree(left, op, right)
 
     def f_vl(self, args, env) -> Any:
         del env
