@@ -22,6 +22,10 @@ import shlex
 import shutil
 import subprocess
 import sys
+import types
+from typing import Optional
+
+tomllib: Optional[types.ModuleType]
 
 try:
     import tomllib

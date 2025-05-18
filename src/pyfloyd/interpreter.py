@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import re
+from typing import Any
 import unicodedata
 
 from pyfloyd import (
@@ -36,21 +37,21 @@ class Interpreter:
         self._memoize = memoize
         self._grammar = grammar
 
-        self._text = None
-        self._path = None
+        self._text = ''
+        self._path = ''
         self._failed = False
         self._val = None
         self._pos = 0
         self._end = -1
         self._errstr = 'Error: uninitialized'
         self._errpos = 0
-        self._cache = {}
-        self._scopes = []
-        self._seeds = {}
-        self._blocked = set()
-        self._operators = {}
-        self._regexps = {}
-        self._externs = grammar.externs
+        self._cache: dict[int, dict[str, Any]] = {}
+        self._scopes: list[dict[str, Any]] = []
+        self._seeds: dict[str, Any] = {}
+        self._blocked: set[str] = set()
+        self._operators: dict[str, m_grammar.OperatorState] = {}
+        self._regexps: dict[str, re.Pattern] = {}
+        self._externs: dict[str, Any] = grammar.externs
 
     def parse(
         self, text: str, path: str = '<string>', externs=None
@@ -61,7 +62,7 @@ class Interpreter:
         self._val = None
         self._pos = 0
         self._end = len(self._text)
-        self._errstr = None
+        self._errstr = ''
         self._errpos = 0
         self._scopes = [{}]
 

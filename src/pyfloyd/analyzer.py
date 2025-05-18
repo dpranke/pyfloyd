@@ -97,7 +97,7 @@ class _Analyzer:
     def __init__(self, grammar: m_grammar.Grammar):
         self.grammar = grammar
         assert self.grammar.ast.t == 'rules'
-        self.errors = []
+        self.errors: list[str] = []
         self.current_prec = 0
         self.current_rule = None
 

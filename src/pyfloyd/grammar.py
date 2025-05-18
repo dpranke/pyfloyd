@@ -17,7 +17,7 @@ from typing import Any, Optional, Union
 
 
 class OperatorState:
-    def __init__(self):
+    def __init__(self) -> None:
         # Map of precedence level to a list of operator literals that
         # have that level, e.g. {0: ['+'], 2: ['*']}
         self.prec_ops: dict[int, list[str]] = {}
@@ -533,7 +533,7 @@ class Grammar:
         self.comment: Optional[Rule] = None
         self.rules: dict[str, Rule] = collections.OrderedDict()
         self.pragmas: list[Rule] = []
-        self.starting_rule: Optional[str] = None
+        self.starting_rule: str = ''
         self.tokens: set[str] = set()
         self.whitespace: Optional[Rule] = None
         self.assoc: dict[str, str] = {}
@@ -547,9 +547,9 @@ class Grammar:
         self.str_needed: bool = False
         self.range_needed: bool = False
         self.re_needed: bool = False
-        self.needed_builtin_functions: dict[str] = []
-        self.needed_builtin_rules: dict[str] = []
-        self.needed_operators: dict[str] = [
+        self.needed_builtin_functions: list[str] = []
+        self.needed_builtin_rules: list[str] = []
+        self.needed_operators: list[str] = [
             'error',
             'fail',
             'offsets',

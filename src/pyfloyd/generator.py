@@ -45,10 +45,10 @@ class GeneratorOptions(attr_dict.AttrDict):
 
 
 class Generator:
-    name: str = None
-    ext: str = None
+    name: str = ''
+    ext: str = ''
     indent: int | str = 2
-    line_length: int = 79
+    line_length: Optional[int] = 79
     help_str: Optional[str] = None
 
     def __init__(
@@ -103,7 +103,7 @@ class Generator:
 def add_arguments(
     parser: argparse.ArgumentParser,
     default_language: str,
-    generators: Sequence[Generator],
+    generators: Sequence[type[Generator]],
 ):
     options = GeneratorOptions(language=default_language)
     parser.add_argument(

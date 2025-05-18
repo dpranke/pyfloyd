@@ -27,7 +27,7 @@ from pyfloyd import support
 class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
     name: str = 'JavaScript'
     ext: str = 'js'
-    indent: Optional[int | str] = 2
+    indent: int | str = 2
     line_length: Optional[int] = 79
 
     def __init__(
