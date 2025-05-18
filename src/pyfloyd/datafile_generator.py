@@ -137,8 +137,7 @@ class DatafileGenerator(generator.Generator):
                     self._interpreter.env.set(t, v)
                 else:
                     body = [['symbol', 'at_exp'], body_text]
-                    fn = lisp_interpreter.UserFn(interp, names, body,
-                                                 name=t)
+                    fn = lisp_interpreter.UserFn(interp, names, body, name=t)
                     self._interpreter.env.set(t, fn)
             else:
                 lisp_interpreter.check(

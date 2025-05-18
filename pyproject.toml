@@ -52,7 +52,7 @@ skip-string-normalization = true
 [tool.pylint.basic]
 # By default, pylint wants method names to be at most 31 chars long,
 # but we want to allow up to 40 for regular names and 50 for test names.
-method-rgx = "((test_[a-zA-Z0-9_]{3,45})|([a-z_][a-zA-Z0-9_]{1,39}))$"
+method-rgx = "((disabled_)?(test_[a-zA-Z0-9_]{3,45})|([a-z_][a-zA-Z0-9_]{1,39}))$"
 
 # By default, pylint only allows UPPER_CASE constants, but we want to
 # allow snake_case as well in some situations.
@@ -87,6 +87,7 @@ disable = [
    "too-many-branches",
    "too-many-instance-attributes",
    "too-many-locals",
+   "too-many-public-methods",
    "too-many-return-statements",
 ]
 

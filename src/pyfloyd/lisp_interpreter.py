@@ -247,7 +247,7 @@ class Interpreter:
         self.env.set('null', None)
         self.define_native_fn('equal', self.f_equal, types=['any', 'any'])
         self.define_native_fn('if', self.fexpr_if, is_fexpr=True)
-        self.define_native_fn('in', self.f_in, types=['str', 'dict'])
+        self.define_native_fn('in', self.f_in, types=['str', 'any'])
         self.define_native_fn('is_empty', self.f_is_empty)
         self.define_native_fn('fn', self.fexpr_fn, is_fexpr=True)
         self.define_native_fn('getattr', self.f_getattr, types=['any', 'str'])
@@ -261,8 +261,7 @@ class Interpreter:
         self.define_native_fn(
             'replace', self.f_replace, types=['str', 'str', 'str']
         )
-        self.define_native_fn(
-            'to_string', self.f_to_string, types=['num'])
+        self.define_native_fn('to_string', self.f_to_string, types=['num'])
         self.define_native_fn(
             'slice', self.f_slice, types=['list', 'num', 'num']
         )

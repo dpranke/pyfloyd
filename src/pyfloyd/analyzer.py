@@ -753,12 +753,10 @@ class _SubRuleRewriter:
         return node
 
     def _ty_regexp(self, node):
-        self._grammar.needed_operators.append('regexp')
         self._grammar.re_needed = True
         return node
 
     def _ty_set(self, node):
-        self._grammar.needed_operators.append('regexp')
         self._grammar.re_needed = True
         return node
 

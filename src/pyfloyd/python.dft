@@ -511,12 +511,12 @@ n_range: [fn [node] [hl [call_op 'range'
                         end]]
 
 n_regexp: [fn [node]
-              [vl [strcat 'p = ' [lit node.v]]
-                  'if p not in self._regexps'
+              [vl [hl 'p = ' [lit node.v]]
+                  'if p not in self._regexps:'
                   '    self._regexps[p] = re.compile(p)'
                   'm = self._regexps[p].match(self._text, self._pos)'
                   'if m:'
-                  '    self._o_succeed(m.group(o), m.end())'
+                  '    self._o_succeed(m.group(0), m.end())'
                   '    return'
                   'self._o_fail()']]
 
@@ -536,12 +536,12 @@ n_scope: [fn [node] [vl 'self._scopes.append({})'
                         ]]
 
 n_set: [fn [node]
-           [vl [strcat 'p =' [lit node.v]]
+           [vl [hl 'p =' [lit [strcat '[' node.v ']']]]
                'if p not in self._regexps:'
                '    self._regexps[p] = re.compile(p)'
                'm = self._regexps[p].match(self._text, self._pos)'
                'if m:'
-               '    self._o_succeed(m.group(o), m.end())'
+               '    self._o_succeed(m.group(0), m.end())'
                '    return'
                'self._o_fail()']]
 

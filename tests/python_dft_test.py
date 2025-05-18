@@ -17,6 +17,7 @@ import unittest
 
 from . import grammar_test
 
+skip = grammar_test.skip
 
 class Tests(
     unittest.TestCase,
@@ -27,3 +28,81 @@ class Tests(
     cmd = [sys.executable]
     language = 'datafile'
     ext = '.py'
+
+    def test_quals(self):
+        pass
+
+    @skip('integration')
+    def test_floyd(self):
+        pass
+
+    @skip('integration')
+    def test_floyd_ws(self):
+        pass
+
+    @skip('integration')
+    def test_json(self):
+        pass
+
+    @skip('integration')
+    def test_json5(self):
+        pass
+
+    @skip('integration')
+    def test_json5_special_floats(self):
+        pass
+
+    @skip('integration')
+    def test_json5_sample(self):
+        pass
+
+    @skip('integration')
+    def test_json5_ws(self):
+        pass
+
+    @skip('operators')
+    def test_not_quite_operators(self):
+        pass
+
+    def test_operator_indirect(self):
+        pass
+
+    @skip('operators')
+    def test_operator_invalid(self):
+        pass
+
+    @skip('operators')
+    def test_operators(self):
+        pass
+
+    @skip('operators')
+    def test_operators_multichar_is_valid(self):
+        pass
+
+    @skip('operators')
+    def test_operators_with_whitespace(self):
+        pass
+
+    @skip('leftrec')
+    def test_recursion_both(self):
+        pass
+
+    @skip('leftrec')
+    def test_recursion_direct_left(self):
+        pass
+
+    @skip('leftrec')
+    def test_recursion_without_a_label(self):
+        pass
+
+    @skip('leftrec')
+    def test_recursion_indirect_left(self):
+        pass
+
+    @skip('leftrec')
+    def test_recursion_left_opt(self):
+        pass
+
+    @skip('leftrec')
+    def test_recursion_repeated(self):
+        pass
