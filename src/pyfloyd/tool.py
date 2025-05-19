@@ -98,10 +98,11 @@ def main(argv=None, host=None):
     except KeyboardInterrupt:
         host.print('Interrupted, exiting.', file=host.stderr)
         return 130  # SIGINT
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        print(e)
+    except Exception as exc:  # pylint: disable=broad-exception-caught
         if args and args.post_mortem:
             pdb.post_mortem()
+        else:
+            raise exc
         return 1
 
 

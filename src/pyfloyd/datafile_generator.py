@@ -165,15 +165,13 @@ class DatafileGenerator(generator.Generator):
     def generate(self) -> str:
         obj = self._interpreter.eval([['symbol', 'generate']])
         if self._fl:
-            new_obj = formatter.as_list(obj)
-        else:
-            new_obj = obj
-        if isinstance(new_obj, formatter.FormatObj):
-            lines = formatter.flatten(
-                new_obj, self.options.line_length, self.options.indent
+            lines = formatter.flatten_as_list(
+                obj, self.options.line_length, self.options.indent
             )
         else:
-            lines = new_obj.splitlines()
+            lines = formatter.flatten(
+                obj, self.options.line_length, self.options.indent
+            )
         res = (
             '\n'.join('' if line.isspace() else line for line in lines) + '\n'
         )

@@ -14,27 +14,39 @@
 
 import unittest
 
-from pyfloyd import formatter
+from pyfloyd.formatter import (
+    as_list,
+    flatten,
+    flatten_as_list,
+    Comma,
+    HList,
+    Indent,
+    LispList as LL,
+    Lit,
+    Saw,
+    Tree,
+    VList,
+)
 
 
-class FormatterTests(unittest.TestCase):
+class Tests(unittest.TestCase):
     def test_str(self):
-        self.assertEqual(['foo'], formatter.flatten('foo'))
+        self.assertEqual(['foo'], flatten('foo'))
 
     def test_comma(self):
-        t = formatter.Comma(['1', '2', '3'])
-        self.assertEqual(['1, 2, 3'], formatter.flatten(t))
+        t = Comma(['1', '2', '3'])
+        self.assertEqual(['1, 2, 3'], flatten(t))
 
-        t = formatter.Comma(
+        t = Comma(
             [
                 '1',
-                formatter.Saw('[', formatter.Comma(['2']), ']'),
+                Saw('[', Comma(['2']), ']'),
             ]
         )
-        self.assertEqual(['1, [2]'], formatter.flatten(t))
+        self.assertEqual(['1, [2]'], flatten(t))
 
         # This tests an array that needs to span multiple lines.
-        t = formatter.Comma(
+        t = Comma(
             [
                 'self._long_rule_1',
                 'self._long_rule_2',
@@ -51,20 +63,18 @@ class FormatterTests(unittest.TestCase):
                 'self._long_rule_4,',
                 'self._long_rule_5,',
             ],
-            formatter.flatten(t),
+            flatten(t),
         )
 
     def test_comma_repr(self):
+        self.assertEqual("Comma(['1', '2'])", repr(Comma(['1', '2'])))
         self.assertEqual(
-            "Comma(['1', '2'])", repr(formatter.Comma(['1', '2']))
-        )
-        self.assertEqual(
-            "Comma(['1', Saw('[', Comma(['2']), ']')])",
+            "Comma(['1', Saw(['[', Comma(['2']), ']'])])",
             repr(
-                formatter.Comma(
+                Comma(
                     [
                         '1',
-                        formatter.Saw('[', formatter.Comma(['2']), ']'),
+                        Saw('[', Comma(['2']), ']'),
                     ]
                 )
             ),
@@ -75,20 +85,35 @@ class FormatterTests(unittest.TestCase):
             'this is a string line that stretches out for a'
             'really long time and will not fit on one line'
         )
-        self.assertEqual([long_str], formatter.flatten(long_str))
+        self.assertEqual([long_str], flatten(long_str))
+
+    def test_list(self):
+        lis = LL(['1', '2', '3'])
+        self.assertEqual(["[1 '2' '3']"], flatten(lis))
+
+        lis = LL(['foo', LL(['fn', LL(['arg']), LL(['length', 'arg'])])])
+        self.assertEqual(["[foo [fn [arg] [length 'arg']]]"], flatten(lis))
+        self.assertEqual(
+            ['[foo [fn [arg]', "         [length 'arg']]]"],
+            flatten(lis, length=14),
+        )
+
+    def test_flatten_as_list(self):
+        lis = LL(['1', '2', '3'])
+        self.assertEqual(["[ll '1' '2' '3']"], flatten_as_list(lis))
 
     def test_mix(self):
-        lines = formatter.flatten(
-            formatter.Saw(
+        lines = flatten(
+            Saw(
                 'self._succeed(',
-                formatter.Saw(
+                Saw(
                     'self.xtou(',
-                    formatter.Comma(
+                    Comma(
                         [
-                            formatter.Tree(
+                            Tree(
                                 "self._get('long_variable_1')",
                                 '+',
-                                formatter.Tree(
+                                Tree(
                                     "self._get('long_variable_2')",
                                     '+',
                                     "self._get('long_variable_3')",
@@ -115,17 +140,17 @@ class FormatterTests(unittest.TestCase):
         )
 
     def test_saw(self):
-        t = formatter.Saw('foo(', "'bar'", ')')
-        self.assertEqual(["foo('bar')"], formatter.flatten(t))
+        t = Saw('foo(', "'bar'", ')')
+        self.assertEqual(["foo('bar')"], flatten(t))
 
-        t = formatter.Saw('foo(', "'bar'", formatter.Saw(')(', "'baz'", ')'))
-        self.assertEqual(["foo('bar')('baz')"], formatter.flatten(t))
+        t = Saw('foo(', "'bar'", Saw(')(', "'baz'", ')'))
+        self.assertEqual(["foo('bar')('baz')"], flatten(t))
 
         # Test that the right length of args can fit on a line of 75
         # chars by itself.
-        t = formatter.Saw(
+        t = Saw(
             'foo(',
-            formatter.Comma(
+            Comma(
                 [
                     'self._long_rule_1',
                     'self._long_rule_2',
@@ -142,11 +167,11 @@ class FormatterTests(unittest.TestCase):
                 'self._long4',
                 ')',
             ],
-            formatter.flatten(t, length=67),
+            flatten(t, length=67),
         )
-        t = formatter.Saw(
+        t = Saw(
             'foo(',
-            formatter.Comma(
+            Comma(
                 [
                     'self._long_rule_1',
                     'self._long_rule_2',
@@ -169,10 +194,10 @@ class FormatterTests(unittest.TestCase):
                 '    self._long_rule_6,',
                 ')',
             ],
-            formatter.flatten(t),
+            flatten(t),
         )
 
-        t2 = formatter.Saw(')[', '4', ']')
+        t2 = Saw(')[', '4', ']')
         t.end = t2
         self.assertEqual(
             [
@@ -185,22 +210,22 @@ class FormatterTests(unittest.TestCase):
                 '    self._long_rule_6,',
                 ')[4]',
             ],
-            formatter.flatten(t),
+            flatten(t),
         )
 
     def test_tree(self):
-        t = formatter.Tree('1', '+', '2')
-        self.assertEqual(['1 + 2'], formatter.flatten(t))
-        t = formatter.Tree(
+        t = Tree('1', '+', '2')
+        self.assertEqual(['1 + 2'], flatten(t))
+        t = Tree(
             "'long string 1'",
             '+',
-            formatter.Tree(
+            Tree(
                 "'long string 2'",
                 '+',
-                formatter.Tree(
+                Tree(
                     "'long string 3'",
                     '+',
-                    formatter.Tree("'long string 4'", '+', "'long string5'"),
+                    Tree("'long string 4'", '+', "'long string5'"),
                 ),
             ),
         )
@@ -212,14 +237,64 @@ class FormatterTests(unittest.TestCase):
                 "+ 'long string 4'",
                 "+ 'long string5'",
             ],
-            formatter.flatten(t),
+            flatten(t),
         )
 
     def test_tree_repr(self):
+        self.assertEqual("Tree(['1', '+', '2'])", repr(Tree('1', '+', '2')))
         self.assertEqual(
-            "Tree('1', '+', '2')", repr(formatter.Tree('1', '+', '2'))
+            "Tree(['1', '+', Tree(['2', '+', '3'])])",
+            repr(Tree('1', '+', Tree('2', '+', '3'))),
         )
-        self.assertEqual(
-            "Tree('1', '+', Tree('2', '+', '3'))",
-            repr(formatter.Tree('1', '+', formatter.Tree('2', '+', '3'))),
+
+
+class AsListTests(unittest.TestCase):
+    def check(self, obj, expected):
+        lis = as_list(obj)
+        self.assertEqual(lis, expected)
+
+    def test_comma(self):
+        self.check(
+            Comma(['1', '2', Indent('bar')]),
+            LL(['comma', '1', '2', LL(['ind', 'bar'])]),
+        )
+
+    def test_hlist(self):
+        self.check(
+            HList(['foo', Indent('bar')]),
+            LL(['hl', 'foo', LL(['ind', 'bar'])]),
+        )
+
+    def test_indent(self):
+        self.check(Indent('foo'), LL(['ind', 'foo']))
+        self.check(
+            Indent(VList(['foo', 'bar'])),
+            LL(['ind', LL(['vl', 'foo', 'bar'])]),
+        )
+
+    def test_lit(self):
+        self.check(Lit('foo'), LL(['lit', 'foo']))
+
+    def test_saw(self):
+        self.check(
+            Saw('foo', 'bar', VList(['baz'])),
+            LL(['saw', 'foo', 'bar', LL(['vl', 'baz'])]),
+        )
+
+    def test_str(self):
+        self.check('foo', 'foo')
+        self.check('foo\n', 'foo\n')
+        self.check('foo\nbar', 'foo\nbar')
+        self.check('foo\nbar\n', 'foo\nbar\n')
+
+    def test_tree(self):
+        self.check(
+            Tree('1', '+', Tree('2', '+', '3')),
+            LL(['tree', '1', '+', LL(['tree', '2', '+', '3'])]),
+        )
+
+    def test_vlist(self):
+        self.check(
+            VList(['foo', Indent('bar')]),
+            LL(['vl', 'foo', LL(['ind', 'bar'])]),
         )

@@ -18,18 +18,44 @@ from typing import Callable, Optional, Sequence, Union
 FormatMethod = Callable[[int, str], list[str]]
 
 
+El = Union[str, 'FormatObj']
+ElSeq = Sequence[El]
+ElList = list[El]
+
+
 class FormatObj:
+    tag = None
+
+    def __init__(self, objs: Optional[ElSeq] = None):
+        self.objs: ElList = objs or []
+
+    def __eq__(self, other):
+        return (
+            (self.__class__ == other.__class__)
+            and (len(self.objs) == len(other.objs))
+            and all(
+                self.objs[i] == other.objs[i] for i in range(len(self.objs))
+            )
+        )
+
+    def __repr__(self):
+        cls_name = self.__class__.__name__
+        return f'{cls_name}([{", ".join(repr(obj) for obj in self.objs)}])'
+
+    def as_list(self):
+        assert self.tag is not None
+        return LispList([self.tag] + [as_list(obj) for obj in self.objs])
+
+    def is_empty(self):
+        return len(self.objs) == 0
+
     def fmt(self, length: Union[int, None], indent: str) -> list[str]:
         """Returns a list of strings, each representing a line."""
         raise NotImplementedError
 
-    def as_list(self) -> 'El':
-        raise NotImplementedError
 
-
-El = Union[str, FormatObj]
-ElSeq = Sequence[El]
-ElList = list[El]
+# For backward compatibility. TODO: remove this.
+ListObj = FormatObj
 
 
 def flatten(
@@ -43,7 +69,7 @@ def flatten(
     return _fmt(obj, length, indent)
 
 
-def flatten_repr(
+def flatten_as_list(
     obj: El, length: Optional[int] = 79, indent: str = '    '
 ) -> list[str]:
     """Print a formatted representation of the tree itself
@@ -55,7 +81,9 @@ def flatten_repr(
 
 def _fmt(obj: El, length: Union[int, None], indent: str) -> list[str]:
     if isinstance(obj, str):
-        return obj.splitlines()
+        if obj == '':
+            return ["''"]
+        return [repr(line) for line in obj.splitlines()]
     return obj.fmt(length, indent)
 
 
@@ -65,30 +93,26 @@ def _fmt_one(obj: El, length: Union[int, None], indent: str) -> str:
     assert len(lines) == 1, (
         f'format unexpectedly returned more than one line: {repr(lines)}'
     )
+
     return lines[0]
 
 
 def as_list(obj):
     if isinstance(obj, FormatObj):
         return obj.as_list()
-    return repr(obj)
+    return obj
 
 
 class Indent(FormatObj):
+    tag = 'ind'
+
     def __init__(self, obj: FormatObj):
-        super().__init__()
-        self.obj = obj
-
-    def __repr__(self):
-        return 'Indent(' + repr(self.obj) + ')'
-
-    def as_list(self):
-        return LispList('ind', as_list(self.obj))
+        super().__init__([obj])
 
     def fmt(self, length: Union[int, None], indent: str) -> list[str]:
         new_l = None if length is None else length - len(indent)
         lines = []
-        for line in self.obj.fmt(new_l, indent):
+        for line in self.objs[0].fmt(new_l, indent):
             if line:
                 lines.append(indent + line)
             else:
@@ -97,17 +121,13 @@ class Indent(FormatObj):
 
 
 class Lit(FormatObj):
+    tag = 'lit'
+
     def __init__(self, s: str):
-        self.s = s
-
-    def __repr__(self):
-        return f'Lit({repr(self.s)})'
-
-    def as_list(self):
-        return LispList('lit', as_list(self.s))
+        super().__init__([s])
 
     def fmt(self, length: Union[int, None], indent: str) -> list[str]:
-        return [self.s]
+        return [self.objs[0]]
 
 
 class MultipleObj(FormatObj):
@@ -130,28 +150,11 @@ class MultipleObj(FormatObj):
         raise NotImplementedError
 
 
-class ListObj(FormatObj):
-    tag = None
-
-    def __init__(self, objs: Optional[ElSeq] = None):
-        self.objs: ElList = []
-
-    def as_list(self):
-        assert self.tag is not None
-        objs = [self.tag]
-        for obj in self.objs:
-            objs.append(as_list(obj))
-        return LispList(*objs)
-
-    def fmt(self, length: Union[int, None], indent: str) -> list[str]:
-        raise NotImplementedError
-
-
-class VList(ListObj):
+class VList(FormatObj):
     tag = 'vl'
 
     def __init__(self, objs: Optional[ElSeq] = None):
-        super().__init__(objs)
+        super().__init__([])
         if objs is None:
             return
         for obj in objs:
@@ -166,15 +169,6 @@ class VList(ListObj):
                         self.objs.extend(obj.splitlines())
                 else:
                     self.objs.append(obj)
-
-    def __repr__(self):
-        if self.objs:
-            return (
-                'VList([\n  '
-                + ',\n  '.join(repr(o) for o in self.objs)
-                + '\n])'
-            )
-        return 'VList()'
 
     def __iadd__(self, obj):
         if isinstance(obj, VList):
@@ -196,23 +190,20 @@ class VList(ListObj):
         return lines
 
 
-class HList(ListObj):
+class HList(FormatObj):
     tag = 'hl'
 
     def __init__(self, objs: Optional[ElSeq] = None):
-        super().__init__(objs)
+        super().__init__([])
         for obj in objs:
             if isinstance(objs[0], self.__class__):
                 self.objs.extend(obj.objs)
             else:
                 self.objs.append(obj)
 
-    def __repr__(self):
-        return 'HList([' + ', '.join(repr(o) for o in self.objs) + '])'
-
     def fmt(self, length: Union[int, None], indent: str) -> list[str]:
         lines: list[str] = []
-        if len(self.objs):
+        if len(self.objs) != 0:
             lines.extend(_fmt(self.objs[0], length, indent))
             for obj in self.objs[1:]:
                 if isinstance(obj, str):
@@ -247,24 +238,34 @@ class Saw(MultipleObj):
     tag = 'saw'
 
     def __init__(self, start: El, mid: El, end: El):
-        super().__init__()
-        self.start: El = start
-        self.mid: El = mid
-        self.end: El = end
+        super().__init__([start, mid, end])
 
-    def __repr__(self):
-        return f'Saw({repr(self.start)}, {repr(self.mid)}, {repr(self.end)})'
+    @property
+    def start(self):
+        return self.objs[0]
 
-    def as_list(self):
-        return LispList(self.tag, self.start, self.mid, self.end)
+    @start.setter
+    def start(self, v):
+        self.objs[0] = v
+
+    @property
+    def mid(self):
+        return self.objs[1]
+
+    @mid.setter
+    def mid(self, v):
+        self.objs[1] = v
+
+    @property
+    def end(self):
+        return self.objs[2]
+
+    @end.setter
+    def end(self, v):
+        self.objs[2] = v
 
     def fmt_one(self, length: Union[int, None], indent: str) -> list[str]:
-        s = (
-            _fmt_one(self.start, length, indent)
-            + _fmt_one(self.mid, length, indent)
-            + _fmt_one(self.end, length, indent)
-        )
-        return [s]
+        return [''.join(_fmt_one(obj, length, indent) for obj in self.objs)]
 
     def fmt_multiple(self, length: Union[int, None], indent: str) -> list[str]:
         lines = _fmt(self.start, length, indent)
@@ -285,19 +286,6 @@ class Comma(MultipleObj):
     """
 
     tag = 'comma'
-
-    def __init__(self, objs: Optional[ElSeq] = None):
-        self.objs: ElList
-        if not objs:
-            self.objs = []
-        else:
-            self.objs = list(objs)
-
-    def __repr__(self):
-        return 'Comma(' + repr(self.objs) + ')'
-
-    def as_list(self):
-        return LispList(self.tag, *self.objs)
 
     def fmt_one(self, length: Union[int, None], indent: str) -> list[str]:
         if not self.objs:
@@ -341,52 +329,63 @@ class Tree(MultipleObj):
     tag = 'tree'
 
     def __init__(self, left: Optional[El], op: str, right: Optional[El]):
-        self.left = left
-        self.op = op
-        self.right = right
-        assert self.left is not None or self.right is not None
+        super().__init__([left, op, right])
+        assert left is not None or right is not None
 
-    def __repr__(self):
-        return f'Tree({self.left!r}, {self.op!r}, {self.right!r})'
+    @property
+    def left(self):
+        return self.objs[0]
 
-    def as_list(self):
-        return LispList(
-            self.tag,
-            'null' if self.left is None else as_list(self.left),
-            self.op,
-            'null' if self.right is None else as_list(self.right),
-        )
+    @left.setter
+    def left(self, v):
+        self.objs[0] = v
+
+    @property
+    def op(self):
+        return self.objs[1]
+
+    @op.setter
+    def op(self, v):
+        self.objs[1] = v
+
+    @property
+    def right(self):
+        return self.objs[2]
+
+    @right.setter
+    def right(self, v):
+        self.objs[2] = v
 
     def fmt_one(self, length: Union[int, None], indent: str) -> list[str]:
-        if self.left is None:
-            s = self.op
-            assert self.right is not None
-            s += _fmt_one(self.right, length, indent)
+        left, op, right = self.objs
+        if left is None:
+            s = op
+            assert right is not None
+            s += _fmt_one(right, length, indent)
         else:
-            s = _fmt_one(self.left, length, indent)
-            if self.right is None:
-                s += self.op
+            s = _fmt_one(left, length, indent)
+            if right is None:
+                s += op
             else:
-                s += ' ' + self.op + ' '
+                s += ' ' + op + ' '
                 new_l = None if length is None else length - len(s)
-                s += _fmt_one(self.right, new_l, indent)
+                s += _fmt_one(right, new_l, indent)
         return [s]
 
     def fmt_multiple(self, length: Union[int, None], indent: str) -> list[str]:
-        if self.left is None:
-            assert self.right is not None
+        left, op, right = self.objs
+        if left is None:
+            assert right is not None
             new_l = None if length is None else length - len(self.op)
-            sublines = _fmt(self.right, new_l, indent)
-            lines = [self.op + sublines[0]] + sublines[1:]
+            sublines = _fmt(right, new_l, indent)
+            lines = [op + sublines[0]] + sublines[1:]
             return lines
 
-        lines = _fmt(self.left, length, indent)
-        if self.right is None:
+        lines = _fmt(left, length, indent)
+        if right is None:
             lines[-1] += self.op
             return lines
 
-        op = self.op
-        right: Optional[El] = self.right
         while isinstance(right, Tree):
             new_l = None if length is None else length - len(op) - 1
             if right.left is not None:
@@ -409,21 +408,14 @@ class Tree(MultipleObj):
 class LispList(MultipleObj):
     tag = 'll'
 
-    def __init__(self, *objs):
-        self.objs = objs
-
-    def __repr__(self):
-        return 'LispList(' + ', '.join(repr(obj) for obj in self.objs) + ')'
-
-    def as_list(self):
-        objs = []
-        for obj in self.objs:
-            objs.append(as_list(obj))
-        return LispList(*objs)
-
     def fmt_one(self, length: Union[int, None], indent: str) -> list[str]:
         s = '['
-        s += ' '.join(_fmt_one(obj, length, indent) for obj in self.objs)
+        if self.objs:
+            s += self.objs[0]
+            if len(self.objs) > 1:
+                for obj in self.objs[1:]:
+                    s += ' '
+                    s += _fmt_one(obj, length, indent)
         s += ']'
         return [s]
 
@@ -431,6 +423,14 @@ class LispList(MultipleObj):
         lines = ['']
         if len(self.objs) == 0:
             return ['[]']
+        if len(self.objs) == 1:
+            if isinstance(self.objs[0], str):
+                return ['[' + self.objs[0] + ']']
+            sl = _fmt(self.objs[0], length, indent)
+            sl[0] = '[' + sl[0] + ']'
+            sl[-1] = sl[-1] + ']'
+            return sl
+
         prefix = '[' + self.objs[0] + ' '
         lines[0] += prefix
         new_l = None if length is None else length - len(prefix)
