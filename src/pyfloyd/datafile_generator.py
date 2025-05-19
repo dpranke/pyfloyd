@@ -37,6 +37,8 @@ class DatafileGenerator(generator.Generator):
         options: generator.GeneratorOptions,
     ):
         super().__init__(host, grammar, options)
+        options.generator_options = options.generator_options or {}
+        self._fl = options.formatter_list
         self._local_vars: dict[str, Any] = {}
 
         self._derive_memoize()
@@ -161,8 +163,14 @@ class DatafileGenerator(generator.Generator):
         return expr
 
     def generate(self) -> str:
-        s = self._interpreter.eval([['symbol', 'generate']])
-        lines = s.splitlines()
+        obj = self._interpreter.eval([['symbol', 'generate']])
+        if isinstance(obj, formatter.El) and self._fl:
+            lines = formatter.flatten_repr(
+                obj, self.options.line_length, self.options.indent
+            )
+        else:
+            assert isinstance(obj, str)
+            lines = obj.splitlines()
         res = ['' if line.isspace() else line for line in lines]
         return '\n'.join(res) + '\n'
 
@@ -182,6 +190,7 @@ class DatafileGenerator(generator.Generator):
         )
         assert isinstance(exprs, list)
 
+        lines = ['']
         s = ''
         for i, expr in enumerate(exprs):
             obj = self._interpreter.eval(expr, new_env)
@@ -192,6 +201,9 @@ class DatafileGenerator(generator.Generator):
                 obj = obj.call([], env)
 
             if isinstance(obj, formatter.FormatObj):
+                if self._fl:
+                    lines.append(obj)
+                    continue
                 obj = '\n'.join(formatter.flatten(obj, 80))
 
             if isinstance(obj, list):
@@ -212,7 +224,15 @@ class DatafileGenerator(generator.Generator):
 
             if num_to_chomp:
                 s = s[:-num_to_chomp]
-            s += res
+            if self._fl:
+                slines = res.splitlines()
+                if slines:
+                    lines[-1] += slines[0]
+                    lines.extend(slines[1:])
+            else:
+                s += res
+        if self._fl:
+            return formatter.VList(lines)
         return s
 
     def _format(self, s, is_blank, num_spaces, nl_is_next) -> tuple[int, str]:
