@@ -73,7 +73,7 @@ def symbol(el: Any) -> str:
     return el[1]
 
 
-CheckerType = Union[str | tuple[Callable[[Any], bool]]]
+CheckerType = Union[str, tuple[Callable[[Any], bool]]]
 
 _typecheckers: dict[str, tuple[Callable[[Any], bool], str]] = {
     'any': (lambda x: True, 'any'),

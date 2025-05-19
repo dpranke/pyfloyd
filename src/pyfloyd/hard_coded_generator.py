@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Union
+
 from pyfloyd import (
     datafile,
     generator,
@@ -164,7 +166,9 @@ class HardCodedGenerator(generator.Generator):
             [self._gen_invoke(node.rule_name), self._map['end']]
         )
 
-    def _ty_e_arr(self, node: m_grammar.Node) -> formatter.Lit | formatter.Saw:
+    def _ty_e_arr(
+        self, node: m_grammar.Node
+    ) -> Union[formatter.Lit, formatter.Saw]:
         if len(node.ch) == 0:
             return formatter.Lit('[]')
         args = [self._gen_expr(c) for c in node.ch]

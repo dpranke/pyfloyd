@@ -19,6 +19,7 @@ from . import grammar_test
 
 skip = grammar_test.skip
 
+
 class Tests(
     unittest.TestCase,
     grammar_test.GeneratorMixin,

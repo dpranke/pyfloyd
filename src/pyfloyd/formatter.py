@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable, Optional, Sequence
+from typing import Callable, Optional, Sequence, Union
 
 
 FormatMethod = Callable[[int, str], list[str]]
@@ -28,7 +28,7 @@ class FormatObj:
         raise NotImplementedError
 
 
-El = str | FormatObj
+El = Union[str, FormatObj]
 ElSeq = Sequence[El]
 ElList = list[El]
 

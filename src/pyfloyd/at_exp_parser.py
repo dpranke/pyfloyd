@@ -601,7 +601,7 @@ class _Parser:
         if self._errpos == len(self._text):
             thing = 'end of input'
         else:
-            thing = '"' + self._text[self._errpos] + '"'
+            thing = repr(self._text[self._errpos]).replace("'", '"')
         path = self._path
         return f'{path}:{lineno} Unexpected {thing} at column {colno}'
 

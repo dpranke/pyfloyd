@@ -75,91 +75,90 @@ class Node:
         assert len(val) == 3
         assert isinstance(val[0], str)
         assert isinstance(val[2], list)
-        match val[0]:
-            case 'action':
-                return Action(Node.to(val[2][0]))
-            case 'apply':
-                return Apply(val[1])
-            case 'choice':
-                return Choice([Node.to(sn) for sn in val[2]])
-            case 'count':
-                return Count(Node.to(val[2][0]), val[1][0], val[1][1])
-            case 'empty':
-                return Empty()
-            case 'ends_in':
-                return EndsIn(Node.to(val[2][0]))
-            case 'equals':
-                return Equals(Node.to(val[2][0]))
-            case 'e_arr':
-                return EArr([Node.to(sn) for sn in val[2]])
-            case 'e_call':
-                return ECall([Node.to(sn) for sn in val[2]])
-            case 'e_const':
-                return EConst(val[1])
-            case 'e_getitem':
-                return EGetitem(Node.to(val[2][0]))
-            case 'e_lit':
-                return ELit(val[1])
-            case 'e_num':
-                return ENum(val[1])
-            case 'e_var':
-                return Var(val[1])
-            case 'e_not':
-                return ENot(Node.to(val[2][0]))
-            case 'e_minus':
-                return EMinus(Node.to(val[2][0]), Node.to(val[2][1]))
-            case 'e_paren':
-                return EParen(Node.to(val[2][0]))
-            case 'e_plus':
-                return EPlus(Node.to(val[2][0]), Node.to(val[2][1]))
-            case 'e_qual':
-                return EQual([Node.to(sn) for sn in val[2]])
-            case 'label':
-                return Label(val[1], Node.to(val[2][0]))
-            case 'leftrec':
-                return Leftrec(val[1], Node.to(val[2][0]))
-            case 'lit':
-                return Lit(val[1])
-            case 'not':
-                return Not(Node.to(val[2][0]))
-            case 'not_one':
-                return NotOne(Node.to(val[2][0]))
-            case 'op':
-                return Op(val[1][0], val[1][1], Node.to(val[2][0]))
-            case 'operator':
-                return Operator(val[1], [Node.to(sn) for sn in val[2]])
-            case 'opt':
-                return Opt(Node.to(val[2][0]))
-            case 'paren':
-                return Paren(Node.to(val[2][0]))
-            case 'plus':
-                return Plus(Node.to(val[2][0]))
-            case 'pred':
-                return Pred(Node.to(val[2][0]))
-            case 'range':
-                return Range(val[1][0], val[1][1])
-            case 'regexp':
-                return Regexp(val[1])
-            case 'rule':
-                return Rule(val[1], Node.to(val[2][0]))
-            case 'rules':
-                return Rules([Node.to(sn) for sn in val[2]])
-            case 'run':
-                return Run(Node.to(val[2][0]))
-            case 'scope':
-                return Scope([Node.to(sn) for sn in val[2]])
-            case 'set':
-                return Set(val[1])
-            case 'seq':
-                return Seq([Node.to(sn) for sn in val[2]])
-            case 'plus':
-                return Plus(Node.to(val[2][0]))
-            case 'star':
-                return Star(Node.to(val[2][0]))
-            case 'unicat':
-                return Unicat(val[1])
-            case _:
-                raise ValueError(f'Unexpected AST node type "{val[0]}"')
+        ty = val[0]
+        if ty == 'action':
+            return Action(Node.to(val[2][0]))
+        if ty == 'apply':
+            return Apply(val[1])
+        if ty == 'choice':
+            return Choice([Node.to(sn) for sn in val[2]])
+        if ty == 'count':
+            return Count(Node.to(val[2][0]), val[1][0], val[1][1])
+        if ty == 'empty':
+            return Empty()
+        if ty == 'ends_in':
+            return EndsIn(Node.to(val[2][0]))
+        if ty == 'equals':
+            return Equals(Node.to(val[2][0]))
+        if ty == 'e_arr':
+            return EArr([Node.to(sn) for sn in val[2]])
+        if ty == 'e_call':
+            return ECall([Node.to(sn) for sn in val[2]])
+        if ty == 'e_const':
+            return EConst(val[1])
+        if ty == 'e_getitem':
+            return EGetitem(Node.to(val[2][0]))
+        if ty == 'e_lit':
+            return ELit(val[1])
+        if ty == 'e_num':
+            return ENum(val[1])
+        if ty == 'e_var':
+            return Var(val[1])
+        if ty == 'e_not':
+            return ENot(Node.to(val[2][0]))
+        if ty == 'e_minus':
+            return EMinus(Node.to(val[2][0]), Node.to(val[2][1]))
+        if ty == 'e_paren':
+            return EParen(Node.to(val[2][0]))
+        if ty == 'e_plus':
+            return EPlus(Node.to(val[2][0]), Node.to(val[2][1]))
+        if ty == 'e_qual':
+            return EQual([Node.to(sn) for sn in val[2]])
+        if ty == 'label':
+            return Label(val[1], Node.to(val[2][0]))
+        if ty == 'leftrec':
+            return Leftrec(val[1], Node.to(val[2][0]))
+        if ty == 'lit':
+            return Lit(val[1])
+        if ty == 'not':
+            return Not(Node.to(val[2][0]))
+        if ty == 'not_one':
+            return NotOne(Node.to(val[2][0]))
+        if ty == 'op':
+            return Op(val[1][0], val[1][1], Node.to(val[2][0]))
+        if ty == 'operator':
+            return Operator(val[1], [Node.to(sn) for sn in val[2]])
+        if ty == 'opt':
+            return Opt(Node.to(val[2][0]))
+        if ty == 'paren':
+            return Paren(Node.to(val[2][0]))
+        if ty == 'plus':
+            return Plus(Node.to(val[2][0]))
+        if ty == 'pred':
+            return Pred(Node.to(val[2][0]))
+        if ty == 'range':
+            return Range(val[1][0], val[1][1])
+        if ty == 'regexp':
+            return Regexp(val[1])
+        if ty == 'rule':
+            return Rule(val[1], Node.to(val[2][0]))
+        if ty == 'rules':
+            return Rules([Node.to(sn) for sn in val[2]])
+        if ty == 'run':
+            return Run(Node.to(val[2][0]))
+        if ty == 'scope':
+            return Scope([Node.to(sn) for sn in val[2]])
+        if ty == 'set':
+            return Set(val[1])
+        if ty == 'seq':
+            return Seq([Node.to(sn) for sn in val[2]])
+        if ty == 'plus':
+            return Plus(Node.to(val[2][0]))
+        if ty == 'star':
+            return Star(Node.to(val[2][0]))
+        if ty == 'unicat':
+            return Unicat(val[1])
+        raise ValueError(f'Unexpected AST node type "{val[0]}"')
 
     def __init__(self, t: str, v: Any, ch: list['Node']):
         self.t: str = t
@@ -194,7 +193,7 @@ class Node:
             attr = 'ch'
         super().__setattr__(attr, v)
 
-    def __getitem__(self, i: int) -> Union[str | Any | list['Node']]:
+    def __getitem__(self, i: int) -> Union[str, Any, list['Node']]:
         assert 0 <= i <= 2
         if i == 0:
             return self.t

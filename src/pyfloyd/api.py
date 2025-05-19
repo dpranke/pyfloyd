@@ -16,7 +16,7 @@
 
 import argparse
 import os
-from typing import Any, NamedTuple, Optional, Protocol, Sequence
+from typing import Any, NamedTuple, Optional, Protocol, Sequence, Union
 
 from pyfloyd import (
     analyzer,
@@ -140,7 +140,7 @@ def compile_to_parser(  # pylint: disable=redefined-builtin
 def generate(
     grammar: str,
     path: str = '<string>',
-    options: Optional[GeneratorOptions | dict[str, Any]] = None,
+    options: Optional[Union[GeneratorOptions, dict[str, Any]]] = None,
     externs: Externs = None,
 ) -> Result:
     """Generate the source code of a parser.

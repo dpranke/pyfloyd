@@ -25,12 +25,12 @@ import sys
 import types
 from typing import Optional
 
-tomllib: Optional[types.ModuleType]
+tomllib: Optional[types.ModuleType] = None
 
 try:
-    import tomllib
+    import tomllib  # type: ignore
 except ModuleNotFoundError:
-    tomllib = None
+    pass
 
 #
 # The `grammars` global is the only thing in this file that should need
@@ -52,7 +52,7 @@ grammars: dict[str, str] = {
 
 def _pyproject_value(val):
     fields = val.split('.')
-    if tomllib and False:  # pylint: disable=condition-evals-to-constant
+    if tomllib:
         with open('pyproject.toml', mode='rb') as fp:
             v = tomllib.load(fp)[fields[0]]
             for field in fields[1:]:
@@ -61,21 +61,21 @@ def _pyproject_value(val):
                 else:
                     return None
             return v
-
-    with open('pyproject.toml', mode='rb') as fp:
-        section = '.'.join(fields[:-1])
-        key = fields[-1]
-        lines = fp.read().decode('utf8').splitlines()
-        found_section = False
-        for line in lines:
-            if found_section:
-                # m = re.match(rf'{key} = "([^"]*)"', line)
-                m = re.match(rf'{key} = (.*)', line)
-                if m:
-                    return eval(m.group(1))  # pylint: disable=eval-used
-            else:
-                if line == f'[{section}]':
-                    found_section = True
+    else:
+        with open('pyproject.toml', mode='rb') as fp:
+            section = '.'.join(fields[:-1])
+            key = fields[-1]
+            lines = fp.read().decode('utf8').splitlines()
+            found_section = False
+            for line in lines:
+                if found_section:
+                    # m = re.match(rf'{key} = "([^"]*)"', line)
+                    m = re.match(rf'{key} = (.*)', line)
+                    if m:
+                        return eval(m.group(1))  # pylint: disable=eval-used
+                else:
+                    if line == f'[{section}]':
+                        found_section = True
     return None
 
 
@@ -130,6 +130,13 @@ class Runner:
                 'the command if supported'
             ),
         )
+        subp.add_argument(
+            '-t',
+            '--typ',
+            action=argparse.BooleanOptionalAction,
+            default=True,
+            help='Install local typ package as well',
+        )
         subp.set_defaults(func=lambda _: method())
         return subp
 
@@ -180,22 +187,10 @@ class Runner:
         subp.add_argument(
             '-u', '--unit', action='store_true', help='Only run unit tests.'
         )
-        subp.add_argument(
-            '--typ',
-            action=argparse.BooleanOptionalAction,
-            default=True,
-            help='Run tests with typ instead of unittest (the default)',
-        )
 
         subp = self.add_parser(
             'devenv',
             help='Set up a dev venv at //.venv with all the needed packages.',
-        )
-        subp.add_argument(
-            '-t',
-            '--typ',
-            action='store_true',
-            help='Install local typ package as well',
         )
 
         subp = self.add_parser(
@@ -242,10 +237,6 @@ class Runner:
         subp.add_argument(
             '-u', '--unit', action='store_true', help='Only run unit tests.'
         )
-        subp.add_argument(
-            '-t', '--typ', action='store_true', help='Run tests with typ.'
-        )
-        subp.add_argument('test', nargs='*', action='store')
 
         subp = self.add_parser('publish', help='Publish packages to PyPI.')
         subp.add_argument(
@@ -273,12 +264,6 @@ class Runner:
             '--failfast',
             action='store_true',
             help='Stop on first fail or error',
-        )
-        subp.add_argument(
-            '--typ',
-            action=argparse.BooleanOptionalAction,
-            default=True,
-            help='Run tests with typ instead of unittest (the default)',
         )
         subp.add_argument(
             '-u', '--unit', action='store_true', help='Only run unit tests.'
@@ -343,6 +328,8 @@ class Runner:
                     '-m',
                     'unittest',
                     'discover',
+                    '-t',
+                    '.',
                     '-s',
                     'tests',
                     '-p',
@@ -413,6 +400,8 @@ class Runner:
 
     def run_presubmit(self):
         self.args.check = True
+        v = sys.version_info
+        print(f'# Using Python version {v.major}.{v.minor}.{v.micro}')
         print('# //run regen --check')
         self.run_regen()
         print('# //run format --check')
@@ -425,6 +414,8 @@ class Runner:
         self.run_mypy()
         print('# //run coverage')
         self.run_coverage()
+        print('')
+        print('# Presubmit completed successfully.')
 
     def run_publish(self):
         if not self.args.test and not self.args.prod:
@@ -487,9 +478,12 @@ class Runner:
                 '-m',
                 'unittest',
                 'discover',
+                '-t',
+                '.',
+                '-s',
+                'tests',
                 '-p',
                 '*_test.py',
-                'tests',
             ]
             if self.args.failfast:
                 cmd.append('-f')

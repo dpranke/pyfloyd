@@ -14,7 +14,7 @@
 
 # pylint: disable=too-many-lines
 
-from typing import Optional
+from typing import Optional, Union
 
 from pyfloyd import datafile
 from pyfloyd import formatter
@@ -27,7 +27,7 @@ from pyfloyd import support
 class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
     name: str = 'JavaScript'
     ext: str = 'js'
-    indent: int | str = 2
+    indent: Union[int, str] = 2
     line_length: Optional[int] = 79
 
     def __init__(

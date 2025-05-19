@@ -15,7 +15,7 @@
 import argparse
 import shlex
 import sys
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Union
 
 import pyfloyd
 from pyfloyd import (
@@ -47,7 +47,7 @@ class GeneratorOptions(attr_dict.AttrDict):
 class Generator:
     name: str = ''
     ext: str = ''
-    indent: int | str = 2
+    indent: Union[int, str] = 2
     line_length: Optional[int] = 79
     help_str: Optional[str] = None
 

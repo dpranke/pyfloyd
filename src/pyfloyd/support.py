@@ -18,7 +18,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from typing import Callable, Optional
+from typing import Callable, Optional, Union
 import unittest
 
 
@@ -188,7 +188,7 @@ class FakeHost:
 
 class _BaseTestCase(unittest.TestCase):
     maxDiff: Optional[int] = None
-    host_fn: Optional[Callable[[], Optional[Host | FakeHost]]] = None
+    host_fn: Optional[Callable[[], Optional[Union[Host, FakeHost]]]] = None
 
     def call(self, host, args, stdin):
         raise NotImplementedError
@@ -223,9 +223,9 @@ class _BaseTestCase(unittest.TestCase):
 
 
 class InlineTestCase(_BaseTestCase):
-    host_fn: Optional[Callable[[], Optional[Host | FakeHost]]] = FakeHost
+    host_fn: Optional[Callable[[], Optional[Union[Host, FakeHost]]]] = FakeHost
     main: Optional[
-        Callable[[Optional[list[str]], Optional[Host | FakeHost]], int]
+        Callable[[Optional[list[str]], Optional[Union[Host, FakeHost]]], int]
     ] = None
 
     def call(self, host, args, stdin):
