@@ -52,6 +52,7 @@ def flatten_repr(
     r_obj = as_list(obj)
     return flatten(r_obj, length, indent)
 
+
 def _fmt(obj: El, length: Union[int, None], indent: str) -> list[str]:
     if isinstance(obj, str):
         return obj.splitlines()
@@ -133,13 +134,7 @@ class ListObj(FormatObj):
     tag = None
 
     def __init__(self, objs: Optional[ElSeq] = None):
-        self.objs: ElList
-        self.objs = []
-        for obj in objs:
-            if isinstance(objs[0], self.__class__):
-                self.objs.extend(obj.objs)
-            else:
-                self.objs.append(obj)
+        self.objs: ElList = []
 
     def as_list(self):
         assert self.tag is not None
@@ -156,8 +151,7 @@ class VList(ListObj):
     tag = 'vl'
 
     def __init__(self, objs: Optional[ElSeq] = None):
-        self.objs: ElList
-        self.objs = []
+        super().__init__(objs)
         for obj in objs:
             if isinstance(obj, self.__class__):
                 self.objs.append(obj)
@@ -186,7 +180,7 @@ class VList(ListObj):
         elif isinstance(obj, str):
             lines = obj.splitlines()
             if len(lines) < 2:
-               self.objs.append(obj)
+                self.objs.append(obj)
             else:
                 self.objs.extend(lines)
         else:
@@ -202,6 +196,14 @@ class VList(ListObj):
 
 class HList(ListObj):
     tag = 'hl'
+
+    def __init__(self, objs: Optional[ElSeq] = None):
+        super().__init__(objs)
+        for obj in objs:
+            if isinstance(objs[0], self.__class__):
+                self.objs.extend(obj.objs)
+            else:
+                self.objs.append(obj)
 
     def __repr__(self):
         return 'HList([' + ', '.join(repr(o) for o in self.objs) + '])'
@@ -401,6 +403,7 @@ class Tree(MultipleObj):
                 lines.append(op + ' ' + right)
         return lines
 
+
 class LispList(MultipleObj):
     tag = 'll'
 
@@ -439,4 +442,3 @@ class LispList(MultipleObj):
                 lines.append(' ' * len(prefix) + sline)
         lines[-1] += ']'
         return lines
-

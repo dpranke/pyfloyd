@@ -179,6 +179,7 @@ def add_arguments(
     parser.add_argument(
         '--line-length',
         action='store',
+        type=int,
         default=options.line_length,
         help='Line length to use (default is language-specific)',
     )
