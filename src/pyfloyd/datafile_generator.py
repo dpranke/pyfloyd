@@ -164,15 +164,20 @@ class DatafileGenerator(generator.Generator):
 
     def generate(self) -> str:
         obj = self._interpreter.eval([['symbol', 'generate']])
-        if isinstance(obj, formatter.El) and self._fl:
-            lines = formatter.flatten_repr(
-                obj, self.options.line_length, self.options.indent
+        if self._fl:
+            new_obj = formatter.as_list(obj)
+        else:
+            new_obj = obj
+        if isinstance(new_obj, formatter.FormatObj):
+            lines = formatter.flatten(
+                new_obj, self.options.line_length, self.options.indent
             )
         else:
-            assert isinstance(obj, str)
-            lines = obj.splitlines()
-        res = ['' if line.isspace() else line for line in lines]
-        return '\n'.join(res) + '\n'
+            lines = new_obj.splitlines()
+        res = (
+            '\n'.join('' if line.isspace() else line for line in lines) + '\n'
+        )
+        return res
 
     def f_at_exp(self, args, env) -> Any:
         if len(args) > 1:
@@ -202,13 +207,12 @@ class DatafileGenerator(generator.Generator):
 
             if isinstance(obj, formatter.FormatObj):
                 if self._fl:
-                    lines.append(obj)
+                    if lines[-1] == '    ':
+                        lines[-1] = formatter.Indent(obj)
+                    else:
+                        lines.append(obj)
                     continue
                 obj = '\n'.join(formatter.flatten(obj, 80))
-
-            if isinstance(obj, list):
-                # TODO: Is this the best thing to do here?
-                obj = ''.join(obj)
 
             lisp_interpreter.check(
                 lisp_interpreter.is_str(obj),
@@ -226,9 +230,11 @@ class DatafileGenerator(generator.Generator):
                 s = s[:-num_to_chomp]
             if self._fl:
                 slines = res.splitlines()
-                if slines:
+                if slines and isinstance(lines[-1], str):
                     lines[-1] += slines[0]
                     lines.extend(slines[1:])
+                else:
+                    lines.extend(slines)
             else:
                 s += res
         if self._fl:

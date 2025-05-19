@@ -23,7 +23,7 @@ class FormatObj:
         """Returns a list of strings, each representing a line."""
         raise NotImplementedError
 
-    def fmt_repr(self) -> 'El':
+    def as_list(self) -> 'El':
         raise NotImplementedError
 
 
@@ -49,7 +49,7 @@ def flatten_repr(
     """Print a formatted representation of the tree itself
 
     Rather than the contents of the tree."""
-    r_obj = _fmt_repr(obj)
+    r_obj = as_list(obj)
     return flatten(r_obj, length, indent)
 
 def _fmt(obj: El, length: Union[int, None], indent: str) -> list[str]:
@@ -67,10 +67,10 @@ def _fmt_one(obj: El, length: Union[int, None], indent: str) -> str:
     return lines[0]
 
 
-def _fmt_repr(obj):
-    if isinstance(obj, str):
-        return repr(obj)
-    return obj.fmt_repr()
+def as_list(obj):
+    if isinstance(obj, FormatObj):
+        return obj.as_list()
+    return repr(obj)
 
 
 class Indent(FormatObj):
@@ -81,8 +81,8 @@ class Indent(FormatObj):
     def __repr__(self):
         return 'Indent(' + repr(self.obj) + ')'
 
-    def fmt_repr(self):
-        return LispList('ind', _fmt_repr(self.obj))
+    def as_list(self):
+        return LispList('ind', as_list(self.obj))
 
     def fmt(self, length: Union[int, None], indent: str) -> list[str]:
         new_l = None if length is None else length - len(indent)
@@ -102,8 +102,8 @@ class Lit(FormatObj):
     def __repr__(self):
         return f'Lit({repr(self.s)})'
 
-    def fmt_repr(self):
-        return LispList('lit', _fmt_repr(self.s))
+    def as_list(self):
+        return LispList('lit', as_list(self.s))
 
     def fmt(self, length: Union[int, None], indent: str) -> list[str]:
         return [self.s]
@@ -141,11 +141,11 @@ class ListObj(FormatObj):
             else:
                 self.objs.append(obj)
 
-    def fmt_repr(self):
+    def as_list(self):
         assert self.tag is not None
         objs = [self.tag]
         for obj in self.objs:
-            objs.append(_fmt_repr(obj))
+            objs.append(as_list(obj))
         return LispList(*objs)
 
     def fmt(self, length: Union[int, None], indent: str) -> list[str]:
@@ -251,7 +251,7 @@ class Saw(MultipleObj):
     def __repr__(self):
         return f'Saw({repr(self.start)}, {repr(self.mid)}, {repr(self.end)})'
 
-    def fmt_repr(self):
+    def as_list(self):
         return LispList(self.tag, self.start, self.mid, self.end)
 
     def fmt_one(self, length: Union[int, None], indent: str) -> list[str]:
@@ -292,7 +292,7 @@ class Comma(MultipleObj):
     def __repr__(self):
         return 'Comma(' + repr(self.objs) + ')'
 
-    def fmt_repr(self):
+    def as_list(self):
         return LispList(self.tag, *self.objs)
 
     def fmt_one(self, length: Union[int, None], indent: str) -> list[str]:
@@ -345,12 +345,12 @@ class Tree(MultipleObj):
     def __repr__(self):
         return f'Tree({self.left!r}, {self.op!r}, {self.right!r})'
 
-    def fmt_repr(self):
+    def as_list(self):
         return LispList(
             self.tag,
-            'null' if self.left is None else _fmt_repr(self.left),
+            'null' if self.left is None else as_list(self.left),
             self.op,
-            'null' if self.right is None else _fmt_repr(self.right),
+            'null' if self.right is None else as_list(self.right),
         )
 
     def fmt_one(self, length: Union[int, None], indent: str) -> list[str]:
@@ -410,10 +410,10 @@ class LispList(MultipleObj):
     def __repr__(self):
         return 'LispList(' + ', '.join(repr(obj) for obj in self.objs) + ')'
 
-    def fmt_repr(self):
+    def as_list(self):
         objs = []
         for obj in self.objs:
-            objs.append(_fmt_repr(obj))
+            objs.append(as_list(obj))
         return LispList(*objs)
 
     def fmt_one(self, length: Union[int, None], indent: str) -> list[str]:
