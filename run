@@ -352,8 +352,6 @@ class Runner:
             sys.exit(2)
 
         cmd = [self.uv_path, 'sync']
-        if self.args.typ:
-            cmd.extend(['--extra', 'typ'])
         if self.args.quiet:
             cmd.append('--quiet')
 
