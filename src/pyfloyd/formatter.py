@@ -152,6 +152,8 @@ class VList(ListObj):
 
     def __init__(self, objs: Optional[ElSeq] = None):
         super().__init__(objs)
+        if objs is None:
+            return
         for obj in objs:
             if isinstance(obj, self.__class__):
                 self.objs.append(obj)
