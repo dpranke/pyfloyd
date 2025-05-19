@@ -796,8 +796,8 @@ wheels = [
 
 [[package]]
 name = "typ"
-version = "2.0.0.dev2"
-source = { git = "https://github.com/dpranke/typ-dev?branch=main#7dca97c80a7a38aeebeba6aa41e3f672b9f1090f" }
+version = "2.0.0.dev3"
+source = { git = "https://github.com/dpranke/typ-dev?branch=main#9b51c714e044b912a6f197d47ae4b630f229b5d8" }
 
 [[package]]
 name = "typing-extensions"
