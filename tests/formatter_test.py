@@ -15,10 +15,11 @@
 import unittest
 
 from pyfloyd.formatter import (
-    as_list,
-    as_lisplist,
     flatten,
     flatten_as_lisplist,
+    from_list,
+    to_list,
+    to_lisplist,
     Comma,
     HList,
     Indent,
@@ -77,6 +78,33 @@ class Tests(unittest.TestCase):
                 )
             ),
         )
+
+    def test_from_list(self):
+        obj = [
+            'comma', 
+            '1', 
+            '2', 
+            ['ind', ['hl', '3', '4']],
+            ['lit', '5'],
+            ['ll', '6'],
+            ['saw', '7', '8', '9'],
+            ['tree', '10', '+', '11'],
+            ['vl', '12', '13'],
+        ]
+        lis = from_list(obj)
+        expected_obj = Comma(
+            [
+                '1',
+                '2',
+                Indent(HList(['3', '4'])),
+                Lit('5'),
+                LL('6'),
+                Saw('7', '8', '9'),
+                Tree('10', '+', '11'),
+                VList(['12', '13'])
+            ]
+        )
+        self.assertEqual(lis, expected_obj)
 
     def test_hlist(self):
         obj = HList(['1', '2'])
@@ -283,10 +311,10 @@ class Tests(unittest.TestCase):
 class AsListTests(unittest.TestCase):
     def check(self, obj, expected_list, expected_lisp_obj, expected_lines,
               line_length=79, indent='    '):
-        actual_list = as_list(obj)
+        actual_list = to_list(obj)
         self.assertEqual(expected_list, actual_list)
 
-        actual_lisp_obj = as_lisplist(obj)
+        actual_lisp_obj = to_lisplist(obj)
         self.assertEqual(expected_lisp_obj, actual_lisp_obj)
 
         actual_lines = flatten_as_lisplist(obj, line_length, indent)
