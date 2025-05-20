@@ -746,105 +746,7 @@ class Encoder:
     def _encode_str(self, obj: str, *, as_key: bool) -> str:
         if as_key:
             return obj
-
-        m = _bare_word_re.match(obj)
-        if m:
-            return obj
-        return self._encode_quoted_str(obj)
-
-    def _encode_quoted_str(self, s: str) -> str:
-        """Returns a quoted string with a minimal number of escaped quotes."""
-        quote_map: dict[str, int] = {}
-        for token in quote_tokens:
-            quote_map[token] = 0
-        lstrs: dict[int, bool] = {}
-
-        i = 0
-        while i < len(s):
-            if s[i] == '\\' and s[i + 1] in '\'"`':
-                i += 2
-            for k in quote_map:
-                if s[i:].startswith(k):
-                    quote_map[k] += 1
-                    i += len(k)
-                    break
-            else:
-                m = _long_str_re.match(s[i:])
-                if m:
-                    lstrs[len(m.group(0)) - 2] = True
-                    i += len(m.group(0))
-                else:
-                    i += 1
-
-        min_quote_count = min(quote_map.values())
-        for tok in reversed(quote_tokens):
-            if quote_map[tok] == min_quote_count:
-                quote = tok
-                break
-        if quote_map[quote]:
-            i = 1
-            while True:
-                if i in lstrs:
-                    i += 1
-                    continue
-                quote = "l'" + '=' * i + "'"
-                break
-
-        i = 0
-        ret = []
-        while i < len(s):
-            if s.startswith(quote, i):
-                ret.append('\\')
-                ret.append(quote[0])
-                i += len(quote)
-                continue
-
-            ch = s[i]
-            o = ord(ch)
-            if o < 32:
-                ret.append(self._escape_ch(ch))
-            elif o < 128 or (
-                not self.ensure_ascii and ch not in ('\u2028', '\u2029')
-            ):
-                ret.append(ch)
-            else:
-                ret.append(self._escape_ch(ch))
-            i += 1
-        ret = ['\n' if r == '\\n' else r for r in ret]
-
-        return quote + ''.join(ret) + quote
-
-    def _escape_ch(self, ch: str) -> str:
-        """Returns the backslash-escaped representation of the char."""
-        if ch == '\\':
-            return '\\\\'
-        if ch == "'":
-            return r'\''
-        if ch == '"':
-            return r'\"'
-        if ch == '\n':
-            return r'\n'
-        if ch == '\r':
-            return r'\r'
-        if ch == '\t':
-            return r'\t'
-        if ch == '\b':
-            return r'\b'
-        if ch == '\f':
-            return r'\f'
-        if ch == '\v':
-            return r'\v'
-        if ch == '\0':
-            return r'\0'
-
-        o = ord(ch)
-        if o < 65536:
-            return rf'\u{o:04x}'
-
-        val = o - 0x10000
-        high = 0xD800 + (val >> 10)
-        low = 0xDC00 + (val & 0x3FF)
-        return rf'\u{high:04x}\u{low:04x}'
+        return encode_string(obj, self.ensure_ascii)
 
     def _encode_non_basic_type(self, obj, seen: Set, level: int) -> str:
         # Basic types can't be recursive so we only check for circularity
@@ -974,6 +876,107 @@ class Encoder:
             indent_str = ''
             end_str = ''
         return indent_str, end_str
+
+
+def encode_string(obj: str, ensure_ascii: bool = True) -> str:
+    m = _bare_word_re.match(obj)
+    if m:
+        return obj
+    return encode_quoted_string(obj)
+
+
+def encode_quoted_string(s: str, ensure_ascii=True) -> str:
+    """Returns a quoted string with a minimal number of escaped quotes."""
+    quote_map: dict[str, int] = {}
+    for token in quote_tokens:
+        quote_map[token] = 0
+    lstrs: dict[int, bool] = {}
+
+    i = 0
+    while i < len(s):
+        if s[i] == '\\' and s[i + 1] in '\'"`':
+            i += 2
+        for k in quote_map:
+            if s[i:].startswith(k):
+                quote_map[k] += 1
+                i += len(k)
+                break
+        else:
+            m = _long_str_re.match(s[i:])
+            if m:
+                lstrs[len(m.group(0)) - 2] = True
+                i += len(m.group(0))
+            else:
+                i += 1
+
+    min_quote_count = min(quote_map.values())
+    for tok in reversed(quote_tokens):
+        if quote_map[tok] == min_quote_count:
+            quote = tok
+            break
+    if quote_map[quote]:
+        i = 1
+        while True:
+            if i in lstrs:
+                i += 1
+                continue
+            quote = "l'" + '=' * i + "'"
+            break
+
+    i = 0
+    ret = []
+    while i < len(s):
+        if s.startswith(quote, i):
+            ret.append('\\')
+            ret.append(quote[0])
+            i += len(quote)
+            continue
+
+        ch = s[i]
+        o = ord(ch)
+        if o < 32:
+            ret.append(escape_char(ch))
+        elif o < 128 or (not ensure_ascii and ch not in ('\u2028', '\u2029')):
+            ret.append(ch)
+        else:
+            ret.append(escape_char(ch))
+        i += 1
+    ret = ['\n' if r == '\\n' else r for r in ret]
+
+    return quote + ''.join(ret) + quote
+
+
+def escape_char(ch: str) -> str:
+    """Returns the backslash-escaped representation of the char."""
+    if ch == '\\':
+        return '\\\\'
+    if ch == "'":
+        return r'\''
+    if ch == '"':
+        return r'\"'
+    if ch == '\n':
+        return r'\n'
+    if ch == '\r':
+        return r'\r'
+    if ch == '\t':
+        return r'\t'
+    if ch == '\b':
+        return r'\b'
+    if ch == '\f':
+        return r'\f'
+    if ch == '\v':
+        return r'\v'
+    if ch == '\0':
+        return r'\0'
+
+    o = ord(ch)
+    if o < 65536:
+        return rf'\u{o:04x}'
+
+    val = o - 0x10000
+    high = 0xD800 + (val >> 10)
+    low = 0xDC00 + (val & 0x3FF)
+    return rf'\u{high:04x}\u{low:04x}'
 
 
 def _get_leading_quote(s):

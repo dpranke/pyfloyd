@@ -14,8 +14,8 @@
 
 import os
 
-import pyfloyd
-from pyfloyd import datafile, support
+from pyfloyd import support, __version__
+from pyfloyd.datafile import tool
 
 
 class _Tests:
@@ -67,11 +67,11 @@ class _Tests:
         )
 
     def test_version(self):
-        self.check(['--version'], out=str(pyfloyd.__version__) + '\n')
+        self.check(['--version'], out=str(__version__) + '\n')
 
 
 class Inline(support.InlineTestCase, _Tests):
-    main = datafile.main
+    main = tool.main
 
 
 class Module(support.ModuleTestCase, _Tests):
