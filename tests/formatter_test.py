@@ -16,8 +16,9 @@ import unittest
 
 from pyfloyd.formatter import (
     as_list,
+    as_lisplist,
     flatten,
-    flatten_as_list,
+    flatten_as_lisplist,
     Comma,
     HList,
     Indent,
@@ -30,9 +31,6 @@ from pyfloyd.formatter import (
 
 
 class Tests(unittest.TestCase):
-    def test_str(self):
-        self.assertEqual(['foo'], flatten('foo'))
-
     def test_comma(self):
         t = Comma(['1', '2', '3'])
         self.assertEqual(['1, 2, 3'], flatten(t))
@@ -80,6 +78,17 @@ class Tests(unittest.TestCase):
             ),
         )
 
+    def test_hlist(self):
+        obj = HList(['1', '2'])
+        self.assertEqual(['12'], flatten(obj))
+
+        obj = HList(['1', HList(['2', '3'])])
+        self.assertEqual(['123'], flatten(obj))
+
+    def test_indent(self):
+        obj = Indent(VList(['1', '2']))
+        self.assertEqual(['    1', '    2'], flatten(obj))
+
     def test_line_too_long(self):
         long_str = (
             'this is a string line that stretches out for a'
@@ -87,20 +96,20 @@ class Tests(unittest.TestCase):
         )
         self.assertEqual([long_str], flatten(long_str))
 
-    def test_list(self):
+    def test_lisplist(self):
+        self.assertEqual(['[]'], flatten(LL([])))
+
+        self.assertEqual(['[1]'], flatten(LL(['1'])))
+
         lis = LL(['1', '2', '3'])
-        self.assertEqual(["[1 '2' '3']"], flatten(lis))
+        self.assertEqual(["[1 2 3]"], flatten(lis))
 
         lis = LL(['foo', LL(['fn', LL(['arg']), LL(['length', 'arg'])])])
-        self.assertEqual(["[foo [fn [arg] [length 'arg']]]"], flatten(lis))
+        self.assertEqual(["[foo [fn [arg] [length arg]]]"], flatten(lis))
         self.assertEqual(
-            ['[foo [fn [arg]', "         [length 'arg']]]"],
+            ['[foo [fn [arg]', "         [length arg]]]"],
             flatten(lis, length=14),
         )
-
-    def test_flatten_as_list(self):
-        lis = LL(['1', '2', '3'])
-        self.assertEqual(["[ll '1' '2' '3']"], flatten_as_list(lis))
 
     def test_mix(self):
         lines = flatten(
@@ -213,6 +222,17 @@ class Tests(unittest.TestCase):
             flatten(t),
         )
 
+    def test_str(self):
+        self.assertEqual([''], flatten(''))
+        self.assertEqual(['foo'], flatten('foo'))
+        self.assertEqual(['foo', 'bar'], flatten('foo\nbar'))
+
+        # TODO: Is this the behavior we want, or should there be
+        # one more line on each?
+        self.assertEqual(['foo', 'bar'], flatten('foo\nbar\n'))
+        self.assertEqual([''], flatten('\n'))
+        self.assertEqual(['foo'], flatten('foo\n'))
+
     def test_tree(self):
         t = Tree('1', '+', '2')
         self.assertEqual(['1 + 2'], flatten(t))
@@ -246,55 +266,96 @@ class Tests(unittest.TestCase):
             "Tree(['1', '+', Tree(['2', '+', '3'])])",
             repr(Tree('1', '+', Tree('2', '+', '3'))),
         )
+    
+    def test_vlist(self):
+        self.assertEqual([], flatten(VList([])))
+        self.assertEqual([''], flatten(VList([''])))
+        self.assertEqual(['1', '2'], flatten(VList(['1', '2'])))
+        vl = VList([])
+        vl += 'foo\nbar'
+        vl += ''
+        vl += 'baz'
+        vl += VList(['1', '2'])
+        self.assertEqual(['foo', 'bar', '', 'baz', '1', '2'], flatten(vl))
+
 
 
 class AsListTests(unittest.TestCase):
-    def check(self, obj, expected):
-        lis = as_list(obj)
-        self.assertEqual(lis, expected)
+    def check(self, obj, expected_list, expected_lisp_obj, expected_lines,
+              line_length=79, indent='    '):
+        actual_list = as_list(obj)
+        self.assertEqual(expected_list, actual_list)
+
+        actual_lisp_obj = as_lisplist(obj)
+        self.assertEqual(expected_lisp_obj, actual_lisp_obj)
+
+        actual_lines = flatten_as_lisplist(obj, line_length, indent)
+        self.assertEqual(expected_lines, actual_lines)
 
     def test_comma(self):
         self.check(
             Comma(['1', '2', Indent('bar')]),
+            ['comma', '1', '2', ['ind', 'bar']],
             LL(['comma', '1', '2', LL(['ind', 'bar'])]),
+            ['[comma 1 2 [ind bar]]']
         )
 
     def test_hlist(self):
         self.check(
             HList(['foo', Indent('bar')]),
+            ['hl', 'foo', ['ind', 'bar']],
             LL(['hl', 'foo', LL(['ind', 'bar'])]),
+            ['[hl foo [ind bar]]']
         )
 
     def test_indent(self):
-        self.check(Indent('foo'), LL(['ind', 'foo']))
+        self.check(
+            Indent('foo'),
+            ['ind', 'foo'],
+            LL(['ind', 'foo']),
+            ['[ind foo]']
+        )
         self.check(
             Indent(VList(['foo', 'bar'])),
+            ['ind', ['vl', 'foo', 'bar']],
             LL(['ind', LL(['vl', 'foo', 'bar'])]),
+            ['[ind [vl foo bar]]']
         )
 
     def test_lit(self):
-        self.check(Lit('foo'), LL(['lit', 'foo']))
+        self.check(
+            Lit('foo'),
+            ['lit', 'foo'],
+            LL(['lit', 'foo']),
+            ['[lit foo]']
+        )
 
     def test_saw(self):
         self.check(
             Saw('foo', 'bar', VList(['baz'])),
+            ['saw', 'foo', 'bar', ['vl', 'baz']],
             LL(['saw', 'foo', 'bar', LL(['vl', 'baz'])]),
+            ['[saw foo bar [vl baz]]']
         )
 
     def test_str(self):
-        self.check('foo', 'foo')
-        self.check('foo\n', 'foo\n')
-        self.check('foo\nbar', 'foo\nbar')
-        self.check('foo\nbar\n', 'foo\nbar\n')
+        self.check('foo', 'foo', 'foo', ['foo'])
+        self.check('foo\n', 'foo\n', 'foo\n', ['foo'])
+        self.check('foo\nbar', 'foo\nbar', 'foo\nbar', ['foo', 'bar'])
+        self.check('foo\nbar\n', 'foo\nbar\n', 'foo\nbar\n', ['foo', 'bar'])
 
     def test_tree(self):
         self.check(
             Tree('1', '+', Tree('2', '+', '3')),
+            ['tree', '1', '+', ['tree', '2', '+', '3']],
             LL(['tree', '1', '+', LL(['tree', '2', '+', '3'])]),
+            ['[tree 1 + [tree 2 + 3]]']
         )
 
     def test_vlist(self):
         self.check(
             VList(['foo', Indent('bar')]),
+            ['vl', 'foo', ['ind', 'bar']],
             LL(['vl', 'foo', LL(['ind', 'bar'])]),
+            ['[vl foo [ind bar]]']
         )

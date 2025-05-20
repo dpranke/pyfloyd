@@ -14,6 +14,8 @@
 
 from typing import Callable, Optional, Sequence, Union
 
+from pyfloyd import datafile
+
 
 FormatMethod = Callable[[int, str], list[str]]
 
@@ -21,6 +23,7 @@ FormatMethod = Callable[[int, str], list[str]]
 El = Union[str, 'FormatObj']
 ElSeq = Sequence[El]
 ElList = list[El]
+_FmtFn = Callable[[El, Union[None, int], str], list[str]]
 
 
 class FormatObj:
@@ -43,13 +46,18 @@ class FormatObj:
         return f'{cls_name}([{", ".join(repr(obj) for obj in self.objs)}])'
 
     def as_list(self):
+        return [self.tag] + [as_list(obj) for obj in self.objs]
+
+    def as_lisplist(self):
         assert self.tag is not None
-        return LispList([self.tag] + [as_list(obj) for obj in self.objs])
+        return LispList([self.tag] + [as_lisplist(obj) for obj in self.objs])
 
     def is_empty(self):
         return len(self.objs) == 0
 
-    def fmt(self, length: Union[int, None], indent: str) -> list[str]:
+    def fmt(
+        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
+    ) -> list[str]:
         """Returns a list of strings, each representing a line."""
         raise NotImplementedError
 
@@ -58,37 +66,51 @@ class FormatObj:
 ListObj = FormatObj
 
 
+def _fmt(obj: El, length: Union[int, None], indent: str) -> list[str]:
+    if isinstance(obj, str):
+        if obj == '':
+            return ['']
+        lines = obj.splitlines()
+        return lines
+    return obj.fmt(length, indent, _fmt)
+
+
 def flatten(
-    obj: El, length: Optional[int] = 79, indent: str = '    '
+    obj: El,
+    length: Union[None, int] = 79,
+    indent: str = '    ',
+    fmt_fn: _FmtFn = _fmt
 ) -> list[str]:
     """Flatten an object into a list of 1 or more strings.
 
     Each string must be shorter than `length` characters, if possible. If
     length is None, lines can be arbitrarily long.
     """
-    return _fmt(obj, length, indent)
+    return fmt_fn(obj, length, indent)
 
 
-def flatten_as_list(
+
+def flatten_as_lisplist(
     obj: El, length: Optional[int] = 79, indent: str = '    '
 ) -> list[str]:
-    """Print a formatted representation of the tree itself
-
-    Rather than the contents of the tree."""
-    r_obj = as_list(obj)
-    return flatten(r_obj, length, indent)
+    """Print a datafile-formatted representation of the tree itself."""
+    r_obj = as_lisplist(obj)
+    return flatten(r_obj, length, indent, _fmt_quote)
 
 
-def _fmt(obj: El, length: Union[int, None], indent: str) -> list[str]:
+def _fmt_quote(obj: El, length: Union[int, None], indent: str) -> list[str]:
     if isinstance(obj, str):
-        if obj == '':
-            return ["''"]
-        return [repr(line) for line in obj.splitlines()]
-    return obj.fmt(length, indent)
+        return [datafile.encode_string(line) for line in obj.splitlines()]
+    return obj.fmt(length, indent, _fmt_quote)
 
 
-def _fmt_one(obj: El, length: Union[int, None], indent: str) -> str:
-    lines = _fmt(obj, length, indent)
+def _fmt_single_line(
+    obj: El,
+    length: Union[int, None],
+    indent: str,
+    fmt_fn: _FmtFn
+) -> str:
+    lines = fmt_fn(obj, length, indent)
     assert isinstance(lines, list)
     assert len(lines) == 1, (
         f'format unexpectedly returned more than one line: {repr(lines)}'
@@ -103,16 +125,24 @@ def as_list(obj):
     return obj
 
 
+def as_lisplist(obj):
+    if isinstance(obj, FormatObj):
+        return obj.as_lisplist()
+    return obj
+
+
 class Indent(FormatObj):
     tag = 'ind'
 
     def __init__(self, obj: FormatObj):
         super().__init__([obj])
 
-    def fmt(self, length: Union[int, None], indent: str) -> list[str]:
+    def fmt(
+        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
+    ) -> list[str]:
         new_l = None if length is None else length - len(indent)
         lines = []
-        for line in self.objs[0].fmt(new_l, indent):
+        for line in self.objs[0].fmt(new_l, indent, fmt_fn):
             if line:
                 lines.append(indent + line)
             else:
@@ -126,27 +156,41 @@ class Lit(FormatObj):
     def __init__(self, s: str):
         super().__init__([s])
 
-    def fmt(self, length: Union[int, None], indent: str) -> list[str]:
+    @property
+    def s(self):
+        return self.objs[0]
+
+    @s.setter
+    def s(self, v):
+        self.objs[0] = v
+
+    def fmt(
+        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
+    ) -> list[str]:
         return [self.objs[0]]
 
 
 class MultipleObj(FormatObj):
-    def fmt(self, length: Union[int, None], indent: str) -> list[str]:
+    def fmt(
+        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
+    ) -> list[str]:
         """Returns a list of strings, each representing a line."""
-        lines = self.fmt_one(None, indent)
-        if length is None:
-            return lines
+        s = self.fmt_single_line(None, indent, fmt_fn)
+        if length is None or len(s) < length:
+            return [s]
+        lines = self.fmt_multiple_lines(None, indent, fmt_fn)
         if all(len(line) < length for line in lines):
             return lines
-        lines = self.fmt_multiple(None, indent)
-        if all(len(line) < length for line in lines):
-            return lines
-        return self.fmt_multiple(length, indent)
+        return self.fmt_multiple_lines(length, indent, fmt_fn)
 
-    def fmt_one(self, length: Union[int, None], indent: str) -> list[str]:
+    def fmt_single_line(
+        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
+    ) -> str:
         raise NotImplementedError
 
-    def fmt_multiple(self, length: Union[int, None], indent: str) -> list[str]:
+    def fmt_multiple_lines(
+        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
+    ) -> list[str]:
         raise NotImplementedError
 
 
@@ -183,10 +227,12 @@ class VList(FormatObj):
             self.objs.append(obj)
         return self
 
-    def fmt(self, length: Union[int, None], indent: str) -> list[str]:
+    def fmt(
+        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
+    ) -> list[str]:
         lines = []
         for obj in self.objs:
-            lines.extend(_fmt(obj, length, indent))
+            lines.extend(fmt_fn(obj, length, indent))
         return lines
 
 
@@ -201,16 +247,18 @@ class HList(FormatObj):
             else:
                 self.objs.append(obj)
 
-    def fmt(self, length: Union[int, None], indent: str) -> list[str]:
+    def fmt(
+        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
+    ) -> list[str]:
         lines: list[str] = []
         if len(self.objs) != 0:
-            lines.extend(_fmt(self.objs[0], length, indent))
+            lines.extend(fmt_fn(self.objs[0], length, indent))
             for obj in self.objs[1:]:
                 if isinstance(obj, str):
                     lines[-1] += obj
                 else:
                     new_l = None if length is None else length - len(lines[-1])
-                    sublines = obj.fmt(new_l, indent)
+                    sublines = obj.fmt(new_l, indent, fmt_fn)
                     lines[-1] += sublines[0]
                     if len(sublines) > 1:
                         lines.extend(sublines[1:])
@@ -264,15 +312,22 @@ class Saw(MultipleObj):
     def end(self, v):
         self.objs[2] = v
 
-    def fmt_one(self, length: Union[int, None], indent: str) -> list[str]:
-        return [''.join(_fmt_one(obj, length, indent) for obj in self.objs)]
+    def fmt_single_line(
+        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
+    ) -> str:
+        s = ''
+        for obj in self.objs:
+            s += _fmt_single_line(obj, length, indent, fmt_fn)
+        return s
 
-    def fmt_multiple(self, length: Union[int, None], indent: str) -> list[str]:
-        lines = _fmt(self.start, length, indent)
+    def fmt_multiple_lines(
+        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
+    ) -> list[str]:
+        lines = fmt_fn(self.start, length, indent)
         new_l = None if length is None else length - len(lines[-1])
-        for line in _fmt(self.mid, length, indent):
+        for line in fmt_fn(self.mid, length, indent):
             lines.append(indent + line)
-        for line in _fmt(self.end, new_l, indent):
+        for line in fmt_fn(self.end, new_l, indent):
             lines.append(line)
         return lines
 
@@ -287,26 +342,30 @@ class Comma(MultipleObj):
 
     tag = 'comma'
 
-    def fmt_one(self, length: Union[int, None], indent: str) -> list[str]:
+    def fmt_single_line(
+        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
+    ) -> str:
         if not self.objs:
-            return ['']
+            return ''
 
         new_l = None if length is None else length
-        s = _fmt_one(self.objs[0], new_l, indent)
+        s = _fmt_single_line(self.objs[0], new_l, indent, fmt_fn)
         for obj in self.objs[1:]:
             if new_l is not None:
                 new_l -= len(s) + 2
-            s += ', ' + _fmt_one(obj, new_l, indent)
-        return [s]
+            s += ', ' + _fmt_single_line(obj, new_l, indent, fmt_fn)
+        return s
 
-    def fmt_multiple(self, length: Union[int, None], indent: str) -> list[str]:
+    def fmt_multiple_lines(
+        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
+    ) -> list[str]:
         if not self.objs:
             return ['']
 
         new_l = None if length is None else length - 1
         lines = []
         for obj in self.objs:
-            lines += _fmt(obj, new_l, indent)
+            lines += fmt_fn(obj, new_l, indent)
             if len(self.objs) > 1:
                 lines[-1] += ','
         return lines
@@ -356,32 +415,36 @@ class Tree(MultipleObj):
     def right(self, v):
         self.objs[2] = v
 
-    def fmt_one(self, length: Union[int, None], indent: str) -> list[str]:
+    def fmt_single_line(
+        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
+    ) -> str:
         left, op, right = self.objs
         if left is None:
             s = op
             assert right is not None
-            s += _fmt_one(right, length, indent)
+            s += _fmt_single_line(right, length, indent, fmt_fn)
         else:
-            s = _fmt_one(left, length, indent)
+            s = _fmt_single_line(left, length, indent, fmt_fn)
             if right is None:
                 s += op
             else:
                 s += ' ' + op + ' '
                 new_l = None if length is None else length - len(s)
-                s += _fmt_one(right, new_l, indent)
-        return [s]
+                s += _fmt_single_line(right, new_l, indent, fmt_fn)
+        return s
 
-    def fmt_multiple(self, length: Union[int, None], indent: str) -> list[str]:
+    def fmt_multiple_lines(
+        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
+    ) -> list[str]:
         left, op, right = self.objs
         if left is None:
             assert right is not None
             new_l = None if length is None else length - len(self.op)
-            sublines = _fmt(right, new_l, indent)
+            sublines = fmt_fn(right, new_l, indent)
             lines = [op + sublines[0]] + sublines[1:]
             return lines
 
-        lines = _fmt(left, length, indent)
+        lines = fmt_fn(left, length, indent)
         if right is None:
             lines[-1] += self.op
             return lines
@@ -389,7 +452,7 @@ class Tree(MultipleObj):
         while isinstance(right, Tree):
             new_l = None if length is None else length - len(op) - 1
             if right.left is not None:
-                right_lines = _fmt(right.left, new_l, indent)
+                right_lines = fmt_fn(right.left, new_l, indent)
                 lines.append(op + ' ' + right_lines[0])
                 lines += right_lines[1:]
             op = right.op
@@ -397,7 +460,7 @@ class Tree(MultipleObj):
         if right is not None:
             new_l = None if length is None else length - len(op) - 1
             if isinstance(right, FormatObj):
-                right_lines = _fmt(right, new_l, indent)
+                right_lines = fmt_fn(right, new_l, indent)
                 lines.append(op + ' ' + right_lines[0])
                 lines += right_lines[1:]
             else:
@@ -406,27 +469,41 @@ class Tree(MultipleObj):
 
 
 class LispList(MultipleObj):
+    """Format as a list, lisp-style.
+
+    Across multiple lines, the second and subsequent lines will be
+    indented to match the second argument to the list, and closing
+    brackets will be on the last line:
+
+        [foo [bar [baz]
+                  [a b c]]
+             [quux]]
+    """
     tag = 'll'
 
-    def fmt_one(self, length: Union[int, None], indent: str) -> list[str]:
+    def fmt_single_line(
+        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
+    ) -> str:
         s = '['
         if self.objs:
-            s += self.objs[0]
+            s += _fmt_single_line(self.objs[0], length, indent, fmt_fn)
             if len(self.objs) > 1:
                 for obj in self.objs[1:]:
                     s += ' '
-                    s += _fmt_one(obj, length, indent)
+                    s += _fmt_single_line(obj, length, indent, fmt_fn)
         s += ']'
-        return [s]
+        return s
 
-    def fmt_multiple(self, length: Union[int, None], indent: str) -> list[str]:
+    def fmt_multiple_lines(
+        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
+    ) -> list[str]:
         lines = ['']
         if len(self.objs) == 0:
             return ['[]']
         if len(self.objs) == 1:
             if isinstance(self.objs[0], str):
                 return ['[' + self.objs[0] + ']']
-            sl = _fmt(self.objs[0], length, indent)
+            sl = fmt_fn(self.objs[0], length, indent)
             sl[0] = '[' + sl[0] + ']'
             sl[-1] = sl[-1] + ']'
             return sl
@@ -435,7 +512,7 @@ class LispList(MultipleObj):
         lines[0] += prefix
         new_l = None if length is None else length - len(prefix)
         for i, obj in enumerate(self.objs[1:]):
-            sl = _fmt(obj, new_l, indent)
+            sl = fmt_fn(obj, new_l, indent)
             if i == 0:
                 lines[0] += sl[0]
             else:
