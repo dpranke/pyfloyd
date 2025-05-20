@@ -440,25 +440,19 @@ class VList(FormatObj):
 
     def __init__(self, objs: Optional[ElSeq] = None):
         super().__init__([])
-        if objs is None:
-            return
+        objs = objs or []
         for obj in objs:
-            if isinstance(obj, self.__class__):
-                self.objs.append(obj)
-            else:
-                if isinstance(obj, str):
-                    lines = obj.splitlines()
-                    if len(lines) < 2:
-                        self.objs.append(obj)
-                    else:
-                        self.objs.extend(obj.splitlines())
-                else:
+            if isinstance(obj, str):
+                lines = obj.splitlines()
+                if len(lines) < 2:
                     self.objs.append(obj)
+                else:
+                    self.objs.extend(obj.splitlines())
+            else:
+                self.objs.append(obj)
 
     def __iadd__(self, obj):
-        if isinstance(obj, VList):
-            self.objs.append(obj)
-        elif isinstance(obj, str):
+        if isinstance(obj, str):
             lines = obj.splitlines()
             if len(lines) < 2:
                 self.objs.append(obj)
@@ -511,6 +505,8 @@ def flatten_as_lisplist(
 
 def _fmt_quote(obj: El, length: Union[int, None], indent: str) -> list[str]:
     if isinstance(obj, str):
+        if obj == '':
+            return [datafile.encode_string('')]
         return [datafile.encode_string(line) for line in obj.splitlines()]
     return obj.fmt(length, indent, _fmt_quote)
 

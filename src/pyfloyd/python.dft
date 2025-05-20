@@ -201,9 +201,9 @@ parse_function: d'''
 
 parser_class: d'
     class _Parser:
-        @parser_constructor[]
+        @parser_constructor
 
-        @parser_methods[]
+        @parser_methods
     '
 
 default_footer: ''
@@ -283,8 +283,8 @@ operator_choices: [fn [o]
 parser_methods: [fn [] [vl [parse_method]
                            ''
                            [vl_l [map [fn [name]
-                                          [vl [invoke [op_name name]
-                                              '']]]
+                                          [vl [invoke [op_name name]]
+                                              '']]
                                       grammar.needed_operators]]
                            [if generator_options.memoize
                                [vl '' o_operator]

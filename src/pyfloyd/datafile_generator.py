@@ -165,7 +165,7 @@ class DatafileGenerator(generator.Generator):
     def generate(self) -> str:
         obj = self._interpreter.eval([['symbol', 'generate']])
         if self._fl:
-            lines = formatter.flatten_as_list(
+            lines = formatter.flatten_as_lisplist(
                 obj, self.options.line_length, self.options.indent
             )
         else:
@@ -217,15 +217,36 @@ class DatafileGenerator(generator.Generator):
                 f'Unexpected at-exp result `{repr(obj)}`',
             )
 
+            # if the expr evaluated to empty and we're on a blank
+            # line, trim the whole line. Otherwise, indent the 
+            # result as appropriate.
             nl_is_next = newline_is_next(exprs, i)
+            if self._fl:
+                if (
+                    (isinstance(lines[-1], str) and lines[-1].isspace()) or
+                    (
+                        isinstance(lines[-1], formatter.VList) and
+                        lines[-1].objs[-1].isspace()
+                    )
+                ):
+                    is_blank = True
+                    num_spaces = len(lines[-1])
+                else:
+                    is_blank = False
+                    num_spaces = 0
+            else:
+                is_blank, num_spaces = ends_blank(s)
 
-            is_blank, num_spaces = ends_blank(s)
             num_to_chomp, res = self._format(
                 obj, is_blank, num_spaces, nl_is_next
             )
-
             if num_to_chomp:
-                s = s[:-num_to_chomp]
+                if self._fl:
+                    lines = lines[:-1]
+                else:
+                    s = s[:-num_to_chomp]
+                continue
+
             if self._fl:
                 slines = res.splitlines()
                 if slines and isinstance(lines[-1], str):
@@ -279,6 +300,8 @@ class DatafileGenerator(generator.Generator):
         """Invoke the template named in arg 1, passing it the remaining args."""
         first = self._interpreter.eval(args[0], env)
         obj = env.get(first)
+        if first == 'parser_constructor':
+            import pdb; pdb.set_trace()
         if lisp_interpreter.is_str(obj):
             return obj
         return self._interpreter.eval([['symbol', first]] + args[1:], env)
