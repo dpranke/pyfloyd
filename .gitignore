@@ -1,6 +1,6 @@
 .coverage
 .ruff_cache
-.venv
+.venv*
 build
 dist
 *.pyc
