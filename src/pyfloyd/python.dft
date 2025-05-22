@@ -248,22 +248,22 @@ operator_choices: [fn [o]
 
 parser_methods: [fn [] [vl [parse_method]
                            [vl_l [map [fn [name]
-                                          [vl ''
+                                          [vl '\n'
                                               [invoke [op_name name]]]]
                                       grammar.needed_operators]]
                            [if generator_options.memoize
-                               [vl '' o_operator]
+                               [vl '\n' o_operator]
                                null]
                            [vl_l [map_items [fn [rule node]
-                                                [vl ''
+                                                [vl '\n'
                                                     [rule_method rule node]]]
                                             grammar.rules]]
                            [vl_l [map [fn [name]
-                                          [vl ''
+                                          [vl '\n'
                                               [invoke [strcat 'r_' name]]]]
                                       grammar.needed_builtin_rules]]
                            [vl_l [map [fn [name]
-                                          [vl ''
+                                          [vl '\n'
                                               [invoke [fn_name name]]]]
                                       grammar.needed_builtin_functions]]]]
 

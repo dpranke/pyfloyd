@@ -878,14 +878,14 @@ class Encoder:
         return indent_str, end_str
 
 
-def encode_string(obj: str, ensure_ascii: bool = True) -> str:
+def encode_string(obj: str, ensure_ascii: bool = True, escape_newlines=False) -> str:
     m = _bare_word_re.match(obj)
     if m:
         return obj
-    return encode_quoted_string(obj, ensure_ascii)
+    return encode_quoted_string(obj, ensure_ascii, escape_newlines)
 
 
-def encode_quoted_string(s: str, ensure_ascii=True) -> str:
+def encode_quoted_string(s: str, ensure_ascii=True, escape_newlines=False) -> str:
     """Returns a quoted string with a minimal number of escaped quotes."""
     quote_map: dict[str, int] = {}
     for token in quote_tokens:
@@ -941,7 +941,7 @@ def encode_quoted_string(s: str, ensure_ascii=True) -> str:
         else:
             ret.append(escape_char(ch))
         i += 1
-    ret = ['\n' if r == '\\n' else r for r in ret]
+    ret = ['\n' if (r == '\\n' and not escape_newlines) else r for r in ret]
 
     return quote + ''.join(ret) + quote
 

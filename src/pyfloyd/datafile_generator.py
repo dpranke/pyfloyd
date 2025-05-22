@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import difflib
 from typing import Any, Optional
 
 from pyfloyd import (
@@ -167,24 +166,21 @@ class DatafileGenerator(generator.Generator):
         return expr
 
     def generate(self) -> str:
-        import pdb; pdb.set_trace()
         obj = self._interpreter.eval([['symbol', 'generate']])
-        ll_lines = formatter.flatten_as_lisplist(
-            obj, self.options.line_length, self.options.indent
-        )
-        ll_res = (
-            '\n'.join('' if line.isspace() else line for line in ll_lines)
-            + '\n'
-        )
 
-        lines = formatter.flatten(
+        if self.options.generator_options.get('as_ll'):
+            fmt_fn = formatter.flatten_as_lisplist
+        else:
+            fmt_fn = formatter.flatten
+
+        lines = fmt_fn(
             obj, self.options.line_length, self.options.indent
         )
-        res = (
-            '\n'.join('' if line.isspace() else line for line in lines)
+        return  (
+            # '\n'.join('' if line.isspace() else line for line in lines)
+            '\n'.join(lines)
             + '\n'
         )
-        return res
 
     def f_at_exp(self, args, env) -> Any:
         # pylint: disable=too-many-statements
@@ -212,92 +208,14 @@ class DatafileGenerator(generator.Generator):
             if lisp_interpreter.is_fn(obj) and len(obj.params) == 0:
                 obj = obj.call([], env)
 
-            if isinstance(obj, str):
-                if obj == '':
-                    pass
-                elif obj == '\n':
-                    objs.append(obj)
-                else:
-                    lines = obj.splitlines()
-                    objs.append(lines[0])
-                    for line in lines[1:]:
-                        objs.append('\n')
-                        objs.append(line)
-                    if obj.endswith('\n'):
-                        objs.append('\n')
-            else:
-                objs.append(obj)
+            objs.append(obj)
+            #if isinstance(obj, str):
+            #    objs.extend(formatter.splitlines(obj))
+            #else:
+            #    objs.append(obj)
 
-        results = []
-        l = len(objs)
-        i = 0
-        tmp = []
-        while i < l:
-            obj = objs[i]
-            tmp.append(obj)
-            if obj == '\n':
-                self._chunk(tmp, results)
-                tmp = []
-            i += 1
-        self._chunk(tmp, results)
-        if len(results) == 0:
-            return ''
-        if len(results) == 1:
-            return results[0]
-        return formatter.VList(results)
-
-    def _chunk(self, tmp, results):
-        tmp2 = []
-        if tmp == ['\n']:
-            results.append('')
-            return
-        if all(self._empty(t) for t in tmp):
-            return
-        if (
-            (len(tmp) == 1 and isinstance(tmp[0], formatter.FormatObj)) or
-            (len(tmp) == 2 and isinstance(tmp[0], formatter.FormatObj) and
-             tmp[1] == '\n')
-        ):
-            results.append(tmp[0])
-        elif (
-            len(tmp) == 3 and 
-            isinstance(tmp[0], str) and
-            tmp[0].isspace() and
-            isinstance(tmp[1], formatter.FormatObj)
-        ):
-            results.append(formatter.Indent([tmp[1]]))
-        elif all(isinstance(t, str) or isinstance(t, formatter.HList)
-               for t in tmp):
-            if len(tmp) == 2 and tmp[-1] == '\n':
-                results.append(tmp[0])
-            elif tmp[-1] == '\n':
-                results.append(formatter.HList(tmp[:-1]))
-            else:
-                results.append(formatter.HList(tmp))
-        else:
-            assert False, f'unexpected chunk case: {repr(tmp)}'
-            results.append(tmp)
-
-    def _empty(self, t):
-        if t is None:
-            return True
-        if isinstance(t, formatter.VList):
-            return t.is_empty()
-        if isinstance(t, str):
-            return t.isspace()
-        return False
-
-    def _format(self, s, is_blank, num_spaces, nl_is_next) -> tuple[int, str]:
-        if nl_is_next:
-            if is_blank and s == '':
-                # If the expr is on a line of its own, and it evalues to
-                # '', trim the whole line. Otherwise, splice the result
-                # into the string, indenting each line as appropriate.
-                return num_spaces + 1, ''
-
-            s = indent(s, num_spaces, nl_is_next)
-
-        return 0, s
+        # return _chunk_objs(objs)
+        return formatter.VList(objs)
 
     def f_comma(self, args, env) -> Any:
         del env
@@ -354,6 +272,80 @@ class DatafileGenerator(generator.Generator):
         return formatter.VList(args[0])
 
 
+def _chunk_objs(objs):
+    results = []
+    n_objs = len(objs)
+    i = 0
+    tmp = []
+    while i < n_objs:
+        obj = objs[i]
+        tmp.append(obj)
+        if obj == '\n':
+            _chunk(tmp, results)
+            tmp = []
+        i += 1
+    _chunk(tmp, results)
+    if len(results) == 0:
+        return ''
+    if len(results) == 1:
+        return results[0]
+    return formatter.VList(results)
+
+
+def _chunk(tmp, results):
+    if tmp == ['\n']:
+        results.append('')
+        return
+    if all(_empty(t) for t in tmp):
+        return
+    if (
+        (len(tmp) == 1 and isinstance(tmp[0], formatter.FormatObj)) or
+        (len(tmp) == 2 and isinstance(tmp[0], formatter.FormatObj) and
+         tmp[1] == '\n')
+    ):
+        results.append(tmp[0])
+    elif (
+        len(tmp) == 3 and
+        isinstance(tmp[0], str) and
+        tmp[0].isspace() and
+        isinstance(tmp[1], formatter.FormatObj)
+    ):
+        results.append(formatter.Indent([tmp[1]]))
+    elif all(isinstance(t, (str, formatter.HList)) for t in tmp):
+        if len(tmp) == 2 and tmp[-1] == '\n':
+            results.append(tmp[0])
+        elif tmp[-1] == '\n':
+            results.append(formatter.HList(tmp[:-1]))
+        else:
+            results.append(formatter.HList(tmp))
+    else:
+        assert False, f'unexpected chunk case: {repr(tmp)}'
+        results.append(tmp)
+
+
+def _empty(t):
+    if t is None:
+        return True
+    if isinstance(t, formatter.VList):
+        return t.is_empty()
+    if isinstance(t, str):
+        return t.isspace()
+    return False
+
+
+def _format(s, is_blank, num_spaces, nl_is_next) -> tuple[int, str]:
+    if nl_is_next:
+        if is_blank and s == '':
+            # If the expr is on a line of its own, and it evalues to
+            # '', trim the whole line. Otherwise, splice the result
+            # into the string, indenting each line as appropriate.
+            return num_spaces + 1, ''
+
+        s = indent(s, num_spaces, nl_is_next)
+
+    return 0, s
+
+
 def ends_blank(s):
     """Returns whether the string ends in a newline followed by a number
     of spaces and how many spaces that is."""
@@ -375,14 +367,12 @@ def newline_is_next(exprs, i):
 
 def indent(s, num_spaces, nl_is_next):
     """Returns a string with all but the first line indented `num_spaces`."""
-    if not s:
-        return ''
-
+    del nl_is_next
+    lines = formatter.splitlines(s)
     res = ''
-    lines = s.splitlines()
-    res += lines[0]
     for line in lines[1:]:
-        res += '\n' + ' ' * num_spaces + line
-    if s.endswith('\n') and not nl_is_next:
-        res += '\n'
+        if line == '\n':
+            res += line
+        else:
+            res += ' ' * num_spaces + line
     return res

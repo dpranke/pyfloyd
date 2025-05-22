@@ -71,16 +71,18 @@ class _MultipleObj(FormatObj):
     ) -> list[str]:
         """Returns a list of strings, each representing a line."""
         s = self.fmt_single_line(None, indent, fmt_fn)
-        if length is None or len(s) < length:
+        if s is not None and (length is None or len(s) < length):
             return [s]
         lines = self.fmt_multiple_lines(None, indent, fmt_fn)
-        if all(len(line) < length for line in lines):
+        if length is None:
+            return lines
+        if all((line is not None and len(line) < length) for line in lines):
             return lines
         return self.fmt_multiple_lines(length, indent, fmt_fn)
 
     def fmt_single_line(
         self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> str:
+    ) -> Optional[str]:
         raise NotImplementedError
 
     def fmt_multiple_lines(
@@ -105,16 +107,22 @@ class Comma(_MultipleObj):
 
     def fmt_single_line(
         self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> str:
+    ) -> Optional[str]:
         if not self.objs:
             return ''
 
         new_l = None if length is None else length
         s = _fmt_single_line(self.objs[0], new_l, indent, fmt_fn)
+        if s is None:
+            return s
+
         for obj in self.objs[1:]:
             if new_l is not None:
                 new_l -= len(s) + 2
-            s += ', ' + _fmt_single_line(obj, new_l, indent, fmt_fn)
+            r = _fmt_single_line(obj, new_l, indent, fmt_fn)
+            if r is None:
+                return r
+            s += ', ' + r
         return s
 
     def fmt_multiple_lines(
@@ -207,16 +215,22 @@ class LispList(_MultipleObj):
 
     def fmt_single_line(
         self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> str:
+    ) -> Optional[str]:
         s = '['
         if self.objs:
-            s += _fmt_single_line(self.objs[0], length, indent, fmt_fn)
+            r = _fmt_single_line(self.objs[0], length, indent, fmt_fn)
+            if r is None:
+                return r
+            s += r
             if len(self.objs) > 1:
                 for obj in self.objs[1:]:
                     if obj is None:
                         continue
                     s += ' '
-                    s += _fmt_single_line(obj, length, indent, fmt_fn)
+                    r = _fmt_single_line(obj, length, indent, fmt_fn)
+                    if r is None:
+                        return r
+                    s += r
         s += ']'
         return s
 
@@ -331,10 +345,13 @@ class Saw(_MultipleObj):
 
     def fmt_single_line(
         self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> str:
+    ) -> Optional[str]:
         s = ''
         for obj in self.objs:
-            s += _fmt_single_line(obj, length, indent, fmt_fn)
+            r = _fmt_single_line(obj, length, indent, fmt_fn)
+            if r is None:
+                return r
+            s += r
         return s
 
     def fmt_multiple_lines(
@@ -399,22 +416,31 @@ class Tree(_MultipleObj):
 
     def fmt_single_line(
         self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> str:
+    ) -> Optional[str]:
         # pylint: disable=unbalanced-tuple-unpacking
         left, op, right = self.objs
         assert isinstance(op, str)
         if left is None:
             s = op
             assert right is not None
-            s += _fmt_single_line(right, length, indent, fmt_fn)
+            r = _fmt_single_line(right, length, indent, fmt_fn)
+            if r is None:
+                return r
+            s = r
         else:
-            s = _fmt_single_line(left, length, indent, fmt_fn)
+            r = _fmt_single_line(left, length, indent, fmt_fn)
+            if r is None:
+                return r
+            s = r
             if right is None:
                 s += op
             else:
                 s += ' ' + op + ' '
                 new_l = None if length is None else length - len(s)
-                s += _fmt_single_line(right, new_l, indent, fmt_fn)
+                r = _fmt_single_line(right, new_l, indent, fmt_fn)
+                if r is None:
+                    return r
+                s += r
         return s
 
     def fmt_multiple_lines(
@@ -465,24 +491,18 @@ class VList(FormatObj):
         super().__init__([])
         objs = objs or []
         for obj in objs:
-            if isinstance(obj, str):
-                lines = obj.splitlines()
-                if len(lines) < 2:
-                    self.objs.append(obj)
-                else:
-                    self.objs.extend(obj.splitlines())
-            else:
-                self.objs.append(obj)
+            #if isinstance(obj, str):
+            #    self.objs.extend(splitlines(obj))
+            #else:
+            #    self.objs.append(obj)
+            self.objs.append(obj)
 
     def __iadd__(self, obj):
-        if isinstance(obj, str):
-            lines = obj.splitlines()
-            if len(lines) < 2:
-                self.objs.append(obj)
-            else:
-                self.objs.extend(lines)
-        else:
-            self.objs.append(obj)
+        #if isinstance(obj, str):
+        #    self.objs.extend(splitlines(obj))
+        #else:
+        #    self.objs.append(obj)
+        self.objs.append(obj)
         return self
 
     def fmt(
@@ -499,10 +519,7 @@ def _fmt(obj: El, length: Union[int, None], indent: str) -> list[str]:
     if obj is None:
         return []
     if isinstance(obj, str):
-        if obj == '':
-            return ['']
-        lines = obj.splitlines()
-        return lines
+        return splitlines(obj)
     return obj.fmt(length, indent, _fmt)
 
 
@@ -532,18 +549,20 @@ def _fmt_quote(obj: El, length: Union[int, None], indent: str) -> list[str]:
     if obj is None:
         return []
     if isinstance(obj, str):
-        if obj == '':
-            return [datafile.encode_string('')]
-        return [datafile.encode_string(line) for line in obj.splitlines()]
+        return [datafile.encode_string(line, escape_newlines=True)
+                for line in splitlines(obj)]
     return obj.fmt(length, indent, _fmt_quote)
 
 
 def _fmt_single_line(
     obj: El, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-) -> str:
+) -> Optional[str]:
     lines = fmt_fn(obj, length, indent)
     assert isinstance(lines, list)
-    assert len(lines) == 1, (
+    if len(lines) > 2 or (len(lines) == 2 and lines[1] != '\n'):
+        return None
+
+    assert (len(lines) == 1) or (len(lines) == 2 and lines[1] == "'\n'"), (
         f'format unexpectedly returned more than one line: {repr(lines)}'
     )
 
@@ -591,3 +610,21 @@ def from_list(obj: Any) -> El:
         arg = from_list(ob)
         args.append(arg)
     return cls(args)
+
+
+def splitlines(s, skip_empty=False):
+    if s == '':
+        if skip_empty:
+            return []
+        return ['']
+    if s == '\n':
+        return ['\n']
+    lines = []
+    spl_lines = s.splitlines()
+    for spl_line in spl_lines[:-1]:
+        lines.append(spl_line)
+        lines.append('\n')
+    lines.append(spl_lines[-1])
+    if s.endswith('\n'):
+        lines.append('\n')
+    return lines
