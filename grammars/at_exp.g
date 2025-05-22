@@ -36,18 +36,22 @@
 
 %externs = allow_trailing                  -> false
 
-grammar = (at_expr | text)* opt_end        -> $1
+grammar = term* opt_end                    -> $1
+
+term    = '@' at_expr
+        | '\n'
+        | /[^@\n]+/
 
 opt_end = ?{allow_trailing}
         | end
 
 ws      =  /[ \t\n]+/
 
-at_expr = '@' opt_id list braces           -> concat(cons($2, $3), [$4])
-        | '@' opt_id list                  -> cons($2, $3)
-        | '@' opt_id braces                -> [$2, $3]
-        | '@' id                           -> $2
-        | '@' string                       -> $2
+at_expr = opt_id list braces               -> concat(cons($1, $2), [$3])
+        | opt_id list                      -> cons($1, $2)
+        | opt_id braces                    -> [$1, $2]
+        | id                               -> $1
+        | string                           -> $1
 
 opt_id  = id
         |                                  -> ['symbol', 'quote']
@@ -77,5 +81,3 @@ list = '[' ws? expr (ws expr)* ws? ']'     -> cons($3, $4)
         | '[' ws? ']'                      -> []
 
 braces   = '{' <(^'}')*> '}'               -> $2
-
-text    = <^'@'*>                          -> $1

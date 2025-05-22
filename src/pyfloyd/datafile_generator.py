@@ -167,75 +167,24 @@ class DatafileGenerator(generator.Generator):
         return expr
 
     def generate(self) -> str:
-        use_fl = self.options.generator_options.get('use_fl', False)
-        save = self.options.generator_options.get('save', False)
-        check = self.options.generator_options.get('check', False)
-        fl_obj = None
-        fl_res = ''
-        fl_as_ll_res = ''
-        s_obj = None
-        s_res = ''
-        d_res = ''
-        if self._fl or use_fl or save or check:
-            fl = self._fl
-            self._fl = True
-            fl_obj = self._interpreter.eval([['symbol', 'generate']])
-            self._fl = fl
-        if not self._fl or save or check:
-            fl = self._fl
-            self._fl = False
-            s_obj = self._interpreter.eval([['symbol', 'generate']])
-            self._fl = fl
+        import pdb; pdb.set_trace()
+        obj = self._interpreter.eval([['symbol', 'generate']])
+        ll_lines = formatter.flatten_as_lisplist(
+            obj, self.options.line_length, self.options.indent
+        )
+        ll_res = (
+            '\n'.join('' if line.isspace() else line for line in ll_lines)
+            + '\n'
+        )
 
-        if self._fl or save:
-            fl_as_ll = formatter.flatten_as_lisplist(
-                fl_obj, self.options.line_length, self.options.indent
-            )
-            fl_as_ll_res = (
-                '\n'.join('' if line.isspace() else line for line in fl_as_ll)
-                + '\n'
-            )
-
-        if save or check or use_fl:
-            fl_lines = formatter.flatten(
-                fl_obj, self.options.line_length, self.options.indent
-            )
-            fl_res = (
-                '\n'.join('' if line.isspace() else line for line in fl_lines)
-                + '\n'
-            )
-
-        if save or check or not use_fl:
-            s_lines = formatter.flatten(
-                s_obj, self.options.line_length, self.options.indent
-            )
-            s_res = (
-                '\n'.join('' if line.isspace() else line for line in s_lines)
-                + '\n'
-            )
-
-        if save or check:
-            if s_res != fl_res:
-                d_lines = difflib.context_diff(
-                    s_res.splitlines(),
-                    fl_res.splitlines(),
-                    fromfile='s.txt',
-                    tofile='fl.txt',
-                )
-                d_res = '\n'.join(d_lines)
-            else:
-                d_res = ''
-
-        if save:
-            self.host.write_text_file('fl_as_ll.txt', fl_as_ll_res)
-            self.host.write_text_file('fl.txt', fl_res)
-            self.host.write_text_file('s.txt', s_res)
-            self.host.write_text_file('diff.txt', d_res)
-        if check:
-            return d_res
-        if use_fl:
-            return fl_res
-        return s_res
+        lines = formatter.flatten(
+            obj, self.options.line_length, self.options.indent
+        )
+        res = (
+            '\n'.join('' if line.isspace() else line for line in lines)
+            + '\n'
+        )
+        return res
 
     def f_at_exp(self, args, env) -> Any:
         # pylint: disable=too-many-statements
@@ -254,9 +203,7 @@ class DatafileGenerator(generator.Generator):
         )
         assert isinstance(exprs, list)
 
-        lines: list[Optional[formatter.El]] = []
-        s = ''
-        objs = []
+        objs: list[Optional[formatter.El]] = []
         for i, expr in enumerate(exprs):
             obj = self._interpreter.eval(expr, new_env)
 
@@ -265,110 +212,80 @@ class DatafileGenerator(generator.Generator):
             if lisp_interpreter.is_fn(obj) and len(obj.params) == 0:
                 obj = obj.call([], env)
 
-            objs.append(obj)
-
-            if isinstance(obj, formatter.FormatObj):
-                if self._fl:
-                    if lines and lines[-1] == '    ':
-                        lines[-1] = formatter.Indent(obj)
-                    else:
-                        lines.append(obj)
-                    continue
-                obj = '\n'.join(formatter.flatten(obj, 80))
-
-            if obj is None:
-                if self._fl:
-                    if (
-                        lines
-                        and isinstance(lines[-1], str)
-                        and lines[-1].isspace()
-                    ):
-                        lines = lines[:-1]
+            if isinstance(obj, str):
+                if obj == '':
+                    pass
+                elif obj == '\n':
+                    objs.append(obj)
                 else:
-                    is_blank, num_spaces = ends_blank(s)
-                    if is_blank and num_spaces:
-                        s = s[:-num_spaces]
-                continue
-
-            lisp_interpreter.check(
-                lisp_interpreter.is_str(obj),
-                f'Unexpected at-exp result `{repr(obj)}`',
-            )
-
-            # If we have a newline after an empty VList, drop both the
-            # VList and the newline.
-            if (
-                len(objs) > 1
-                and (
-                    objs[-2] is None
-                    or (
-                        isinstance(objs[-2], formatter.VList)
-                        and (objs[-2].is_empty())
-                    )
-                )
-                and obj == '\n'
-            ):
-                objs = objs[:-2]
-                continue
-
-            # If we have a newline after a non-empty VList, drop it.
-            if (
-                len(objs) > 1
-                and isinstance(objs[-2], formatter.VList)
-                and obj == '\n'
-            ):
-                objs = objs[:-1]
-                continue
-
-            # if the expr evaluated to empty and we're on a blank
-            # line, trim the whole line. Otherwise, indent the
-            # result as appropriate.
-            nl_is_next = newline_is_next(exprs, i)
-            # pylint: disable=too-many-boolean-expressions
-            if self._fl:
-                if (
-                    lines
-                    and isinstance(lines[-1], str)
-                    and lines[-1].isspace()
-                ) or (
-                    lines
-                    and isinstance(lines[-1], formatter.VList)
-                    and len(lines[-1].objs) > 0
-                    and isinstance(lines[-1].objs[-1], str)
-                    and lines[-1].objs[-1].isspace()
-                ):
-                    is_blank = True
-                    assert isinstance(lines[-1], formatter.VList)
-                    assert isinstance(lines[-1].objs[-1], str)
-                    num_spaces = len(lines[-1].objs[-1])
-                else:
-                    is_blank = False
-                    num_spaces = 0
+                    lines = obj.splitlines()
+                    objs.append(lines[0])
+                    for line in lines[1:]:
+                        objs.append('\n')
+                        objs.append(line)
+                    if obj.endswith('\n'):
+                        objs.append('\n')
             else:
-                is_blank, num_spaces = ends_blank(s)
+                objs.append(obj)
 
-            num_to_chomp, res = self._format(
-                obj, is_blank, num_spaces, nl_is_next
-            )
-            if num_to_chomp:
-                if self._fl and lines:
-                    lines = lines[:-1]
-                else:
-                    s = s[:-num_to_chomp]
-                continue
+        results = []
+        l = len(objs)
+        i = 0
+        tmp = []
+        while i < l:
+            obj = objs[i]
+            tmp.append(obj)
+            if obj == '\n':
+                self._chunk(tmp, results)
+                tmp = []
+            i += 1
+        self._chunk(tmp, results)
+        if len(results) == 0:
+            return ''
+        if len(results) == 1:
+            return results[0]
+        return formatter.VList(results)
 
-            if self._fl:
-                slines = res.splitlines()
-                if slines and lines and isinstance(lines[-1], str):
-                    lines[-1] += slines[0]
-                    lines.extend(slines[1:])
-                else:
-                    lines.extend(slines)
+    def _chunk(self, tmp, results):
+        tmp2 = []
+        if tmp == ['\n']:
+            results.append('')
+            return
+        if all(self._empty(t) for t in tmp):
+            return
+        if (
+            (len(tmp) == 1 and isinstance(tmp[0], formatter.FormatObj)) or
+            (len(tmp) == 2 and isinstance(tmp[0], formatter.FormatObj) and
+             tmp[1] == '\n')
+        ):
+            results.append(tmp[0])
+        elif (
+            len(tmp) == 3 and 
+            isinstance(tmp[0], str) and
+            tmp[0].isspace() and
+            isinstance(tmp[1], formatter.FormatObj)
+        ):
+            results.append(formatter.Indent([tmp[1]]))
+        elif all(isinstance(t, str) or isinstance(t, formatter.HList)
+               for t in tmp):
+            if len(tmp) == 2 and tmp[-1] == '\n':
+                results.append(tmp[0])
+            elif tmp[-1] == '\n':
+                results.append(formatter.HList(tmp[:-1]))
             else:
-                s += res
-        if self._fl:
-            return formatter.VList(lines)
-        return s
+                results.append(formatter.HList(tmp))
+        else:
+            assert False, f'unexpected chunk case: {repr(tmp)}'
+            results.append(tmp)
+
+    def _empty(self, t):
+        if t is None:
+            return True
+        if isinstance(t, formatter.VList):
+            return t.is_empty()
+        if isinstance(t, str):
+            return t.isspace()
+        return False
 
     def _format(self, s, is_blank, num_spaces, nl_is_next) -> tuple[int, str]:
         if nl_is_next:
