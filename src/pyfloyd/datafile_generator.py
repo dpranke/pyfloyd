@@ -116,43 +116,10 @@ class DatafileGenerator(generator.Generator):
         interp = self._interpreter
         for t, v in templates.items():
             if isinstance(v, str):
-                # TODO: Fix dedenting properly.
-                if v.startswith('\n'):
-                    v = v[1:]
-                if v.startswith('@['):
-                    stop = v.index('{')
-                    exprs, err, _ = at_exp_parser.parse(v[0:stop])
-                    lisp_interpreter.check(
-                        err is None, f'Failed to parse at-exp `{v}`'
-                    )
-                    lisp_interpreter.check(len(exprs) == 1)
-                    expr = exprs[0]
-                    lisp_interpreter.check(
-                        exprs[0][0] == ['symbol', 'list'],
-                        f'Unexpected at-exp parse result `{exprs}`',
-                    )
-                    names = [expr[1] for expr in exprs[0][1:]]
-                    body_text = v[stop + 1 : -1]
-                else:
-                    names = []
-                    body_text = v
-                if '@' not in body_text:
-                    self._interpreter.env.set(t, v)
-                else:
-                    body = [['symbol', 'at_exp'], body_text]
-                    fn = lisp_interpreter.UserFn(interp, names, body, name=t)
-                    self._interpreter.env.set(t, fn)
-            elif v is None:
-                self._interpreter.env.set(t, v)
+                obj = [['symbol', 'fn'], [], [['symbol', 'at_exp'], v]]
             else:
-                lisp_interpreter.check(
-                    lisp_interpreter.is_list(v), f"{v} isn't a list or null"
-                )
-                if v[0] == ['symbol', 'fn']:
-                    self._interpreter.define(t, v)
-                else:
-                    expr = [['symbol', 'fn'], [], v]
-                    self._interpreter.define(t, expr)
+                obj = v
+            self._interpreter.define(t, obj)
 
     # TODO: this should really be a check for whether you can handle
     # this data type, not whether it is foreign.
@@ -202,18 +169,7 @@ class DatafileGenerator(generator.Generator):
         objs: list[Optional[formatter.El]] = []
         for i, expr in enumerate(exprs):
             obj = self._interpreter.eval(expr, new_env)
-
-            # If `@foo` resolves to a lambda with no parameters,
-            # evaluate that.
-            if lisp_interpreter.is_fn(obj) and len(obj.params) == 0:
-                obj = obj.call([], env)
-
             objs.append(obj)
-            #if isinstance(obj, str):
-            #    objs.extend(formatter.splitlines(obj))
-            #else:
-            #    objs.append(obj)
-
         # return _chunk_objs(objs)
         return formatter.VList(objs)
 

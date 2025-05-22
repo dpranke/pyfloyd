@@ -54,7 +54,7 @@ at_expr = opt_id list braces               -> concat(cons($1, $2), [$3])
         | string                           -> $1
 
 opt_id  = id
-        |                                  -> ['symbol', 'quote']
+        |                                  -> ['symbol', 'fn']
 
 id      = /[a-zA-Z_][\.a-zA-Z0-9_]*/       -> ['symbol', $1]
 

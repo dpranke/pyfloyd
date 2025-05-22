@@ -32,7 +32,7 @@ def check(flag: bool, msg: str = ''):
 
 
 def is_atom(el: Any) -> bool:
-    return isinstance(el, (bool, int, float, str))
+    return isinstance(el, (bool, int, float, str)) or el is None
 
 
 def is_bool(el: Any) -> bool:
@@ -54,6 +54,10 @@ def is_foreign(el: Any, env: 'Env') -> bool:
 
 def is_list(el: Any) -> bool:
     return isinstance(el, Sequence)
+
+
+def is_null(el: Any) -> bool:
+    return el is None
 
 
 def is_number(el: Any) -> bool:

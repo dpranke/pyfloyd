@@ -167,9 +167,10 @@ class HList(FormatObj):
                 else:
                     new_l = None if length is None else length - len(lines[-1])
                     sublines = obj.fmt(new_l, indent, fmt_fn)
-                    lines[-1] += sublines[0]
-                    if len(sublines) > 1:
-                        lines.extend(sublines[1:])
+                    if sublines:
+                        lines[-1] += sublines[0]
+                        if len(sublines) > 1:
+                            lines.extend(sublines[1:])
         return lines
 
 
@@ -457,7 +458,8 @@ class Tree(_MultipleObj):
             assert isinstance(op, str)
             new_l = None if length is None else length - len(self.op)
             sublines: list[str] = fmt_fn(right, new_l, indent)
-            lines = [op + sublines[0]] + sublines[1:]
+            if sublines:
+                lines = [op + sublines[0]] + sublines[1:]
             return lines
 
         lines = fmt_fn(left, length, indent)
