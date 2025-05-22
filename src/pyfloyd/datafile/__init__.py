@@ -48,7 +48,7 @@ of behavior.
 
 import types
 
-from .api import ( # noqa: F401 (unused-import)
+from .api import (  # noqa: F401 (unused-import)
     decode_escape,
     dedent,
     dump,

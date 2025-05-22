@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any
+import difflib
+from typing import Any, Optional
 
 from pyfloyd import (
     at_exp_parser,
@@ -29,6 +30,7 @@ from pyfloyd import (
 class DatafileGenerator(generator.Generator):
     name = 'datafile'
     help_str = 'Generator code from a datafile template'
+    indent = '    '
 
     def __init__(
         self,
@@ -141,9 +143,11 @@ class DatafileGenerator(generator.Generator):
                     body = [['symbol', 'at_exp'], body_text]
                     fn = lisp_interpreter.UserFn(interp, names, body, name=t)
                     self._interpreter.env.set(t, fn)
+            elif v is None:
+                self._interpreter.env.set(t, v)
             else:
                 lisp_interpreter.check(
-                    lisp_interpreter.is_list(v), f"{v} isn't a list"
+                    lisp_interpreter.is_list(v), f"{v} isn't a list or null"
                 )
                 if v[0] == ['symbol', 'fn']:
                     self._interpreter.define(t, v)
@@ -163,21 +167,78 @@ class DatafileGenerator(generator.Generator):
         return expr
 
     def generate(self) -> str:
-        obj = self._interpreter.eval([['symbol', 'generate']])
-        if self._fl:
-            lines = formatter.flatten_as_lisplist(
-                obj, self.options.line_length, self.options.indent
+        use_fl = self.options.generator_options.get('use_fl', False)
+        save = self.options.generator_options.get('save', False)
+        check = self.options.generator_options.get('check', False)
+        fl_obj = None
+        fl_res = ''
+        fl_as_ll_res = ''
+        s_obj = None
+        s_res = ''
+        d_res = ''
+        if self._fl or use_fl or save or check:
+            fl = self._fl
+            self._fl = True
+            fl_obj = self._interpreter.eval([['symbol', 'generate']])
+            self._fl = fl
+        if not self._fl or save or check:
+            fl = self._fl
+            self._fl = False
+            s_obj = self._interpreter.eval([['symbol', 'generate']])
+            self._fl = fl
+
+        if self._fl or save:
+            fl_as_ll = formatter.flatten_as_lisplist(
+                fl_obj, self.options.line_length, self.options.indent
             )
-        else:
-            lines = formatter.flatten(
-                obj, self.options.line_length, self.options.indent
+            fl_as_ll_res = (
+                '\n'.join('' if line.isspace() else line for line in fl_as_ll)
+                + '\n'
             )
-        res = (
-            '\n'.join('' if line.isspace() else line for line in lines) + '\n'
-        )
-        return res
+
+        if save or check or use_fl:
+            fl_lines = formatter.flatten(
+                fl_obj, self.options.line_length, self.options.indent
+            )
+            fl_res = (
+                '\n'.join('' if line.isspace() else line for line in fl_lines)
+                + '\n'
+            )
+
+        if save or check or not use_fl:
+            s_lines = formatter.flatten(
+                s_obj, self.options.line_length, self.options.indent
+            )
+            s_res = (
+                '\n'.join('' if line.isspace() else line for line in s_lines)
+                + '\n'
+            )
+
+        if save or check:
+            if s_res != fl_res:
+                d_lines = difflib.context_diff(
+                    s_res.splitlines(),
+                    fl_res.splitlines(),
+                    fromfile='s.txt',
+                    tofile='fl.txt',
+                )
+                d_res = '\n'.join(d_lines)
+            else:
+                d_res = ''
+
+        if save:
+            self.host.write_text_file('fl_as_ll.txt', fl_as_ll_res)
+            self.host.write_text_file('fl.txt', fl_res)
+            self.host.write_text_file('s.txt', s_res)
+            self.host.write_text_file('diff.txt', d_res)
+        if check:
+            return d_res
+        if use_fl:
+            return fl_res
+        return s_res
 
     def f_at_exp(self, args, env) -> Any:
+        # pylint: disable=too-many-statements
         if len(args) > 1:
             new_env = lisp_interpreter.Env(parent=self._interpreter.env)
             names = args[0]
@@ -193,8 +254,9 @@ class DatafileGenerator(generator.Generator):
         )
         assert isinstance(exprs, list)
 
-        lines = ['']
+        lines: list[Optional[formatter.El]] = []
         s = ''
+        objs = []
         for i, expr in enumerate(exprs):
             obj = self._interpreter.eval(expr, new_env)
 
@@ -203,34 +265,82 @@ class DatafileGenerator(generator.Generator):
             if lisp_interpreter.is_fn(obj) and len(obj.params) == 0:
                 obj = obj.call([], env)
 
+            objs.append(obj)
+
             if isinstance(obj, formatter.FormatObj):
                 if self._fl:
-                    if lines[-1] == '    ':
+                    if lines and lines[-1] == '    ':
                         lines[-1] = formatter.Indent(obj)
                     else:
                         lines.append(obj)
                     continue
                 obj = '\n'.join(formatter.flatten(obj, 80))
 
+            if obj is None:
+                if self._fl:
+                    if (
+                        lines
+                        and isinstance(lines[-1], str)
+                        and lines[-1].isspace()
+                    ):
+                        lines = lines[:-1]
+                else:
+                    is_blank, num_spaces = ends_blank(s)
+                    if is_blank and num_spaces:
+                        s = s[:-num_spaces]
+                continue
+
             lisp_interpreter.check(
                 lisp_interpreter.is_str(obj),
                 f'Unexpected at-exp result `{repr(obj)}`',
             )
 
+            # If we have a newline after an empty VList, drop both the
+            # VList and the newline.
+            if (
+                len(objs) > 1
+                and (
+                    objs[-2] is None
+                    or (
+                        isinstance(objs[-2], formatter.VList)
+                        and (objs[-2].is_empty())
+                    )
+                )
+                and obj == '\n'
+            ):
+                objs = objs[:-2]
+                continue
+
+            # If we have a newline after a non-empty VList, drop it.
+            if (
+                len(objs) > 1
+                and isinstance(objs[-2], formatter.VList)
+                and obj == '\n'
+            ):
+                objs = objs[:-1]
+                continue
+
             # if the expr evaluated to empty and we're on a blank
-            # line, trim the whole line. Otherwise, indent the 
+            # line, trim the whole line. Otherwise, indent the
             # result as appropriate.
             nl_is_next = newline_is_next(exprs, i)
+            # pylint: disable=too-many-boolean-expressions
             if self._fl:
                 if (
-                    (isinstance(lines[-1], str) and lines[-1].isspace()) or
-                    (
-                        isinstance(lines[-1], formatter.VList) and
-                        lines[-1].objs[-1].isspace()
-                    )
+                    lines
+                    and isinstance(lines[-1], str)
+                    and lines[-1].isspace()
+                ) or (
+                    lines
+                    and isinstance(lines[-1], formatter.VList)
+                    and len(lines[-1].objs) > 0
+                    and isinstance(lines[-1].objs[-1], str)
+                    and lines[-1].objs[-1].isspace()
                 ):
                     is_blank = True
-                    num_spaces = len(lines[-1])
+                    assert isinstance(lines[-1], formatter.VList)
+                    assert isinstance(lines[-1].objs[-1], str)
+                    num_spaces = len(lines[-1].objs[-1])
                 else:
                     is_blank = False
                     num_spaces = 0
@@ -241,7 +351,7 @@ class DatafileGenerator(generator.Generator):
                 obj, is_blank, num_spaces, nl_is_next
             )
             if num_to_chomp:
-                if self._fl:
+                if self._fl and lines:
                     lines = lines[:-1]
                 else:
                     s = s[:-num_to_chomp]
@@ -249,7 +359,7 @@ class DatafileGenerator(generator.Generator):
 
             if self._fl:
                 slines = res.splitlines()
-                if slines and isinstance(lines[-1], str):
+                if slines and lines and isinstance(lines[-1], str):
                     lines[-1] += slines[0]
                     lines.extend(slines[1:])
                 else:
@@ -300,8 +410,6 @@ class DatafileGenerator(generator.Generator):
         """Invoke the template named in arg 1, passing it the remaining args."""
         first = self._interpreter.eval(args[0], env)
         obj = env.get(first)
-        if first == 'parser_constructor':
-            import pdb; pdb.set_trace()
         if lisp_interpreter.is_str(obj):
             return obj
         return self._interpreter.eval([['symbol', first]] + args[1:], env)

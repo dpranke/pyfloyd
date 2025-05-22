@@ -24,6 +24,7 @@ import pathlib
 import pdb
 import pprint
 import sys
+import traceback
 
 # If necessary, add ../.. to sys.path so that we can run pyfloyd even when
 # it's not installed.
@@ -100,6 +101,7 @@ def main(argv=None, host=None):
         return 130  # SIGINT
     except Exception as exc:  # pylint: disable=broad-exception-caught
         if args and args.post_mortem:
+            traceback.print_exception(exc)
             pdb.post_mortem()
         else:
             raise exc

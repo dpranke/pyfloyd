@@ -882,7 +882,7 @@ def encode_string(obj: str, ensure_ascii: bool = True) -> str:
     m = _bare_word_re.match(obj)
     if m:
         return obj
-    return encode_quoted_string(obj)
+    return encode_quoted_string(obj, ensure_ascii)
 
 
 def encode_quoted_string(s: str, ensure_ascii=True) -> str:

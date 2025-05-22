@@ -81,9 +81,9 @@ class Tests(unittest.TestCase):
 
     def test_from_list(self):
         obj = [
-            'comma', 
-            '1', 
-            '2', 
+            'comma',
+            '1',
+            '2',
             ['ind', ['hl', '3', '4']],
             ['lit', '5'],
             ['ll', '6'],
@@ -101,7 +101,7 @@ class Tests(unittest.TestCase):
                 LL('6'),
                 Saw('7', '8', '9'),
                 Tree('10', '+', '11'),
-                VList(['12', '13'])
+                VList(['12', '13']),
             ]
         )
         self.assertEqual(lis, expected_obj)
@@ -130,12 +130,12 @@ class Tests(unittest.TestCase):
         self.assertEqual(['[1]'], flatten(LL(['1'])))
 
         lis = LL(['1', '2', '3'])
-        self.assertEqual(["[1 2 3]"], flatten(lis))
+        self.assertEqual(['[1 2 3]'], flatten(lis))
 
         lis = LL(['foo', LL(['fn', LL(['arg']), LL(['length', 'arg'])])])
-        self.assertEqual(["[foo [fn [arg] [length arg]]]"], flatten(lis))
+        self.assertEqual(['[foo [fn [arg] [length arg]]]'], flatten(lis))
         self.assertEqual(
-            ['[foo [fn [arg]', "         [length arg]]]"],
+            ['[foo [fn [arg]', '         [length arg]]]'],
             flatten(lis, length=14),
         )
 
@@ -294,7 +294,7 @@ class Tests(unittest.TestCase):
             "Tree(['1', '+', Tree(['2', '+', '3'])])",
             repr(Tree('1', '+', Tree('2', '+', '3'))),
         )
-    
+
     def test_vlist(self):
         self.assertEqual([], flatten(VList([])))
         self.assertEqual([''], flatten(VList([''])))
@@ -307,10 +307,16 @@ class Tests(unittest.TestCase):
         self.assertEqual(['foo', 'bar', '', 'baz', '1', '2'], flatten(vl))
 
 
-
 class AsListTests(unittest.TestCase):
-    def check(self, obj, expected_list, expected_lisp_obj, expected_lines,
-              line_length=79, indent='    '):
+    def check(
+        self,
+        obj,
+        expected_list,
+        expected_lisp_obj,
+        expected_lines,
+        line_length=79,
+        indent='    ',
+    ):
         actual_list = to_list(obj)
         self.assertEqual(expected_list, actual_list)
 
@@ -325,7 +331,7 @@ class AsListTests(unittest.TestCase):
             Comma(['1', '2', Indent('bar')]),
             ['comma', '1', '2', ['ind', 'bar']],
             LL(['comma', '1', '2', LL(['ind', 'bar'])]),
-            ['[comma 1 2 [ind bar]]']
+            ['[comma 1 2 [ind bar]]'],
         )
 
     def test_hlist(self):
@@ -333,29 +339,23 @@ class AsListTests(unittest.TestCase):
             HList(['foo', Indent('bar')]),
             ['hl', 'foo', ['ind', 'bar']],
             LL(['hl', 'foo', LL(['ind', 'bar'])]),
-            ['[hl foo [ind bar]]']
+            ['[hl foo [ind bar]]'],
         )
 
     def test_indent(self):
         self.check(
-            Indent('foo'),
-            ['ind', 'foo'],
-            LL(['ind', 'foo']),
-            ['[ind foo]']
+            Indent('foo'), ['ind', 'foo'], LL(['ind', 'foo']), ['[ind foo]']
         )
         self.check(
             Indent(VList(['foo', 'bar'])),
             ['ind', ['vl', 'foo', 'bar']],
             LL(['ind', LL(['vl', 'foo', 'bar'])]),
-            ['[ind [vl foo bar]]']
+            ['[ind [vl foo bar]]'],
         )
 
     def test_lit(self):
         self.check(
-            Lit('foo'),
-            ['lit', 'foo'],
-            LL(['lit', 'foo']),
-            ['[lit foo]']
+            Lit('foo'), ['lit', 'foo'], LL(['lit', 'foo']), ['[lit foo]']
         )
 
     def test_saw(self):
@@ -363,7 +363,7 @@ class AsListTests(unittest.TestCase):
             Saw('foo', 'bar', VList(['baz'])),
             ['saw', 'foo', 'bar', ['vl', 'baz']],
             LL(['saw', 'foo', 'bar', LL(['vl', 'baz'])]),
-            ['[saw foo bar [vl baz]]']
+            ['[saw foo bar [vl baz]]'],
         )
 
     def test_str(self):
@@ -377,7 +377,7 @@ class AsListTests(unittest.TestCase):
             Tree('1', '+', Tree('2', '+', '3')),
             ['tree', '1', '+', ['tree', '2', '+', '3']],
             LL(['tree', '1', '+', LL(['tree', '2', '+', '3'])]),
-            ['[tree 1 + [tree 2 + 3]]']
+            ['[tree 1 + [tree 2 + 3]]'],
         )
 
     def test_vlist(self):
@@ -385,5 +385,5 @@ class AsListTests(unittest.TestCase):
             VList(['foo', Indent('bar')]),
             ['vl', 'foo', ['ind', 'bar']],
             LL(['vl', 'foo', LL(['ind', 'bar'])]),
-            ['[vl foo [ind bar]]']
+            ['[vl foo [ind bar]]'],
         )
