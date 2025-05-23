@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Optional
+from typing import Any
 
 from pyfloyd import (
     at_exp_parser,
@@ -45,10 +45,12 @@ class DatafileGenerator(generator.Generator):
         self._derive_memoize()
         self._derive_local_vars()
 
-        self._interpreter = interp = lisp_interpreter.Interpreter()
+        self._interpreter = interp = lisp_interpreter.Interpreter(
+            foreign_handlers=[self._handle_node]
+        )
         interp.env.set('grammar', grammar)
         interp.env.set('generator_options', self.options)
-        interp.define_native_fn('at_exp', self.f_at_exp)
+        interp.define_native_fn('at_exp', self.f_at_exp, types=['str'])
         interp.define_native_fn('comma', self.f_comma)
         interp.define_native_fn('hl', self.f_hl)
         interp.define_native_fn('hl_l', self.f_hl_l, types=['list'])
@@ -70,7 +72,7 @@ class DatafileGenerator(generator.Generator):
             fname = self._host.join(host.dirname(__file__), 'python.dft')
         self._process_template_file(fname)
 
-        # TODO: figure out how to handle non-multi-char literals.
+        # TODO: Figure out how to correctly handle non-multi-char literals.
         if grammar.ch_needed and not grammar.str_needed:
             grammar.str_needed = True
             grammar.needed_operators = sorted(
@@ -105,11 +107,6 @@ class DatafileGenerator(generator.Generator):
         for _, node in self.grammar.rules.items():
             node.local_vars = _walk(node)
 
-    def _parse_bareword(self, s: str, as_key: bool) -> Any:
-        if as_key:
-            return s
-        return ['symbol', s]
-
     def _process_template_file(self, fname):
         df_str = self._host.read_text_file(fname)
         templates = datafile.loads(
@@ -120,11 +117,16 @@ class DatafileGenerator(generator.Generator):
         for t, v in templates.items():
             self._interpreter.define(t, v)
 
+    def _parse_bareword(self, s: str, as_key: bool) -> Any:
+        if as_key:
+            return s
+        return ['symbol', s]
+
     def _to_at_exp(self, ty, tag, obj, as_key=False):
         assert ty == 'string' and tag == '@' and not as_key, (
-                f'Uexpected tag fn invocation: '
-                f'ty={ty} tag={tag} obj={repr(obj)}, as_key={as_key}'
-            )
+            f'Uexpected tag fn invocation: '
+            f'ty={ty} tag={tag} obj={repr(obj)}, as_key={as_key}'
+        )
         s = datafile.dedent(obj)
         return [['symbol', 'fn'], [], [['symbol', 'at_exp'], s]]
 
@@ -141,41 +143,20 @@ class DatafileGenerator(generator.Generator):
 
     def generate(self) -> str:
         obj = self._interpreter.eval([['symbol', 'generate']])
-
         if self.options.generator_options.get('as_ll'):
             fmt_fn = formatter.flatten_as_lisplist
         else:
             fmt_fn = formatter.flatten
-
         lines = fmt_fn(obj, self.options.line_length, self.options.indent)
-        return (
-            # '\n'.join('' if line.isspace() else line for line in lines)
-            '\n'.join(lines) + '\n'
-        )
+        return '\n'.join(lines) + '\n'
 
     def f_at_exp(self, args, env) -> Any:
-        # pylint: disable=too-many-statements
-        if len(args) > 1:
-            new_env = lisp_interpreter.Env(parent=self._interpreter.env)
-            names = args[0]
-            for i, name in enumerate(names):
-                new_env.set(name, args[i + 1])
-        else:
-            new_env = env
-        text = args[-1]
-        lisp_interpreter.check(lisp_interpreter.is_str(text))
-        exprs, err, _ = at_exp_parser.parse(text, '-')
+        exprs, err, _ = at_exp_parser.parse(args[0], '-')
         lisp_interpreter.check(
-            err is None, f'Unexpected at-exp parse error: {err}'
+            err is None, f'Unexpected at_exp parse error: {err}'
         )
-        assert isinstance(exprs, list)
-
-        objs: list[Optional[formatter.El]] = []
-        for i, expr in enumerate(exprs):
-            obj = self._interpreter.eval(expr, new_env)
-            objs.append(obj)
-        return _chunk_objs(objs)
-        # return formatter.VList(objs)
+        values = [self._interpreter.eval(expr, env) for expr in exprs]
+        return _process_at_exp_values(values)
 
     def f_comma(self, args, env) -> Any:
         del env
@@ -232,108 +213,70 @@ class DatafileGenerator(generator.Generator):
         return formatter.VList(args[0])
 
 
-def _chunk_objs(objs):
+def _process_at_exp_values(values):
     results = []
-    n_objs = len(objs)
-    i = 0
-    tmp = []
-    use_hl = True
-    while i < n_objs:
-        obj = objs[i]
-        tmp.append(obj)
-        if obj == '\n':
-            results.extend(_chunk(tmp))
-            tmp = []
-        i += 1
-    results.extend(_chunk(tmp))
-    if len(results) == 0:
-        return ''
-    if len(results) == 1:
-        return results[0]
+
+    # If the only thing on the line was a newline, keep it.
+    if values == ['\n']:
+        return formatter.VList([''])
+
+    # Iterate through the list of objects returned from evaluating the
+    # at-exp string. Whenever we hit a newline, look at the values since
+    # the last newline and decide what to do with them.
+    current_values = []
+    for v in values:
+        if v == '\n':
+            results.extend(_process_one_line_of_values(current_values))
+            current_values = []
+        else:
+            current_values.append(v)
+
+    # Also process any arguments following the last newline (or, all
+    # of the arguments, if there was no newline).
+    if len(current_values) != 0:
+        results.extend(_process_one_line_of_values(current_values))
     return formatter.VList(results)
 
 
-def _chunk(tmp):
-    results = []
-    if tmp == ['\n']:
-        return ['']
-    if all(_empty(t) for t in tmp):
+def _process_one_line_of_values(values):
+    # Drop the line if appropriate (see below). This allows embedded
+    # at-exps and functions to avoid trailing newlines and unwanted
+    # blank lines resulting in the output.
+    if _should_drop_the_line(values):
         return []
-    if (len(tmp) == 1 and isinstance(tmp[0], formatter.FormatObj)) or (
-        len(tmp) == 2
-        and isinstance(tmp[0], formatter.FormatObj)
-        and tmp[1] == '\n'
+
+    # If there is just one value on the line and it is a FormatObj, return it.
+    if len(values) == 1 and isinstance(values[0], formatter.FormatObj):
+        return [values[0]]
+
+    # If the set is a series of spaces followed by a FormatObj,
+    # indent and return the format obj.
+    if (
+        len(values) == 2
+        and isinstance(values[0], str)
+        and values[0].isspace()
+        and isinstance(values[1], formatter.FormatObj)
     ):
-        return [tmp[0]]
-    elif (
-        len(tmp) == 3
-        and isinstance(tmp[0], str)
-        and tmp[0].isspace()
-        and isinstance(tmp[1], formatter.FormatObj)
-    ):
-        return [formatter.Indent([tmp[1]])]
-    elif all(isinstance(t, (str, formatter.HList)) for t in tmp):
-        if len(tmp) == 2 and tmp[-1] == '\n':
-            return [tmp[0]]
-        elif tmp[-1] == '\n':
-            return [formatter.HList(tmp[:-1])]
-        else:
-            return [formatter.HList(tmp)]
-    else:
-        assert False, f'unexpected chunk case: {repr(tmp)}'
-        results.append(tmp)
+        return [formatter.Indent([values[1]])]
+
+    # If everything is a string or an HList, return an HList containing them.
+    if all(isinstance(v, (str, formatter.HList)) for v in values):
+        return [formatter.HList(values)]
+
+    assert False, f'unexpected line of values: {repr(values)}'
 
 
-def _empty(t):
-    if t is None:
-        return True
-    if isinstance(t, formatter.VList):
-        return t.is_empty()
-    if isinstance(t, str):
-        return t.isspace()
-    return False
-
-
-def _format(s, is_blank, num_spaces, nl_is_next) -> tuple[int, str]:
-    if nl_is_next:
-        if is_blank and s == '':
-            # If the expr is on a line of its own, and it evalues to
-            # '', trim the whole line. Otherwise, splice the result
-            # into the string, indenting each line as appropriate.
-            return num_spaces + 1, ''
-
-        s = indent(s, num_spaces, nl_is_next)
-
-    return 0, s
-
-
-def ends_blank(s):
-    """Returns whether the string ends in a newline followed by a number
-    of spaces and how many spaces that is."""
-    i = len(s) - 1
-    num_spaces = 0
-    while i >= 0 and s[i] == ' ':
-        i -= 1
-        num_spaces += 1
-    return (i >= 0 and s[i] == '\n'), num_spaces
-
-
-def newline_is_next(exprs, i):
-    if i < len(exprs) - 1:
-        return lisp_interpreter.is_str(exprs[i + 1]) and exprs[
-            i + 1
-        ].startswith('\n')
-    return False
-
-
-def indent(s, num_spaces, nl_is_next):
-    """Returns a string with all but the first line indented `num_spaces`."""
-    del nl_is_next
-    lines = formatter.splitlines(s)
-    res = ''
-    for line in lines[1:]:
-        if line == '\n':
-            res += line
-        else:
-            res += ' ' * num_spaces + line
-    return res
+# A line of values should be dropped (or skipped) when:
+# - At least one value is either None or a VList with no elements.
+# - Any other values are whitespace.
+def _should_drop_the_line(values):
+    has_empty_value = False
+    has_non_empty_string = False
+    for v in values:
+        if v is None:
+            has_empty_value = True
+        if isinstance(v, formatter.VList) and v.is_empty():
+            has_empty_value = True
+        if isinstance(v, str) and not v.isspace():
+            has_non_empty_string = True
+    return has_empty_value and not has_non_empty_string

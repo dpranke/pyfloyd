@@ -493,17 +493,9 @@ class VList(FormatObj):
         super().__init__([])
         objs = objs or []
         for obj in objs:
-            # if isinstance(obj, str):
-            #    self.objs.extend(splitlines(obj))
-            # else:
-            #    self.objs.append(obj)
             self.objs.append(obj)
 
     def __iadd__(self, obj):
-        # if isinstance(obj, str):
-        #    self.objs.extend(splitlines(obj))
-        # else:
-        #    self.objs.append(obj)
         self.objs.append(obj)
         return self
 
@@ -620,15 +612,12 @@ def splitlines(s, skip_empty=False):
     if s == '':
         if skip_empty:
             return []
-        return [''] # ['']
+        return ['']
     if s == '\n':
-        return [''] # ['\n']
+        return ['']
     lines = []
     spl_lines = s.splitlines()
     for spl_line in spl_lines[:-1]:
         lines.append(spl_line)
-        # lines.append('\n')
     lines.append(spl_lines[-1])
-    #if s.endswith('\n'):
-    #    lines.append('\n')
     return lines
