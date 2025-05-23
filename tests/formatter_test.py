@@ -24,8 +24,8 @@ from pyfloyd.formatter import (
     HList,
     Indent,
     LispList as LL,
-    Lit,
     Saw,
+    Triangle,
     Tree,
     VList,
 )
@@ -33,26 +33,19 @@ from pyfloyd.formatter import (
 
 class Tests(unittest.TestCase):
     def test_comma(self):
-        t = Comma(['1', '2', '3'])
+        t = Comma('1', '2', '3')
         self.assertEqual(['1, 2, 3'], flatten(t))
 
-        t = Comma(
-            [
-                '1',
-                Saw('[', Comma(['2']), ']'),
-            ]
-        )
+        t = Comma('1', Triangle('[', Comma('2'), ']'))
         self.assertEqual(['1, [2]'], flatten(t))
 
         # This tests an array that needs to span multiple lines.
         t = Comma(
-            [
-                'self._long_rule_1',
-                'self._long_rule_2',
-                'self._long_rule_3',
-                'self._long_rule_4',
-                'self._long_rule_5',
-            ]
+            'self._long_rule_1',
+            'self._long_rule_2',
+            'self._long_rule_3',
+            'self._long_rule_4',
+            'self._long_rule_5',
         )
         self.assertEqual(
             [
@@ -66,17 +59,10 @@ class Tests(unittest.TestCase):
         )
 
     def test_comma_repr(self):
-        self.assertEqual("Comma(['1', '2'])", repr(Comma(['1', '2'])))
+        self.assertEqual("Comma('1', '2')", repr(Comma('1', '2')))
         self.assertEqual(
-            "Comma(['1', Saw(['[', Comma(['2']), ']'])])",
-            repr(
-                Comma(
-                    [
-                        '1',
-                        Saw('[', Comma(['2']), ']'),
-                    ]
-                )
-            ),
+            "Comma('1', Triangle('[', Comma('2'), ']'))",
+            repr(Comma('1', Triangle('[', Comma('2'), ']'))),
         )
 
     def test_from_list(self):
@@ -85,36 +71,32 @@ class Tests(unittest.TestCase):
             '1',
             '2',
             ['ind', ['hl', '3', '4']],
-            ['lit', '5'],
             ['ll', '6'],
-            ['saw', '7', '8', '9'],
+            ['tri', '7', '8', '9'],
             ['tree', '10', '+', '11'],
             ['vl', '12', '13'],
         ]
         lis = from_list(obj)
         expected_obj = Comma(
-            [
-                '1',
-                '2',
-                Indent(HList(['3', '4'])),
-                Lit('5'),
-                LL('6'),
-                Saw('7', '8', '9'),
-                Tree('10', '+', '11'),
-                VList(['12', '13']),
-            ]
+            '1',
+            '2',
+            Indent(HList('3', '4')),
+            LL('6'),
+            Triangle('7', '8', '9'),
+            Tree('10', '+', '11'),
+            VList('12', '13'),
         )
         self.assertEqual(lis, expected_obj)
 
     def test_hlist(self):
-        obj = HList(['1', '2'])
+        obj = HList('1', '2')
         self.assertEqual(['12'], flatten(obj))
 
-        obj = HList(['1', HList(['2', '3'])])
+        obj = HList('1', HList('2', '3'))
         self.assertEqual(['123'], flatten(obj))
 
     def test_indent(self):
-        obj = Indent(VList(['1', '2']))
+        obj = Indent(VList('1', '2'))
         self.assertEqual(['    1', '    2'], flatten(obj))
 
     def test_line_too_long(self):
@@ -125,14 +107,14 @@ class Tests(unittest.TestCase):
         self.assertEqual([long_str], flatten(long_str))
 
     def test_lisplist(self):
-        self.assertEqual(['[]'], flatten(LL([])))
+        self.assertEqual(['[]'], flatten(LL()))
 
-        self.assertEqual(['[1]'], flatten(LL(['1'])))
+        self.assertEqual(['[1]'], flatten(LL('1')))
 
-        lis = LL(['1', '2', '3'])
+        lis = LL('1', '2', '3')
         self.assertEqual(['[1 2 3]'], flatten(lis))
 
-        lis = LL(['foo', LL(['fn', LL(['arg']), LL(['length', 'arg'])])])
+        lis = LL('foo', LL('fn', LL('arg'), LL('length', 'arg')))
         self.assertEqual(['[foo [fn [arg] [length arg]]]'], flatten(lis))
         self.assertEqual(
             ['[foo [fn [arg]', '         [length arg]]]'],
@@ -142,25 +124,29 @@ class Tests(unittest.TestCase):
     def test_mix(self):
         lines = flatten(
             Saw(
-                'self._succeed(',
-                Saw(
-                    'self.xtou(',
-                    Comma(
-                        [
-                            Tree(
-                                "self._get('long_variable_1')",
-                                '+',
+                'self._succeed',
+                Triangle(
+                    '(',
+                    Saw(
+                        'self.xtou',
+                        Triangle(
+                            '(',
+                            Comma(
                                 Tree(
-                                    "self._get('long_variable_2')",
+                                    "self._get('long_variable_1')",
                                     '+',
-                                    "self._get('long_variable_3')",
-                                ),
-                            )
-                        ]
+                                    Tree(
+                                        "self._get('long_variable_2')",
+                                        '+',
+                                        "self._get('long_variable_3')",
+                                    ),
+                                )
+                            ),
+                            ')',
+                        ),
                     ),
                     ')',
                 ),
-                ')',
             )
         )
         self.assertEqual(
@@ -177,65 +163,74 @@ class Tests(unittest.TestCase):
         )
 
     def test_saw(self):
-        t = Saw('foo(', "'bar'", ')')
-        self.assertEqual(["foo('bar')"], flatten(t))
+        # test short triangle cases.
+        t = Saw('foo', Triangle('(', '0', ')'))
+        self.assertEqual(['foo(0)'], flatten(t))
 
-        t = Saw('foo(', "'bar'", Saw(')(', "'baz'", ')'))
-        self.assertEqual(["foo('bar')('baz')"], flatten(t))
+        t = Saw('foo', Triangle('(', '0', ')'), Triangle('(', '0', ')'))
+        self.assertEqual(['foo(0)(0)'], flatten(t))
 
-        # Test that the right length of args can fit on a line of 75
-        # chars by itself.
+        # Test the three different cases for a saw with one long triangle.
         t = Saw(
-            'foo(',
-            Comma(
-                [
+            'foo',
+            Triangle(
+                '(',
+                Comma(
                     'self._long_rule_1',
                     'self._long_rule_2',
                     'self._long_3',
                     'self._long4',
-                ]
+                ),
+                ')',
             ),
-            ')',
         )
         self.assertEqual(
             [
+                'foo(self._long_rule_1, self._long_rule_2, self._long_3, '
+                'self._long4)',
+            ],
+            flatten(t, length=75),
+        )
+
+        self.assertEqual(
+            [
                 'foo(',
-                '    self._long_rule_1, self._long_rule_2, self._long_3, '
-                'self._long4',
+                (
+                    '    self._long_rule_1, self._long_rule_2, self._long_3, '
+                    'self._long4'
+                ),
                 ')',
             ],
             flatten(t, length=67),
-        )
-        t = Saw(
-            'foo(',
-            Comma(
-                [
-                    'self._long_rule_1',
-                    'self._long_rule_2',
-                    'self._long_rule_3',
-                    'self._long_rule_4',
-                    'self._long_rule_5',
-                    'self._long_rule_6',
-                ]
-            ),
-            ')',
         )
         self.assertEqual(
             [
                 'foo(',
                 '    self._long_rule_1,',
                 '    self._long_rule_2,',
-                '    self._long_rule_3,',
-                '    self._long_rule_4,',
-                '    self._long_rule_5,',
-                '    self._long_rule_6,',
+                '    self._long_3,',
+                '    self._long4,',
                 ')',
             ],
-            flatten(t),
+            flatten(t, length=60),
         )
 
-        t2 = Saw(')[', '4', ']')
-        t.end = t2
+        t = Saw(
+            'foo',
+            Triangle(
+                '(',
+                Comma(
+                    'self._long_rule_1',
+                    'self._long_rule_2',
+                    'self._long_rule_3',
+                    'self._long_rule_4',
+                    'self._long_rule_5',
+                    'self._long_rule_6',
+                ),
+                ')',
+            ),
+            Triangle('[', '4', ']'),
+        )
         self.assertEqual(
             [
                 'foo(',
@@ -289,21 +284,21 @@ class Tests(unittest.TestCase):
         )
 
     def test_tree_repr(self):
-        self.assertEqual("Tree(['1', '+', '2'])", repr(Tree('1', '+', '2')))
+        self.assertEqual("Tree('1', '+', '2')", repr(Tree('1', '+', '2')))
         self.assertEqual(
-            "Tree(['1', '+', Tree(['2', '+', '3'])])",
+            "Tree('1', '+', Tree('2', '+', '3'))",
             repr(Tree('1', '+', Tree('2', '+', '3'))),
         )
 
     def test_vlist(self):
-        self.assertEqual([], flatten(VList([])))
-        self.assertEqual([''], flatten(VList([''])))
-        self.assertEqual(['1', '2'], flatten(VList(['1', '2'])))
-        vl = VList([])
+        self.assertEqual([], flatten(VList()))
+        self.assertEqual([''], flatten(VList('')))
+        self.assertEqual(['1', '2'], flatten(VList('1', '2')))
+        vl = VList()
         vl += 'foo\nbar'
         vl += ''
         vl += 'baz'
-        vl += VList(['1', '2'])
+        vl += VList('1', '2')
         self.assertEqual(['foo', 'bar', '', 'baz', '1', '2'], flatten(vl))
 
 
@@ -328,42 +323,37 @@ class AsListTests(unittest.TestCase):
 
     def test_comma(self):
         self.check(
-            Comma(['1', '2', Indent('bar')]),
+            Comma('1', '2', Indent('bar')),
             ['comma', '1', '2', ['ind', 'bar']],
-            LL(['comma', '1', '2', LL(['ind', 'bar'])]),
+            LL('comma', '1', '2', LL('ind', 'bar')),
             ['[comma 1 2 [ind bar]]'],
         )
 
     def test_hlist(self):
         self.check(
-            HList(['foo', Indent('bar')]),
+            HList('foo', Indent('bar')),
             ['hl', 'foo', ['ind', 'bar']],
-            LL(['hl', 'foo', LL(['ind', 'bar'])]),
+            LL('hl', 'foo', LL('ind', 'bar')),
             ['[hl foo [ind bar]]'],
         )
 
     def test_indent(self):
         self.check(
-            Indent('foo'), ['ind', 'foo'], LL(['ind', 'foo']), ['[ind foo]']
+            Indent('foo'), ['ind', 'foo'], LL('ind', 'foo'), ['[ind foo]']
         )
         self.check(
-            Indent(VList(['foo', 'bar'])),
+            Indent(VList('foo', 'bar')),
             ['ind', ['vl', 'foo', 'bar']],
-            LL(['ind', LL(['vl', 'foo', 'bar'])]),
+            LL('ind', LL('vl', 'foo', 'bar')),
             ['[ind [vl foo bar]]'],
-        )
-
-    def test_lit(self):
-        self.check(
-            Lit('foo'), ['lit', 'foo'], LL(['lit', 'foo']), ['[lit foo]']
         )
 
     def test_saw(self):
         self.check(
-            Saw('foo', 'bar', VList(['baz'])),
-            ['saw', 'foo', 'bar', ['vl', 'baz']],
-            LL(['saw', 'foo', 'bar', LL(['vl', 'baz'])]),
-            ['[saw foo bar [vl baz]]'],
+            Saw('foo', Triangle('(', '4', ')')),
+            ['saw', 'foo', ['tri', '(', '4', ')']],
+            LL('saw', 'foo', LL('tri', '(', '4', ')')),
+            ["[saw foo [tri '(' 4 ')']]"],
         )
 
     def test_str(self):
@@ -376,14 +366,14 @@ class AsListTests(unittest.TestCase):
         self.check(
             Tree('1', '+', Tree('2', '+', '3')),
             ['tree', '1', '+', ['tree', '2', '+', '3']],
-            LL(['tree', '1', '+', LL(['tree', '2', '+', '3'])]),
+            LL('tree', '1', '+', LL('tree', '2', '+', '3')),
             ['[tree 1 + [tree 2 + 3]]'],
         )
 
     def test_vlist(self):
         self.check(
-            VList(['foo', Indent('bar')]),
+            VList('foo', Indent('bar')),
             ['vl', 'foo', ['ind', 'bar']],
-            LL(['vl', 'foo', LL(['ind', 'bar'])]),
+            LL('vl', 'foo', LL('ind', 'bar')),
             ['[vl foo [ind bar]]'],
         )

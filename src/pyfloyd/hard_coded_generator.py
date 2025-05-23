@@ -53,14 +53,22 @@ class HardCodedGenerator(generator.Generator):
             text = s
         else:
             text = datafile.dedent(s)
-        return formatter.VList(text.splitlines())
+        vl = formatter.VList()
+        lines = text.splitlines()
+        for line in lines:
+            vl += line
+        return vl
 
     def _defmtf(self, s: str, dedented=False, **kwargs) -> formatter.VList:
         if dedented:
             text = s
         else:
             text = datafile.dedent(s)
-        return formatter.VList(text.format(**kwargs).splitlines())
+        lines = text.format(**kwargs).splitlines()
+        vl = formatter.VList()
+        for line in lines:
+            vl += line
+        return vl
 
     def _fmt(self, obj: formatter.FormatObj) -> str:
         text = (
@@ -76,6 +84,9 @@ class HardCodedGenerator(generator.Generator):
         raise NotImplementedError
 
     def _gen_invoke(self, fn: str, *args) -> formatter.FormatObj:
+        raise NotImplementedError
+
+    def _gen_funcname(self, name: str) -> str:
         raise NotImplementedError
 
     def _gen_thisvar(self, name: str) -> str:
@@ -99,7 +110,7 @@ class HardCodedGenerator(generator.Generator):
         fn = getattr(self, f'_ty_{node.t}')
         r = fn(node)
         if not isinstance(r, formatter.VList):
-            r = formatter.VList([r])
+            r = formatter.VList(r)
         return r
 
     def _gen_needed_methods(self) -> formatter.FormatObj:
@@ -139,59 +150,52 @@ class HardCodedGenerator(generator.Generator):
 
     def _ty_action(self, node: m_grammar.Node) -> formatter.ListObj:
         return formatter.HList(
-            [
-                formatter.Saw(
-                    self._gen_rulename('succeed') + '(',
-                    self._gen_expr(node.child),
-                    ')',
-                ),
-                self._map['end'],
-            ]
+            formatter.Saw(
+                self._gen_rulename('succeed'),
+                formatter.Triangle('(', self._gen_expr(node.child), ')')
+            ),
+            self._map['end'],
         )
 
     def _ty_apply(self, node: m_grammar.Node) -> formatter.ListObj:
         assert isinstance(node, m_grammar.Apply)
         if node.memoize:
             return formatter.HList(
-                [
-                    self._gen_invoke(
-                        'memoize',
-                        f"'{node.rule_name}'",
-                        self._gen_rulename(node.rule_name),
-                    ),
-                    self._map['end'],
-                ]
+                self._gen_invoke(
+                    'memoize',
+                    f"'{node.rule_name}'",
+                    self._gen_rulename(node.rule_name),
+                ),
+                self._map['end'],
             )
         return formatter.HList(
-            [self._gen_invoke(node.rule_name), self._map['end']]
+            self._gen_invoke(node.rule_name), self._map['end']
         )
 
-    def _ty_e_arr(
-        self, node: m_grammar.Node
-    ) -> Union[formatter.Lit, formatter.Saw]:
+    def _ty_e_arr(self, node: m_grammar.Node) -> Union[str, formatter.Triangle]:
         if len(node.ch) == 0:
-            return formatter.Lit('[]')
+            return '[]'
         args = [self._gen_expr(c) for c in node.ch]
-        return formatter.Saw('[', formatter.Comma(args), ']')
+        return formatter.Triangle('[', formatter.Comma(*args), ']')
 
-    def _ty_e_call(self, node: m_grammar.Node) -> formatter.Saw:
+    def _ty_e_call(self, node: m_grammar.Node) -> formatter.Triangle:
         # There are no built-in functions that take no arguments, so make
         # sure we're not being called that way.
         # TODO: Figure out if we need this routine or not when we also
         # fix the quals.
         assert len(node.ch) != 0
         args = [self._gen_expr(c) for c in node.ch]
-        return formatter.Saw('(', formatter.Comma(args), ')')
+        return formatter.Triangle('(', formatter.Comma(*args), ')')
 
-    def _ty_e_const(self, node: m_grammar.Node) -> formatter.Lit:
+    def _ty_e_const(self, node: m_grammar.Node) -> str:
         assert isinstance(node.v, str)
-        return formatter.Lit(self._map[node.v])
+        return self._map[node.v]
 
-    def _ty_e_getitem(self, node: m_grammar.Node) -> formatter.Saw:
-        return formatter.Saw('[', self._gen_expr(node.child), ']')
+    def _ty_e_getitem(self, node: m_grammar.Node) -> formatter.Triangle:
+        return formatter.Triangle('[', self._gen_expr(node.child), ']')
 
-    def _ty_e_lit(self, node: m_grammar.Node) -> formatter.Lit:
-        return formatter.Lit(self._gen_lit(node.v))
+    def _ty_e_lit(self, node: m_grammar.Node) -> str:
+        return self._gen_lit(node.v)
 
     def _ty_e_minus(self, node: m_grammar.Node) -> formatter.Tree:
         assert isinstance(node, m_grammar.EMinus)
@@ -204,9 +208,9 @@ class HardCodedGenerator(generator.Generator):
             None, self._map['not'], self._gen_expr(node.child)
         )
 
-    def _ty_e_num(self, node: m_grammar.Node) -> formatter.Lit:
+    def _ty_e_num(self, node: m_grammar.Node) -> str:
         assert isinstance(node.v, str)
-        return formatter.Lit(node.v)
+        return str(node.v)
 
     def _ty_e_paren(self, node: m_grammar.Node) -> formatter.FormatObj:
         return self._gen_expr(node.child)
@@ -218,68 +222,28 @@ class HardCodedGenerator(generator.Generator):
         )
 
     def _ty_e_qual(self, node: m_grammar.Node) -> formatter.Saw:
-        first = node.ch[0]
-        second = node.ch[1]
-        start: formatter.Lit
-        if first.t == 'e_var':
-            if second.t == 'e_call':
-                # first is an identifier, but it must refer to a
-                # built-in function if second is a call.
-                function_name = first.v
-                # Note that unknown functions were caught during analysis
-                # so we don't have to worry about that here.
-                start = formatter.Lit(self._gen_thisvar(f'fn_{function_name}'))
-            else:
-                # If second isn't a call, then first refers to a variable.
-                v = self._ty_e_var(first)
-                assert isinstance(v, formatter.Lit)
-                start = v
+        objs = [self._gen_expr(c) for c in node.ch]
+        return formatter.Saw(*objs)
 
-            saw = self._gen_expr(second)
-            assert isinstance(saw, formatter.Saw), (
-                f'{second} did not return a Saw'
-            )
-            saw.start = formatter.HList([start.s, saw.start])
-            i = 2
-        else:
-            # TODO: We need to do typechecking, and figure out a better
-            # strategy for propagating errors/exceptions.
-            saw = self._gen_expr(first)
-            assert isinstance(saw, formatter.Saw), (
-                f'{first} did not return a Saw'
-            )
-            i = 1
-        next_saw: formatter.Saw = saw
-        for n in node.ch[i:]:
-            new_saw = self._gen_expr(n)
-            assert isinstance(new_saw, formatter.Saw), (
-                f'{n} did not return a Saw'
-            )
-            assert isinstance(next_saw.end, str)
-            new_saw.start = formatter.HList([next_saw.end, new_saw.start])
-            next_saw.end = new_saw
-            next_saw = new_saw
-        return saw
-
-    def _ty_e_var(self, node: m_grammar.Node) -> formatter.FormatObj:
+    def _ty_e_var(self, node: m_grammar.Node) -> formatter.El:
         assert isinstance(node, m_grammar.Var)
         if node.outer_scope:
             return self._gen_invoke('lookup', "'" + node.v + "'")
         if node.v in self.grammar.externs:
-            return formatter.Lit(self._gen_extern(node.v))
-        return formatter.Lit(self._gen_varname(node.v))
+            return self._gen_extern(node.v)
+        if node.v in self.grammar.needed_builtin_functions:
+            return self._gen_funcname(node.v)
+        return self._gen_varname(node.v)
 
     def _ty_empty(self, node) -> formatter.ListObj:
         del node
         return formatter.HList(
-            [self._gen_invoke('succeed', self._map['null']), self._map['end']]
+            self._gen_invoke('succeed', self._map['null']), self._map['end']
         )
 
     def _ty_equals(self, node) -> formatter.ListObj:
         arg = self._gen_expr(node.child)
-        return formatter.HList(
-            [self._gen_invoke('str', arg), self._map['end']]
-        )
+        return formatter.HList(self._gen_invoke('str', arg), self._map['end'])
 
     def _ty_leftrec(self, node) -> formatter.ListObj:
         if node.left_assoc:
@@ -288,15 +252,13 @@ class HardCodedGenerator(generator.Generator):
             left_assoc = self._map['false']
 
         return formatter.HList(
-            [
-                self._gen_invoke(
-                    'leftrec',
-                    self._gen_rulename(node.child.v),
-                    "'" + node.v + "'",
-                    left_assoc,
-                ),
-                self._map['end'],
-            ]
+            self._gen_invoke(
+                'leftrec',
+                self._gen_rulename(node.child.v),
+                "'" + node.v + "'",
+                left_assoc,
+            ),
+            self._map['end'],
         )
 
     def _ty_lit(self, node) -> formatter.ListObj:
@@ -306,7 +268,7 @@ class HardCodedGenerator(generator.Generator):
         else:
             method = 'str'
         return formatter.HList(
-            [self._gen_invoke(method, expr), self._map['end']]
+            self._gen_invoke(method, expr), self._map['end']
         )
 
     def _ty_operator(self, node) -> formatter.ListObj:
@@ -315,22 +277,18 @@ class HardCodedGenerator(generator.Generator):
         # from self.grammar.operators[node.v].choices.
         assert node.ch == []
         return formatter.HList(
-            [
-                self._gen_invoke('operator', "'" + node.v + "'"),
-                self._map['end'],
-            ]
+            self._gen_invoke('operator', "'" + node.v + "'"),
+            self._map['end'],
         )
 
     def _ty_range(self, node) -> formatter.ListObj:
         return formatter.HList(
-            [
-                self._gen_invoke(
-                    'range',
-                    self._gen_lit(node.start),
-                    self._gen_lit(node.stop),
-                ),
-                self._map['end'],
-            ]
+            self._gen_invoke(
+                'range',
+                self._gen_lit(node.start),
+                self._gen_lit(node.stop),
+            ),
+            self._map['end'],
         )
 
     def _ty_regexp(self, node) -> formatter.ListObj:
@@ -342,8 +300,6 @@ class HardCodedGenerator(generator.Generator):
 
     def _ty_unicat(self, node) -> formatter.ListObj:
         return formatter.HList(
-            [
-                self._gen_invoke('unicat', self._gen_lit(node.v)),
-                self._map['end'],
-            ]
+            self._gen_invoke('unicat', self._gen_lit(node.v)),
+            self._map['end'],
         )

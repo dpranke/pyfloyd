@@ -265,7 +265,7 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
         return vl
 
     def _gen_constructor(self) -> formatter.VList:
-        obj = formatter.VList(['def __init__(self, text, path):'])
+        obj = formatter.VList('def __init__(self, text, path):')
 
         vl = self._defmt("""
             self._text = text
@@ -311,7 +311,7 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
                 text += '    ' + str(prec) + ': ['
                 text += ', '.join("'" + op + "'" for op in o.prec_ops[prec])
                 text += '],\n'
-            vl += formatter.Indent(formatter.VList(text.splitlines()))
+            vl += formatter.Indent(formatter.VList(*text.splitlines()))
             vl += '}'
             vl += 'o.precs = sorted(o.prec_ops, reverse=True)'
             vl += (
@@ -413,10 +413,8 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
         self, method_name: str, node: gram.Node
     ) -> formatter.VList:
         return formatter.VList(
-            [
-                formatter.HList(['def _', method_name, '(self):']),
-                formatter.Indent(self._gen_stmts(node)),
-            ]
+            formatter.HList('def _', method_name, '(self):'),
+            formatter.Indent(self._gen_stmts(node)),
         )
 
     def _gen_thisvar(self, name: str) -> str:
@@ -425,18 +423,24 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
     def _gen_rulename(self, name: str) -> str:
         return 'self._' + name
 
+    def _gen_funcname(self, name: str) -> str:
+        return 'self._fn_' + name
+
     def _gen_extern(self, name: str) -> str:
         return "self._externs['" + name + "']"
 
     def _gen_invoke(self, fn, *args) -> formatter.Saw:
-        return formatter.Saw('self._' + fn + '(', formatter.Comma(args), ')')
+        return formatter.Saw(
+            'self._' + fn,
+            formatter.Triangle('(', formatter.Comma(*args), ')')
+        )
 
     #
     # Handlers for each non-host node in the glop AST follow.
     #
 
     def _ty_choice(self, node: gram.Node) -> formatter.ListObj:
-        vl = formatter.VList(['p = self._pos'])
+        vl = formatter.VList('p = self._pos')
         for subnode in node.ch[:-1]:
             vl += self._gen_stmts(subnode)
             vl += 'if not self._failed:'
@@ -447,12 +451,10 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
 
     def _ty_count(self, node: gram.Node) -> formatter.ListObj:
         vl = formatter.VList(
-            [
-                'vs = []',
-                'i = 0',
-                f'cmin, cmax = {node.v}',
-                'while i < cmax:',
-            ]
+            'vs = []',
+            'i = 0',
+            f'cmin, cmax = {node.v}',
+            'while i < cmax:',
         )
         svl = self._gen_stmts(node.child)
         svl += 'if self._failed:'
@@ -468,184 +470,152 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
         return vl
 
     def _ty_ends_in(self, node: gram.Node) -> formatter.ListObj:
-        sublines = self._gen_stmts(node.child)
-        lines = [
-            'while True:',
-        ] + [formatter.Indent(sublines)]
+        vl = formatter.VList('while True:')
+        vl += formatter.Indent(self._gen_stmts(node.child))
         if node.can_fail:
-            lines.extend(['    if not self._failed:', '        break'])
-        lines.extend(
-            [
-                '    self._r_any()',
-                '    if self._failed:',
-                '        break',
-            ]
-        )
-        return formatter.VList(lines)
+            vl += ['    if not self._failed:', '        break']
+        vl += [
+            '    self._r_any()',
+            '    if self._failed:',
+            '        break',
+        ]
+        return vl
 
     def _ty_label(self, node: gram.Node) -> formatter.ListObj:
         assert isinstance(node, gram.Label)
-        lines: formatter.ElList = [self._gen_stmts(node.child)]
+        vl = formatter.VList(self._gen_stmts(node.child))
         if node.child.can_fail:
-            lines.extend(['if self._failed:', '    return'])
+            vl += ['if self._failed:', '    return']
         if node.outer_scope:
-            lines.extend([f"self._scopes[-1]['{node.name}'] = self._val"])
+            vl += f"self._scopes[-1]['{node.name}'] = self._val"
         else:
-            lines.extend(
-                [
-                    f'{self._gen_varname(node.name)} = self._val',
-                ]
-            )
-        return formatter.VList(lines)
+            vl += f'{self._gen_varname(node.name)} = self._val'
+        return vl
 
     def _ty_not(self, node: gram.Node) -> formatter.ListObj:
-        sublines = self._gen_stmts(node.child)
-        lines = (
-            [
-                'p = self._pos',
-                'errpos = self._errpos',
-            ]
-            + [sublines]
-            + [
-                'if self._failed:',
-                '    self._succeed(None, p)',
-                'else:',
-                '    self._rewind(p)',
-                '    self._errpos = errpos',
-                '    self._fail()',
-            ]
+        vl = formatter.VList(
+            'p = self._pos',
+            'errpos = self._errpos',
         )
-        return formatter.VList(lines)
+        vl += self._gen_stmts(node.child)
+        vl += [
+            'if self._failed:',
+            '    self._succeed(None, p)',
+            'else:',
+            '    self._rewind(p)',
+            '    self._errpos = errpos',
+            '    self._fail()',
+        ]
+        return vl
 
     def _ty_not_one(self, node: gram.Node) -> formatter.ListObj:
         sublines = self._gen_stmts(self.grammar.node(gram.Not, node.child))
-        return formatter.VList(
-            [sublines, 'if not self._failed:', '    self._r_any()']
-        )
+        vl = formatter.VList()
+        vl += sublines
+        vl += ['if not self._failed:', '    self._r_any()']
+        return vl
 
     def _ty_opt(self, node: gram.Node) -> formatter.ListObj:
-        sublines = self._gen_stmts(node.child)
-        return formatter.VList(
-            [
-                'p = self._pos',
-            ]
-            + [sublines]
-            + [
-                'if self._failed:',
-                '    self._succeed([], p)',
-                'else:',
-                '    self._succeed([self._val])',
-            ]
-        )
+        vl = formatter.VList('p = self._pos')
+        vl += self._gen_stmts(node.child)
+        vl += [
+            'if self._failed:',
+            '    self._succeed([], p)',
+            'else:',
+            '    self._succeed([self._val])',
+        ]
+        return vl
 
     def _ty_paren(self, node: gram.Node) -> formatter.ListObj:
         return self._gen_stmts(node.child)
 
     def _ty_plus(self, node: gram.Node) -> formatter.ListObj:
         sublines = self._gen_stmts(node.child)
-        lines = (
-            ['vs = []']
-            + [sublines]
-            + [
-                'if self._failed:',
-                '    return',
-                'vs.append(self._val)',
-                'while True:',
-                '    p = self._pos',
-            ]
-            + [formatter.Indent(sublines)]
-            + [
-                '    if self._failed or self._pos == p:',
-                '        self._rewind(p)',
-                '        break',
-                '    vs.append(self._val)',
-                'self._succeed(vs)',
-            ]
-        )
-
-        return formatter.VList(lines)
+        vl = formatter.VList('vs = []')
+        vl += sublines
+        vl += [
+            'if self._failed:',
+            '    return',
+            'vs.append(self._val)',
+            'while True:',
+            '    p = self._pos',
+            formatter.Indent(sublines),
+            '    if self._failed or self._pos == p:',
+            '        self._rewind(p)',
+            '        break',
+            '    vs.append(self._val)',
+            'self._succeed(vs)',
+        ]
+        return vl
 
     def _ty_pred(self, node: gram.Node) -> formatter.ListObj:
         arg = self._gen_expr(node.child)
         return formatter.VList(
-            [
-                formatter.HList(['v = ', arg]),
-                'if v is True:',
-                '    self._succeed(v)',
-                'elif v is False:',
-                '    self._fail()',
-                'else:',
-                "    raise _ParsingRuntimeError('Bad predicate value')",
-            ]
+            formatter.HList('v = ', arg),
+            'if v is True:',
+            '    self._succeed(v)',
+            'elif v is False:',
+            '    self._fail()',
+            'else:',
+            "    raise _ParsingRuntimeError('Bad predicate value')",
         )
 
     def _ty_regexp(self, node: gram.Node) -> formatter.ListObj:
         return formatter.VList(
-            [
-                f'p = {self._gen_lit(node.v)}',
-                'if p not in self._regexps:',
-                '    self._regexps[p] = re.compile(p)',
-                'm = self._regexps[p].match(self._text, self._pos)',
-                'if m:',
-                '    self._succeed(m.group(0), m.end())',
-                '    return',
-                'self._fail()',
-            ]
+            f'p = {self._gen_lit(node.v)}',
+            'if p not in self._regexps:',
+            '    self._regexps[p] = re.compile(p)',
+            'm = self._regexps[p].match(self._text, self._pos)',
+            'if m:',
+            '    self._succeed(m.group(0), m.end())',
+            '    return',
+            'self._fail()',
         )
 
     def _ty_run(self, node: gram.Node) -> formatter.VList:
-        sublines = self._gen_stmts(node.child)
-        lines = ['start = self._pos'] + [sublines]
+        vl = formatter.VList('start = self._pos')
+        vl += self._gen_stmts(node.child)
         if node.child.can_fail:
-            lines.extend(['if self._failed:', '    return'])
-        lines.extend(
-            [
-                'end = self._pos',
-                'self._val = self._text[start:end]',
-            ]
-        )
-        return formatter.VList(lines)
+            vl += ['if self._failed:', '    return']
+        vl += [
+            'end = self._pos',
+            'self._val = self._text[start:end]',
+        ]
+        return vl
 
     def _ty_scope(self, node: gram.Node) -> formatter.VList:
-        return formatter.VList(
-            [
-                'self._scopes.append({})',
-            ]
-            + [self._gen_stmts(node.child)]
-            + [
-                'self._scopes.pop()',
-            ]
-        )
+        vl = formatter.VList('self._scopes.append({})')
+        vl += self._gen_stmts(node.child)
+        vl += 'self._scopes.pop()'
+        return vl
 
     def _ty_seq(self, node: gram.Node) -> formatter.VList:
-        lines: formatter.ElList = [self._gen_stmts(node.ch[0])]
+        vl = formatter.VList(self._gen_stmts(node.ch[0]))
         if node.ch[0].can_fail:
-            lines.extend(['if self._failed:', '    return'])
+            vl += ['if self._failed:', '    return']
         for subnode in node.ch[1:-1]:
-            lines.append(self._gen_stmts(subnode))
+            vl += self._gen_stmts(subnode)
             if subnode.can_fail:
-                lines.extend(['if self._failed:', '    return'])
-        lines.append(self._gen_stmts(node.ch[-1]))
-        return formatter.VList(lines)
+                vl += ['if self._failed:', '    return']
+        vl += self._gen_stmts(node.ch[-1])
+        return vl
 
     def _ty_star(self, node: gram.Node) -> formatter.VList:
         sublines = self._gen_stmts(node.child)
-        lines = (
-            [
-                'vs = []',
-                'while True:',
-                '    p = self._pos',
-            ]
-            + [formatter.Indent(sublines)]
-            + [
-                '    if self._failed or self._pos == p:',
-                '        self._rewind(p)',
-                '        break',
-                '    vs.append(self._val)',
-                'self._succeed(vs)',
-            ]
+        vl = formatter.VList(
+            'vs = []',
+            'while True:',
+            '    p = self._pos',
         )
-        return formatter.VList(lines)
+        vl += formatter.Indent(sublines)
+        vl += [
+            '    if self._failed or self._pos == p:',
+            '        self._rewind(p)',
+            '        break',
+            '    vs.append(self._val)',
+            'self._succeed(vs)',
+        ]
+        return vl
 
     def _gen_main_footer(self) -> formatter.VList:
         return self._defmt("""

@@ -30,8 +30,8 @@ _FmtFn = Callable[[El, Union[None, int], str], list[str]]
 class FormatObj:
     tag: str = ''
 
-    def __init__(self, objs: Optional[ElSeq] = None):
-        self.objs: ElList = list(objs) if objs else []
+    def __init__(self, *objs):
+        self.objs = list(objs)
 
     def __eq__(self, other):
         return (
@@ -44,14 +44,14 @@ class FormatObj:
 
     def __repr__(self):
         cls_name = self.__class__.__name__
-        return f'{cls_name}([{", ".join(repr(obj) for obj in self.objs)}])'
+        return f'{cls_name}({", ".join(repr(obj) for obj in self.objs)})'
 
     def to_list(self):
         return [self.tag] + [to_list(obj) for obj in self.objs]
 
     def to_lisplist(self):
         assert self.tag is not None
-        return LispList([self.tag] + [to_lisplist(obj) for obj in self.objs])
+        return LispList(self.tag, *[to_lisplist(obj) for obj in self.objs])
 
     def is_empty(self):
         return len(self.objs) == 0
@@ -143,9 +143,8 @@ class Comma(_MultipleObj):
 class HList(FormatObj):
     tag = 'hl'
 
-    def __init__(self, objs: Optional[ElSeq] = None):
-        super().__init__([])
-        objs = objs or []
+    def __init__(self, *objs):
+        super().__init__()
         for obj in objs:
             if isinstance(objs[0], self.__class__):
                 assert isinstance(obj, FormatObj)
@@ -176,12 +175,6 @@ class HList(FormatObj):
 
 class Indent(FormatObj):
     tag = 'ind'
-
-    def __init__(self, objs):
-        if isinstance(objs, list):
-            super().__init__(objs)
-        else:
-            super().__init__([objs])
 
     def fmt(
         self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
@@ -269,33 +262,8 @@ class LispList(_MultipleObj):
         return lines
 
 
-class Lit(FormatObj):
-    tag = 'lit'
-
-    def __init__(self, obj: Union[str, ElSeq]):
-        if isinstance(obj, str):
-            super().__init__([obj])
-        else:
-            assert len(obj) > 0 and isinstance(obj[0], str)
-            super().__init__(obj)
-
-    @property
-    def s(self):
-        return self.objs[0]
-
-    @s.setter
-    def s(self, v):
-        self.objs[0] = v
-
-    def fmt(
-        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> list[str]:
-        assert isinstance(self.objs[0], str)
-        return [self.objs[0]]
-
-
 class Saw(_MultipleObj):
-    """Formats series of calls and lists as a saw-shaped pattern.
+    """Formats values in a saw-shaped pattern.
 
     Expressions of the form `foo(x)`, `[4]`, and `foo(x)[4]` can be called
     saw-shaped, as when the arguments are long, the rest can be a series
@@ -309,40 +277,56 @@ class Saw(_MultipleObj):
     ]
 
     where the unindented parts are all on a single line and the indented
-    parts may be on one or more lines.
+    parts may be on one or more lines. We express this as one Saw object
+    with an initial prefix + multiple Triangle objects.
     """
 
     tag = 'saw'
 
-    def __init__(self, *args):
-        if len(args) == 3:
-            super().__init__(args)
-        else:
-            super().__init__(*args)
+    def __init__(self, s, *args):
+        super().__init__(s, *args)
+        for arg in args:
+            assert isinstance(arg, Triangle)
 
-    @property
-    def start(self):
-        return self.objs[0]
+    def fmt_single_line(
+        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
+    ) -> Optional[str]:
+        s = _fmt_single_line(self.objs[0], length, indent, fmt_fn)
+        if s is None:
+            return s
+        for obj in self.objs[1:]:
+            new_l = _new_length(length, len(s))
+            r = _fmt_single_line(obj, new_l, indent, fmt_fn)
+            if r is None:
+                return r
+            s += r
+        return s
 
-    @start.setter
-    def start(self, v):
-        self.objs[0] = v
+    def fmt_multiple_lines(
+        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
+    ) -> list[str]:
+        t = self.objs[1]
+        assert isinstance(t, Triangle)
+        assert isinstance(t.left, str)
+        lines = fmt_fn(self.objs[0], length, indent)
+        for obj in self.objs[1:]:
+            new_l = _new_length(length, len(lines[-1]))
+            sub_lines = fmt_fn(obj, new_l, indent)
+            lines[-1] += sub_lines[0]
+            lines.extend(indent + line for line in sub_lines[1:-1])
+            if len(sub_lines) > 1:
+                lines.append(sub_lines[-1])
+        return lines
 
-    @property
-    def mid(self):
-        return self.objs[1]
 
-    @mid.setter
-    def mid(self, v):
-        self.objs[1] = v
+class Triangle(_MultipleObj):
+    tag = 'tri'
 
-    @property
-    def end(self):
-        return self.objs[2]
-
-    @end.setter
-    def end(self, v):
-        self.objs[2] = v
+    def __init__(self, left, mid, right):
+        super().__init__(left, mid, right)
+        self.left, self.mid, self.right = left, mid, right
+        assert isinstance(self.objs[0], str)
+        assert isinstance(self.objs[2], str)
 
     def fmt_single_line(
         self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
@@ -358,68 +342,32 @@ class Saw(_MultipleObj):
     def fmt_multiple_lines(
         self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
     ) -> list[str]:
-        lines = fmt_fn(self.start, length, indent)
-        new_l = None if length is None else length - len(lines[-1])
-        for line in fmt_fn(self.mid, length, indent):
-            lines.append(indent + line)
-        for line in fmt_fn(self.end, new_l, indent):
-            lines.append(line)
+        lines = fmt_fn(self.objs[0], length, indent)
+        new_l = _new_length(length, len(indent))
+        lines.extend(fmt_fn(self.objs[1], new_l, indent))
+        lines.extend(fmt_fn(self.objs[2], length, indent))
         return lines
 
 
 class Tree(_MultipleObj):
-    """Format a tree of expressions.
+    """Formats a call or dereference.
 
-    This formats a tree of expressions, like `1 + 2 - 3`. If the expressions
-    need to be split across multiple lines, we want the lines to be split
-    before each operator, e.g.:
-        1
-        + 2
-        - 3
-    This requires some surgery when walking the tree.
-
-    `left` and `right` may be `None` to handle prefix and postfix operators.
+    Given an expression like '(foo)' or '[bar]', where there's a starting
+    and ending string and a possibly more complex object in the middle,
+    formats these thing over possibly multiple lines.
     """
 
     tag = 'tree'
 
-    def __init__(self, *args):
-        if len(args) == 3:
-            super().__init__(args)
-        else:
-            super().__init__(*args)
-        assert self.left is not None or self.right is not None
-
-    @property
-    def left(self) -> Optional[El]:
-        return self.objs[0]
-
-    @left.setter
-    def left(self, v: Optional[El]):
-        self.objs[0] = v
-
-    @property
-    def op(self) -> str:
-        assert isinstance(self.objs[1], str)
-        return self.objs[1]
-
-    @op.setter
-    def op(self, v: str):
-        self.objs[1] = v
-
-    @property
-    def right(self) -> Optional[El]:
-        return self.objs[2]
-
-    @right.setter
-    def right(self, v: Optional[El]):
-        self.objs[2] = v
+    def __init__(self, left, op, right):
+        super().__init__(left, op, right)
+        self.left, self.op, self.right = left, op, right
 
     def fmt_single_line(
         self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
     ) -> Optional[str]:
         # pylint: disable=unbalanced-tuple-unpacking
-        left, op, right = self.objs
+        left, op, right = self.left, self.op, self.right
         assert isinstance(op, str)
         if left is None:
             s = op
@@ -447,8 +395,7 @@ class Tree(_MultipleObj):
     def fmt_multiple_lines(
         self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
     ) -> list[str]:
-        # pylint: disable=unbalanced-tuple-unpacking
-        left, op, right = self.objs
+        left, op, right = self.left, self.op, self.right
         lines: list[str]
         right_lines: list[str]
         assert isinstance(op, str)
@@ -456,7 +403,7 @@ class Tree(_MultipleObj):
         if left is None:
             assert right is not None
             assert isinstance(op, str)
-            new_l = None if length is None else length - len(self.op)
+            new_l = None if length is None else length - len(op)
             sublines: list[str] = fmt_fn(right, new_l, indent)
             if sublines:
                 lines = [op + sublines[0]] + sublines[1:]
@@ -464,17 +411,17 @@ class Tree(_MultipleObj):
 
         lines = fmt_fn(left, length, indent)
         if right is None:
-            lines[-1] += self.op
+            lines[-1] += op
             return lines
 
         while isinstance(right, Tree):
             new_l = None if length is None else length - len(op) - 1
-            if right.left is not None:
-                right_lines = fmt_fn(right.left, new_l, indent)
+            if right.objs[0] is not None:
+                right_lines = fmt_fn(right.objs[0], new_l, indent)
                 lines.append(op + ' ' + right_lines[0])
                 lines += right_lines[1:]
-            op = right.op
-            right = right.right
+            op = right.objs[1]
+            right = right.objs[2]
         if right is not None:
             new_l = None if length is None else length - len(op) - 1
             if isinstance(right, FormatObj):
@@ -489,14 +436,11 @@ class Tree(_MultipleObj):
 class VList(FormatObj):
     tag = 'vl'
 
-    def __init__(self, objs: Optional[ElSeq] = None):
-        super().__init__([])
-        objs = objs or []
-        for obj in objs:
-            self.objs.append(obj)
-
     def __iadd__(self, obj):
-        self.objs.append(obj)
+        if isinstance(obj, list):
+            self.objs.extend(obj)
+        else:
+            self.objs.append(obj)
         return self
 
     def fmt(
@@ -605,7 +549,7 @@ def from_list(obj: Any) -> El:
     for ob in obj[1:]:
         arg = from_list(ob)
         args.append(arg)
-    return cls(args)
+    return cls(*args)
 
 
 def splitlines(s, skip_empty=False):
@@ -621,3 +565,7 @@ def splitlines(s, skip_empty=False):
         lines.append(spl_line)
     lines.append(spl_lines[-1])
     return lines
+
+
+def _new_length(l1: Union[int, None], l2: int) -> Union[int, None]:
+    return l1 if l1 is None else l1 - l2

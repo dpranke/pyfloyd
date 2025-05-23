@@ -346,16 +346,16 @@ n_count: [fn [node] [vl 'vs = []'
                         'self._o_succeed(vs)']]
 
 n_e_arr: [fn [node] [if [is_empty node.ch]
-                        [lit '[]']
-                        [saw '['
+                        '[]'
+                        [tri '['
                              [comma [map [fn [c] [expr c]] node.ch]]
                              ']']]]
 
-n_e_call: [fn [node] [saw '(' [comma [map [fn [c] [expr c]] node.ch]] ')']]
+n_e_call: [fn [node] [tri '(' [comma [map [fn [c] [expr c]] node.ch]] ')']]
 
 n_e_const: [fn [node] [invoke [strcat 'c_' node.v]]]
 
-n_e_getitem: [fn [node] [saw '[' [expr node.child] ']']]
+n_e_getitem: [fn [node] [tri '[' [expr node.child] ']']]
 
 n_e_lit: [fn [node] [lit node.v]]
 
@@ -867,7 +867,7 @@ extern:    [fn [name] [strcat 'self._externs[' name ']']]
 varname:   [fn [name] [strcat 'v_' [replace name '$', '_']]]
 
 # Invoke a method on the parser object.
-call:      [fn [name args] [saw [hl 'self._' name '('] [comma args] ')']]
+call:      [fn [name args] [tri [strcat 'self._' name '('] [comma args] ')']]
 
 # Invoke specific kinds of methods on the parser object.
 call_op:   [fn [name args] [call [op_name name] args]]

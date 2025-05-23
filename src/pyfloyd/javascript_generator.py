@@ -204,7 +204,7 @@ class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
         return vl
 
     def _gen_operator_state(self) -> formatter.VList:
-        vl = formatter.VList(['this.operators = {};'])
+        vl = formatter.VList('this.operators = {};')
         vl += 'let o;'
         for rule, o in self.grammar.operators.items():
             vl += 'o = new OperatorState();'
@@ -332,228 +332,202 @@ class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
     def _gen_rulename(self, name: str) -> str:
         return 'this.' + name
 
+    def _gen_funcname(self, name: str) -> str:
+        return 'this.fn_' + name
+
     def _gen_extern(self, name: str) -> str:
         return "this.externs.get('" + name + "');"
 
     def _gen_invoke(self, fn: str, *args) -> formatter.Saw:
-        return formatter.Saw('this.' + fn + '(', formatter.Comma(args), ')')
+        return formatter.Saw(
+            self._gen_rulename(fn),
+            formatter.Triangle('(', formatter.Comma(*args), ')')
+        )
 
     #
     # Handlers for each non-host node in the glop AST follow.
     #
 
     def _ty_choice(self, node) -> formatter.VList:
-        lines: formatter.ElList = ['pos = this.pos;']
+        vl = formatter.VList('pos = this.pos;')
         for subnode in node.ch[:-1]:
-            lines.append(self._gen_stmts(subnode))
-            lines.append('if (!this.failed) {')
-            lines.append('  return;')
-            lines.append('}')
-            lines.append('this.rewind(pos);')
-        lines.append(self._gen_stmts(node.ch[-1]))
-        return formatter.VList(lines)
+            vl += self._gen_stmts(subnode)
+            vl += 'if (!this.failed) {'
+            vl += '  return;'
+            vl += '}'
+            vl += 'this.rewind(pos);'
+        vl += self._gen_stmts(node.ch[-1])
+        return vl
 
     def _ty_count(self, node) -> formatter.VList:
         assert isinstance(node, gram.Count)
-        lines: formatter.ElList = [
+        vl = formatter.VList(
             'vs = [];',
             'i = 0;',
             f'cmin = {node.start};',
             f'cmax = {node.stop};',
             'while (i < cmax) {',
-        ]
-        lines.append(formatter.Indent(self._gen_stmts(node.child)))
-        lines.extend(
-            [
-                '  if (this.failed) {',
-                '    if (i >= cmin) {',
-                '      this.succeed(vs);',
-                '      return;',
-                '    }',
-                '    return;',
-                '  }',
-                '  vs.push(this.val);',
-                '  i += 1;',
-                '}',
-                'this.succeed(vs);',
-            ]
         )
-        return formatter.VList(lines)
+        vl += formatter.Indent(self._gen_stmts(node.child))
+        vl += [
+            '  if (this.failed) {',
+            '    if (i >= cmin) {',
+            '      this.succeed(vs);',
+            '      return;',
+            '    }',
+            '    return;',
+            '  }',
+            '  vs.push(this.val);',
+            '  i += 1;',
+            '}',
+            'this.succeed(vs);',
+        ]
+        return vl
 
     def _ty_ends_in(self, node) -> formatter.VList:
         sublines = self._gen_stmts(node.child)
         return formatter.VList(
-            [
-                'while (true) {',
-            ]
-            + [formatter.Indent(sublines)]
-            + [
-                '  if (!this.failed) {',
-                '    break;',
-                '  }',
-                '  this.r_any();',
-                '  if (this.failed) {',
-                '    break;',
-                '  }',
-                '}',
-            ]
+            'while (true) {',
+            formatter.Indent(sublines),
+            '  if (!this.failed) {',
+            '    break;',
+            '  }',
+            '  this.r_any();',
+            '  if (this.failed) {',
+            '    break;',
+            '  }',
+            '}',
         )
 
     def _ty_label(self, node) -> formatter.VList:
-        lines = [self._gen_stmts(node.child)]
         varname = self._gen_varname(node.v)
+        vl = formatter.VList()
+        vl += self._gen_stmts(node.child)
         if node.outer_scope:
-            lines.append(
-                formatter.VList(
-                    [
-                        'if (!this.failed) {',
-                        f"  this.scopes[this.scopes.length-1].set('{node.v}', this.val);"
-                        '}',
-                    ]
-                )
-            )
+            vl += [
+                'if (!this.failed) {',
+                (
+                    f'  this.scopes[this.scopes.length-1].'
+                    f"set('{node.v}', this.val);"
+                ),
+                '}',
+            ]
         else:
-            lines.append(
-                formatter.VList(
-                    [
-                        'if (!this.failed) {',
-                        f'  {varname} = this.val;',
-                        '}',
-                    ]
-                )
-            )
-        return formatter.VList(lines)
+            vl += [
+                'if (!this.failed) {',
+                f'  {varname} = this.val;',
+                '}',
+            ]
+        return vl
 
     def _ty_not(self, node) -> formatter.VList:
-        sublines = self._gen_stmts(node.child)
-        lines = (
-            [
-                'pos = this.pos;',
-                'errpos = this.errpos;',
-            ]
-            + [sublines]
-            + [
-                'if (this.failed) {',
-                '  this.succeed(null, pos);',
-                '} else {',
-                '  this.rewind(pos);',
-                '  this.errpos = errpos;',
-                '  this.fail();',
-                '}',
-            ]
+        vl = formatter.VList(
+            'pos = this.pos;',
+            'errpos = this.errpos;',
         )
-        return formatter.VList(lines)
+        vl += self._gen_stmts(node.child)
+        vl += [
+            'if (this.failed) {',
+            '  this.succeed(null, pos);',
+            '} else {',
+            '  this.rewind(pos);',
+            '  this.errpos = errpos;',
+            '  this.fail();',
+            '}',
+        ]
+        return vl
 
     def _ty_not_one(self, node) -> formatter.VList:
-        sublines = self._gen_stmts(self.grammar.node(gram.Not, node.child))
-        return formatter.VList(
-            [sublines]
-            + [
-                'if (!this.failed) {',
-                '  this.r_any(pos);',
-                '}',
-            ]
-        )
+        vl = formatter.VList()
+        vl += self._gen_stmts(self.grammar.node(gram.Not, node.child))
+        vl += [
+            'if (!this.failed) {',
+            '  this.r_any(pos);',
+            '}',
+        ]
+        return vl
 
     def _ty_opt(self, node) -> formatter.VList:
-        sublines = self._gen_stmts(node.child)
-        lines = (
-            [
-                'pos = this.pos;',
-            ]
-            + [sublines]
-            + [
-                'if (this.failed) {',
-                '  this.succeed([], pos);',
-                '} else {',
-                '  this.succeed([this.val]);',
-                '}',
-            ]
+        vl = formatter.VList(
+            'pos = this.pos;',
         )
-        return formatter.VList(lines)
+        vl += self._gen_stmts(node.child)
+        vl += [
+            'if (this.failed) {',
+            '  this.succeed([], pos);',
+            '} else {',
+            '  this.succeed([this.val]);',
+            '}',
+        ]
+        return vl
 
     def _ty_paren(self, node) -> formatter.VList:
         return self._gen_stmts(node.child)
 
     def _ty_plus(self, node) -> formatter.VList:
         sublines = self._gen_stmts(node.child)
-        lines = formatter.VList(
-            ['vs = [];']
-            + [sublines]
-            + [
-                'vs.push(this.val);',
-                'if (this.failed) {',
-                '  return;',
-                '}',
-                'while (true) {',
-                '  pos = this.pos;',
-            ]
-            + [formatter.Indent(sublines)]
-            + [
-                '  if (this.failed || this.pos === pos) {',
-                '    this.rewind(pos);',
-                '    break;',
-                '  }',
-                '  vs.push(this.val);',
-                '}',
-                'this.succeed(vs);',
-            ]
-        )
-        return lines
+        vl = formatter.VList('vs = [];')
+        vl += sublines
+        vl += [
+            'vs.push(this.val);',
+            'if (this.failed) {',
+            '  return;',
+            '}',
+            'while (true) {',
+            '  pos = this.pos;',
+            formatter.Indent(sublines),
+            '  if (this.failed || this.pos === pos) {',
+            '    this.rewind(pos);',
+            '    break;',
+            '  }',
+            '  vs.push(this.val);',
+            '}',
+            'this.succeed(vs);',
+        ]
+        return vl
 
     def _ty_pred(self, node) -> formatter.VList:
         arg = self._gen_expr(node.child)
         return formatter.VList(
-            [
-                formatter.HList(['v = ', arg]),
-                'if (v === true) {',
-                '  this.succeed(v);',
-                '} else if (v === false) {',
-                '  this.fail();',
-                '} else {',
-                "  throw new ParsingRuntimeError('Bad predicate value');",
-                '}',
-            ]
+            formatter.HList('v = ', arg),
+            'if (v === true) {',
+            '  this.succeed(v);',
+            '} else if (v === false) {',
+            '  this.fail();',
+            '} else {',
+            "  throw new ParsingRuntimeError('Bad predicate value');",
+            '}',
         )
 
     def _ty_regexp(self, node) -> formatter.VList:
         return formatter.VList(
-            [
-                f"r = new RegExp({self._gen_lit(node.v)}, 'gy');"
-                'r.lastIndex = this.pos;',
-                'found = r.exec(this.text);',
-                'if (found) {',
-                '  this.succeed(found[0], this.pos + found[0].length);',
-                '  return;',
-                '}',
-                'this.fail();',
-            ]
+            f"r = new RegExp({self._gen_lit(node.v)}, 'gy');"
+            'r.lastIndex = this.pos;',
+            'found = r.exec(this.text);',
+            'if (found) {',
+            '  this.succeed(found[0], this.pos + found[0].length);',
+            '  return;',
+            '}',
+            'this.fail();',
         )
 
     def _ty_run(self, node) -> formatter.VList:
-        lines = self._gen_stmts(node.child)
-        return formatter.VList(
-            ['start = this.pos;']
-            + [lines]
-            + [
-                'if (this.failed) {',
-                '  return;',
-                '}',
-                'end = this.pos;',
-                'this.val = this.text.substr(start, end);',
-            ]
-        )
+        vl = formatter.VList('start = this.pos;')
+        vl += self._gen_stmts(node.child)
+        vl += [
+            'if (this.failed) {',
+            '  return;',
+            '}',
+            'end = this.pos;',
+            'this.val = this.text.substr(start, end);',
+        ]
+        return vl
 
     def _ty_scope(self, node) -> formatter.VList:
-        return formatter.VList(
-            [
-                'this.scopes.push(new Map());',
-            ]
-            + [self._gen_stmts(node.child)]
-            + [
-                'this.scopes.pop();',
-            ]
-        )
+        vl = formatter.VList('this.scopes.push(new Map());')
+        vl += self._gen_stmts(node.child)
+        vl += 'this.scopes.pop();'
+        return vl
 
     def _ty_seq(self, node) -> formatter.VList:
         vl = formatter.VList()
@@ -569,24 +543,20 @@ class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
 
     def _ty_star(self, node) -> formatter.VList:
         sublines = self._gen_stmts(node.child)
-        lines = (
-            [
-                'vs = [];',
-                'while (true) {',
-                '  pos = this.pos;',
-            ]
-            + [formatter.Indent(sublines)]
-            + [
-                '  if (this.failed || this.pos === pos) {',
-                '    this.rewind(pos);',
-                '    break;',
-                '  }',
-                '  vs.push(this.val);',
-                '}',
-                'this.succeed(vs);',
-            ]
+        vl = formatter.VList(
+            'vs = [];',
+            'while (true) {',
+            '  pos = this.pos;',
+            formatter.Indent(sublines),
+            '  if (this.failed || this.pos === pos) {',
+            '    this.rewind(pos);',
+            '    break;',
+            '  }',
+            '  vs.push(this.val);',
+            '}',
+            'this.succeed(vs);',
         )
-        return formatter.VList(lines)
+        return vl
 
     def _gen_main_footer(self) -> formatter.VList:
         return self._defmt("""
