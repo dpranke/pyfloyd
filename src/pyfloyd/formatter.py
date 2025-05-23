@@ -427,7 +427,7 @@ class Tree(_MultipleObj):
             r = _fmt_single_line(right, length, indent, fmt_fn)
             if r is None:
                 return r
-            s = r
+            s += r
         else:
             r = _fmt_single_line(left, length, indent, fmt_fn)
             if r is None:
@@ -620,15 +620,15 @@ def splitlines(s, skip_empty=False):
     if s == '':
         if skip_empty:
             return []
-        return ['']
+        return [''] # ['']
     if s == '\n':
-        return ['\n']
+        return [''] # ['\n']
     lines = []
     spl_lines = s.splitlines()
     for spl_line in spl_lines[:-1]:
         lines.append(spl_line)
-        lines.append('\n')
+        # lines.append('\n')
     lines.append(spl_lines[-1])
-    if s.endswith('\n'):
-        lines.append('\n')
+    #if s.endswith('\n'):
+    #    lines.append('\n')
     return lines

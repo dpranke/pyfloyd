@@ -174,8 +174,8 @@ class DatafileGenerator(generator.Generator):
         for i, expr in enumerate(exprs):
             obj = self._interpreter.eval(expr, new_env)
             objs.append(obj)
-        # return _chunk_objs(objs)
-        return formatter.VList(objs)
+        return _chunk_objs(objs)
+        # return formatter.VList(objs)
 
     def f_comma(self, args, env) -> Any:
         del env
@@ -237,14 +237,15 @@ def _chunk_objs(objs):
     n_objs = len(objs)
     i = 0
     tmp = []
+    use_hl = True
     while i < n_objs:
         obj = objs[i]
         tmp.append(obj)
         if obj == '\n':
-            _chunk(tmp, results)
+            results.extend(_chunk(tmp))
             tmp = []
         i += 1
-    _chunk(tmp, results)
+    results.extend(_chunk(tmp))
     if len(results) == 0:
         return ''
     if len(results) == 1:
@@ -252,32 +253,32 @@ def _chunk_objs(objs):
     return formatter.VList(results)
 
 
-def _chunk(tmp, results):
+def _chunk(tmp):
+    results = []
     if tmp == ['\n']:
-        results.append('')
-        return
+        return ['']
     if all(_empty(t) for t in tmp):
-        return
+        return []
     if (len(tmp) == 1 and isinstance(tmp[0], formatter.FormatObj)) or (
         len(tmp) == 2
         and isinstance(tmp[0], formatter.FormatObj)
         and tmp[1] == '\n'
     ):
-        results.append(tmp[0])
+        return [tmp[0]]
     elif (
         len(tmp) == 3
         and isinstance(tmp[0], str)
         and tmp[0].isspace()
         and isinstance(tmp[1], formatter.FormatObj)
     ):
-        results.append(formatter.Indent([tmp[1]]))
+        return [formatter.Indent([tmp[1]])]
     elif all(isinstance(t, (str, formatter.HList)) for t in tmp):
         if len(tmp) == 2 and tmp[-1] == '\n':
-            results.append(tmp[0])
+            return [tmp[0]]
         elif tmp[-1] == '\n':
-            results.append(formatter.HList(tmp[:-1]))
+            return [formatter.HList(tmp[:-1])]
         else:
-            results.append(formatter.HList(tmp))
+            return [formatter.HList(tmp)]
     else:
         assert False, f'unexpected chunk case: {repr(tmp)}'
         results.append(tmp)

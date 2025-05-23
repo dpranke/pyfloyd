@@ -205,6 +205,7 @@ parser_constructor: @'''
             [vl 'self._operators = {}'
                 [map_items operator_state grammar.operators]]
             [vl]]
+
     '''  # parse_constructor
 
 externs = [fn [] [vl 'self._externs = {'
@@ -317,7 +318,7 @@ parse_without_exception: @'''
 n_action: [fn [node]
               [hl [call_op 'succeed' [list [expr node.child]]] c_end]]
 
-n_apply: [fn [node] [hl [call_rule node.rule_name []] c_end]]
+n_apply: [fn [node] [hl [call_rule node.rule_name [list]] c_end]]
 
 n_choice: [fn [node] [vl 'p = self._pos'
                          [vl_l [map [fn [c] [vl [stmts c]
@@ -360,7 +361,7 @@ n_e_lit: [fn [node] [lit node.v]]
 
 n_e_minus: [fn [node] [tree [expr node.left] '-' [expr node.right]]]
 
-n_e_not: [fn [node] [tree null [invoke 'c_not'] [expr node.child]]]
+n_e_not: [fn [node] [tree null c_not [expr node.child]]]
 
 n_e_num: [fn [node] node.v]
 

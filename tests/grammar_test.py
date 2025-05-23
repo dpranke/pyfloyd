@@ -1148,13 +1148,13 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
 
 
 class _GeneratedParserWrapper:
-    def __init__(self, cmd, ext, source_code):
+    def __init__(self, cmd, ext, grammar, source_code):
         self.cmd = cmd
         self.ext = ext
+        self.grammar = grammar
         self.source_code = source_code
         self.host = pyfloyd.support.Host()
         self.tempdir = self.host.mkdtemp()
-        self.source_code = source_code
         self.source = os.path.join(self.tempdir, f'parser{self.ext}')
         self.host.write_text_file(self.source, self.source_code)
 
@@ -1201,7 +1201,7 @@ class GeneratorMixin:
             return None, err, endpos
 
         return (
-            _GeneratedParserWrapper(self.cmd, self.ext, source_code),
+            _GeneratedParserWrapper(self.cmd, self.ext, grammar, source_code),
             None,
             0,
         )
