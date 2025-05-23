@@ -243,8 +243,7 @@ class Interpreter:
     def __init__(self):
         self.env = Env()
         self.global_env = self.env
-        self.is_foreign = is_foreign
-        self.eval_foreign = self._default_eval_foreign
+        self.foreign_handlers = []
 
         self.env.set('true', True)
         self.env.set('false', False)
@@ -271,8 +270,8 @@ class Interpreter:
         )
         self.define_native_fn('strcat', self.f_strcat)
 
-    def _default_eval_foreign(self, expr: Any, env: Env) -> Any:
-        raise InterpreterError('eval_foreign called by mistake')
+    def add_foreign_handler(self, func: Any):
+        self.foreign_handlers.append(func)
 
     def define_native_fn(
         self,
@@ -291,25 +290,27 @@ class Interpreter:
         env = env or self.env
         if is_atom(expr) or is_dict(expr):
             return expr
-        if self.is_foreign(expr, env):
-            return self.eval_foreign(expr, env)
         if is_symbol(expr):
             sym = symbol(expr)
             check(env.bound(sym), f"Unbound symbol '{sym}'")
             return env.get(sym)
-
-        check(is_list(expr), f"Don't know how to evaluate `{expr}`")
-        first = expr[0]
-        rest = expr[1:]
-        fn = self.eval(first, env)
-        check(is_fn(fn), f"Don't know how to apply `{fn}`")
-        if fn.is_fexpr:
-            # Don't evaluate the args when calling an fexpr.
-            return fn.call(rest, env)
-        args = []
-        for r in rest:
-            args.append(self.eval(r, env))
-        return fn.call(args, env)
+        if is_list(expr):
+            first = expr[0]
+            rest = expr[1:]
+            fn = self.eval(first, env)
+            check(is_fn(fn), f"Don't know how to apply `{fn}`")
+            if fn.is_fexpr:
+                # Don't evaluate the args when calling an fexpr.
+                return fn.call(rest, env)
+            args = []
+            for r in rest:
+                args.append(self.eval(r, env))
+            return fn.call(args, env)
+        for handler in self.foreign_handlers:
+            handled, val = handler(expr, env)
+            if handled:
+                return val
+        raise InterpreterError("Don't know how to evaluate `{expr}`")
 
     def f_equal(self, args, env):
         del env

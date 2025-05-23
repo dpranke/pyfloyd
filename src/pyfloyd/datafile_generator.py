@@ -45,9 +45,8 @@ class DatafileGenerator(generator.Generator):
         self._derive_memoize()
         self._derive_local_vars()
 
-        self._interpreter = interp = lisp_interpreter.Interpreter(
-            foreign_handlers=[self._handle_node]
-        )
+        self._interpreter = interp = lisp_interpreter.Interpreter()
+        interp.add_foreign_handler(self._eval_foreign)
         interp.env.set('grammar', grammar)
         interp.env.set('generator_options', self.options)
         interp.define_native_fn('at_exp', self.f_at_exp, types=['str'])
@@ -62,8 +61,6 @@ class DatafileGenerator(generator.Generator):
         interp.define_native_fn('tree', self.f_tree)
         interp.define_native_fn('vl', self.f_vl)
         interp.define_native_fn('vl_l', self.f_vl_l)
-        interp.is_foreign = self.is_foreign
-        interp.eval_foreign = self.eval_foreign
 
         self._host = host
         if 'file' in options.generator_options:
@@ -130,16 +127,11 @@ class DatafileGenerator(generator.Generator):
         s = datafile.dedent(obj)
         return [['symbol', 'fn'], [], [['symbol', 'at_exp'], s]]
 
-    # TODO: this should really be a check for whether you can handle
-    # this data type, not whether it is foreign.
-    def is_foreign(self, expr: Any, env: lisp_interpreter.Env) -> bool:
+    def _eval_foreign(self, expr: Any, env: lisp_interpreter.Env) -> bool:
+        del env
         if isinstance(expr, m_grammar.Node):
-            return True
-        return lisp_interpreter.is_foreign(expr, env)
-
-    def eval_foreign(self, expr: Any, env: lisp_interpreter.Env) -> Any:
-        assert self.is_foreign(expr, env)
-        return expr
+            return True, expr
+        return False, None
 
     def generate(self) -> str:
         obj = self._interpreter.eval([['symbol', 'generate']])
