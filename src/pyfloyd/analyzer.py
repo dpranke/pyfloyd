@@ -306,9 +306,9 @@ class _Analyzer:
                 self.grammar.lookup_needed = True
                 self.grammar.outer_scope_rules.add(self.current_rule)
                 references.add(var_name)
-            elif var_name in labels or var_name[0] == '$':
-                references.add(var_name)
+            elif var_name in local_labels or var_name[0] == '$':
                 node.kind = 'local'
+                references.add(var_name)
             elif var_name in self.grammar.externs:
                 node.kind = 'extern'
             elif var_name in m_grammar.BUILTIN_FUNCTIONS:

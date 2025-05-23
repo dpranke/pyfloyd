@@ -195,7 +195,7 @@ class DatafileGenerator(generator.Generator):
 
     def f_saw(self, args, env) -> Any:
         del env
-        return formatter.Saw(*args)
+        return formatter.Saw(*args[0])
 
     def f_tree(self, args, env) -> Any:
         del env

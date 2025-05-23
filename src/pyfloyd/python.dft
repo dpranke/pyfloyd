@@ -369,20 +369,15 @@ n_e_paren: [fn [node] [expr node.child]]
 
 n_e_plus: [fn [node] [tree [expr node.left] '+' [expr node.right]]]
 
-n_e_qual: [fn [node] [if [equal [getattr [getitem node.ch 0] 't']
-                                'e_arr']
-                         [hl [invoke_node [getitem node.ch 0]]
-                             [invoke_node [getitem node.ch 1]]]
-                         [hl 'self._fn_'
-                             [getattr [getitem node.ch 0] 'v']
-                             [invoke_node [getitem node.ch 1]]]]]
+n_e_qual: [fn [node] [saw [map [fn [n] [invoke_node n]]
+                               node.ch]]]
 
 n_e_ident: [fn [node] [if [equal node.kind 'outer']
                           [call_op 'lookup' [list [strcat "'" node.v "'"]]]
                           [if [equal node.kind 'extern']
                               [extern node.v]
                               [if [equal node.kind 'function']
-                                  [fn_name node.v]
+                                  [strcat 'self._' [fn_name node.v]]
                                   [varname node.v]]]]]
 
 
@@ -874,5 +869,3 @@ call:      [fn [name args] [tri [strcat 'self._' name '('] [comma args] ')']]
 # Invoke specific kinds of methods on the parser object.
 call_op:   [fn [name args] [call [op_name name] args]]
 call_rule: [fn [name args] [call [rule_name name] args]]
-call_fn:   [fn [name args] [call [fn_name name] args]]
-

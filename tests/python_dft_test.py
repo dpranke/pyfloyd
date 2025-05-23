@@ -30,9 +30,6 @@ class Tests(
     language = 'datafile'
     ext = '.py'
 
-    def test_quals(self):
-        pass
-
     @skip('integration')
     def test_floyd(self):
         pass
