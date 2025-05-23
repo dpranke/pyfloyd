@@ -493,16 +493,16 @@ class VList(FormatObj):
         super().__init__([])
         objs = objs or []
         for obj in objs:
-            #if isinstance(obj, str):
+            # if isinstance(obj, str):
             #    self.objs.extend(splitlines(obj))
-            #else:
+            # else:
             #    self.objs.append(obj)
             self.objs.append(obj)
 
     def __iadd__(self, obj):
-        #if isinstance(obj, str):
+        # if isinstance(obj, str):
         #    self.objs.extend(splitlines(obj))
-        #else:
+        # else:
         #    self.objs.append(obj)
         self.objs.append(obj)
         return self
@@ -551,8 +551,10 @@ def _fmt_quote(obj: El, length: Union[int, None], indent: str) -> list[str]:
     if obj is None:
         return []
     if isinstance(obj, str):
-        return [datafile.encode_string(line, escape_newlines=True)
-                for line in splitlines(obj)]
+        return [
+            datafile.encode_string(line, escape_newlines=True)
+            for line in splitlines(obj)
+        ]
     return obj.fmt(length, indent, _fmt_quote)
 
 

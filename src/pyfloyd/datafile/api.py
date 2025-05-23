@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pylint: disable=too-many-lines
+
 import argparse
 import collections
 import math
@@ -78,6 +80,7 @@ def load(
     allow_trailing: bool = False,
     allow_numwords: bool = False,
     start: Optional[int] = None,
+    custom_tags: Optional[dict[str, Any]] = None,
 ) -> Any:
     """Deserialize ``fp`` (a ``.read()``-supporting file-like object
     containing a Floyd datafile) to a Python object.
@@ -130,6 +133,7 @@ def load(
         allow_trailing=allow_trailing,
         allow_numwords=allow_numwords,
         start=start,
+        custom_tags=custom_tags,
     )
     if err:
         raise ValueError(err)
@@ -151,6 +155,7 @@ def loads(
     allow_trailing: bool = False,
     allow_numwords: bool = False,
     start: Optional[int] = None,
+    custom_tags: Optional[dict[str, Any]] = None,
 ):
     """Deserialize ``s`` (a string containing a Floyd datafile) to a Python
     object.
@@ -189,6 +194,7 @@ def loads(
         allow_trailing=allow_trailing,
         allow_numwords=allow_numwords,
         start=start,
+        custom_tags=custom_tags,
     )
     if err:
         raise ValueError(err)
@@ -210,6 +216,7 @@ def parse(
     parse_numword: Optional[Callable[[str], Any]] = None,
     parse_bareword: Optional[Callable[[str, bool], Any]] = None,
     start: Optional[int] = None,
+    custom_tags: Optional[dict[str, Any]] = None,
 ):
     """Parse ```s``, returning positional information along with a value.
 
@@ -274,6 +281,7 @@ def parse(
         parse_numword=parse_numword,
         parse_bareword=parse_bareword,
         start=start,
+        custom_tags=custom_tags,
     )
 
 
@@ -286,6 +294,7 @@ class Decoder:
         self._parse_bareword = None
         self._parse_object = None
         self._parse_object_pairs = None
+        self._custom_tags = None
 
     def parse(
         self,
@@ -302,6 +311,7 @@ class Decoder:
         allow_trailing=False,
         allow_numwords=False,
         start=0,
+        custom_tags: Optional[dict[str, Any]] = None,
     ) -> Tuple[Any, Optional[str], Optional[int]]:
         self._allow_trailing = allow_trailing
         self._allow_numwords = allow_numwords
@@ -310,6 +320,7 @@ class Decoder:
         self._parse_number = parse_number or self.parse_number
         self._parse_numword = parse_numword or self.parse_numword
         self._parse_bareword = parse_bareword or self.parse_bareword
+        self._custom_tags = custom_tags or {}
 
         if isinstance(s, bytes):
             encoding = encoding or 'utf-8'
@@ -415,23 +426,37 @@ class Decoder:
         if ty == 'bareword':
             return self._parse_bareword(v, as_key=False)
         if ty == 'string':
+            if tag in self._custom_tags:
+                return self._custom_tags[tag](ty, tag, v, as_key=False)
             return self.parse_string(tag, v, as_key=False)
         if ty == 'string_list':
             r = [self._walk_ast(el) for el in v]
+            if tag in self._custom_tags:
+                return self._custom_tags[tag](ty, tag, v)
             return self.parse_string_list(tag, r)
         if ty == 'object':
             pairs = []
             for key_ast, obj in v:
                 ty, key_tag, s = key_ast
                 if ty == 'string':
-                    key = self.parse_string(key_tag, s, as_key=True)
+                    if key_tag in self._custom_tags:
+                        key = self._custom_tags[key_tag](
+                            ty, key_tag, s, as_key=True
+                        )
+                    else:
+                        key = self.parse_string(key_tag, s, as_key=True)
                 else:
                     assert ty == 'bareword'
                     key = self._parse_bareword(s, as_key=True)
                 v = self._walk_ast(obj)
                 pairs.append((key, v))
+            if tag in self._custom_tags:
+                return self._custom_tags[tag](ty, tag, pairs)
             return self.parse_object_pairs(tag, pairs)
         if ty == 'array':
+            vals = [self._walk_ast(el) for el in v]
+            if tag in self._custom_tags:
+                self._custom_tags[tag](ty, tag, vals)
             return self.parse_array(tag, [self._walk_ast(el) for el in v])
         raise ValueError('unknown el: ' + el)  # pragma: no cover
 
@@ -878,14 +903,18 @@ class Encoder:
         return indent_str, end_str
 
 
-def encode_string(obj: str, ensure_ascii: bool = True, escape_newlines=False) -> str:
+def encode_string(
+    obj: str, ensure_ascii: bool = True, escape_newlines=False
+) -> str:
     m = _bare_word_re.match(obj)
     if m:
         return obj
     return encode_quoted_string(obj, ensure_ascii, escape_newlines)
 
 
-def encode_quoted_string(s: str, ensure_ascii=True, escape_newlines=False) -> str:
+def encode_quoted_string(
+    s: str, ensure_ascii=True, escape_newlines=False
+) -> str:
     """Returns a quoted string with a minimal number of escaped quotes."""
     quote_map: dict[str, int] = {}
     for token in quote_tokens:

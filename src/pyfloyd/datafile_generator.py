@@ -112,14 +112,21 @@ class DatafileGenerator(generator.Generator):
 
     def _process_template_file(self, fname):
         df_str = self._host.read_text_file(fname)
-        templates = datafile.loads(df_str, parse_bareword=self._parse_bareword)
-        interp = self._interpreter
+        templates = datafile.loads(
+            df_str,
+            parse_bareword=self._parse_bareword,
+            custom_tags={'@': self._to_at_exp},
+        )
         for t, v in templates.items():
-            if isinstance(v, str):
-                obj = [['symbol', 'fn'], [], [['symbol', 'at_exp'], v]]
-            else:
-                obj = v
-            self._interpreter.define(t, obj)
+            self._interpreter.define(t, v)
+
+    def _to_at_exp(self, ty, tag, obj, as_key=False):
+        assert ty == 'string' and tag == '@' and not as_key, (
+                f'Uexpected tag fn invocation: '
+                f'ty={ty} tag={tag} obj={repr(obj)}, as_key={as_key}'
+            )
+        s = datafile.dedent(obj)
+        return [['symbol', 'fn'], [], [['symbol', 'at_exp'], s]]
 
     # TODO: this should really be a check for whether you can handle
     # this data type, not whether it is foreign.
@@ -140,13 +147,10 @@ class DatafileGenerator(generator.Generator):
         else:
             fmt_fn = formatter.flatten
 
-        lines = fmt_fn(
-            obj, self.options.line_length, self.options.indent
-        )
-        return  (
+        lines = fmt_fn(obj, self.options.line_length, self.options.indent)
+        return (
             # '\n'.join('' if line.isspace() else line for line in lines)
-            '\n'.join(lines)
-            + '\n'
+            '\n'.join(lines) + '\n'
         )
 
     def f_at_exp(self, args, env) -> Any:
@@ -254,17 +258,17 @@ def _chunk(tmp, results):
         return
     if all(_empty(t) for t in tmp):
         return
-    if (
-        (len(tmp) == 1 and isinstance(tmp[0], formatter.FormatObj)) or
-        (len(tmp) == 2 and isinstance(tmp[0], formatter.FormatObj) and
-         tmp[1] == '\n')
+    if (len(tmp) == 1 and isinstance(tmp[0], formatter.FormatObj)) or (
+        len(tmp) == 2
+        and isinstance(tmp[0], formatter.FormatObj)
+        and tmp[1] == '\n'
     ):
         results.append(tmp[0])
     elif (
-        len(tmp) == 3 and
-        isinstance(tmp[0], str) and
-        tmp[0].isspace() and
-        isinstance(tmp[1], formatter.FormatObj)
+        len(tmp) == 3
+        and isinstance(tmp[0], str)
+        and tmp[0].isspace()
+        and isinstance(tmp[1], formatter.FormatObj)
     ):
         results.append(formatter.Indent([tmp[1]]))
     elif all(isinstance(t, (str, formatter.HList)) for t in tmp):
