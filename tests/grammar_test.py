@@ -262,7 +262,9 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
             'grammar = -> foo()',
             text='',
             grammar_err=(
-                'Errors were found:\n  Unknown function "foo" called\n'
+                'Errors were found:\n'
+                '  Unknown function "foo" called\n'
+                '  Unknown identifier "foo" referenced\n'
             ),
         )
 
@@ -271,7 +273,7 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
             'grammar = -> v',
             text='',
             grammar_err=(
-                'Errors were found:\n  Unknown variable "v" referenced\n'
+                'Errors were found:\n  Unknown identifier "v" referenced\n'
             ),
         )
 
@@ -607,7 +609,7 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
             grammar_err=(
                 'Errors were found:\n'
                 '  Variable "x" never used\n'
-                '  Unknown variable "x" referenced\n'
+                '  Unknown identifier "x" referenced\n'
             ),
         )
 
@@ -626,7 +628,7 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
             grammar_err=(
                 'Errors were found:\n'
                 '  Variable "f" never used\n'
-                '  Unknown variable "f" referenced\n'
+                '  Unknown identifier "f" referenced\n'
             ),
         )
 

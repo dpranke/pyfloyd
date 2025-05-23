@@ -234,7 +234,7 @@ class _Analyzer:
                 node.ch[i - 1] = m_grammar.Label(name, c)
 
     def _check_positional_var_refs(self, node, current_index, labels_needed):
-        if node.t == 'e_var':
+        if node.t == 'e_ident':
             if node.v[0] == '$':
                 num = int(node.v[1:])
                 if num >= current_index:
@@ -247,13 +247,7 @@ class _Analyzer:
                     # referenced, so just keep track of the known ones.
                     labels_needed.add(node.v)
 
-        if node.t == 'e_qual' and node.ch[1].t == 'e_call':
-            assert node.ch[0].t == 'e_var'
-            # Skip over the first child as it is a function name.
-            start = 1
-        else:
-            start = 0
-        for n in node.ch[start:]:
+        for n in node.ch:
             self._check_positional_var_refs(n, current_index, labels_needed)
 
     def check_for_unknown_functions(self, node):
@@ -300,31 +294,32 @@ class _Analyzer:
                 del labels[v]
             return
 
-        if node.t == 'e_var':
+        if node.t == 'e_ident':
             var_name = node.v
-            if var_name not in local_labels:
-                if var_name in labels:
-                    node.outer_scope = True
-                    labels[var_name].outer_scope = True
-                    self.grammar.needed_operators.append('lookup')
-                    self.grammar.lookup_needed = True
-                    self.grammar.outer_scope_rules.add(self.current_rule)
-            else:
-                if var_name in labels and labels[var_name].outer_scope:
-                    node.outer_scope = True
-            if var_name in labels:
+            if (var_name not in local_labels and var_name in labels) or (
+                var_name in labels and labels[var_name].outer_scope
+            ):
+                node.outer_scope = True
+                node.kind = 'outer'
+                labels[var_name].outer_scope = True
+                self.grammar.needed_operators.append('lookup')
+                self.grammar.lookup_needed = True
+                self.grammar.outer_scope_rules.add(self.current_rule)
                 references.add(var_name)
+            elif var_name in labels or var_name[0] == '$':
+                references.add(var_name)
+                node.kind = 'local'
             elif var_name in self.grammar.externs:
-                pass
-            elif not var_name[0] == '$':
-                self.errors.append(f'Unknown variable "{var_name}" referenced')
+                node.kind = 'extern'
+            elif var_name in m_grammar.BUILTIN_FUNCTIONS:
+                node.kind = 'function'
+                self.grammar.needed_builtin_functions.append(var_name)
+            else:
+                self.errors.append(
+                    f'Unknown identifier "{var_name}" referenced'
+                )
 
-        if node.t == 'e_qual' and node.ch[1].t == 'e_call':
-            # Skip over names that are functions.
-            start = 1
-        else:
-            start = 0
-        for c in node.ch[start:]:
+        for c in node.ch:
             self._check_named_vars(c, labels, local_labels, references)
 
 
@@ -715,8 +710,6 @@ class _SubRuleRewriter:
         return node
 
     def _ty_e_qual(self, node):
-        if node.ch[0].t == 'e_var' and node.ch[1].t == 'e_call':
-            self._grammar.needed_builtin_functions.append(node.ch[0].v)
         return self._walkn(node)
 
     def _ty_not_one(self, node):

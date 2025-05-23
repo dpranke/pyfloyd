@@ -1634,7 +1634,7 @@ class _Parser:
         v__1 = self._val
         if self._failed:
             return
-        self._succeed(['e_var', v__1, []])
+        self._succeed(['e_ident', v__1, []])
 
     def _s_e_prim_5(self):
         self._memoize('r__filler', self._r__filler)

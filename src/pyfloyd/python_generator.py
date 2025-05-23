@@ -431,8 +431,7 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
 
     def _gen_invoke(self, fn, *args) -> formatter.Saw:
         return formatter.Saw(
-            'self._' + fn,
-            formatter.Triangle('(', formatter.Comma(*args), ')')
+            'self._' + fn, formatter.Triangle('(', formatter.Comma(*args), ')')
         )
 
     #

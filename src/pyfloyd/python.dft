@@ -377,11 +377,13 @@ n_e_qual: [fn [node] [if [equal [getattr [getitem node.ch 0] 't']
                              [getattr [getitem node.ch 0] 'v']
                              [invoke_node [getitem node.ch 1]]]]]
 
-n_e_var: [fn [node] [if node.outer_scope
-                        [call_op 'lookup' [list [strcat "'" node.v "'"]]]
-                        [if [in node.v grammar.externs]
-                            [extern node.v]
-                            [varname node.v]]]]
+n_e_ident: [fn [node] [if [equal node.kind 'outer']
+                          [call_op 'lookup' [list [strcat "'" node.v "'"]]]
+                          [if [equal node.kind 'extern']
+                              [extern node.v]
+                              [if [equal node.kind 'function']
+                                  [fn_name node.v]
+                                  [varname node.v]]]]]
 
 
 n_empty: [fn [node] [hl [call_op 'succeed' [list c_null]] c_end]]

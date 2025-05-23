@@ -121,7 +121,7 @@ class Printer:
         v = self._proc(ops[0])
         return v + ''.join(self._proc(op) for op in ops[1:])
 
-    def _ty_e_var(self, node):
+    def _ty_e_ident(self, node):
         return node[1]
 
     def _ty_empty(self, node):

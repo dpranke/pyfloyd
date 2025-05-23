@@ -244,7 +244,7 @@ class _Parser:
         if not self._failed:
             return
         self._rewind(p)
-        self._succeed(['symbol', 'quote'])
+        self._succeed(['symbol', 'lisp'])
 
     def _r_id(self):
         self._s_id_1()

@@ -27,12 +27,7 @@
 # See https://docs.racket-lang.org/scribble/reader.html for more.
 #
 # Only the subset of the at-exp syntax that is needed by the Floyd templates
-# is currently implemented. There is one significant difference between
-# the Scribble implementation and the Floyd implementation, which is that
-# in Scribble, if the id part is omitted, it defaults to 'list'. In
-# Floyd, it defaults to defining a lambda where the [] part lists the
-# parameters to the lambda and the {} is the body of the lambda. This
-# difference, however, is implemented outside of the parser.
+# is currently implemented.
 
 %externs = allow_trailing                  -> false
 
@@ -54,7 +49,7 @@ at_expr = opt_id list braces               -> concat(cons($1, $2), [$3])
         | string                           -> $1
 
 opt_id  = id
-        |                                  -> ['symbol', 'fn']
+        |                                  -> ['symbol', 'lisp']
 
 id      = /[a-zA-Z_][\.a-zA-Z0-9_]*/       -> ['symbol', $1]
 

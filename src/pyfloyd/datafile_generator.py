@@ -203,10 +203,10 @@ class DatafileGenerator(generator.Generator):
 
     def f_tri(self, args, env) -> Any:
         del env
-        left, op, right = args
         return formatter.Triangle(*args)
 
     def f_vl(self, args, env) -> Any:
+        del env
         vl = formatter.VList()
         vl += args
         return vl

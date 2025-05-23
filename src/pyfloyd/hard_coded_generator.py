@@ -152,7 +152,7 @@ class HardCodedGenerator(generator.Generator):
         return formatter.HList(
             formatter.Saw(
                 self._gen_rulename('succeed'),
-                formatter.Triangle('(', self._gen_expr(node.child), ')')
+                formatter.Triangle('(', self._gen_expr(node.child), ')'),
             ),
             self._map['end'],
         )
@@ -172,7 +172,9 @@ class HardCodedGenerator(generator.Generator):
             self._gen_invoke(node.rule_name), self._map['end']
         )
 
-    def _ty_e_arr(self, node: m_grammar.Node) -> Union[str, formatter.Triangle]:
+    def _ty_e_arr(
+        self, node: m_grammar.Node
+    ) -> Union[str, formatter.Triangle]:
         if len(node.ch) == 0:
             return '[]'
         args = [self._gen_expr(c) for c in node.ch]
@@ -225,14 +227,15 @@ class HardCodedGenerator(generator.Generator):
         objs = [self._gen_expr(c) for c in node.ch]
         return formatter.Saw(*objs)
 
-    def _ty_e_var(self, node: m_grammar.Node) -> formatter.El:
-        assert isinstance(node, m_grammar.Var)
-        if node.outer_scope:
+    def _ty_e_ident(self, node: m_grammar.Node) -> formatter.El:
+        assert isinstance(node, m_grammar.EIdent)
+        if node.kind == 'outer':
             return self._gen_invoke('lookup', "'" + node.v + "'")
-        if node.v in self.grammar.externs:
+        if node.kind == 'extern':
             return self._gen_extern(node.v)
-        if node.v in self.grammar.needed_builtin_functions:
+        if node.kind == 'function':
             return self._gen_funcname(node.v)
+        assert node.kind == 'local', f'Unexpected identifer kind {node!r}'
         return self._gen_varname(node.v)
 
     def _ty_empty(self, node) -> formatter.ListObj:

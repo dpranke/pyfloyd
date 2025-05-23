@@ -102,8 +102,8 @@ class Node:
             return ELit(val[1])
         if ty == 'e_num':
             return ENum(val[1])
-        if ty == 'e_var':
-            return Var(val[1])
+        if ty in ('e_var', 'e_ident'):
+            return EIdent(val[1])
         if ty == 'e_not':
             return ENot(Node.to(val[2][0]))
         if ty == 'e_minus':
@@ -325,6 +325,19 @@ class EGetitem(Node):
         super().__init__('e_getitem', None, [child])
 
 
+class EIdent(Node):
+    derived_attrs = ['outer_scope', 'kind']
+
+    def __init__(self, name):
+        super().__init__('e_ident', name, [])
+        self.outer_scope = False
+        self.kind = ''  # one of 'extern', 'function', local', 'outer'
+
+    @property
+    def name(self):
+        return self.v
+
+
 class ELit(Node):
     def __init__(self, v):
         super().__init__('e_lit', v, [])
@@ -507,23 +520,6 @@ class Star(Node):
 class Unicat(Node):
     def __init__(self, v):
         super().__init__('unicat', v, [])
-
-
-class Val(Node):
-    def __init__(self, t, val):
-        super().__init__(t, val, [])
-
-
-class Var(Node):
-    derived_attrs = ['outer_scope']
-
-    def __init__(self, name):
-        super().__init__('e_var', name, [])
-        self.outer_scope = False
-
-    @property
-    def name(self):
-        return self.v
 
 
 class Grammar:

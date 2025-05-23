@@ -296,32 +296,37 @@ class Interpreter:
                 assert op == 'e_call'
                 # Note that unknown functions were caught during analysis
                 # so it's safe to dereference this without checking.
-                fn = getattr(self, '_fn_' + lhs, None)
-                self._val = fn(*rhs)
+                self._val = lhs(*rhs)
 
-    def _ty_e_var(self, node):
-        v = getattr(self, '_fn_' + node.v, None)
-        if v:
-            self._succeed(node.v)
-            return
-
+    def _ty_e_ident(self, node):
         # Unknown variables should have been caught in analysis.
         v = node.v
         if v[0] == '$':
             # Look up positional labels in the current scope.
             self._succeed(self._scopes[-1][v])
-        else:
-            # Look up named labels in any scope.
-            i = len(self._scopes) - 1
-            while i >= 0:
-                if v in self._scopes[i]:
-                    self._succeed(self._scopes[i][v])
-                    return
-                i -= 1
-            if v in self._externs:
-                self._succeed(self._externs[v])
+            return
+
+        if node.kind == 'extern':
+            self._succeed(self._externs[v])
+            return
+        if node.kind == 'function':
+            v = getattr(self, '_fn_' + node.v, None)
+            if v:
+                self._succeed(v)
                 return
-            assert False, f'Unknown label "{v}"'
+        if node.kind == 'local':
+            self._succeed(self._scopes[-1][v])
+            return
+
+        # Look up named labels in any scope.
+        assert node.kind == 'outer'
+        i = len(self._scopes) - 1
+        while i >= 0:
+            if v in self._scopes[i]:
+                self._succeed(self._scopes[i][v])
+                return
+            i -= 1
+        assert False, f'Unknown label "{v}"'
 
     def _ty_empty(self, node):
         del node

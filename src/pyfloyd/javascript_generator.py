@@ -341,7 +341,7 @@ class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
     def _gen_invoke(self, fn: str, *args) -> formatter.Saw:
         return formatter.Saw(
             self._gen_rulename(fn),
-            formatter.Triangle('(', formatter.Comma(*args), ')')
+            formatter.Triangle('(', formatter.Comma(*args), ')'),
         )
 
     #
