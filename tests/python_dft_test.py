@@ -17,8 +17,6 @@ import unittest
 
 from . import grammar_test
 
-skip = grammar_test.skip
-
 
 class Tests(
     unittest.TestCase,
@@ -29,31 +27,3 @@ class Tests(
     cmd = [sys.executable]
     language = 'datafile'
     ext = '.py'
-
-    @skip('integration')
-    def test_floyd(self):
-        pass
-
-    @skip('integration')
-    def test_floyd_ws(self):
-        pass
-
-    @skip('integration')
-    def test_json(self):
-        pass
-
-    @skip('integration')
-    def test_json5(self):
-        pass
-
-    @skip('integration')
-    def test_json5_special_floats(self):
-        pass
-
-    @skip('integration')
-    def test_json5_sample(self):
-        pass
-
-    @skip('integration')
-    def test_json5_ws(self):
-        pass
