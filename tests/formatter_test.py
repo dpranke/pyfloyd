@@ -89,6 +89,12 @@ class Tests(unittest.TestCase):
         self.assertEqual(lis, expected_obj)
 
     def test_hlist(self):
+        obj = HList()
+        self.assertEqual([''], flatten(obj))
+
+        obj = HList('1')
+        self.assertEqual(['1'], flatten(obj))
+
         obj = HList('1', '2')
         self.assertEqual(['12'], flatten(obj))
 

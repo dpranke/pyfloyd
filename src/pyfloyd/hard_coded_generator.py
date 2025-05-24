@@ -129,9 +129,9 @@ class HardCodedGenerator(generator.Generator):
             add_method('leftrec')
         if self.grammar.lookup_needed:
             add_method('lookup')
-        add_method('offsets')
         if self.options.memoize:
             add_method('memoize')
+        add_method('offsets')
         if self.grammar.operator_needed:
             add_method('operator')
         if self.grammar.range_needed:

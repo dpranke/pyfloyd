@@ -76,6 +76,10 @@ class DatafileGenerator(generator.Generator):
             grammar.needed_operators = sorted(
                 grammar.needed_operators + ['str']
             )
+        if self.options.memoize:
+            grammar.needed_operators = sorted(
+                grammar.needed_operators + ['memoize']
+            )
 
     def _derive_memoize(self):
         def _walk(node):

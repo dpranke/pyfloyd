@@ -1976,6 +1976,15 @@ class _Parser:
         self._failed = True
         self._errpos = max(self._errpos, self._pos)
 
+    def _memoize(self, rule_name, fn):
+        p = self._pos
+        r = self._cache.setdefault(p, {}).get(rule_name)
+        if r:
+            self._val, self._failed, self._pos = r
+            return
+        fn()
+        self._cache[p][rule_name] = (self._val, self._failed, self._pos)
+
     def _offsets(self, pos):
         lineno = 1
         colno = 1
@@ -1986,15 +1995,6 @@ class _Parser:
             else:
                 colno += 1
         return lineno, colno
-
-    def _memoize(self, rule_name, fn):
-        p = self._pos
-        r = self._cache.setdefault(p, {}).get(rule_name)
-        if r:
-            self._val, self._failed, self._pos = r
-            return
-        fn()
-        self._cache[p][rule_name] = (self._val, self._failed, self._pos)
 
     def _rewind(self, newpos):
         self._succeed(None, newpos)

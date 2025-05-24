@@ -156,20 +156,22 @@ class HList(FormatObj):
         self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
     ) -> list[str]:
         lines: list[str] = []
-        if len(self.objs) != 0:
-            lines.extend(fmt_fn(self.objs[0], length, indent))
-            for obj in self.objs[1:]:
-                if obj is None:
-                    continue
-                if isinstance(obj, str):
-                    lines[-1] += obj
-                else:
-                    new_l = None if length is None else length - len(lines[-1])
-                    sublines = obj.fmt(new_l, indent, fmt_fn)
-                    if sublines:
-                        lines[-1] += sublines[0]
-                        if len(sublines) > 1:
-                            lines.extend(sublines[1:])
+        if len(self.objs) == 0:
+            return ['']
+
+        lines.extend(fmt_fn(self.objs[0], length, indent))
+        for obj in self.objs[1:]:
+            if obj is None:
+                continue
+            if isinstance(obj, str):
+                lines[-1] += obj
+            else:
+                new_l = None if length is None else length - len(lines[-1])
+                sublines = obj.fmt(new_l, indent, fmt_fn)
+                if sublines:
+                    lines[-1] += sublines[0]
+                    if len(sublines) > 1:
+                        lines.extend(sublines[1:])
         return lines
 
 

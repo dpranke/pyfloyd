@@ -147,7 +147,7 @@ operator_state_class: d'
 
 parse_function: d'''
     def parse(
-        text: str, path: str = '<string>', externs: Externs = None
+        text: str, path: str = '<string>', externs: Externs = None, start: int = 0
     ) -> Result:
         """Parse a given text and return the result.
 
@@ -163,7 +163,7 @@ parse_function: d'''
         messages to indicate the path to the filename containing the given
         text.
         """
-        return _Parser(text, path).parse(externs)
+        return _Parser(text, path).parse(externs, start)
     '''  # parse_function
 
 parser_class: @'
@@ -210,9 +210,11 @@ parser_constructor: @'''
 
 externs = [fn [] [vl 'self._externs = {'
                      [ind_l [map_items [fn [k v]
-                                           [strcat "    '"
-                                            k "': " 
-                                            [to_string v] ","]]
+                                           [strcat "'"
+                                                   k
+                                                   "': "
+                                                   [to_string v]
+                                                   ","]]
                                        grammar.externs]]
                      '}']]
 
@@ -251,13 +253,6 @@ operator_choices: [fn [o]
                                  o.choices]]
 
 parser_methods: [fn [] [vl [parse_method]
-                           [vl_l [map [fn [name]
-                                          [vl ''
-                                              [invoke [op_name name]]]]
-                                      grammar.needed_operators]]
-                           [if generator_options.memoize
-                               [vl '' o_operator]
-                               null]
                            [vl_l [map_items [fn [rule node]
                                                 [vl ''
                                                     [rule_method rule node]]]
@@ -266,6 +261,10 @@ parser_methods: [fn [] [vl [parse_method]
                                           [vl '\n'
                                               [invoke [strcat 'r_' name]]]]
                                       grammar.needed_builtin_rules]]
+                           [vl_l [map [fn [name]
+                                          [vl ''
+                                              [invoke [op_name name]]]]
+                                      grammar.needed_operators]]
                            [vl_l [map [fn [name]
                                           [vl '\n'
                                               [invoke [fn_name name]]]]
@@ -276,14 +275,15 @@ parse_method: [fn [] [if grammar.exception_needed
                          [parse_without_exception]]]
 
 parse_with_exception: @'''
-    def parse(self, externs: Externs = None):
+    def parse(self, externs: Externs = None, start: int = 0):
+        self._pos = start
         errors = ''
         if externs:
             for k, v in externs.items():
                 if k in self._externs:
                     self._externs[k] = v
                 else:
-                    errors += f'Unexpected extern "{k}"\\n'
+                    errors += f'Unexpected extern "{k}"\n'
         if errors:
             return Result(None, errors, 0)
         try:
@@ -302,7 +302,8 @@ parse_with_exception: @'''
     '''
 
 parse_without_exception: @'''
-    def parse(self, externs: Externs = None):
+    def parse(self, externs: Externs = None, start: int = 0):
+        self._pos = start
         if externs:
             for k, v in externs.items():
                 self._externs[k] = v
@@ -321,7 +322,13 @@ parse_without_exception: @'''
 n_action: [fn [node]
               [hl [call_op 'succeed' [list [expr node.child]]] c_end]]
 
-n_apply: [fn [node] [hl [call_rule node.rule_name [list]] c_end]]
+n_apply: [fn [node]
+             [if node.memoize
+                 [hl [call_op 'memoize' [list [lit node.rule_name]
+                                              [strcat 'self._'
+                                                      node.rule_name]]]
+                     c_end]
+                 [hl [call_rule node.rule_name [list]] c_end]]]
 
 n_choice: [fn [node] [vl 'p = self._pos'
                          [vl_l [map [fn [c] [vl [stmts c]
@@ -333,10 +340,11 @@ n_choice: [fn [node] [vl 'p = self._pos'
 
 n_count: [fn [node] [vl 'vs = []'
                         'i = 0'
-                        [strcat 'cmin, cmax = ' 
+                        [strcat 'cmin, cmax = ['
                                 [to_string [getitem node.v 0]]
                                 ', '
-                                [to_string [getitem node.v 1]]]
+                                [to_string [getitem node.v 1]]
+                                ']']
                         'while i < cmax:'
                         [ind [stmts node.child]
                              'if self._failed:'
@@ -418,7 +426,10 @@ n_leftrec: [fn [node] [hl [call_op 'leftrec'
                                          [if node.left_assoc c_true c_false]]]
                            c_end]]
 
-n_lit: [fn [node] [hl [call_op 'str' [list [lit node.v]]] c_end]]
+n_lit: [fn [node] [hl [if [equal [strlen node.v] 1]
+                          [call_op 'ch' [list [lit node.v]]]
+                          [call_op 'str' [list [lit node.v]]]]
+                      c_end]]
 
 n_not: [fn [node] [vl 'p = self._pos'
                       'errpos = self._errpos'
@@ -501,7 +512,7 @@ n_scope: [fn [node] [vl 'self._scopes.append({})'
                         ]]
 
 n_set: [fn [node]
-           [vl [hl 'p =' [lit [strcat '[' node.v ']']]]
+           [vl [hl 'p = ' [lit [strcat '[' node.v ']']]]
                'if p not in self._regexps:'
                '    self._regexps[p] = re.compile(p)'
                'm = self._regexps[p].match(self._text, self._pos)'
@@ -570,12 +581,8 @@ o_error: d'''
             thing = 'end of input'
         else:
             thing = repr(self._text[self._errpos]).replace("'", '"')
-        return '%s:%d Unexpected %s at column %d' % (
-            self._path,
-            lineno,
-            thing,
-            colno,
-        )
+        path = self._path
+        return f'{path}:{lineno} Unexpected {thing} at column {colno}'
     '''
 
 o_fail: d'''

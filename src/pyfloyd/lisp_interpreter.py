@@ -270,6 +270,7 @@ class Interpreter:
         )
         self.define_native_fn('sort', self.f_sort, types=['list'])
         self.define_native_fn('strcat', self.f_strcat)
+        self.define_native_fn('strlen', self.f_strlen, types=['str'])
 
     def add_foreign_handler(self, func: Any):
         self.foreign_handlers.append(func)
@@ -410,6 +411,10 @@ class Interpreter:
     def f_strcat(self, args, env):
         del env
         return ''.join(args)
+
+    def f_strlen(self, args, env):
+        del env
+        return len(args[0])
 
     def f_to_string(self, args, env):
         del env
