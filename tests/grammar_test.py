@@ -317,6 +317,16 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
         self.check('grammar = "\\n\\"foo" -> true', text='\n"foo', out=True)
         self.check("grammar = '\\'foo' -> true", text="'foo", out=True)
 
+    def test_externs(self):
+        g = """
+        %externs = foo -> true
+                 | bar -> false
+
+        g = ?{foo} -> 'foo is true'
+          | ?{bar} -> 'bar is true'
+        """
+        self.check(g, text='', out='foo is true')
+
     @skip('integration')
     def test_floyd(self):
         contents = self.read_grammar('floyd.g')

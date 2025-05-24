@@ -209,7 +209,10 @@ parser_constructor: @'''
     '''  # parse_constructor
 
 externs = [fn [] [vl 'self._externs = {'
-                     [ind_l [map_items [fn [k v] [at_exp "    '@k': @v,"]]
+                     [ind_l [map_items [fn [k v]
+                                           [strcat "    '"
+                                            k "': " 
+                                            [to_string v] ","]]
                                        grammar.externs]]
                      '}']]
 
@@ -860,7 +863,7 @@ fn_name:   [fn [name] [strcat 'fn_' name]]
 rule_name: [fn [name] name]
 
 # Reference different kinds of variable names.
-extern:    [fn [name] [strcat 'self._externs[' name ']']]
+extern:    [fn [name] [strcat 'self._externs[' [lit name] ']']]
 varname:   [fn [name] [strcat 'v_' [replace name '$', '_']]]
 
 # Invoke a method on the parser object.
