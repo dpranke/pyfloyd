@@ -1,0 +1,158 @@
+# Copyright 2025 Dirk Pranke. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This file a set of base code generation templates appropriate for many
+# dynamically typed, block structured, garbage collected languages.
+
+templates = {
+
+# 'generate' is invoked to generate the file from the AST.
+generate: @"
+    @if[generator_options.main [main_header] [default_header]]
+    @if[grammar.exception_needed 
+        [vl '' '' parsing_runtime_exception_class]
+        [vl]]
+    @if[grammar.operators
+        [vl '' '' operator_state_class]
+        [vl]]
+
+
+    @result_class
+
+
+    @parse_function
+
+
+    @parser_class[]
+    @if[generator_options.main main_footer default_footer]
+    "
+
+parser_methods: [fn [] [vl [parse_method]
+                           [vl_l [map_items [fn [rule node]
+                                                [vl ''
+                                                    [rule_method rule node]]]
+                                            grammar.rules]]
+                           [vl_l [map [fn [name]
+                                          [vl '\n'
+                                              [invoke [strcat 'r_' name]]]]
+                                      grammar.needed_builtin_rules]]
+                           [vl_l [map [fn [name]
+                                          [vl ''
+                                              [invoke [op_name name]]]]
+                                      grammar.needed_operators]]
+                           [vl_l [map [fn [name]
+                                          [vl '\n'
+                                              [invoke [fn_name name]]]]
+                                      grammar.needed_builtin_functions]]]]
+
+parse_method: [fn [] [if grammar.exception_needed
+                         [parse_with_exception]
+                         [parse_without_exception]]]
+
+#
+# Rules for nodes in the AST that are basically the same across languages
+#
+
+n_action: [fn [node] [succeed [list [expr node.child]]]]
+
+n_apply: [fn [node]
+             [if node.memoize
+                 [hl [call_op 'memoize' [list [lit node.rule_name]
+                                              [method_name node.rule_name]]]
+                     c_end]
+                 [hl [call_rule node.rule_name [list]] c_end]]]
+
+n_e_arr: [fn [node] [if [is_empty node.ch]
+                        '[]'
+                        [tri '['
+                             [comma [map [fn [c] [expr c]] node.ch]]
+                             ']']]]
+
+n_e_call: [fn [node] [tri '(' [comma [map [fn [c] [expr c]] node.ch]] ')']]
+
+n_e_const: [fn [node] [invoke [strcat 'c_' node.v]]]
+
+n_e_getitem: [fn [node] [tri '[' [expr node.child] ']']]
+
+n_e_ident: [fn [node] [if [equal node.kind 'outer']
+                          [call_op 'lookup' [list [lit node.v]]]
+                          [if [equal node.kind 'extern']
+                              [extern node.v]
+                              [if [equal node.kind 'function']
+                                  [method_name [fn_name node.v]]
+                                  [varname node.v]]]]]
+
+n_e_lit: [fn [node] [lit node.v]]
+
+n_e_minus: [fn [node] [tree [expr node.left] '-' [expr node.right]]]
+
+n_e_not: [fn [node] [tree null c_not [expr node.child]]]
+
+n_e_num: [fn [node] node.v]
+
+n_e_paren: [fn [node] [expr node.child]]
+
+n_e_plus: [fn [node] [tree [expr node.left] '+' [expr node.right]]]
+
+n_e_qual: [fn [node] [saw [map [fn [n] [invoke_node n]] node.ch]]]
+
+n_empty: [fn [node] [succeed [list c_null]]]
+
+n_equals: [fn [node] [hl [call_op 'str' [list [expr node.child]] c_end]]]
+
+n_leftrec: [fn [node] [hl [call_op 'leftrec'
+                                   [list [method_name node.child.v]
+                                         [lit node.v]
+                                         [if node.left_assoc c_true c_false]]]
+                           c_end]]
+
+n_lit: [fn [node] [hl [if [equal [strlen node.v] 1]
+                          [call_op 'ch' [list [lit node.v]]]
+                          [call_op 'str' [list [lit node.v]]]]
+                      c_end]]
+
+n_operator: [fn [node] [hl [call_op 'operator' [list [lit node.v]] c_end]]]
+
+n_range: [fn [node] [hl [call_op 'range'
+                                 [list [lit node.start] [lit node.stop]]]
+                        c_end]]
+
+n_unicat: [fn [node] [hl [call_op 'unicat' [list [lit node.v]]] c_end]]
+
+#
+# Helper methods
+#
+
+# Generate code for a host expression node.
+expr:      [fn [node] [invoke [node_name node.t] node]]
+
+# Generate code for a statement node (i.e., type of rule).
+stmts:     [fn [node] [invoke [node_name node.t] node]]
+
+# Invokes a template that takes a single argument, an AST node.
+invoke_node: [fn [node] [invoke [node_name node.t] node]]
+
+# Returns the method name corresponding to different kinds of functions.
+node_name: [fn [name] [strcat 'n_' name]]
+op_name:   [fn [name] [strcat 'o_' name]]
+fn_name:   [fn [name] [strcat 'fn_' name]]
+rule_name: [fn [name] name]
+
+# Invoke specific kinds of methods on the parser object.
+call_op:   [fn [name args] [call [op_name name] args]]
+call_rule: [fn [name args] [call [rule_name name] args]]
+
+succeed: [fn [args] [hl [call [op_name 'succeed'] args] c_end]]
+
+}

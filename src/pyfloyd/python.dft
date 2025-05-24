@@ -1,27 +1,26 @@
+# Copyright 2025 Dirk Pranke. All rights reserved.
 #
-# Main / starting rule
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-
-# 'generate' is invoked to generate the file from the AST.
-generate: @"
-    @if[generator_options.main [main_header] [default_header]]
-    @if[grammar.exception_needed 
-        [vl '' '' parsing_runtime_exception_class]
-        [vl]]
-    @if[grammar.operators
-        [vl '' '' operator_state_class]
-        [vl]]
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
-    @result_class
+# This file contains the code generation templates for Python3.
+# It depends on a base set of templates used by fairly similar languages.
 
+starting_template: 'generate'
 
-    @parse_function
+inherit: ['base']
 
-
-    @parser_class[]
-    @if[generator_options.main main_footer default_footer]
-    "
+templates: {
 
 #
 # Basic block structure of the file
@@ -228,7 +227,7 @@ operator_state: [fn [rule o]
                         'o.choices = {'
                         [ind_l [operator_choices o]]
                         '}'
-                        [at_exp "self._operators['@rule'] = o"]]]
+                        [strcat "self._operators['" rule "'] = o"]]]
 
 operator_prec: [fn [o]
                    [ind_l [map [fn [prec]
@@ -242,37 +241,13 @@ operator_prec: [fn [o]
 
 operator_rassoc: [fn [o]
                      [hl 'o.rassoc = set(['
-                         [comma  [map [fn [op]
-                                          [strcat "'" op "'"]]
-                                 o.rassoc]]
+                         [comma  [map [fn [op] [strcat "'" op "'"]]
+                                      o.rassoc]]
                          '])']]
 
-operator_choices: [fn [o]
-                      [map_items [fn [op meth]
-                                     [at_exp "'@op': self._@meth,"]]
-                                 o.choices]]
-
-parser_methods: [fn [] [vl [parse_method]
-                           [vl_l [map_items [fn [rule node]
-                                                [vl ''
-                                                    [rule_method rule node]]]
-                                            grammar.rules]]
-                           [vl_l [map [fn [name]
-                                          [vl '\n'
-                                              [invoke [strcat 'r_' name]]]]
-                                      grammar.needed_builtin_rules]]
-                           [vl_l [map [fn [name]
-                                          [vl ''
-                                              [invoke [op_name name]]]]
-                                      grammar.needed_operators]]
-                           [vl_l [map [fn [name]
-                                          [vl '\n'
-                                              [invoke [fn_name name]]]]
-                                      grammar.needed_builtin_functions]]]]
-
-parse_method: [fn [] [if grammar.exception_needed
-                         [parse_with_exception]
-                         [parse_without_exception]]]
+operator_choices: [fn [o] [map_items [fn [op meth]
+                                         [strcat "'" op "': self._" meth ","]]
+                                     o.choices]]
 
 parse_with_exception: @'''
     def parse(self, externs: Externs = None, start: int = 0):
@@ -319,17 +294,6 @@ parse_without_exception: @'''
 # Rules for each node in the AST
 #
 
-n_action: [fn [node]
-              [hl [call_op 'succeed' [list [expr node.child]]] c_end]]
-
-n_apply: [fn [node]
-             [if node.memoize
-                 [hl [call_op 'memoize' [list [lit node.rule_name]
-                                              [strcat 'self._'
-                                                      node.rule_name]]]
-                     c_end]
-                 [hl [call_rule node.rule_name [list]] c_end]]]
-
 n_choice: [fn [node] [vl 'p = self._pos'
                          [vl_l [map [fn [c] [vl [stmts c]
                                                 'if not self._failed:'
@@ -356,46 +320,6 @@ n_count: [fn [node] [vl 'vs = []'
                              'i += 1']
                         'self._o_succeed(vs)']]
 
-n_e_arr: [fn [node] [if [is_empty node.ch]
-                        '[]'
-                        [tri '['
-                             [comma [map [fn [c] [expr c]] node.ch]]
-                             ']']]]
-
-n_e_call: [fn [node] [tri '(' [comma [map [fn [c] [expr c]] node.ch]] ')']]
-
-n_e_const: [fn [node] [invoke [strcat 'c_' node.v]]]
-
-n_e_getitem: [fn [node] [tri '[' [expr node.child] ']']]
-
-n_e_lit: [fn [node] [lit node.v]]
-
-n_e_minus: [fn [node] [tree [expr node.left] '-' [expr node.right]]]
-
-n_e_not: [fn [node] [tree null c_not [expr node.child]]]
-
-n_e_num: [fn [node] node.v]
-
-n_e_paren: [fn [node] [expr node.child]]
-
-n_e_plus: [fn [node] [tree [expr node.left] '+' [expr node.right]]]
-
-n_e_qual: [fn [node] [saw [map [fn [n] [invoke_node n]]
-                               node.ch]]]
-
-n_e_ident: [fn [node] [if [equal node.kind 'outer']
-                          [call_op 'lookup' [list [strcat "'" node.v "'"]]]
-                          [if [equal node.kind 'extern']
-                              [extern node.v]
-                              [if [equal node.kind 'function']
-                                  [strcat 'self._' [fn_name node.v]]
-                                  [varname node.v]]]]]
-
-
-n_empty: [fn [node] [hl [call_op 'succeed' [list c_null]] c_end]]
-
-n_equals: [fn [node] [hl [call_op 'str' [list [expr node.child]] c_end]]]
-
 n_label: [fn [node] [vl [stmts node.child]
                         [if node.child.can_fail
                             [vl 'if self._failed:' '    return']
@@ -418,19 +342,6 @@ n_ends_in: [fn [node] [vl 'while True:'
                                'if self._failed:'
                                '    break']]]
 
-
-
-n_leftrec: [fn [node] [hl [call_op 'leftrec'
-                                   [list [strcat 'self._' node.child.v]
-                                         [strcat "'" node.v "'"]
-                                         [if node.left_assoc c_true c_false]]]
-                           c_end]]
-
-n_lit: [fn [node] [hl [if [equal [strlen node.v] 1]
-                          [call_op 'ch' [list [lit node.v]]]
-                          [call_op 'str' [list [lit node.v]]]]
-                      c_end]]
-
 n_not: [fn [node] [vl 'p = self._pos'
                       'errpos = self._errpos'
                       [stmts node.child]
@@ -445,16 +356,12 @@ n_not_one: [fn [node] [vl [n_not node]
                           'if not self._failed:'
                           [ind [call_rule 'r_any' [list]]]]]
 
-n_operator: [fn [node] [hl [call_op 'operator'
-                                    [list [strcat "'" node.v "'"]]]]]
-
 n_opt: [fn [node] [vl 'p = self._pos'
                          [stmts node.child]
                          'if self._failed:'
                          '    self._o_succeed([], p)'
                          'else:'
                          '    self._o_succeed([self._val])']]
-
 
 n_paren: [fn [node] [stmts node.child]]
 
@@ -481,10 +388,6 @@ n_pred: [fn [node]
                 '    self._o_fail()'
                 'else:'
                 "    raise _ParsingRuntimeError('Bad predicate value')"]]
-
-n_range: [fn [node] [hl [call_op 'range'
-                                 [list [lit node.start] [lit node.stop]]]
-                        c_end]]
 
 n_regexp: [fn [node]
               [vl [hl 'p = ' [lit node.v]]
@@ -545,8 +448,6 @@ n_star: [fn [node]
                      '    break'
                      'vs.append(self._val)']
                 'self._o_succeed(vs)']]
-
-n_unicat: [fn [node] [hl [call_op 'unicat' [list [lit node.v]]] c_end]]
 
 #
 # Built-in operators and rules
@@ -853,29 +754,19 @@ c_end:    ''      # statement terminator
 # Helper rules
 #
 
-expr:      [fn [node] [invoke [node_name node.t] node]]
-
-stmts:     [fn [node] [invoke [node_name node.t] node]]
-
 rule_method: [fn [rule node] [vl [strcat 'def _' rule '(self):']
                                  [ind [invoke_node node]]]]
 
-# Invokes a template that takes a single argument, an AST node.
-invoke_node: [fn [node] [invoke [node_name node.t] node]]
-
-# Returns the method name corresponding to different kinds of functions.
-node_name: [fn [name] [strcat 'n_' name]]
-op_name:   [fn [name] [strcat 'o_' name]]
-fn_name:   [fn [name] [strcat 'fn_' name]]
-rule_name: [fn [name] name]
 
 # Reference different kinds of variable names.
 extern:    [fn [name] [strcat 'self._externs[' [lit name] ']']]
 varname:   [fn [name] [strcat 'v_' [replace name '$', '_']]]
 
-# Invoke a method on the parser object.
-call:      [fn [name args] [tri [strcat 'self._' name '('] [comma args] ')']]
+method_name: [fn [name] [strcat 'self._' name]]
 
-# Invoke specific kinds of methods on the parser object.
-call_op:   [fn [name args] [call [op_name name] args]]
-call_rule: [fn [name args] [call [rule_name name] args]]
+# Invoke a method on the parser object.
+call:      [fn [name args] [tri [strcat [method_name name] '(']
+                                [comma args]
+                                ')']]
+
+}

@@ -38,6 +38,7 @@ class DatafileGenerator(generator.Generator):
         options: generator.GeneratorOptions,
     ):
         super().__init__(host, grammar, options)
+        self.datafile: dict[str, Any] = {}
         options.generator_options = options.generator_options or {}
         self._fl = options.formatter_list
         self._local_vars: dict[str, Any] = {}
@@ -65,10 +66,13 @@ class DatafileGenerator(generator.Generator):
 
         self._host = host
         if 'file' in options.generator_options:
-            fname = options.generator_options.get('file')
+            default_df = options.generator_options.get('file')
         else:
-            fname = self._host.join(host.dirname(__file__), 'python.dft')
-        self._process_template_file(fname)
+            default_df = 'python'
+        path = self._find_datafile(default_df)
+        self._load_datafiles(path)
+        for t, v in self.datafile['templates'].items():
+            self._interpreter.define(t, v)
 
         # TODO: Figure out how to correctly handle non-multi-char literals.
         if grammar.ch_needed and not grammar.str_needed:
@@ -109,15 +113,37 @@ class DatafileGenerator(generator.Generator):
         for _, node in self.grammar.rules.items():
             node.local_vars = _walk(node)
 
-    def _process_template_file(self, fname):
-        df_str = self._host.read_text_file(fname)
-        templates = datafile.loads(
+    def _find_datafile(self, name):
+        if self._host.exists(name):
+            return name
+        _, ext = self._host.splitext(name)
+        if ext == '':
+            name += '.dft'
+        path = self._host.join(self._host.dirname(__file__), name)
+        if not self._host.exists(path):
+            raise ValueError(f"template file '{name}' not found")
+        return path
+
+    def _load_datafiles(self, name):
+        df_str = self._host.read_text_file(self._find_datafile(name))
+        df = datafile.loads(
             df_str,
             parse_bareword=self._parse_bareword,
             custom_tags={'@': self._to_at_exp},
         )
-        for t, v in templates.items():
-            self._interpreter.define(t, v)
+        if 'inherit' in df:
+            for base in df['inherit']:
+                self._load_datafiles(base)
+        self._merge_datafile(df)
+
+    def _merge_datafile(self, df):
+        if 'starting_template' in df:
+            self.datafile['starting_template'] = df['starting_template']
+        if 'templates' not in self.datafile:
+            self.datafile['templates'] = {}
+        if 'templates' in df:
+            for k, v in df['templates'].items():
+                self.datafile['templates'][k] = v
 
     def _parse_bareword(self, s: str, as_key: bool) -> Any:
         if as_key:
@@ -141,7 +167,9 @@ class DatafileGenerator(generator.Generator):
         return False, None
 
     def generate(self) -> str:
-        obj = self._interpreter.eval([['symbol', 'generate']])
+        obj = self._interpreter.eval(
+            [['symbol', self.datafile['starting_template']]]
+        )
         if self.options.generator_options.get('as_ll'):
             fmt_fn = formatter.flatten_as_lisplist
         else:
