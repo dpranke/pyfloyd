@@ -18,7 +18,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from typing import Callable, Optional
+from typing import Callable, Optional, Union
 import unittest
 
 
@@ -33,6 +33,9 @@ class Host:
 
     def exists(self, path):
         return os.path.exists(path)
+
+    def dirname(self, path):
+        return os.path.dirname(path)
 
     def getcwd(self):
         return os.getcwd()
@@ -185,12 +188,11 @@ class FakeHost:
 
 class _BaseTestCase(unittest.TestCase):
     maxDiff: Optional[int] = None
-    host_fn: Optional[Callable[[], Optional[Host | FakeHost]]] = None
+    host_fn: Optional[Callable[[], Optional[Union[Host, FakeHost]]]] = None
 
     def call(self, host, args, stdin):
         raise NotImplementedError
 
-    # pylint: disable=too-many-positional-arguments
     def check(
         self, args, stdin=None, files=None, returncode=0, out=None, err=None
     ):
@@ -219,13 +221,11 @@ class _BaseTestCase(unittest.TestCase):
                 h.rmtree(tmpdir)
                 h.chdir(orig_wd)
 
-    # pylint: enable=too-many-positional-arguments
-
 
 class InlineTestCase(_BaseTestCase):
-    host_fn: Optional[Callable[[], Optional[Host | FakeHost]]] = FakeHost
+    host_fn: Optional[Callable[[], Optional[Union[Host, FakeHost]]]] = FakeHost
     main: Optional[
-        Callable[[Optional[list[str]], Optional[Host | FakeHost]], int]
+        Callable[[Optional[list[str]], Optional[Union[Host, FakeHost]]], int]
     ] = None
 
     def call(self, host, args, stdin):
@@ -294,9 +294,7 @@ class ScriptTestCase(HostTestCase):
                 return [sys._base_executable, self.script]
             return [sys.executable, self.script]
         script = shutil.which(self.script)
-        self.assertIsNotNone(
-            script, 'Could not find `%s` in PATH' % self.script
-        )
+        self.assertIsNotNone(script, f'Could not find `{self.script}` in PATH')
         return [script]
 
 

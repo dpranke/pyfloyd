@@ -13,10 +13,13 @@
 # limitations under the License.
 
 import re
+from typing import Any
 import unicodedata
 
-from pyfloyd.ast import Apply, EMinus, EPlus, Not, Regexp
-from pyfloyd import parser
+from pyfloyd import (
+    grammar as m_grammar,
+    grammar_parser,
+)
 
 
 class _OperatorState:
@@ -30,36 +33,36 @@ class _OperatorState:
 
 
 class Interpreter:
-    def __init__(self, grammar, memoize):
+    def __init__(self, grammar: m_grammar.Grammar, memoize: bool):
         self._memoize = memoize
         self._grammar = grammar
 
-        self._text = None
-        self._path = None
+        self._text = ''
+        self._path = ''
         self._failed = False
         self._val = None
         self._pos = 0
         self._end = -1
         self._errstr = 'Error: uninitialized'
         self._errpos = 0
-        self._cache = {}
-        self._scopes = []
-        self._seeds = {}
-        self._blocked = set()
-        self._operators = {}
-        self._regexps = {}
-        self._externs = grammar.externs
+        self._cache: dict[int, dict[str, Any]] = {}
+        self._scopes: list[dict[str, Any]] = []
+        self._seeds: dict[str, Any] = {}
+        self._blocked: set[str] = set()
+        self._operators: dict[str, m_grammar.OperatorState] = {}
+        self._regexps: dict[str, re.Pattern] = {}
+        self._externs: dict[str, Any] = grammar.externs
 
     def parse(
         self, text: str, path: str = '<string>', externs=None
-    ) -> parser.Result:
+    ) -> grammar_parser.Result:
         self._text = text
         self._path = path
         self._failed = False
         self._val = None
         self._pos = 0
         self._end = len(self._text)
-        self._errstr = None
+        self._errstr = ''
         self._errpos = 0
         self._scopes = [{}]
 
@@ -71,12 +74,12 @@ class Interpreter:
                 else:
                     errors += f'Missing extern "{k}"\n'
         if errors:
-            return parser.Result(None, errors.strip(), 0)
+            return grammar_parser.Result(None, errors.strip(), 0)
 
         self._interpret(self._grammar.rules[self._grammar.starting_rule])
         if self._failed:
             return self._format_error()
-        return parser.Result(self._val, None, self._pos)
+        return grammar_parser.Result(self._val, None, self._pos)
 
     def _interpret(self, node):
         fn = getattr(self, f'_ty_{node.t}', None)
@@ -130,10 +133,10 @@ class Interpreter:
                 thing = 'end of input'
             else:
                 thing = repr(self._text[self._errpos]).replace("'", '"')
-            self._errstr = 'Unexpected %s at column %d' % (thing, colno)
+            self._errstr = f'Unexpected {thing} at column {colno}'
 
-        msg = '%s:%d %s' % (self._path, lineno, self._errstr)
-        return parser.Result(None, msg, self._errpos)
+        msg = f'{self._path}:{lineno} {self._errstr}'
+        return grammar_parser.Result(None, msg, self._errpos)
 
     def _r_any(self):
         if self._pos != self._end:
@@ -244,7 +247,7 @@ class Interpreter:
         self._succeed(node.v)
 
     def _ty_e_minus(self, node):
-        assert isinstance(node, EMinus)
+        assert isinstance(node, m_grammar.EMinus)
         self._interpret(node.left)
         v1 = self._val
         self._interpret(node.right)
@@ -270,7 +273,7 @@ class Interpreter:
         self._interpret(node.child)
 
     def _ty_e_plus(self, node):
-        assert isinstance(node, EPlus)
+        assert isinstance(node, m_grammar.EPlus)
         self._interpret(node.left)
         v1 = self._val
         self._interpret(node.right)
@@ -293,32 +296,37 @@ class Interpreter:
                 assert op == 'e_call'
                 # Note that unknown functions were caught during analysis
                 # so it's safe to dereference this without checking.
-                fn = getattr(self, '_fn_' + lhs, None)
-                self._val = fn(*rhs)
+                self._val = lhs(*rhs)
 
-    def _ty_e_var(self, node):
-        v = getattr(self, '_fn_' + node.v, None)
-        if v:
-            self._succeed(node.v)
-            return
-
+    def _ty_e_ident(self, node):
         # Unknown variables should have been caught in analysis.
         v = node.v
         if v[0] == '$':
             # Look up positional labels in the current scope.
             self._succeed(self._scopes[-1][v])
-        else:
-            # Look up named labels in any scope.
-            i = len(self._scopes) - 1
-            while i >= 0:
-                if v in self._scopes[i]:
-                    self._succeed(self._scopes[i][v])
-                    return
-                i -= 1
-            if v in self._externs:
-                self._succeed(self._externs[v])
+            return
+
+        if node.kind == 'extern':
+            self._succeed(self._externs[v])
+            return
+        if node.kind == 'function':
+            v = getattr(self, '_fn_' + node.v, None)
+            if v:
+                self._succeed(v)
                 return
-            assert False, f'Unknown label "{v}"'
+        if node.kind == 'local':
+            self._succeed(self._scopes[-1][v])
+            return
+
+        # Look up named labels in any scope.
+        assert node.kind == 'outer'
+        i = len(self._scopes) - 1
+        while i >= 0:
+            if v in self._scopes[i]:
+                self._succeed(self._scopes[i][v])
+                return
+            i -= 1
+        assert False, f'Unknown label "{v}"'
 
     def _ty_empty(self, node):
         del node
@@ -329,7 +337,7 @@ class Interpreter:
             self._interpret(node.child)
             if not self._failed:
                 return
-            self._ty_apply(self._grammar.node(Apply, 'any'))
+            self._ty_apply(self._grammar.node(m_grammar.Apply, 'any'))
             if self._failed:
                 return
 
@@ -393,9 +401,9 @@ class Interpreter:
             self._fail(val)
 
     def _ty_not_one(self, node):
-        self._ty_not(self._grammar.node(Not, node.child))
+        self._ty_not(self._grammar.node(m_grammar.Not, node.child))
         if not self._failed:
-            self._ty_apply(self._grammar.node(Apply, 'any'))
+            self._ty_apply(self._grammar.node(m_grammar.Apply, 'any'))
 
     def _ty_operator(self, node):
         pos = self._pos
@@ -519,7 +527,7 @@ class Interpreter:
                 break
 
     def _ty_set(self, node):
-        new_node = self._grammar.node(Regexp, '[' + node.v + ']')
+        new_node = self._grammar.node(m_grammar.Regexp, '[' + node.v + ']')
         self._interpret(new_node)
 
     def _ty_star(self, node):

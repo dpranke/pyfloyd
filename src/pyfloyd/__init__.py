@@ -49,35 +49,33 @@ compile the parser ahead of time:
     >>>
 """
 
-# pylint: disable=redefined-builtin
-from pyfloyd.api import (
-    parse,
-    compile,
+from types import ModuleType
+
+
+from pyfloyd.api import (  # noqa: F401 (unused-import)
+    add_generator_arguments,
+    compile_to_parser,
     dump_ast,
+    parse,
     generate,
+    generator_options_from_args,
     pretty_print,
     CompiledResult,
+    Externs,
     GeneratorOptions,
+    Grammar,
     ParserInterface,
     Result,
     DEFAULT_LANGUAGE,
+    DEFAULT_TEMPLATE,
+    EXT_TO_LANG,
+    LANGUAGE_MAP,
     SUPPORTED_LANGUAGES,
+    __version__,
 )
-from pyfloyd.version import __version__
 
-# pylint: enable=redefined-builtin
 
-__all__ = [
-    '__version__',
-    'compile',
-    'dump_ast',
-    'generate',
-    'parse',
-    'pretty_print',
-    'CompiledResult',
-    'GeneratorOptions',
-    'ParserInterface',
-    'Result',
-    'DEFAULT_LANGUAGE',
-    'SUPPORTED_LANGUAGES',
-]
+__all__ = []
+for _k in list(globals()):
+    if not isinstance(globals()[_k], ModuleType):
+        __all__.append(_k)

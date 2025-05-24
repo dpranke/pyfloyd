@@ -32,23 +32,21 @@ import os
 import sys
 
 try:
-    import pyfloyd
+    from pyfloyd import datafile
 except ModuleNotFoundError:  # pragma: no cover
     src_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
     sys.path.insert(0, src_dir)
-    import pyfloyd
 
-import pyfloyd.datafile
-import pyfloyd.support
+from pyfloyd import datafile, support, version
 
 
 def main(argv=None, host=None):
-    host = host or pyfloyd.support.Host()
+    host = host or support.Host()
 
     args = _parse_args(host, argv)
 
     if args.version:
-        host.print(pyfloyd.__version__)
+        host.print(version.__version__)
         return 0
 
     if args.cmd:
@@ -66,11 +64,11 @@ def main(argv=None, host=None):
         except ValueError:
             pass
 
-    obj = pyfloyd.datafile.loads(inp)
+    obj = datafile.loads(inp)
     if args.as_json:
         s = json.dumps(obj, indent=args.indent)
     else:
-        s = pyfloyd.datafile.dumps(obj, indent=args.indent)
+        s = datafile.dumps(obj, indent=args.indent)
     host.print(s)
     return 0
 
@@ -110,7 +108,7 @@ def _parse_args(host, argv):
         '-V',
         '--version',
         action='store_true',
-        help=f'show version ({pyfloyd.__version__})',
+        help=f'show version ({version.__version__})',
     )
     parser.add_argument(
         '-c',

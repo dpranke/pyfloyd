@@ -14,29 +14,63 @@
 
 """A pure Python implementation of the Floyd datafile format.
 
-This module follows the API of the standard `json` module as much as
-possible. It provides the following functions:
+This module follows the API of the standard `json` module where possible.
+As such, it provides the following functions:
 
-- `load()`  - Load an object from a file
-- `loads()` - Load an object from a string
-- `dump()`  - Dump an object to a file
-- `dumps()` - Dump an object to a string
-- `parse()` - Parse an object from a string, returning positional information.
+- load   - Load an object from a file
+- loads  - Load an object from a string
+- dump   - Dump an object to a file
+- dumps  - Dump an object to a string
+
+It also provides a number of other utility functions:
+
+- parse         - Parse an object from a string, returning positional
+                  and error information (does not raise exceptions).
+- dedent        - Remove leading whitespace from a multiline string per the
+                  datafile specification
+- decode_escape - Returns the unicode character for a given datafile
+                  escape sequence.
+- escape_char   - Returns the matching datafile escape sequence for
+                  a unicode characer.
+- encode_string - Returns an encoded (quoted and escaped as appropriate)
+                  string matching the datafile specification. This will
+                  return a string as an unqouted bareword if possible.
+- encode_quoted_string - Returns an quoted (and escaped) string (no
+                         barewords).
+- ishex         - Returns whether a character is a hex digit.
+- isoct         - Returns whether a character is an octal digit.
+
+Decoding (the process of turning a string into a data structure, i.e.,
+the load/loads/parse functions) is implemented in terms of a `Decoder`
+class that can be subclassed to provide fine-grained customization
+of behavior.
 """
 
-from .api import dump, dumps, load, loads, parse
-from .tool import main
+import types
+
+from .api import (  # noqa: F401 (unused-import)
+    decode_escape,
+    dedent,
+    dump,
+    dumps,
+    encode_string,
+    encode_quoted_string,
+    escape_char,
+    ishex,
+    isoct,
+    load,
+    loads,
+    parse,
+    ArgparseAppendAction,
+    ArgparseStoreAction,
+    Decoder,
+)
 
 
 __version__ = '0.1.0.dev0'
 
 
-__all__ = [
-    '__version__',
-    'load',
-    'loads',
-    'dump',
-    'dumps',
-    'main',
-    'parse',
-]
+__all__ = []
+for _k in list(globals()):
+    if not isinstance(globals()[_k], types.ModuleType):
+        __all__.append(_k)

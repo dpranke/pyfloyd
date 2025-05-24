@@ -16,19 +16,14 @@
 
 import json
 import os
-import pathlib
-import shutil
 import subprocess
-import sys
 import textwrap
 from typing import Optional, Dict
-import unittest
 
 import pyfloyd
-import pyfloyd.support
 
 
-THIS_DIR = pathlib.Path(__file__).parent
+THIS_DIR = os.path.dirname(__file__)
 
 SKIP = os.environ.get('SKIP', '')
 
@@ -46,9 +41,18 @@ def skip(kind):
     return decorator
 
 
-class GrammarTestsMixin:
+class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
     max_diff = None
     floyd_externs: Optional[Dict[str, bool]] = None
+
+    def read_grammar(self, grammar):
+        path = os.path.join(THIS_DIR, '..', 'grammars', grammar)
+        with open(path, 'r', encoding='utf8') as fp:
+            return fp.read()
+
+    def compile_grammar(self, grammar, **kwargs):
+        contents = self.read_grammar(grammar)
+        return self.compile(contents, grammar, **kwargs)
 
     def check(
         self,
@@ -80,7 +84,6 @@ class GrammarTestsMixin:
         self.assertMultiLineEqual(err, p_err)
 
     def test_action(self):
-        # self.check('grammar = end { true }', text='', out=True)
         self.check('grammar = end -> true', text='', out=True)
 
     def test_any_fails(self):
@@ -259,7 +262,9 @@ class GrammarTestsMixin:
             'grammar = -> foo()',
             text='',
             grammar_err=(
-                'Errors were found:\n  Unknown function "foo" called\n'
+                'Errors were found:\n'
+                '  Unknown function "foo" called\n'
+                '  Unknown identifier "foo" referenced\n'
             ),
         )
 
@@ -268,7 +273,7 @@ class GrammarTestsMixin:
             'grammar = -> v',
             text='',
             grammar_err=(
-                'Errors were found:\n  Unknown variable "v" referenced\n'
+                'Errors were found:\n  Unknown identifier "v" referenced\n'
             ),
         )
 
@@ -312,16 +317,24 @@ class GrammarTestsMixin:
         self.check('grammar = "\\n\\"foo" -> true', text='\n"foo', out=True)
         self.check("grammar = '\\'foo' -> true", text="'foo", out=True)
 
+    def test_externs(self):
+        g = """
+        %externs = foo -> true
+                 | bar -> false
+
+        g = ?{foo} -> 'foo is true'
+          | ?{bar} -> 'bar is true'
+        """
+        self.check(g, text='', out='foo is true')
+
     @skip('integration')
     def test_floyd(self):
-        h = pyfloyd.support.Host()
-        path = str(THIS_DIR / '../grammars/floyd.g')
-        grammar = h.read_text_file(path)
+        contents = self.read_grammar('floyd.g')
         p, err, _ = self.compile(
-            grammar, path, memoize=True, externs=self.floyd_externs
+            contents, 'floyd.g', memoize=True, externs=self.floyd_externs
         )
         self.assertIsNone(err)
-        out, err, _ = p.parse(grammar, '../grammars/floyd.g')
+        out, err, _ = p.parse(contents, 'floyd.g')
         # We don't check the actual output here because it is too long
         # and we don't want the test to be so sensitive to the AST for
         # the floyd grammar.
@@ -330,12 +343,12 @@ class GrammarTestsMixin:
 
     @skip('integration')
     def test_floyd_ws(self):
-        h = pyfloyd.support.Host()
-        path = str(THIS_DIR / '../grammars/floyd_ws.g')
-        grammar = h.read_text_file(path)
-        p, err, _ = self.compile(grammar, path, externs=self.floyd_externs)
+        contents = self.read_grammar('floyd_ws.g')
+        p, err, _ = self.compile(
+            contents, 'floyd_ws.g', externs=self.floyd_externs
+        )
         self.assertIsNone(err)
-        out, err, _ = p.parse(grammar, '../grammars/floyd.g')
+        out, err, _ = p.parse(contents, 'floyd_ws.g')
         # We don't check the actual output here because it is too long
         # and we don't want the test to be so sensitive to the AST for
         # the floyd grammar.
@@ -433,9 +446,7 @@ class GrammarTestsMixin:
 
     @skip('integration')
     def test_json(self):
-        h = pyfloyd.support.Host()
-        path = str(THIS_DIR / '../grammars/json.g')
-        p, err, _ = self.compile(h.read_text_file(path), path)
+        p, err, _ = self.compile_grammar('json.g')
         self.assertIsNone(err)
         self._common_json_checks(p, {})
 
@@ -447,9 +458,7 @@ class GrammarTestsMixin:
     @skip('integration')
     def test_json5(self):
         externs = {'strict': True}
-        h = pyfloyd.support.Host()
-        path = str(THIS_DIR / '../grammars/json5.g')
-        p, err, _ = self.compile(h.read_text_file(path), path)
+        p, err, _ = self.compile_grammar('json5.g')
         self.assertIsNone(err)
         self._common_json_checks(p, externs=externs)
         self._common_json5_checks(p, externs=externs)
@@ -457,9 +466,7 @@ class GrammarTestsMixin:
     @skip('integration')
     def test_json5_special_floats(self):
         externs = {'strict': True}
-        h = pyfloyd.support.Host()
-        path = str(THIS_DIR / '../grammars/json5.g')
-        p, err, _ = self.compile(h.read_text_file(path), path)
+        p, err, _ = self.compile_grammar('json5.g')
         self.assertIsNone(err)
 
         # TODO: Figure out what to do with 'Infinity' and 'NaN'.
@@ -514,9 +521,7 @@ class GrammarTestsMixin:
         # Check the sample file from pyjson5.
         # this skips the `'to': Infinity` pair because that can't
         # be marshalled in and out of JSON.
-        h = pyfloyd.support.Host()
-        path = str(THIS_DIR / '../grammars/json5.g')
-        p, err, _ = self.compile(h.read_text_file(path), path)
+        p, err, _ = self.compile_grammar('json5.g')
         self.assertIsNone(err)
         self.checkp(
             p,
@@ -569,10 +574,7 @@ class GrammarTestsMixin:
     @skip('integration')
     def test_json5_ws(self):
         externs = {'strict': False}
-        h = pyfloyd.support.Host()
-        path = str(THIS_DIR / '../grammars/json5_ws.g')
-        grammar = h.read_text_file(path)
-        p, err, _ = self.compile(grammar, path)
+        p, err, _ = self.compile_grammar('json5_ws.g')
         self.assertIsNone(err)
         self._common_json_checks(p, externs=externs)
         self._common_json5_checks(p, externs=externs)
@@ -617,7 +619,7 @@ class GrammarTestsMixin:
             grammar_err=(
                 'Errors were found:\n'
                 '  Variable "x" never used\n'
-                '  Unknown variable "x" referenced\n'
+                '  Unknown identifier "x" referenced\n'
             ),
         )
 
@@ -636,7 +638,7 @@ class GrammarTestsMixin:
             grammar_err=(
                 'Errors were found:\n'
                 '  Variable "f" never used\n'
-                '  Unknown variable "f" referenced\n'
+                '  Unknown identifier "f" referenced\n'
             ),
         )
 
@@ -738,6 +740,7 @@ class GrammarTestsMixin:
             out=None,
         )
 
+    @skip('operators')
     def test_operator_indirect(self):
         # Tests that you can specify the list of operators in a rule
         # separate from the actual pragma.
@@ -868,6 +871,13 @@ class GrammarTestsMixin:
             text='',
             out=None,
             err='<string>:1 Bad predicate value',
+        )
+
+    def test_range(self):
+        grammar = "g = '0'..'9':d -> d"
+        self.check(grammar, text='5', out='5')
+        self.check(
+            grammar, text='a', err='<string>:1 Unexpected "a" at column 1'
         )
 
     @skip('leftrec')
@@ -1156,23 +1166,14 @@ class GrammarTestsMixin:
         self.check(grammar, '" "', out=True)
 
 
-class Interpreter(unittest.TestCase, GrammarTestsMixin):
-    max_diff = None
-
-    def compile(self, grammar, path='<string>', memoize=False, externs=None):
-        return pyfloyd.compile(
-            textwrap.dedent(grammar), path, memoize=memoize, externs=externs
-        )
-
-
 class _GeneratedParserWrapper:
-    def __init__(self, cmd, ext, source_code):
+    def __init__(self, cmd, ext, grammar, source_code):
         self.cmd = cmd
         self.ext = ext
+        self.grammar = grammar
         self.source_code = source_code
         self.host = pyfloyd.support.Host()
         self.tempdir = self.host.mkdtemp()
-        self.source_code = source_code
         self.source = os.path.join(self.tempdir, f'parser{self.ext}')
         self.host.write_text_file(self.source, self.source_code)
 
@@ -1219,30 +1220,7 @@ class GeneratorMixin:
             return None, err, endpos
 
         return (
-            _GeneratedParserWrapper(self.cmd, self.ext, source_code),
+            _GeneratedParserWrapper(self.cmd, self.ext, grammar, source_code),
             None,
             0,
         )
-
-
-class PythonGenerator(unittest.TestCase, GeneratorMixin, GrammarTestsMixin):
-    maxDiff = None
-    cmd = [sys.executable]
-    language = 'python'
-    ext = '.py'
-
-
-class JavaScriptGenerator(
-    unittest.TestCase, GeneratorMixin, GrammarTestsMixin
-):
-    cmd = [shutil.which('node')]
-    language = 'javascript'
-    ext = '.js'
-    floyd_externs = {'unicode_names': False}
-
-    @skip('integration')
-    def test_json5_special_floats(self):
-        # TODO: `Infinity` and `NaN` are legal Python values and legal
-        # JavaScript values, but they are not legal JSON values, and so
-        # we can't read them in from output that is JSON.
-        pass

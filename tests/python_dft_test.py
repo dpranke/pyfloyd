@@ -1,4 +1,4 @@
-# Copyright 2024 Google Inc. All rights reserved.
+# Copyright 2025 Dirk Pranke. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,12 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# pragma: no cover
-
 import sys
+import unittest
 
-from pyfloyd import tool
+from . import grammar_test
 
 
-if __name__ == '__main__':
-    sys.exit(tool.main())
+class Tests(
+    unittest.TestCase,
+    grammar_test.GeneratorMixin,
+    grammar_test.GrammarTestsMixin,
+):
+    maxDiff = None
+    cmd = [sys.executable]
+    language = 'datafile'
+    ext = '.py'

@@ -1,0 +1,104 @@
+#!/usr/bin/env racket
+; Evaluate a file as a scribble document and pretty-print out the list
+; of expressions it evaluates to, inserting newlines after each "\n"
+; to make things a bit more readable.
+#lang racket/base
+(require racket/pretty)
+(require racket/cmdline)
+(require racket/list)
+(require racket/port)
+(require racket/string)
+(require scribble/reader)
+
+(define (p x)
+  (pretty-print x #:newline? #f)
+  (if (equal? x "\n") (display "\n ") (void)))
+
+(define (slice lis start end)
+  (let ((last-index (if (>= end 0) end (+ (length lis) end))))
+    (drop (take lis last-index) start)))
+
+(define (p/list exprs)
+   (display "'(") 
+   (let ((i 0))
+     (for ((expr exprs))
+       (if (not (void? expr))
+           (begin (p expr)     
+                  (if (< i (length exprs))
+                      (display " ")
+                      (void))
+                  (set! i (+ i 1)))
+           (void))))
+   (display ")\n"))
+
+(define pretty-printed? (make-parameter #f))
+(define unevaluated? (make-parameter #f))
+(define evaluated? (make-parameter #f))
+(define joined? (make-parameter #f))
+
+(define remaining_args
+  (command-line
+   #:once-each
+   [("-p" "--pretty-print") "Pretty print the scribble-evaluated result"
+                            (pretty-printed? #t)]
+   #:once-any
+   [("-u" "--unevaluated") "Show the unevaluated result" (unevaluated? #t)]
+   [("-e" "--evaluated") "Show the evaluated result" (evaluated? #t)]
+   [("-j" "--joined") "Show the string-joined result" (joined? #t)]
+
+   #:args remaining
+   remaining))
+
+(define input
+  (if (or (empty? remaining_args) (equal? remaining_args '("-")))
+    (current-input-port)
+    (open-input-file (car remaining_args))))
+
+;(set! input (open-input-file "t2.scribble"))
+
+(define (discard x) (void))
+
+; get rid of the first line containing the #lang, if need be
+(if (string-prefix? (read-line (peeking-input-port input)) "#lang")
+     (discard (read-line input))
+     (void))
+
+; Read in the rest as one big at-exp.
+(define exprs (read-inside input))
+
+(define results (parameterize ([current-namespace (make-base-namespace)])
+                (map (lambda (expr)
+                       (cond [(and (list? expr) (symbol? (car expr)))
+                              (eval expr)]
+                             [else expr]))
+                     exprs)))
+
+;(define (string-rec x) (cond [(list? x)
+;                              (apply string-append (map string-rec x))]
+;                             [(string? x) x]
+;                             [else ""]))
+(define (string-rec x)
+  (letrec [(blank? #t)
+           (void? #f)
+           (fn (lambda (y)
+                 (cond [(list? y) (apply string-append (map fn y))]
+                       [(string? y) 
+                        (if (and blank? void? (equal? y "\n"))
+                            (begin
+                             (set! void? #f)
+                             (set! blank? #t)
+                             "")
+                            (if (equal? y "\n")
+                                (begin (set! blank? #t) y)
+                                (begin
+                                 (set! blank? #f) y)))]
+                       [else
+                        (begin (set! void? #t) "")])))]
+    (fn x)))
+
+(let [(fn (if (pretty-printed?) pretty-print p/list))]
+   (cond [(unevaluated?) (fn exprs)]
+         [(evaluated?) (fn results)]
+         [else (display (string-rec results))]))
+
+; vim: set ft=racket:

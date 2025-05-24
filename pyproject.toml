@@ -32,7 +32,7 @@ dev = [
     'pylint==3.3.7',
     'ruff==0.11.7',
     'twine==6.1.0',
-    'typ @ git+https://github.com/dpranke/typ-dev',
+    'typ',  # See dependency info in [tool.uv.sources], below.
     'uv==0.7.3',
 ]
 
@@ -42,22 +42,73 @@ Issues = "https://github.com/dpranke/pyfloyd/issues"
 Changelog = "https://github.com/dpranke/pyfloyd/blob/master/README.md"
 
 [project.scripts]
-fdf = "pyfloyd.datafile:main"
+fdf = "pyfloyd.datafile.tool:main"
 pyfloyd = "pyfloyd.tool:main"
 
 [tool.black]
 line-length = 79
 skip-string-normalization = true
 
+[tool.pylint.basic]
+# By default, pylint wants method names to be at most 31 chars long,
+# but we want to allow up to 40 for regular names and 50 for test names.
+method-rgx = "((disabled_)?(test_[a-zA-Z0-9_]{3,45})|([a-z_][a-zA-Z0-9_]{1,39}))$"
+
+# By default, pylint only allows UPPER_CASE constants, but we want to
+# allow snake_case as well in some situations.
+const-rgx = "[a-zA-Z_][a-zA-Z0-9_]{0,20}$"
+
+# By default, pylint wants all parameter names to be at least two chars long,
+# but we want to allow single-char parameter names as well.
+argument-rgx = "[a-z_][a-z0-9_]{0,19}$"
+
+# By default, pylint wants all variable names to be at least two chars long,
+# but we want to allow single-char variable names as well.
+variable-rgx = "[a-z_][a-z0-9_]{0,19}$"
+
+max-args = 8
+max-positional-arguments = 8
+
+# Recommend at most 65 statements per function/method
+max-statements = 65
+
+[tool.pylint.'messages control']
+
+disable = [
+   # Too much is duplicated between generated parsers and other AST walkers.
+   "duplicate-code",
+
+   # Don't want warnings for these.
+   "fixme",
+   "missing-docstring",
+
+   # These are violated too often in practice.
+   "too-few-public-methods",
+   "too-many-branches",
+   "too-many-instance-attributes",
+   "too-many-locals",
+   "too-many-public-methods",
+   "too-many-return-statements",
+]
+
+[tool.pylint.reports]
+reports = false
+
+[tool.pylint.score]
+score = false
+
 [tool.ruff]
-include = [ "run", "src/pyfloyd/*.py", "tests/*.py" ]
+include = ["pyproject.toml", "run", "src/**/*.py", "tests/**/*.py"]
 line-length = 79
 
 [tool.ruff.format]
 quote-style = "single"
 
 [tool.setuptools.packages.find]
-where = [ "src" ]
+where = ["src"]
 
 [tool.setuptools.dynamic]
 version = {attr = "pyfloyd.__version__"}
+
+[tool.uv.sources]
+typ = { git = "https://github.com/dpranke/typ-dev", branch = "main" }

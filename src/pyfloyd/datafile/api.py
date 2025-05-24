@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pylint: disable=too-many-lines
+
+import argparse
 import collections
 import math
 import re
@@ -32,9 +35,34 @@ from typing import (
 from . import parser
 
 
+class ArgparseStoreAction(argparse.Action):
+    def __call__(self, *args, **kwargs):
+        _, namespace, text, flag = args
+        d = loads(text)
+        if not isinstance(d, dict):
+            raise ValueError(f'Bad option string for {flag}: {repr(text)}')
+        setattr(namespace, self.dest, d)
+
+
+class ArgparseAppendAction(argparse.Action):
+    def __call__(self, *args, **kwargs):
+        _, namespace, text, flag = args
+        opts = getattr(namespace, self.dest, {})
+        opts = opts or {}
+        d = loads(text)
+        if not isinstance(d, dict):
+            raise ValueError(f'Bad option string for {flag}: {repr(text)}')
+        opts.update(d)
+        setattr(namespace, self.dest, opts)
+
+
+quote_tokens = ('```', '"""', "'''", '`', '"', "'")
+
 _bare_word_re = re.compile(r'^[^\\\s\[\]\(\)\{\}:\'"`]+$')
 
 _long_str_re = re.compile(r"^l'=+'")
+
+# pylint: disable=too-many-arguments
 
 
 def load(
@@ -45,12 +73,14 @@ def load(
     object_hook: Optional[Callable[[Mapping[str, Any]], Any]] = None,
     parse_number: Optional[Callable[[str], Any]] = None,
     parse_numword: Optional[Callable[[str], Any]] = None,
+    parse_bareword: Optional[Callable[[str, bool], Any]] = None,
     object_pairs_hook: Optional[
         Callable[[Iterable[Tuple[str, Any]]], Any]
     ] = None,
     allow_trailing: bool = False,
     allow_numwords: bool = False,
     start: Optional[int] = None,
+    custom_tags: Optional[dict[str, Any]] = None,
 ) -> Any:
     """Deserialize ``fp`` (a ``.read()``-supporting file-like object
     containing a Floyd datafile) to a Python object.
@@ -98,10 +128,12 @@ def load(
         object_hook=object_hook,
         parse_number=parse_number,
         parse_numword=parse_numword,
+        parse_bareword=parse_bareword,
         object_pairs_hook=object_pairs_hook,
         allow_trailing=allow_trailing,
         allow_numwords=allow_numwords,
         start=start,
+        custom_tags=custom_tags,
     )
     if err:
         raise ValueError(err)
@@ -116,12 +148,14 @@ def loads(
     object_hook: Optional[Callable[[Mapping[str, Any]], Any]] = None,
     parse_number: Optional[Callable[[str], Any]] = None,
     parse_numword: Optional[Callable[[str], Any]] = None,
+    parse_bareword: Optional[Callable[[str, bool], Any]] = None,
     object_pairs_hook: Optional[
         Callable[[Iterable[Tuple[str, Any]]], Any]
     ] = None,
     allow_trailing: bool = False,
     allow_numwords: bool = False,
     start: Optional[int] = None,
+    custom_tags: Optional[dict[str, Any]] = None,
 ):
     """Deserialize ``s`` (a string containing a Floyd datafile) to a Python
     object.
@@ -155,10 +189,12 @@ def loads(
         object_hook=object_hook,
         parse_number=parse_number,
         parse_numword=parse_numword,
+        parse_bareword=parse_bareword,
         object_pairs_hook=object_pairs_hook,
         allow_trailing=allow_trailing,
         allow_numwords=allow_numwords,
         start=start,
+        custom_tags=custom_tags,
     )
     if err:
         raise ValueError(err)
@@ -168,17 +204,19 @@ def loads(
 def parse(
     s: str,
     *,
+    allow_trailing: bool = False,
+    allow_numwords: bool = False,
     encoding: Optional[str] = None,
     cls: Any = None,
     object_hook: Optional[Callable[[Mapping[str, Any]], Any]] = None,
-    parse_number: Optional[Callable[[str], Any]] = None,
-    parse_numword: Optional[Callable[[str], Any]] = None,
     object_pairs_hook: Optional[
         Callable[[Iterable[Tuple[str, Any]]], Any]
     ] = None,
-    allow_trailing: bool = False,
-    allow_numwords: bool = False,
+    parse_number: Optional[Callable[[str], Any]] = None,
+    parse_numword: Optional[Callable[[str], Any]] = None,
+    parse_bareword: Optional[Callable[[str, bool], Any]] = None,
     start: Optional[int] = None,
+    custom_tags: Optional[dict[str, Any]] = None,
 ):
     """Parse ```s``, returning positional information along with a value.
 
@@ -230,98 +268,200 @@ def parse(
         [1, 2, 3, 4]
 
     """
-    assert cls is None, 'Custom decoders are not supported'
-
-    if isinstance(s, bytes):
-        encoding = encoding or 'utf-8'
-        s = s.decode(encoding)
-
-    if not s:
-        raise ValueError('Empty strings are not legal Floyd datafiles')
-    start = start or 0
-    externs = {
-        'allow_trailing': allow_trailing,
-        'allow_numwords': allow_numwords,
-    }
-    ast, err, pos = parser.parse(s, '<string>', externs)
-    if err:
-        return None, err, pos
-
-    value = _convert(
-        ast,
+    cls = cls or Decoder
+    obj = cls()
+    return obj.parse(
+        s,
+        allow_numwords=allow_numwords,
+        allow_trailing=allow_trailing,
+        encoding=encoding,
         object_hook=object_hook,
+        object_pairs_hook=object_pairs_hook,
         parse_number=parse_number,
         parse_numword=parse_numword,
-        object_pairs_hook=object_pairs_hook,
+        parse_bareword=parse_bareword,
+        start=start,
+        custom_tags=custom_tags,
     )
-    return value, None, pos
 
 
-def _convert(
-    ast,
-    object_hook,
-    parse_number,
-    parse_numword,
-    object_pairs_hook,
-):
-    def _dictify(pairs):
+class Decoder:
+    def __init__(self):
+        self._allow_trailing = False
+        self._allow_numwords = False
+        self._parse_number = None
+        self._parse_numword = None
+        self._parse_bareword = None
+        self._parse_object = None
+        self._parse_object_pairs = None
+        self._custom_tags = None
+
+    def parse(
+        self,
+        s: str,
+        *,
+        encoding: Optional[str] = None,
+        object_hook: Optional[Callable[[Mapping[str, Any]], Any]] = None,
+        object_pairs_hook: Optional[
+            Callable[[Iterable[Tuple[str, Any]]], Any]
+        ] = None,
+        parse_number: Optional[Callable[[str], Any]] = None,
+        parse_numword: Optional[Callable[[str], Any]] = None,
+        parse_bareword: Optional[Callable[[str, bool], Any]] = None,
+        allow_trailing=False,
+        allow_numwords=False,
+        start=0,
+        custom_tags: Optional[dict[str, Any]] = None,
+    ) -> Tuple[Any, Optional[str], Optional[int]]:
+        self._allow_trailing = allow_trailing
+        self._allow_numwords = allow_numwords
+        self._parse_object = object_hook
+        self._parse_object_pairs = object_pairs_hook
+        self._parse_number = parse_number or self.parse_number
+        self._parse_numword = parse_numword or self.parse_numword
+        self._parse_bareword = parse_bareword or self.parse_bareword
+        self._custom_tags = custom_tags or {}
+
+        if isinstance(s, bytes):
+            encoding = encoding or 'utf-8'
+            s = s.decode(encoding)
+
+        if not s:
+            raise ValueError('Empty strings are not legal Floyd datafiles')
+        start = start or 0
+        externs = {
+            'allow_trailing': self._allow_trailing,
+            'allow_numwords': self._allow_numwords,
+        }
+        ast, err, pos = parser.parse(s, '<string>', externs)
+        if err:
+            return None, err, pos
+
+        value = self._walk_ast(ast)
+        return value, None, pos
+
+    def parse_array(self, tag, objs):
+        if tag:
+            raise ValueError(f'Unsupported array tag {tag}')
+        return objs
+
+    def parse_number(self, s):
+        s = s.replace('_', '')
+        if s.startswith('0x'):
+            return int(s, base=16)
+        if s.startswith('0b'):
+            return int(s, base=2)
+        if s.startswith('0o'):
+            return int(s, base=8)
+        if '.' in s or 'e' in s or 'E' in s:
+            return float(s)
+        return int(s)
+
+    def parse_numword(self, s):
+        return s
+
+    def parse_bareword(self, s, as_key):
+        del as_key
+        i = 0
+        ret = []
+        while i < len(s):
+            if s[i] == '\\':
+                i, c = decode_escape(s, i)
+                ret.append(c)
+            else:
+                ret.append(s[i])
+                i += 1
+        return ''.join(ret)
+
+    def parse_string(self, tag, s, as_key):
+        del as_key
+        is_rstr = 'r' in tag
+        is_dstr = 'd' in tag
+        i = 0
+        ret = []
+        while i < len(s):
+            if s[i] == '\\' and not is_rstr:
+                i, c = decode_escape(s, i)
+                ret.append(c)
+            else:
+                ret.append(s[i])
+                i += 1
+        if is_dstr:
+            return dedent(''.join(ret))
+        return ''.join(ret)
+
+    def parse_string_list(self, tag, strs):
+        if tag:
+            raise ValueError(f'Unsupported string_list tag {tag}')
+        return ''.join(strs)
+
+    def parse_object_pairs(self, tag, pairs):
+        if tag:
+            raise ValueError(f'Unsupported object tag {tag}')
         keys = set()
         key_pairs = []
-        for key_ast, val in pairs:
-            _, tag, s = key_ast
-            key = _decode_str(s, 'r' in tag, 'd' in tag)
+        for key, val in pairs:
             if key in keys:
                 raise ValueError(f'Duplicate key "{key}" found in object')
             keys.add(key)
             key_pairs.append((key, val))
-
-        if object_pairs_hook:
-            return object_pairs_hook(key_pairs)
-        if object_hook:
-            return object_hook(dict(key_pairs))
+        if self._parse_object_pairs:
+            return self._parse_object_pairs(key_pairs)
+        if self._parse_object:
+            return self._parse_object(dict(key_pairs))
         return dict(key_pairs)
 
-    return _walk_ast(
-        ast,
-        _dictify,
-        parse_number or _decode_number,
-        parse_numword or _decode_numword,
-    )
+    def _walk_ast(self, el):
+        ty, tag, v = el
+        if ty == 'true':
+            return True
+        if ty == 'false':
+            return False
+        if ty == 'null':
+            return None
+        if ty == 'number':
+            return self._parse_number(v)
+        if ty == 'numword':
+            return self._parse_numword(v)
+        if ty == 'bareword':
+            return self._parse_bareword(v, as_key=False)
+        if ty == 'string':
+            if tag in self._custom_tags:
+                return self._custom_tags[tag](ty, tag, v, as_key=False)
+            return self.parse_string(tag, v, as_key=False)
+        if ty == 'string_list':
+            r = [self._walk_ast(el) for el in v]
+            if tag in self._custom_tags:
+                return self._custom_tags[tag](ty, tag, v)
+            return self.parse_string_list(tag, r)
+        if ty == 'object':
+            pairs = []
+            for key_ast, obj in v:
+                ty, key_tag, s = key_ast
+                if ty == 'string':
+                    if key_tag in self._custom_tags:
+                        key = self._custom_tags[key_tag](
+                            ty, key_tag, s, as_key=True
+                        )
+                    else:
+                        key = self.parse_string(key_tag, s, as_key=True)
+                else:
+                    assert ty == 'bareword'
+                    key = self._parse_bareword(s, as_key=True)
+                v = self._walk_ast(obj)
+                pairs.append((key, v))
+            if tag in self._custom_tags:
+                return self._custom_tags[tag](ty, tag, pairs)
+            return self.parse_object_pairs(tag, pairs)
+        if ty == 'array':
+            vals = [self._walk_ast(el) for el in v]
+            if tag in self._custom_tags:
+                self._custom_tags[tag](ty, tag, vals)
+            return self.parse_array(tag, [self._walk_ast(el) for el in v])
+        raise ValueError('unknown el: ' + el)  # pragma: no cover
 
 
-def _decode_number(v):
-    s = v.replace('_', '')
-    if s.startswith('0x'):
-        return int(s, base=16)
-    if s.startswith('0b'):
-        return int(s, base=2)
-    if s.startswith('0o'):
-        return int(s, base=8)
-    if '.' in s or 'e' in s or 'E' in s:
-        return float(s)
-    return int(s)
-
-
-def _decode_numword(v):
-    return v
-
-
-def _decode_str(s, is_rstr, is_dstr):
-    i = 0
-    ret = []
-    while i < len(s):
-        if s[i] == '\\' and not is_rstr:
-            i, c = _decode_escape(s, i)
-            ret.append(c)
-        else:
-            ret.append(s[i])
-            i += 1
-    if is_dstr:
-        return dedent(''.join(ret))
-    return ''.join(ret)
-
-
-def _decode_escape(s, i):
+def decode_escape(s, i):
     c = s[i + 1]
     if c == 'n':
         return i + 2, '\n'
@@ -343,22 +483,24 @@ def _decode_escape(s, i):
         return i + 2, '"'
     if c == '`':
         return i + 2, '`'
+    if c == '\\':
+        return i + 2, '\\'
     if c == 'x':
-        if _check(s, i + 2, 2, _ishex):
+        if _check(s, i + 2, 2, ishex):
             return i + 4, chr(int(s[i + 2 : i + 4], base=16))
     if c == 'u':
-        if _check(s, i + 2, 4, _ishex):
+        if _check(s, i + 2, 4, ishex):
             return i + 6, chr(int(s[i + 2 : i + 6], base=16))
     if c == 'U':
-        if _check(s, i + 2, 8, _ishex):
+        if _check(s, i + 2, 8, ishex):
             return i + 10, chr(int(s[i + 2 : i + 10], base=16))
-    if len(s) > i + 1 and _isoct(s[i + 1]):
+    if len(s) > i + 1 and isoct(s[i + 1]):
         x = int(s[i + 1], base=8)
         j = 2
-        if len(s) > i + 2 and _isoct(s[i + 2]):
+        if len(s) > i + 2 and isoct(s[i + 2]):
             x = x * 8 + int(s[i + 2], base=8)
             j += 1
-        if len(s) > i + 3 and _isoct(s[i + 3]):
+        if len(s) > i + 3 and isoct(s[i + 3]):
             x = x * 8 + int(s[i + 2], base=8)
             j += 1
         return j, chr(x)
@@ -371,17 +513,16 @@ def _check(s, i, n, fn):
     return all(fn(s[j]) for j in range(i, i + n))
 
 
-def _ishex(ch):
+def ishex(ch):
     return ch in '0123456789abcdefABCDEF'
 
 
-def _isoct(ch):
+def isoct(ch):
     return '0' <= ch <= '7'
 
 
 def dedent(s):
     # TODO: Figure out what to do with tabs and other non-space whitespace.
-
     def _indent(s):
         i = 0
         while i < len(s) and s[i] == ' ':
@@ -390,50 +531,51 @@ def dedent(s):
 
     lines = s.splitlines()
     if len(lines) < 2:
-        return s
+        return s.strip()
 
-    line0 = lines[0]
-    min_indent = min(_indent(line) for line in lines[1:])
-    if line0.strip():
-        r = line0 + '\n'
-    else:
-        r = ''
-    return r + '\n'.join(line[min_indent:] for line in lines[1:]) + '\n'
+    min_indent = min(_indent(line) for line in lines[1:] if line)
 
+    # TODO: It's not clear what the best thing to do with multiline strings
+    # with text on the first line is. Examples:
+    #
+    # one = d'foo
+    #   bar'
+    # two = d'  foo
+    #   bar'
+    # three = d'  foo
+    #           bar'
+    # four  = d'  foo  '
+    #
+    # The only one of these that seems really useful is three, if it evaluated
+    # to '  foo\nbar'; that would allow you to do indented first lines
+    # without having to use an extra line. The other two just seem kinda
+    # goofy. However, we can't currently implement three correctly because
+    # the AST doesn't contain the column number the string starts at.
+    #
+    # We support evaluating four to 'foo'; that would be reasonably
+    # consistent with other things, although it's not clear why you
+    # would want to dedent a single-line string at all.
+    #
+    # For now, just raise an error if there is ever non-blank text
+    # on the first line of a multiline string. We should try to fix this
+    # to support three before widely publicizing the format.
+    if lines[0] and not lines[0].isspace():
+        raise ValueError(
+            "Multiline strings can't have any text on the same "
+            'line as the opening quote'
+        )
+    r = ''
+    if lines[1:-1]:
+        r += (
+            '\n'.join(line[min_indent:].rstrip() for line in lines[1:-1])
+            + '\n'
+        )
+    if not lines[-1].isspace():
+        r += lines[-1][min_indent:]
+        if s.endswith('\n'):
+            r += '\n'
 
-def _walk_ast(
-    el,
-    dictify: Callable[[Iterable[Tuple[str, Any]]], Any],
-    parse_number,
-    parse_numword,
-):
-    ty, tag, v = el
-    if ty == 'true':
-        return True
-    if ty == 'false':
-        return False
-    if ty == 'null':
-        return None
-    if ty == 'number':
-        return parse_number(v)
-    if ty == 'numword':
-        return parse_numword(v)
-    if ty == 'string':
-        return _decode_str(v, 'r' in tag, 'd' in tag)
-    if ty == 'string_list':
-        r = [_walk_ast(el, dictify, parse_number, parse_numword) for el in v]
-        return ''.join(r)
-    if ty == 'object':
-        pairs = []
-        for key, val_expr in v:
-            val = _walk_ast(val_expr, dictify, parse_number, parse_numword)
-            pairs.append((key, val))
-        return dictify(pairs)
-    if ty == 'array':
-        return [
-            _walk_ast(el, dictify, parse_number, parse_numword) for el in v
-        ]
-    raise ValueError('unknown el: ' + el)  # pragma: no cover
+    return r
 
 
 def dump(
@@ -629,97 +771,7 @@ class Encoder:
     def _encode_str(self, obj: str, *, as_key: bool) -> str:
         if as_key:
             return obj
-
-        m = _bare_word_re.match(obj, re.MULTILINE)
-        if m:
-            return obj
-        return self._encode_quoted_str(obj)
-
-    def _encode_quoted_str(self, s: str) -> str:
-        """Returns a quoted string with a minimal number of escaped quotes."""
-        quote_map = {"'": 0, '"': 0, '`': 0, "'''": 0, '"""': 0, '```': 0}
-        lstrs: dict[int, bool] = {}
-
-        i = 0
-        while i < len(s):
-            if s[i] == '\\' and s[i + 1] in '\'"`':
-                i += 2
-            for k in quote_map:
-                if s[i:].startswith(k):
-                    quote_map[k] += 1
-                    i += len(k)
-                    break
-            else:
-                m = _long_str_re.match(s[i:])
-                if m:
-                    lstrs[len(m.group(0)) - 2] = True
-                    i += len(m.group(0))
-                else:
-                    i += 1
-
-        quote = sorted(quote_map.keys(), key=lambda k: quote_map[k])[0]
-        if quote_map[quote]:
-            i = 1
-            while True:
-                if i in lstrs:
-                    i += 1
-                    continue
-                quote = "l'" + '=' * i + "'"
-                break
-
-        i = 0
-        ret = []
-        while i < len(s):
-            if s.startswith(quote, i):
-                ret.append('\\')
-                ret.append(quote[0])
-                i += len(quote)
-                continue
-
-            ch = s[i]
-            o = ord(ch)
-            if o < 32:
-                ret.append(self._escape_ch(ch))
-            elif o < 128 or (
-                not self.ensure_ascii and ch not in ('\u2028', '\u2029')
-            ):
-                ret.append(ch)
-            else:
-                ret.append(self._escape_ch(ch))
-            i += 1
-        return quote + ''.join(ret) + quote
-
-    def _escape_ch(self, ch: str) -> str:
-        """Returns the backslash-escaped representation of the char."""
-        if ch == '\\':
-            return '\\\\'
-        if ch == "'":
-            return r'\''
-        if ch == '"':
-            return r'\"'
-        if ch == '\n':
-            return r'\n'
-        if ch == '\r':
-            return r'\r'
-        if ch == '\t':
-            return r'\t'
-        if ch == '\b':
-            return r'\b'
-        if ch == '\f':
-            return r'\f'
-        if ch == '\v':
-            return r'\v'
-        if ch == '\0':
-            return r'\0'
-
-        o = ord(ch)
-        if o < 65536:
-            return rf'\u{o:04x}'
-
-        val = o - 0x10000
-        high = 0xD800 + (val >> 10)
-        low = 0xDC00 + (val & 0x3FF)
-        return rf'\u{high:04x}\u{low:04x}'
+        return encode_string(obj, self.ensure_ascii)
 
     def _encode_non_basic_type(self, obj, seen: Set, level: int) -> str:
         # Basic types can't be recursive so we only check for circularity
@@ -740,7 +792,7 @@ class Encoder:
             max_len = 80
         if isinstance(obj, collections.abc.Mapping):
             s = self._encode_dict(obj, seen, level + 1, oneline=True)
-            if len(s) > max_len or '\n' in s:
+            if len(s) > max_len and ('\n' not in s):
                 s = self._encode_dict(obj, seen, level + 1, oneline=False)
         elif isinstance(obj, collections.abc.Sequence):
             s = self._encode_array(obj, seen, level + 1, oneline=True)
@@ -763,7 +815,10 @@ class Encoder:
             return '{}'
 
         indent_str, end_str = self._spacers(level, False)
-        item_sep = self.item_separator + indent_str
+        if '\n' in indent_str:
+            item_sep = self.item_separator.strip() + indent_str
+        else:
+            item_sep = self.item_separator + indent_str
         kv_sep = self.kv_separator
 
         if self.sort_keys:
@@ -788,6 +843,22 @@ class Encoder:
                 s += item_sep
 
             val_str = self.encode(obj[key], seen, level, as_key=False)
+            if (
+                isinstance(obj[key], str)
+                and '\n' in obj[key]
+                and self.indent is not None
+            ):
+                if isinstance(self.indent, int):
+                    d_indent_str = indent_str + ' ' * self.indent
+                else:
+                    d_indent_str = indent_str + self.indent
+                lines = val_str.splitlines()
+                leading_quote = _get_leading_quote(lines[0])
+                val_str = 'd' + leading_quote
+                val_str += d_indent_str + lines[0][len(leading_quote) :]
+                for line in lines[1:-1]:
+                    val_str += d_indent_str + line
+                val_str += d_indent_str + lines[-1]
             s += key_str + kv_sep + val_str
 
         s += end_str + '}'
@@ -830,6 +901,119 @@ class Encoder:
             indent_str = ''
             end_str = ''
         return indent_str, end_str
+
+
+def encode_string(
+    obj: str, ensure_ascii: bool = True, escape_newlines=False
+) -> str:
+    m = _bare_word_re.match(obj)
+    if m:
+        return obj
+    return encode_quoted_string(obj, ensure_ascii, escape_newlines)
+
+
+def encode_quoted_string(
+    s: str, ensure_ascii=True, escape_newlines=False
+) -> str:
+    """Returns a quoted string with a minimal number of escaped quotes."""
+    quote_map: dict[str, int] = {}
+    for token in quote_tokens:
+        quote_map[token] = 0
+    lstrs: dict[int, bool] = {}
+
+    i = 0
+    while i < len(s):
+        if s[i] == '\\' and s[i + 1] in '\'"`':
+            i += 2
+        for k in quote_map:
+            if s[i:].startswith(k):
+                quote_map[k] += 1
+                i += len(k)
+                break
+        else:
+            m = _long_str_re.match(s[i:])
+            if m:
+                lstrs[len(m.group(0)) - 2] = True
+                i += len(m.group(0))
+            else:
+                i += 1
+
+    min_quote_count = min(quote_map.values())
+    for tok in reversed(quote_tokens):
+        if quote_map[tok] == min_quote_count:
+            quote = tok
+            break
+    if quote_map[quote]:
+        i = 1
+        while True:
+            if i in lstrs:
+                i += 1
+                continue
+            quote = "l'" + '=' * i + "'"
+            break
+
+    i = 0
+    ret = []
+    while i < len(s):
+        if s.startswith(quote, i):
+            ret.append('\\')
+            ret.append(quote[0])
+            i += len(quote)
+            continue
+
+        ch = s[i]
+        o = ord(ch)
+        if o < 32:
+            ret.append(escape_char(ch))
+        elif o < 128 or (not ensure_ascii and ch not in ('\u2028', '\u2029')):
+            ret.append(ch)
+        else:
+            ret.append(escape_char(ch))
+        i += 1
+    ret = ['\n' if (r == '\\n' and not escape_newlines) else r for r in ret]
+
+    return quote + ''.join(ret) + quote
+
+
+def escape_char(ch: str) -> str:
+    """Returns the backslash-escaped representation of the char."""
+    if ch == '\\':
+        return '\\\\'
+    if ch == "'":
+        return r'\''
+    if ch == '"':
+        return r'\"'
+    if ch == '\n':
+        return r'\n'
+    if ch == '\r':
+        return r'\r'
+    if ch == '\t':
+        return r'\t'
+    if ch == '\b':
+        return r'\b'
+    if ch == '\f':
+        return r'\f'
+    if ch == '\v':
+        return r'\v'
+    if ch == '\0':
+        return r'\0'
+
+    o = ord(ch)
+    if o < 65536:
+        return rf'\u{o:04x}'
+
+    val = o - 0x10000
+    high = 0xD800 + (val >> 10)
+    low = 0xDC00 + (val & 0x3FF)
+    return rf'\u{high:04x}\u{low:04x}'
+
+
+def _get_leading_quote(s):
+    for q in quote_tokens:
+        if s.startswith(q):
+            return q
+    m = _long_str_re.match(s)
+    return m.group(0)
 
 
 def _raise_type_error(obj) -> Any:

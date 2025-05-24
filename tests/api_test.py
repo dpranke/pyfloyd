@@ -21,7 +21,7 @@ class APITest(unittest.TestCase):
     maxDiff = None
 
     def test_compile(self):
-        parser, err, _ = pyfloyd.compile('grammar = "foo" "bar"')
+        parser, err, _ = pyfloyd.compile_to_parser('grammar = "foo" "bar"')
         self.assertIsNone(err)
 
         val, err, _ = parser.parse('baz')
@@ -29,7 +29,7 @@ class APITest(unittest.TestCase):
         self.assertEqual(err, '<string>:1 Unexpected "b" at column 1')
 
     def test_compile_bad_grammar(self):
-        parser, err, _ = pyfloyd.compile('xyz')
+        parser, err, _ = pyfloyd.compile_to_parser('xyz')
         self.assertIsNone(parser)
         self.assertEqual(err, '<string>:1 Unexpected end of input at column 4')
 
@@ -37,7 +37,7 @@ class APITest(unittest.TestCase):
         txt, err, _ = pyfloyd.generate('grammar = "Hello" end -> true')
         self.assertIsNone(err)
         scope = {}
-        exec(txt, scope)
+        exec(txt, scope)  # pylint: disable=exec-used
         parse_fn = scope['parse']
         result = parse_fn('Hello', '<string>')
         self.assertIsNone(result.err)
@@ -57,7 +57,7 @@ class APITest(unittest.TestCase):
             err,
             (
                 'Unsupported language "q"\n'
-                'Only "javascript" and "python" are supported.\n'
+                'Only "datafile" and "javascript" and "python" are supported.\n'
             ),
         )
 

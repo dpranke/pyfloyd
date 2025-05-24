@@ -14,7 +14,8 @@
 
 import os
 
-import pyfloyd.datafile
+from pyfloyd import support, __version__
+from pyfloyd.datafile import tool
 
 
 class _Tests:
@@ -42,16 +43,16 @@ class _Tests:
         )
 
     def test_read_command(self):
-        self.check(['-c', '"foo"'], out="'foo'\n")
+        self.check(['-c', '"foo"'], out='foo\n')
 
     def test_read_from_stdin(self):
-        self.check([], stdin='"foo"\n', out="'foo'\n")
+        self.check([], stdin='"foo"\n', out='foo\n')
 
     def test_read_from_a_file(self):
         files = {
             'foo.fdf': '"foo"\n',
         }
-        self.check(['foo.fdf'], files=files, out="'foo'\n")
+        self.check(['foo.fdf'], files=files, out='foo\n')
 
     def test_unknown_switch(self):
         self.check(
@@ -66,22 +67,22 @@ class _Tests:
         )
 
     def test_version(self):
-        self.check(['--version'], out=str(pyfloyd.__version__) + '\n')
+        self.check(['--version'], out=str(__version__) + '\n')
 
 
-class Inline(pyfloyd.support.InlineTestCase, _Tests):
-    main = pyfloyd.datafile.main
+class Inline(support.InlineTestCase, _Tests):
+    main = tool.main
 
 
-class Module(pyfloyd.support.ModuleTestCase, _Tests):
+class Module(support.ModuleTestCase, _Tests):
     module = 'pyfloyd.datafile'
 
 
-class Script(pyfloyd.support.ScriptTestCase, _Tests):
+class Script(support.ScriptTestCase, _Tests):
     script = 'fdf'
 
 
-class Tool(pyfloyd.support.ScriptTestCase, _Tests):
+class Tool(support.ScriptTestCase, _Tests):
     script = os.path.join(
         os.path.dirname(__file__),
         '..',

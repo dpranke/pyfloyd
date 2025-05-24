@@ -21,8 +21,10 @@ import io
 import json
 import os
 import pathlib
+import pdb
 import pprint
 import sys
+import traceback
 
 # If necessary, add ../.. to sys.path so that we can run pyfloyd even when
 # it's not installed.
@@ -36,15 +38,16 @@ if (
 
 # pylint: disable=wrong-import-position
 import pyfloyd
-from pyfloyd import generator
-from pyfloyd.support import Host
+from pyfloyd import datafile, support
 
 
 def main(argv=None, host=None):
-    host = host or Host()
+    host = host or support.Host()
 
+    args = None
     try:
         args, err = _parse_args(host, argv)
+
         if err is not None:
             return err
 
@@ -55,8 +58,8 @@ def main(argv=None, host=None):
 
         externs = {}
         for d in args.define:
-            k, v = d.split('=', 1)
-            externs[k] = json.loads(v)
+            vs = datafile.loads(d)
+            externs.update(vs)
 
         if args.ast or args.full_ast:
             ast, err = pyfloyd.dump_ast(
@@ -76,10 +79,8 @@ def main(argv=None, host=None):
         elif args.pretty_print:
             contents, err = pyfloyd.pretty_print(grammar, args.grammar)
         elif args.compile:
-            if not args.language:
-                args.language = pyfloyd.DEFAULT_LANGUAGE
-            options = pyfloyd.GeneratorOptions(
-                language=args.language, main=args.main, memoize=args.memoize
+            options = pyfloyd.generator_options_from_args(
+                args, argv, language=None
             )
             contents, err, _ = pyfloyd.generate(
                 grammar, path=args.grammar, options=options
@@ -91,18 +92,25 @@ def main(argv=None, host=None):
             host.print(err, file=host.stderr)
             return 1
         _write(host, args.output, contents)
-        if args.compile and args.main:
+        if args.compile and args.main and args.output != '-':
             host.make_executable(args.output)
         return 0
 
     except KeyboardInterrupt:
         host.print('Interrupted, exiting.', file=host.stderr)
         return 130  # SIGINT
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        if args and args.post_mortem:
+            traceback.print_exception(exc)
+            pdb.post_mortem()
+        else:
+            raise exc
+        return 1
 
 
 def _parse_args(host, argv):
     ap = argparse.ArgumentParser(prog='pyfloyd')
-    generator.add_language_arguments(ap)
+    pyfloyd.add_generator_arguments(ap)
     ap.add_argument(
         '--ast', action='store_true', help='dump the parsed AST of the grammar'
     )
@@ -124,9 +132,9 @@ def _parse_args(host, argv):
         '-D',
         '--define',
         action='append',
-        metavar='var=val',
+        metavar='datafile-string',
         default=[],
-        help='Define an external var=value',
+        help='options for the grammar (specified as %%externs in the grammar)',
     )
     ap.add_argument(
         '-o', '--output', metavar='path', help='path to write output to'
@@ -151,24 +159,8 @@ def _parse_args(host, argv):
         '-V',
         '--version',
         action='store_true',
-        help='print current version (%s)' % pyfloyd.__version__,
+        help=f'print current version ({pyfloyd.__version__})',
     )
-    ap.add_argument(
-        '-M',
-        '--memoize',
-        action='store_true',
-        default=False,
-        help='memoize intermediate results (off by default)',
-    )
-    ap.add_argument('--no-memoize', dest='memoize', action='store_false')
-    ap.add_argument(
-        '-m',
-        '--main',
-        action='store_true',
-        default=False,
-        help='generate a main() wrapper (off by default)',
-    )
-    ap.add_argument('--no-main', dest='main', action='store_false')
     ap.add_argument(
         'grammar',
         nargs='?',
@@ -178,6 +170,7 @@ def _parse_args(host, argv):
     ap.add_argument(
         'input', nargs='?', default='-', help='path to read data from'
     )
+    ap.add_argument('--post-mortem', '--pm', action='store_true')
 
     args = ap.parse_args(argv)
 
@@ -189,31 +182,31 @@ def _parse_args(host, argv):
         host.print('You must specify a grammar.')
         return None, 2
 
+    if not args.language:
+        if args.output:
+            ext = os.path.splitext(args.output)[1]
+            args.language = pyfloyd.EXT_TO_LANG[ext].name
+        else:
+            args.language = pyfloyd.DEFAULT_LANGUAGE
+            ext = pyfloyd.LANGUAGE_MAP[args.language].ext
+    else:
+        ext = pyfloyd.LANGUAGE_MAP[args.language].ext
+
     if not args.output:
         if args.compile:
-            if not args.language:
-                args.language = generator.DEFAULT_LANGUAGE
-            ext = generator.LANG_TO_EXT[args.language]
-            args.output = host.splitext(args.grammar)[0] + ext
+            args.output = host.splitext(args.grammar)[0] + '.' + ext
         else:
             args.output = '-'
-    elif not args.language:
-        if not args.language:
-            ext = os.path.splitext(args.output)[1]
-            args.language = generator.EXT_TO_LANG[ext]
 
     return args, None
 
 
 def _read_grammar(host, args):
     if not host.exists(args.grammar):
-        return None, 'Error: no such file: "%s"' % args.grammar
+        return None, f'Error: no such file: "{args.grammar}"'
 
-    try:
-        grammar_txt = host.read_text_file(args.grammar)
-        return grammar_txt, None
-    except Exception as e:
-        return None, 'Error reading "%s": %s' % (args.grammar, str(e))
+    grammar_txt = host.read_text_file(args.grammar)
+    return grammar_txt, None
 
 
 def _interpret_grammar(host, args, grammar, externs):

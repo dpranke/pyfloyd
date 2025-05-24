@@ -14,30 +14,66 @@
 
 # pylint: disable=too-many-positional-arguments
 
-from typing import Any, Dict, NamedTuple, Optional, Protocol, Tuple
+import argparse
+import os
+from typing import Any, NamedTuple, Optional, Protocol, Sequence, Union
 
-from pyfloyd import analyzer, ast
-from pyfloyd.interpreter import Interpreter
-from pyfloyd import parser
-from pyfloyd.printer import Printer
-from pyfloyd import generator
-from pyfloyd.python_generator import PythonGenerator
-from pyfloyd.javascript_generator import JavaScriptGenerator
+from pyfloyd import (
+    analyzer,
+    datafile_generator,
+    generator,
+    interpreter as m_interpreter,
+    javascript_generator,
+    python_generator,
+    grammar as m_grammar,
+    grammar_parser,
+    printer,
+    support,
+    version,
+)
 
-Result = parser.Result
 
-Externs = Optional[Dict[str, Any]]
+__version__ = version.__version__
 
-Generator = generator.Generator
+_generators = (
+    datafile_generator.DatafileGenerator,
+    javascript_generator.JavaScriptGenerator,
+    python_generator.PythonGenerator,
+)
+
+DEFAULT_LANGUAGE = 'python'
+
+DEFAULT_TEMPLATE = os.path.join(os.path.dirname(__file__), 'python.dft')
+
+EXT_TO_LANG = {gen.ext: gen.name for gen in _generators}
+
+LANGUAGE_MAP = {gen.name.lower(): gen for gen in _generators}
+
+SUPPORTED_LANGUAGES = tuple(gen.name.lower() for gen in _generators)
+
+Externs = Optional[dict[str, Any]]
+
 GeneratorOptions = generator.GeneratorOptions
-DEFAULT_LANGUAGE = generator.DEFAULT_LANGUAGE
-SUPPORTED_LANGUAGES = generator.SUPPORTED_LANGUAGES
 
-_generators = {
-    'javascript': JavaScriptGenerator,
-    'python': PythonGenerator,
-}
-assert set(_generators.keys()) == set(generator.SUPPORTED_LANGUAGES)
+Grammar = m_grammar.Grammar
+
+Host = support.Host
+
+Result = grammar_parser.Result
+
+
+def add_generator_arguments(
+    parser: argparse.ArgumentParser, default_language=DEFAULT_LANGUAGE
+):
+    return generator.add_arguments(parser, default_language, _generators)
+
+
+def generator_options_from_args(
+    args: argparse.Namespace,
+    argv: Sequence[str],
+    language: str = DEFAULT_LANGUAGE,
+):
+    return generator.options_from_args(args, argv, language)
 
 
 class ParserInterface(Protocol):
@@ -79,7 +115,7 @@ class CompiledResult(NamedTuple):
     pos: Optional[int] = None
 
 
-def compile(  # pylint: disable=redefined-builtin
+def compile_to_parser(  # pylint: disable=redefined-builtin
     grammar: str,
     path: str = '<string>',
     memoize: bool = False,
@@ -90,12 +126,12 @@ def compile(  # pylint: disable=redefined-builtin
     This routine parses the provided grammar and returns an object
     that can parse strings according to the grammar.
     """
-    result = parser.parse(grammar, path, externs)
+    result = grammar_parser.parse(grammar, path, externs)
     if result.err:
         return CompiledResult(err=result.err, pos=result.pos)
     try:
         g = analyzer.analyze(result.val, rewrite_subrules=False)
-        interpreter = Interpreter(g, memoize=memoize)
+        interpreter = m_interpreter.Interpreter(g, memoize=memoize)
         return CompiledResult(interpreter, None)
     except analyzer.AnalysisError as e:
         return CompiledResult(None, str(e))
@@ -104,7 +140,7 @@ def compile(  # pylint: disable=redefined-builtin
 def generate(
     grammar: str,
     path: str = '<string>',
-    options: Optional[GeneratorOptions] = None,
+    options: Optional[Union[GeneratorOptions, dict[str, Any]]] = None,
     externs: Externs = None,
 ) -> Result:
     """Generate the source code of a parser.
@@ -137,29 +173,34 @@ def generate(
     the result will describe the errors.
     """
 
-    result = parser.parse(grammar, path, externs)
+    result = grammar_parser.parse(grammar, path, externs)
     if result.err:
         return result
     try:
-        grammar_obj = analyzer.analyze(
-            result.val,
-            rewrite_subrules=True,
-        )
+        grammar_obj = analyzer.analyze(result.val, rewrite_subrules=True)
     except analyzer.AnalysisError as e:
         return Result(err=str(e))
 
-    options = options or GeneratorOptions()
-    gen: Generator
-    cls = _generators.get(options.language.lower())
-    if cls:
-        gen = cls(grammar_obj, options)
-        text = gen.generate()
-        return Result(text)
+    if not isinstance(options, generator.GeneratorOptions):
+        if options is None:
+            options = generator.GeneratorOptions()
+        else:
+            assert options is None or isinstance(options, dict)
+            options = generator.GeneratorOptions(**options)
+
+    if options.language is None:
+        options.language = DEFAULT_LANGUAGE
+
+    for cls in _generators:
+        if options.language.lower() == cls.name.lower():
+            gen = cls(support.Host(), grammar_obj, options)
+            text = gen.generate()
+            return Result(text)
 
     supp = ' and '.join(f'"{lang}"' for lang in SUPPORTED_LANGUAGES)
     err = (
         f'Unsupported language "{options.language}"\n'
-        f'Only {supp} are supported.\n'
+        f'Only {supp.lower()} are supported.\n'
     )
     return Result(None, err, 0)
 
@@ -190,7 +231,7 @@ def parse(
     string where the parser stopped. If there is an error, `pos` will
     indicate where in the string the error occurred.
     """
-    result = compile(grammar, grammar_path, memoize=memoize)
+    result = compile_to_parser(grammar, grammar_path, memoize=memoize)
     if result.err:
         return Result(err='Error in grammar: ' + result.err, pos=result.pos)
     assert result.parser is not None
@@ -200,7 +241,7 @@ def parse(
 def pretty_print(
     grammar: str,
     path: str = '<string>',
-) -> Tuple[Optional[str], Optional[str]]:
+) -> tuple[Optional[str], Optional[str]]:
     """Pretty-print a grammar.
 
     `grammar` is the grammar to parse and format. `path` can be used to
@@ -212,22 +253,22 @@ def pretty_print(
     any errors, if it wasn't. If one of the values in the tuple is non-None,
     the other will be None.
     """
-    result = parser.parse(grammar, path)
+    result = grammar_parser.parse(grammar, path)
     if result.err:
         return None, result.err
-    return Printer(result.val).dumps(), None
+    return printer.Printer(result.val).dumps(), None
 
 
 def dump_ast(
     grammar: str,
     path: str = '<string>',
     rewrite_subrules: bool = False,
-) -> Tuple[Optional[ast.Node], Optional[str]]:
+) -> tuple[Optional[m_grammar.Node], Optional[str]]:
     """Returns the parsed AST from the grammar. Possibly useful for debugging.
 
     `rewrite_subrules` works as in the other methods.
     """
-    result = parser.parse(grammar, path)
+    result = grammar_parser.parse(grammar, path)
     if result.err:
         return None, result.err
 

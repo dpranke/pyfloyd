@@ -12,12 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# pragma: no cover
+import textwrap
+import unittest
 
-import sys
-
-from pyfloyd import tool
+import pyfloyd
 
 
-if __name__ == '__main__':
-    sys.exit(tool.main())
+from . import grammar_test
+
+
+class Tests(unittest.TestCase, grammar_test.GrammarTestsMixin):
+    max_diff = None
+
+    def compile(self, grammar, path='<string>', memoize=False, externs=None):
+        return pyfloyd.compile_to_parser(
+            textwrap.dedent(grammar), path, memoize=memoize, externs=externs
+        )

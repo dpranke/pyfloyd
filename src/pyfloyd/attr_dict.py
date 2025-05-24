@@ -1,4 +1,4 @@
-# Copyright 2024 Google Inc. All rights reserved.
+# Copyright 2025 Dirk Pranke. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,12 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# pragma: no cover
 
-import sys
+class AttrDict(dict):
+    """A very simple subclass of dict that permits direct reference to keys.
 
-from pyfloyd import tool
+    If a dict d contains the key 'foo', then you can access it with
+    `d.foo` as well as `d['foo']`."""
 
+    def __getattr__(self, name):
+        return self.__getitem__(name)
 
-if __name__ == '__main__':
-    sys.exit(tool.main())
+    def __setattr__(self, name, value):
+        return self.__setitem__(name, value)
+
+    def update(self, *args, **values):
+        for k, v in dict(*args, **values).items():
+            self[k] = v
