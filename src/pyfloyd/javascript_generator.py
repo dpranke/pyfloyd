@@ -248,13 +248,13 @@ class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
                     this.r_{starting_rule}();
 
                     if (this.failed) {{
-                      return new Result(null, this.error(), this.errpos);
+                      return new Result(null, this.o_error(), this.errpos);
                     }} else {{
                       return new Result(this.val, null, this.pos);
                     }}
                   }} catch (e) {{
                     if (e instanceof ParsingRuntimeError) {{
-                      let [lineno, _] = this.offsets(this.errpos);
+                      let [lineno, _] = this.o_offsets(this.errpos);
                       return new Result(null, this.path + ':' + lineno + ' ' + e.toString());
                     }} else {{
                       throw e;
@@ -281,7 +281,7 @@ class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
               this.r_{starting_rule}();
 
               if (this.failed) {{
-                return new Result(null, this.error(), this.errpos);
+                return new Result(null, this.o_error(), this.errpos);
               }} else {{
                 return new Result(this.val, null, this.pos);
               }}
@@ -335,6 +335,9 @@ class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
     def _gen_funcname(self, name: str) -> str:
         return 'this.fn_' + name
 
+    def _gen_opname(self, name: str) -> str:
+        return 'o_' + name
+
     def _gen_extern(self, name: str) -> str:
         return "this.externs.get('" + name + "');"
 
@@ -355,7 +358,7 @@ class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
             vl += 'if (!this.failed) {'
             vl += '  return;'
             vl += '}'
-            vl += 'this.rewind(pos);'
+            vl += 'this.o_rewind(pos);'
         vl += self._gen_stmts(node.ch[-1])
         return vl
 
@@ -372,7 +375,7 @@ class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
         vl += [
             '  if (this.failed) {',
             '    if (i >= cmin) {',
-            '      this.succeed(vs);',
+            '      this.o_succeed(vs);',
             '      return;',
             '    }',
             '    return;',
@@ -380,7 +383,7 @@ class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
             '  vs.push(this.val);',
             '  i += 1;',
             '}',
-            'this.succeed(vs);',
+            'this.o_succeed(vs);',
         ]
         return vl
 
@@ -428,11 +431,11 @@ class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
         vl += self._gen_stmts(node.child)
         vl += [
             'if (this.failed) {',
-            '  this.succeed(null, pos);',
+            '  this.o_succeed(null, pos);',
             '} else {',
-            '  this.rewind(pos);',
+            '  this.o_rewind(pos);',
             '  this.errpos = errpos;',
-            '  this.fail();',
+            '  this.o_fail();',
             '}',
         ]
         return vl
@@ -454,9 +457,9 @@ class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
         vl += self._gen_stmts(node.child)
         vl += [
             'if (this.failed) {',
-            '  this.succeed([], pos);',
+            '  this.o_succeed([], pos);',
             '} else {',
-            '  this.succeed([this.val]);',
+            '  this.o_succeed([this.val]);',
             '}',
         ]
         return vl
@@ -477,12 +480,12 @@ class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
             '  pos = this.pos;',
             formatter.Indent(sublines),
             '  if (this.failed || this.pos === pos) {',
-            '    this.rewind(pos);',
+            '    this.o_rewind(pos);',
             '    break;',
             '  }',
             '  vs.push(this.val);',
             '}',
-            'this.succeed(vs);',
+            'this.o_succeed(vs);',
         ]
         return vl
 
@@ -491,9 +494,9 @@ class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
         return formatter.VList(
             formatter.HList('v = ', arg),
             'if (v === true) {',
-            '  this.succeed(v);',
+            '  this.o_succeed(v);',
             '} else if (v === false) {',
-            '  this.fail();',
+            '  this.o_fail();',
             '} else {',
             "  throw new ParsingRuntimeError('Bad predicate value');",
             '}',
@@ -505,10 +508,10 @@ class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
             'r.lastIndex = this.pos;',
             'found = r.exec(this.text);',
             'if (found) {',
-            '  this.succeed(found[0], this.pos + found[0].length);',
+            '  this.o_succeed(found[0], this.pos + found[0].length);',
             '  return;',
             '}',
-            'this.fail();',
+            'this.o_fail();',
         )
 
     def _ty_run(self, node) -> formatter.VList:
@@ -549,12 +552,12 @@ class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
             '  pos = this.pos;',
             formatter.Indent(sublines),
             '  if (this.failed || this.pos === pos) {',
-            '    this.rewind(pos);',
+            '    this.o_rewind(pos);',
             '    break;',
             '  }',
             '  vs.push(this.val);',
             '}',
-            'this.succeed(vs);',
+            'this.o_succeed(vs);',
         )
         return vl
 
@@ -656,33 +659,33 @@ _BUILTINS = {
     'r_any': """
         r_any() {
           if (this.pos < this.end) {
-            this.succeed(this.text[this.pos], this.pos + 1);
+            this.o_succeed(this.text[this.pos], this.pos + 1);
           } else {
-            this.fail();
+            this.o_fail();
           }
         }
         """,
     'r_end': """
         r_end() {
           if (this.pos === this.end) {
-            this.succeed(null);
+            this.o_succeed(null);
           } else {
-            this.fail();
+            this.o_fail();
           }
         }
         """,
     'ch': """
-        ch(c) {
+        o_ch(c) {
           let pos = this.pos;
           if (pos < this.end && this.text[pos] === c) {
-            this.succeed(c, this.pos + 1);
+            this.o_succeed(c, this.pos + 1);
           } else {
-            this.fail();
+            this.o_fail();
           }
         }
         """,
     'offsets': """
-        offsets(pos) {
+        o_offsets(pos) {
           let lineno = 1;
           let colno = 1;
           for (let i = 0; i < pos; i++) {
@@ -697,8 +700,8 @@ _BUILTINS = {
         }
         """,
     'error': """
-        error() {
-          let [lineno, colno] = this.offsets(this.errpos);
+        o_error() {
+          let [lineno, colno] = this.o_offsets(this.errpos);
           let thing;
           if (this.errpos === this.end) {
             thing = 'end of input';
@@ -709,14 +712,14 @@ _BUILTINS = {
         }
         """,
     'fail': """
-        fail() {
+        o_fail() {
           this.val = undefined;
           this.failed = true;
           this.errpos = Math.max(this.errpos, this.pos);
         }
         """,
     'leftrec': """
-        leftrec(rule, rule_name, left_assoc) {
+        o_leftrec(rule, rule_name, left_assoc) {
           let pos = this.pos;
           let key = [rule_name, pos];
           let seed = this.seeds[key];
@@ -752,7 +755,7 @@ _BUILTINS = {
         }
         """,
     'lookup': """
-        lookup(v) {
+        o_lookup(v) {
           let l = this.scopes.length - 1;
           while (l >= 0) {
             if (this.scopes[l].has(v)) {
@@ -767,7 +770,7 @@ _BUILTINS = {
         }
         """,
     'memoize': """
-        memoize(rule_name, fn) {
+        o_memoize(rule_name, fn) {
           let pos = this.pos;
           if (!this.cache.has(pos)) {
             this.cache.set(pos, new Map());
@@ -781,7 +784,7 @@ _BUILTINS = {
         }
         """,
     'operator': """
-        operator(rule_name) {
+        o_operator(rule_name) {
           let o = this.operators[rule_name];
           let pos = this.pos;
           let key = [rule_name, pos];
@@ -815,7 +818,7 @@ _BUILTINS = {
                 repeat = true;
                 break;
               }
-              this.rewind(pos);
+              this.o_rewind(pos);
             }
             if (!repeat) {
               i += 1;
@@ -831,29 +834,29 @@ _BUILTINS = {
         }
         """,
     'range': """
-        range(i, j) {
+        o_range(i, j) {
           let pos = this.pos;
           if (pos == this.end) {
-            this.fail();
+            this.o_fail();
             return;
           }
           let c = this.text[pos];
           if (i <= c && c <= j) {
-            this.succeed(this.text[pos], this.pos + 1);
+            this.o_succeed(this.text[pos], this.pos + 1);
           } else {
-            this.fail();
+            this.o_fail();
           }
         }
         """,
     'rewind': """
-        rewind(newpos) {
-          this.succeed(null, newpos);
+        o_rewind(newpos) {
+          this.o_succeed(null, newpos);
         }
         """,
     'str': """
-        str(s) {
+        o_str(s) {
           for (let ch of s) {
-            this.ch(ch);
+            this.o_ch(ch);
             if (this.failed) {
               return;
             }
@@ -862,7 +865,7 @@ _BUILTINS = {
         }
         """,
     'succeed': """
-        succeed(v, newpos = null) {
+        o_succeed(v, newpos = null) {
           this.val = v;
           this.failed = false;
           if (newpos !== null) {
@@ -871,17 +874,17 @@ _BUILTINS = {
         }
         """,
     'unicat': """
-        unicat(cat) {
+        o_unicat(cat) {
           if (this.pos == this.end) {
-            this.fail();
+            this.o_fail();
             return
           }
           let c = this.text[this.pos];
           let re = new RegExp(`\\\\p{${cat}}`, 'u');
           if (c.match(re)) {
-            this.succeed(c, this.pos + 1);
+            this.o_succeed(c, this.pos + 1);
           } else {
-            this.fail();
+            this.o_fail();
           }
         }
         """,

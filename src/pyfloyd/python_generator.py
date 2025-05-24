@@ -368,10 +368,10 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
                         self._r_{starting_rule}()
 
                         if self._failed:
-                            return Result(None, self._error(), self._errpos)
+                            return Result(None, self._o_error(), self._errpos)
                         return Result(self._val, None, self._pos)
                     except _ParsingRuntimeError as e:  # pragma: no cover
-                        lineno, _ = self._offsets(self._errpos)
+                        lineno, _ = self._o_offsets(self._errpos)
                         return Result(
                             None,
                             self._path + ':' + str(lineno) + ' ' + str(e),
@@ -390,7 +390,7 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
                 self._r_{starting_rule}()
 
                 if self._failed:
-                    return Result(None, self._error(), self._errpos)
+                    return Result(None, self._o_error(), self._errpos)
                 return Result(self._val, None, self._pos)
             """
         )
@@ -429,6 +429,9 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
     def _gen_extern(self, name: str) -> str:
         return "self._externs['" + name + "']"
 
+    def _gen_opname(self, name: str) -> str:
+        return 'o_' + name
+
     def _gen_invoke(self, fn, *args) -> formatter.Saw:
         return formatter.Saw(
             'self._' + fn, formatter.Triangle('(', formatter.Comma(*args), ')')
@@ -444,7 +447,7 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
             vl += self._gen_stmts(subnode)
             vl += 'if not self._failed:'
             vl += '    return'
-            vl += 'self._rewind(p)'
+            vl += 'self._o_rewind(p)'
         vl += self._gen_stmts(node.ch[-1])
         return vl
 
@@ -458,14 +461,14 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
         svl = self._gen_stmts(node.child)
         svl += 'if self._failed:'
         svl += '    if i >= cmin:'
-        svl += '        self._succeed(vs)'
+        svl += '        self._o_succeed(vs)'
         svl += '        return'
         svl += '    return'
         svl += 'vs.append(self._val)'
         svl += 'i += 1'
 
         vl += formatter.Indent(svl)
-        vl += 'self._succeed(vs)'
+        vl += 'self._o_succeed(vs)'
         return vl
 
     def _ty_ends_in(self, node: gram.Node) -> formatter.ListObj:
@@ -499,11 +502,11 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
         vl += self._gen_stmts(node.child)
         vl += [
             'if self._failed:',
-            '    self._succeed(None, p)',
+            '    self._o_succeed(None, p)',
             'else:',
-            '    self._rewind(p)',
+            '    self._o_rewind(p)',
             '    self._errpos = errpos',
-            '    self._fail()',
+            '    self._o_fail()',
         ]
         return vl
 
@@ -519,9 +522,9 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
         vl += self._gen_stmts(node.child)
         vl += [
             'if self._failed:',
-            '    self._succeed([], p)',
+            '    self._o_succeed([], p)',
             'else:',
-            '    self._succeed([self._val])',
+            '    self._o_succeed([self._val])',
         ]
         return vl
 
@@ -540,10 +543,10 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
             '    p = self._pos',
             formatter.Indent(sublines),
             '    if self._failed or self._pos == p:',
-            '        self._rewind(p)',
+            '        self._o_rewind(p)',
             '        break',
             '    vs.append(self._val)',
-            'self._succeed(vs)',
+            'self._o_succeed(vs)',
         ]
         return vl
 
@@ -552,9 +555,9 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
         return formatter.VList(
             formatter.HList('v = ', arg),
             'if v is True:',
-            '    self._succeed(v)',
+            '    self._o_succeed(v)',
             'elif v is False:',
-            '    self._fail()',
+            '    self._o_fail()',
             'else:',
             "    raise _ParsingRuntimeError('Bad predicate value')",
         )
@@ -566,9 +569,9 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
             '    self._regexps[p] = re.compile(p)',
             'm = self._regexps[p].match(self._text, self._pos)',
             'if m:',
-            '    self._succeed(m.group(0), m.end())',
+            '    self._o_succeed(m.group(0), m.end())',
             '    return',
-            'self._fail()',
+            'self._o_fail()',
         )
 
     def _ty_run(self, node: gram.Node) -> formatter.VList:
@@ -609,10 +612,10 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
         vl += formatter.Indent(sublines)
         vl += [
             '    if self._failed or self._pos == p:',
-            '        self._rewind(p)',
+            '        self._o_rewind(p)',
             '        break',
             '    vs.append(self._val)',
-            'self._succeed(vs)',
+            'self._o_succeed(vs)',
         ]
         return vl
 
@@ -632,27 +635,27 @@ _BUILTINS = {
     'r_any': """
         def _r_any(self):
             if self._pos < self._end:
-                self._succeed(self._text[self._pos], self._pos + 1)
+                self._o_succeed(self._text[self._pos], self._pos + 1)
             else:
-                self._fail()
+                self._o_fail()
         """,
     'r_end': """
         def _r_end(self):
             if self._pos == self._end:
-                self._succeed(None)
+                self._o_succeed(None)
             else:
-                self._fail()
+                self._o_fail()
         """,
     'ch': """
-        def _ch(self, ch):
+        def _o_ch(self, ch):
             p = self._pos
             if p < self._end and self._text[p] == ch:
-                self._succeed(ch, self._pos + 1)
+                self._o_succeed(ch, self._pos + 1)
             else:
-                self._fail()
+                self._o_fail()
         """,
     'offsets': """
-        def _offsets(self, pos):
+        def _o_offsets(self, pos):
             lineno = 1
             colno = 1
             for i in range(pos):
@@ -664,8 +667,8 @@ _BUILTINS = {
             return lineno, colno
         """,
     'error': """
-        def _error(self):
-            lineno, colno = self._offsets(self._errpos)
+        def _o_error(self):
+            lineno, colno = self._o_offsets(self._errpos)
             if self._errpos == len(self._text):
                 thing = 'end of input'
             else:
@@ -674,13 +677,13 @@ _BUILTINS = {
             return f'{path}:{lineno} Unexpected {thing} at column {colno}'
         """,
     'fail': """
-        def _fail(self):
+        def _o_fail(self):
             self._val = None
             self._failed = True
             self._errpos = max(self._errpos, self._pos)
         """,
     'leftrec': """
-        def _leftrec(self, rule, rule_name, left_assoc):
+        def _o_leftrec(self, rule, rule_name, left_assoc):
             pos = self._pos
             key = (rule_name, pos)
             seed = self._seeds.get(key)
@@ -709,7 +712,7 @@ _BUILTINS = {
                     return
         """,
     'lookup': """
-        def _lookup(self, var):
+        def _o_lookup(self, var):
             i = len(self._scopes) - 1
             while i >= 0:
                 if var in self._scopes[i]:
@@ -720,7 +723,7 @@ _BUILTINS = {
             assert False, f'unknown var {var}'
         """,
     'memoize': """
-        def _memoize(self, rule_name, fn):
+        def _o_memoize(self, rule_name, fn):
             p = self._pos
             r = self._cache.setdefault(p, {}).get(rule_name)
             if r:
@@ -730,7 +733,7 @@ _BUILTINS = {
             self._cache[p][rule_name] = (self._val, self._failed, self._pos)
         """,
     'operator': """
-        def _operator(self, rule_name):
+        def _o_operator(self, rule_name):
             o = self._operators[rule_name]
             pos = self._pos
             key = (rule_name, self._pos)
@@ -760,7 +763,7 @@ _BUILTINS = {
                         self._seeds[key] = current
                         repeat = True
                         break
-                    self._rewind(pos)
+                    self._o_rewind(pos)
                 if not repeat:
                     i += 1
 
@@ -771,39 +774,39 @@ _BUILTINS = {
             self._val, self._failed, self._pos = current
         """,
     'range': """
-        def _range(self, i, j):
+        def _o_range(self, i, j):
             p = self._pos
             if p != self._end and ord(i) <= ord(self._text[p]) <= ord(j):
-                self._succeed(self._text[p], self._pos + 1)
+                self._o_succeed(self._text[p], self._pos + 1)
             else:
-                self._fail()
+                self._o_fail()
         """,
     'rewind': """
-        def _rewind(self, newpos):
-            self._succeed(None, newpos)
+        def _o_rewind(self, newpos):
+            self._o_succeed(None, newpos)
         """,
     'str': """
-        def _str(self, s):
+        def _o_str(self, s):
             for ch in s:
-                self._ch(ch)
+                self._o_ch(ch)
                 if self._failed:
                     return
             self._val = s
         """,
     'succeed': """
-        def _succeed(self, v, newpos=None):
+        def _o_succeed(self, v, newpos=None):
             self._val = v
             self._failed = False
             if newpos is not None:
                 self._pos = newpos
         """,
     'unicat': """
-        def _unicat(self, cat):
+        def _o_unicat(self, cat):
             p = self._pos
             if p < self._end and unicodedata.category(self._text[p]) == cat:
-                self._succeed(self._text[p], self._pos + 1)
+                self._o_succeed(self._text[p], self._pos + 1)
             else:
-                self._fail()
+                self._o_fail()
         """,
     'fn_atof': """
         def _fn_atof(self, s):

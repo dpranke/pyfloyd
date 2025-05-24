@@ -99,6 +99,9 @@ class HardCodedGenerator(generator.Generator):
         r = f'v_{name.replace("$", "_")}'
         return r
 
+    def _gen_opname(self, name: str) -> str:
+        raise NotImplementedError
+
     def _gen_lit(self, lit: str) -> str:
         return string_literal.encode(lit)
 
@@ -150,9 +153,8 @@ class HardCodedGenerator(generator.Generator):
 
     def _ty_action(self, node: m_grammar.Node) -> formatter.ListObj:
         return formatter.HList(
-            formatter.Saw(
-                self._gen_rulename('succeed'),
-                formatter.Triangle('(', self._gen_expr(node.child), ')'),
+            self._gen_invoke(
+                self._gen_opname('succeed'), self._gen_expr(node.child)
             ),
             self._map['end'],
         )
@@ -162,7 +164,7 @@ class HardCodedGenerator(generator.Generator):
         if node.memoize:
             return formatter.HList(
                 self._gen_invoke(
-                    'memoize',
+                    self._gen_opname('memoize'),
                     f"'{node.rule_name}'",
                     self._gen_rulename(node.rule_name),
                 ),
@@ -230,7 +232,9 @@ class HardCodedGenerator(generator.Generator):
     def _ty_e_ident(self, node: m_grammar.Node) -> formatter.El:
         assert isinstance(node, m_grammar.EIdent)
         if node.kind == 'outer':
-            return self._gen_invoke('lookup', "'" + node.v + "'")
+            return self._gen_invoke(
+                self._gen_opname('lookup'), "'" + node.v + "'"
+            )
         if node.kind == 'extern':
             return self._gen_extern(node.v)
         if node.kind == 'function':
@@ -241,12 +245,15 @@ class HardCodedGenerator(generator.Generator):
     def _ty_empty(self, node) -> formatter.ListObj:
         del node
         return formatter.HList(
-            self._gen_invoke('succeed', self._map['null']), self._map['end']
+            self._gen_invoke(self._gen_opname('succeed'), self._map['null']),
+            self._map['end']
         )
 
     def _ty_equals(self, node) -> formatter.ListObj:
         arg = self._gen_expr(node.child)
-        return formatter.HList(self._gen_invoke('str', arg), self._map['end'])
+        return formatter.HList(
+            self._gen_invoke(self._gen_opname('str'), arg), self._map['end']
+        )
 
     def _ty_leftrec(self, node) -> formatter.ListObj:
         if node.left_assoc:
@@ -256,7 +263,7 @@ class HardCodedGenerator(generator.Generator):
 
         return formatter.HList(
             self._gen_invoke(
-                'leftrec',
+                self._gen_opname('leftrec'),
                 self._gen_rulename(node.child.v),
                 "'" + node.v + "'",
                 left_assoc,
@@ -267,9 +274,9 @@ class HardCodedGenerator(generator.Generator):
     def _ty_lit(self, node) -> formatter.ListObj:
         expr = self._gen_lit(node.v)
         if len(node.v) == 1:
-            method = 'ch'
+            method = 'o_ch'
         else:
-            method = 'str'
+            method = 'o_str'
         return formatter.HList(
             self._gen_invoke(method, expr), self._map['end']
         )
@@ -280,14 +287,14 @@ class HardCodedGenerator(generator.Generator):
         # from self.grammar.operators[node.v].choices.
         assert node.ch == []
         return formatter.HList(
-            self._gen_invoke('operator', "'" + node.v + "'"),
+            self._gen_invoke(self._gen_opname('operator'), "'" + node.v + "'"),
             self._map['end'],
         )
 
     def _ty_range(self, node) -> formatter.ListObj:
         return formatter.HList(
             self._gen_invoke(
-                'range',
+                self._gen_opname('range'),
                 self._gen_lit(node.start),
                 self._gen_lit(node.stop),
             ),
@@ -303,6 +310,6 @@ class HardCodedGenerator(generator.Generator):
 
     def _ty_unicat(self, node) -> formatter.ListObj:
         return formatter.HList(
-            self._gen_invoke('unicat', self._gen_lit(node.v)),
+            self._gen_invoke(self._gen_opname('unicat'), self._gen_lit(node.v)),
             self._map['end'],
         )
