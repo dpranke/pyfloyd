@@ -338,7 +338,7 @@ n_ends_in: [fn [node] [vl 'while True:'
                               [ind 'if not self._failed:'
                                    '    break']
                               [vl]]
-                          [ind [call_rule 'r_any' [list]]
+                          [ind [call_rule 'r_any' q[]]
                                'if self._failed:'
                                '    break']]]
 
@@ -354,7 +354,7 @@ n_not: [fn [node] [vl 'p = self._pos'
 
 n_not_one: [fn [node] [vl [n_not node]
                           'if not self._failed:'
-                          [ind [call_rule 'r_any' [list]]]]]
+                          [ind [call_rule 'r_any' q[]]]]]
 
 n_opt: [fn [node] [vl 'p = self._pos'
                          [stmts node.child]

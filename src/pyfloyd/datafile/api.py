@@ -456,7 +456,7 @@ class Decoder:
         if ty == 'array':
             vals = [self._walk_ast(el) for el in v]
             if tag in self._custom_tags:
-                self._custom_tags[tag](ty, tag, vals)
+                return self._custom_tags[tag](ty, tag, vals)
             return self.parse_array(tag, [self._walk_ast(el) for el in v])
         raise ValueError('unknown el: ' + el)  # pragma: no cover
 

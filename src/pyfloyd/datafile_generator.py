@@ -129,7 +129,10 @@ class DatafileGenerator(generator.Generator):
         df = datafile.loads(
             df_str,
             parse_bareword=self._parse_bareword,
-            custom_tags={'@': self._to_at_exp},
+            custom_tags={
+                '@': self._to_at_exp,
+                'q': self._to_quoted_list
+            },
         )
         if 'inherit' in df:
             for base in df['inherit']:
@@ -157,6 +160,13 @@ class DatafileGenerator(generator.Generator):
         )
         s = datafile.dedent(obj)
         return [['symbol', 'fn'], [], [['symbol', 'at_exp'], s]]
+
+    def _to_quoted_list(self, ty, tag, obj, as_key=False):
+        assert ty == 'array' and tag == 'q' and not as_key, (
+            f'Uexpected tag fn invocation: '
+            f'ty={ty} tag={tag} obj={repr(obj)}, as_key={as_key}'
+        )
+        return [['symbol', 'list'] + obj]
 
     def _eval_node(
         self, expr: Any, env: lisp_interpreter.Env

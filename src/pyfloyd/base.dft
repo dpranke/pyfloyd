@@ -71,7 +71,7 @@ n_apply: [fn [node]
                  [hl [call_op 'memoize' [list [lit node.rule_name]
                                               [method_name node.rule_name]]]
                      c_end]
-                 [hl [call_rule node.rule_name [list]] c_end]]]
+                 [hl [call_rule node.rule_name q[]] c_end]]]
 
 n_e_arr: [fn [node] [if [is_empty node.ch]
                         '[]'
