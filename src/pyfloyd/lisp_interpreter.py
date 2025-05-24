@@ -109,7 +109,7 @@ def typecheck(name: str, types: list[CheckerType], args: list[Any]):
             check(
                 ty_fn(args[i]),
                 (
-                    f'f{name} arg #{i} ({repr(args[i])}) passed to `{name}`'
+                    f'{name} arg #{i} ({repr(args[i])}) passed to `{name}`'
                     f'is not a {ty_name}'
                 ),
             )
@@ -250,11 +250,11 @@ class Interpreter:
         self.env.set('null', None)
         self.define_native_fn('equal', self.f_equal, types=['any', 'any'])
         self.define_native_fn('if', self.fexpr_if, is_fexpr=True)
-        self.define_native_fn('in', self.f_in, types=['str', 'any'])
+        self.define_native_fn('in', self.f_in, types=['any', 'any'])
         self.define_native_fn('is_empty', self.f_is_empty)
         self.define_native_fn('fn', self.fexpr_fn, is_fexpr=True)
-        self.define_native_fn('getattr', self.f_getattr, types=['any', 'str'])
-        self.define_native_fn('getitem', self.f_getitem, types=['list', 'num'])
+        self.define_native_fn('getattr', self.f_getattr, types=['any', 'any'])
+        self.define_native_fn('getitem', self.f_getitem, types=['any', 'any'])
         self.define_native_fn('join', self.f_join, types=['str', 'list'])
         self.define_native_fn('keys', self.f_keys)
         self.define_native_fn('list', self.f_list)
@@ -268,6 +268,7 @@ class Interpreter:
         self.define_native_fn(
             'slice', self.f_slice, types=['list', 'num', 'num']
         )
+        self.define_native_fn('sort', self.f_sort, types=['list'])
         self.define_native_fn('strcat', self.f_strcat)
 
     def add_foreign_handler(self, func: Any):
@@ -342,7 +343,7 @@ class Interpreter:
 
     def f_keys(self, args, env):
         del env
-        return args[0].keys()
+        return list(args[0].keys())
 
     def f_map(self, args, env):
         if len(args) == 3:

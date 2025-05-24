@@ -203,14 +203,14 @@ parser_constructor: @'''
         @if[grammar.lookup_needed 'self._scopes = []' null]
         @if[grammar.operator_needed
             [vl 'self._operators = {}'
-                [map_items operator_state grammar.operators]]
+                [vl_l [map_items operator_state grammar.operators]]]
             [vl]]
 
     '''  # parse_constructor
 
 externs = [fn [] [vl 'self._externs = {'
-                     [ind [map_items [fn [k v] [at_exp "    '@k': @v,"]]
-                                     grammar.externs]]
+                     [ind_l [map_items [fn [k v] [at_exp "    '@k': @v,"]]
+                                       grammar.externs]]
                      '}']]
 
 operator_state: [fn [rule o]
@@ -226,11 +226,11 @@ operator_state: [fn [rule o]
                         [at_exp "self._operators['@rule'] = o"]]]
 
 operator_prec: [fn [o]
-                   [ind [map [fn [prec]
-                                 [hl prec
+                   [ind_l [map [fn [prec]
+                                 [hl [to_string prec]
                                      ': ['
-                                     [hl_l [map [fn [op] [strcat "'" op "'"]
-                                                [getattr o.prec_ops prec]]
+                                     [hl_l [map [fn [op] [strcat "'" op "'"]]
+                                                [getitem o.prec_ops prec]
                                                 ', ']]
                                      '],']]
                              [sort [keys o.prec_ops]]]]]
@@ -432,7 +432,7 @@ n_not_one: [fn [node] [vl [n_not node]
                           [ind [call_rule 'r_any' [list]]]]]
 
 n_operator: [fn [node] [hl [call_op 'operator'
-                                    [[strcat "'" node.v "'"]]]]]
+                                    [list [strcat "'" node.v "'"]]]]]
 
 n_opt: [fn [node] [vl 'p = self._pos'
                          [stmts node.child]

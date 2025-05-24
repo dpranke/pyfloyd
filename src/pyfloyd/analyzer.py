@@ -721,18 +721,20 @@ class _SubRuleRewriter:
         self._grammar.operator_needed = True
         o = m_grammar.OperatorState()
         prec_ops = {}
+        rassoc = set()
         for operator in node.ch:
             op, prec = operator.v
             subnode = operator.child
             prec_ops.setdefault(prec, []).append(op)
             if self._grammar.assoc.get(op) == 'right':
-                o.rassoc.add(op)
+                rassoc.add(op)
             subnode_rule = self._subrule()
             o.choices[op] = subnode_rule
             self._subrules[subnode_rule] = self._walk(subnode)
 
         for prec in sorted(prec_ops):
             o.prec_ops[prec] = prec_ops[prec]
+        o.rassoc = list(rassoc)
         self._grammar.operators[node.v] = o
         node.ch = []
         return node

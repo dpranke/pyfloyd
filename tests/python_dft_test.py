@@ -57,26 +57,3 @@ class Tests(
     @skip('integration')
     def test_json5_ws(self):
         pass
-
-    @skip('operators')
-    def test_not_quite_operators(self):
-        pass
-
-    def test_operator_indirect(self):
-        pass
-
-    @skip('operators')
-    def test_operator_invalid(self):
-        pass
-
-    @skip('operators')
-    def test_operators(self):
-        pass
-
-    @skip('operators')
-    def test_operators_multichar_is_valid(self):
-        pass
-
-    @skip('operators')
-    def test_operators_with_whitespace(self):
-        pass
