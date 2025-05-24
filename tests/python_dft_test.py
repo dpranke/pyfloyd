@@ -80,27 +80,3 @@ class Tests(
     @skip('operators')
     def test_operators_with_whitespace(self):
         pass
-
-    @skip('leftrec')
-    def test_recursion_both(self):
-        pass
-
-    @skip('leftrec')
-    def test_recursion_direct_left(self):
-        pass
-
-    @skip('leftrec')
-    def test_recursion_without_a_label(self):
-        pass
-
-    @skip('leftrec')
-    def test_recursion_indirect_left(self):
-        pass
-
-    @skip('leftrec')
-    def test_recursion_left_opt(self):
-        pass
-
-    @skip('leftrec')
-    def test_recursion_repeated(self):
-        pass

@@ -863,6 +863,13 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
             err='<string>:1 Bad predicate value',
         )
 
+    def test_range(self):
+        grammar = "g = '0'..'9':d -> d"
+        self.check(grammar, text='5', out='5')
+        self.check(
+            grammar, text='a', err='<string>:1 Unexpected "a" at column 1'
+        )
+
     @skip('leftrec')
     def test_recursion_both(self):
         grammar = """\

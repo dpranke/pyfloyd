@@ -410,9 +410,9 @@ n_ends_in: [fn [node] [vl 'while True:'
 
 
 n_leftrec: [fn [node] [hl [call_op 'leftrec'
-                                   [[rule_name node.child.v]
-                                    [strcat "'" node.v "'"]]
-                                    [if node.left_assoc bool_t bool_f]]
+                                   [list [strcat 'self._' node.child.v]
+                                         [strcat "'" node.v "'"]
+                                         [if node.left_assoc c_true c_false]]]
                            c_end]]
 
 n_lit: [fn [node] [hl [call_op 'str' [list [lit node.v]]] c_end]]
@@ -469,7 +469,7 @@ n_pred: [fn [node]
                 "    raise _ParsingRuntimeError('Bad predicate value')"]]
 
 n_range: [fn [node] [hl [call_op 'range'
-                                 [[lit node.start] [lit node.stop]]]
+                                 [list [lit node.start] [lit node.stop]]]
                         c_end]]
 
 n_regexp: [fn [node]
