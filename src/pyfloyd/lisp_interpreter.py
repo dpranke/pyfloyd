@@ -217,7 +217,7 @@ class UserFn(Fn):
     def __init__(
         self,
         interp: 'Interpreter',
-        params: list[str],
+        params: Union[str, list[str]],
         body: Any,
         env: Optional[Env] = None,
         is_fexpr: bool = True,
@@ -226,16 +226,17 @@ class UserFn(Fn):
     ):
         env = env or interp.global_env
         super().__init__(interp, env, is_fexpr, name, types)
-        self.params: list[str] = []
-        for param in params:
-            check(is_str(param))
-            self.params.append(param)
+        self.params = params
         self.body = body
 
     def call(self, args: list[Any], env: Env):
         if self.types:
             typecheck(self.name, self.types, args)
-        new_env = Env(values=dict(zip(self.params, args)), parent=self.env)
+        if isinstance(self.params, list):
+            values = dict(zip(self.params, args))
+        else:
+            values = {self.params: args}
+        new_env = Env(values=values, parent=self.env)
         return self.interp.eval(self.body, new_env)
 
 
@@ -248,6 +249,7 @@ class Interpreter:
         self.env.set('true', True)
         self.env.set('false', False)
         self.env.set('null', None)
+        self.define_native_fn('cons', self.f_cons, types=['any', 'list'])
         self.define_native_fn('define', self.fexpr_define, is_fexpr=True)
         self.define_native_fn('equal', self.f_equal, types=['any', 'any'])
         self.define_native_fn('if', self.fexpr_if, is_fexpr=True)
@@ -258,6 +260,7 @@ class Interpreter:
         self.define_native_fn('getitem', self.f_getitem, types=['any', 'any'])
         self.define_native_fn('join', self.f_join, types=['str', 'list'])
         self.define_native_fn('keys', self.f_keys)
+        self.define_native_fn('length', self.f_length)
         self.define_native_fn('list', self.f_list)
         self.define_native_fn('map', self.f_map)
         self.define_native_fn('map_items', self.f_map_items)
@@ -319,6 +322,9 @@ class Interpreter:
         head, body = args
         name = self.eval(head, env)
         self.env.set(name, self.eval(body, env))
+
+    def f_cons(self, args, env):
+        return [args[0]] + args[1]
 
     def f_equal(self, args, env):
         del env
@@ -396,6 +402,10 @@ class Interpreter:
             return sep.join(results)
         return results
 
+    def f_length(self, args, env):
+        del env
+        return len(args[0])
+
     def f_list(self, args, env):
         del env
         return list(args)
@@ -428,10 +438,17 @@ class Interpreter:
 
     def fexpr_fn(self, args, env):
         param_symbols, body = args
-        names = []
-        for expr in param_symbols:
-            names.append(symbol(expr))
-        return UserFn(self, names, body, env, is_fexpr=False)
+        if len(param_symbols) and param_symbols[0] == 'symbol':
+            params = symbol(param_symbols)
+        else:
+            params = []
+            for expr in param_symbols:
+                params.append(symbol(expr))
+        if env.bound('_t_name'):
+            name = env.get('_t_name')
+            if name == '':
+                name = None
+        return UserFn(self, params, body, env, is_fexpr=False, name=name)
 
     def fexpr_if(self, args, env):
         cond, t_expr, f_expr = args
