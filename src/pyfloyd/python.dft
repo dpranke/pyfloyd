@@ -16,6 +16,11 @@
 # This file contains the code generation templates for Python3.
 # It depends on a base set of templates used by fairly similar languages.
 
+name = 'Python'
+ext = 'py'
+indent = 4
+line_length = 79
+
 starting_template: 'generate'
 
 inherit: ['base']
@@ -320,6 +325,17 @@ n_count: [fn [node] [vl 'vs = []'
                              'i += 1']
                         'self._o_succeed(vs)']]
 
+
+n_ends_in: [fn [node] [vl 'while True:'
+                          [ind [stmts node.child]]
+                          [if node.can_fail
+                              [ind 'if not self._failed:'
+                                   '    break']
+                              [vl]]
+                          [ind [call_rule 'r_any' q[]]
+                               'if self._failed:'
+                               '    break']]]
+
 n_label: [fn [node] [vl [stmts node.child]
                         [if node.child.can_fail
                             [vl 'if self._failed:' '    return']
@@ -331,16 +347,6 @@ n_label: [fn [node] [vl [stmts node.child]
                                         ' = self._val']]
                             [vl [strcat [varname node.name]
                                         ' = self._val']]]]]
-
-n_ends_in: [fn [node] [vl 'while True:'
-                          [ind [stmts node.child]]
-                          [if node.can_fail
-                              [ind 'if not self._failed:'
-                                   '    break']
-                              [vl]]
-                          [ind [call_rule 'r_any' q[]]
-                               'if self._failed:'
-                               '    break']]]
 
 n_not: [fn [node] [vl 'p = self._pos'
                       'errpos = self._errpos'
@@ -362,8 +368,6 @@ n_opt: [fn [node] [vl 'p = self._pos'
                          '    self._o_succeed([], p)'
                          'else:'
                          '    self._o_succeed([self._val])']]
-
-n_paren: [fn [node] [stmts node.child]]
 
 n_plus: [fn [node]
             [vl 'vs = []'
@@ -414,16 +418,6 @@ n_scope: [fn [node] [vl 'self._scopes.append({})'
                         'self._scopes.pop()'
                         ]]
 
-n_set: [fn [node]
-           [vl [hl 'p = ' [lit [strcat '[' node.v ']']]]
-               'if p not in self._regexps:'
-               '    self._regexps[p] = re.compile(p)'
-               'm = self._regexps[p].match(self._text, self._pos)'
-               'if m:'
-               '    self._o_succeed(m.group(0), m.end())'
-               '    return'
-               'self._o_fail()']]
-
 n_seq: [fn [node]
            [vl [stmts [getitem node.ch 0]]
                [if [getattr [getitem node.ch 0] 'can_fail']
@@ -437,6 +431,16 @@ n_seq: [fn [node]
                                           [vl]]]]
                           [slice node.ch 1 -1]]]
                [stmts [getitem node.ch -1]]]]
+
+n_set: [fn [node]
+           [vl [hl 'p = ' [lit [strcat '[' node.v ']']]]
+               'if p not in self._regexps:'
+               '    self._regexps[p] = re.compile(p)'
+               'm = self._regexps[p].match(self._text, self._pos)'
+               'if m:'
+               '    self._o_succeed(m.group(0), m.end())'
+               '    return'
+               'self._o_fail()']]
 
 n_star: [fn [node]
             [vl 'vs = []'

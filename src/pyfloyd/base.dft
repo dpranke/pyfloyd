@@ -15,6 +15,20 @@
 # This file a set of base code generation templates appropriate for many
 # dynamically typed, block structured, garbage collected languages.
 
+# These two values must be overridden by other templates.
+
+# Name of the language being generated, e.g., "Python"
+name = null
+
+# File extension used by the language, e.g. "py" (no leading dot)
+ext = null
+
+# indent for blocks (int number of spaces or a string value)
+indent = 2
+
+# Maximum line length; can use `null` for no maximum.
+line_length = 79
+
 templates = {
 
 # 'generate' is invoked to generate the file from the AST.
@@ -123,6 +137,8 @@ n_lit: [fn [node] [hl [if [equal [strlen node.v] 1]
                       c_end]]
 
 n_operator: [fn [node] [hl [call_op 'operator' [list [lit node.v]] c_end]]]
+
+n_paren: [fn [node] [stmts node.child]]
 
 n_range: [fn [node] [hl [call_op 'range'
                                  [list [lit node.start] [lit node.stop]]]

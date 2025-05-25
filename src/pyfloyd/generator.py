@@ -31,7 +31,6 @@ class GeneratorOptions(attr_dict.AttrDict):
         self.argv = []
         self.command_line = ''
         self.dialect = ''
-        self.formatter_list = False
         self.generator_options = {}
         self.indent = None
         self.language = None
@@ -61,7 +60,8 @@ class Generator:
         self.grammar = grammar
         self.options = options
 
-        # Derive option values from the grammar if need be.
+        # Derive option values from the grammar if need be;
+        # they will also be overridden by the codegen templates.
         if self.options.line_length is None:
             self.options.line_length = self.line_length
         if self.options.indent is None:
@@ -73,16 +73,12 @@ class Generator:
             or 'unicode_lookup' in self.grammar.needed_builtin_functions
         )
 
-        # TODO: Pull this from the grammar.
-        if self.options.memoize is None:
-            self.options.memoize = False
-
         self._derive_memoize()
 
     def _derive_memoize(self):
         def _walk(node):
             if node.t == 'apply':
-                if self.options.memoize and node.rule_name.startswith('r_'):
+                if node.rule_name.startswith('r_'):
                     name = node.rule_name[2:]
                     node.memoize = (
                         name not in self.grammar.operators
@@ -94,7 +90,15 @@ class Generator:
                 for c in node.ch:
                     _walk(c)
 
-        _walk(self.grammar.ast)
+        # TODO: Pull this from the grammar.
+        if self.options.memoize is None:
+            self.options.memoize = False
+
+        if self.options.memoize:
+            self.grammar.needed_operators = sorted(
+                self.grammar.needed_operators + ['memoize']
+            )
+            _walk(self.grammar.ast)
 
     def generate(self) -> str:
         raise NotImplementedError
@@ -162,7 +166,7 @@ def add_arguments(
         '--formatter-list',
         '--fl',
         action='store_true',
-        default=options.formatter_list,
+        default=False,
         help=(
             'Return the formatter tree as a list of objects of objects '
             'instead of as a string'

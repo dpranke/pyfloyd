@@ -38,13 +38,16 @@ class DatafileGenerator(generator.Generator):
         options: generator.GeneratorOptions,
     ):
         super().__init__(host, grammar, options)
-        self.datafile: dict[str, Any] = {}
+        self.datafile: dict[str, Any] = {
+            'name': None,
+            'starting_template': None,
+            'indent': 2,
+            'ext': None,
+            'local_vars': {},
+            'templates': {},
+        }
+        self.df_keys_to_merge = {'local_vars', 'templates'}
         options.generator_options = options.generator_options or {}
-        self._fl = options.formatter_list
-        self._local_vars: dict[str, Any] = {}
-
-        self._derive_memoize()
-        self._derive_local_vars()
 
         self._interpreter = interp = lisp_interpreter.Interpreter()
         interp.add_foreign_handler(self._eval_node)
@@ -64,47 +67,28 @@ class DatafileGenerator(generator.Generator):
         interp.define_native_fn('vl', self.f_vl)
         interp.define_native_fn('vl_l', self.f_vl_l)
 
-        self._host = host
-        if 'file' in options.generator_options:
-            default_df = options.generator_options.get('file')
-        else:
-            default_df = 'python'
-        path = self._find_datafile(default_df)
+        default_template = options.generator_options.get('file', 'python')
+        path = self._find_datafile(default_template)
         self._load_datafiles(path)
+        self.name = self.datafile['name']
+        self.ext = self.datafile['ext']
+        self.options.indent = self.datafile['indent']
+        if isinstance(self.options.indent, int):
+            self.options.indent = ' ' * self.options.indent
+        self.options.line_length = self.datafile.get('line_length', 79)
+
         self._process_templates()
-
-        # TODO: Figure out how to correctly handle non-multi-char literals.
-        if grammar.ch_needed and not grammar.str_needed:
-            grammar.str_needed = True
-            grammar.needed_operators = sorted(
-                grammar.needed_operators + ['str']
-            )
-        if self.options.memoize:
-            grammar.needed_operators = sorted(
-                grammar.needed_operators + ['memoize']
-            )
-
-    def _derive_memoize(self):
-        def _walk(node):
-            if node.t == 'apply':
-                if self.options.memoize and node.rule_name.startswith('r_'):
-                    name = node.rule_name[2:]
-                    node.memoize = (
-                        name not in self.grammar.operators
-                        and name not in self.grammar.leftrec_rules
-                    )
-                else:
-                    node.memoize = False
-            else:
-                for c in node.ch:
-                    _walk(c)
-
-        _walk(self.grammar.ast)
+        self._derive_memoize()
+        self._derive_local_vars()
 
     def _derive_local_vars(self):
+        df_locals = self.datafile.get('local_vars', {})
+        if not df_locals:
+            return
+
         def _walk(node) -> set[str]:
             local_vars: set[str] = set()
-            local_vars.update(set(self._local_vars.get(node.t, [])))
+            local_vars.update(set(df_locals.get(node.t, [])))
             for c in node.ch:
                 local_vars.update(_walk(c))
             return local_vars
@@ -113,18 +97,18 @@ class DatafileGenerator(generator.Generator):
             node.local_vars = _walk(node)
 
     def _find_datafile(self, name):
-        if self._host.exists(name):
+        if self.host.exists(name):
             return name
-        _, ext = self._host.splitext(name)
+        _, ext = self.host.splitext(name)
         if ext == '':
             name += '.dft'
-        path = self._host.join(self._host.dirname(__file__), name)
-        if not self._host.exists(path):
+        path = self.host.join(self.host.dirname(__file__), name)
+        if not self.host.exists(path):
             raise ValueError(f"template file '{name}' not found")
         return path
 
     def _load_datafiles(self, name):
-        df_str = self._host.read_text_file(self._find_datafile(name))
+        df_str = self.host.read_text_file(self._find_datafile(name))
         df = datafile.loads(
             df_str,
             parse_bareword=self._parse_bareword,
@@ -136,13 +120,13 @@ class DatafileGenerator(generator.Generator):
         self._merge_datafile(df)
 
     def _merge_datafile(self, df):
-        if 'starting_template' in df:
-            self.datafile['starting_template'] = df['starting_template']
-        if 'templates' not in self.datafile:
-            self.datafile['templates'] = {}
-        if 'templates' in df:
-            for k, v in df['templates'].items():
-                self.datafile['templates'][k] = v
+        for df_key in self.datafile.keys():
+            if df_key in df:
+                if df_key in self.df_keys_to_merge:
+                    for k, v in df[df_key].items():
+                        self.datafile[df_key][k] = v
+                else:
+                    self.datafile[df_key] = df[df_key]
 
     def _parse_bareword(self, s: str, as_key: bool) -> Any:
         if as_key:
