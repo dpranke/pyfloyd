@@ -246,7 +246,7 @@ class HardCodedGenerator(generator.Generator):
         del node
         return formatter.HList(
             self._gen_invoke(self._gen_opname('succeed'), self._map['null']),
-            self._map['end']
+            self._map['end'],
         )
 
     def _ty_equals(self, node) -> formatter.ListObj:
@@ -310,6 +310,8 @@ class HardCodedGenerator(generator.Generator):
 
     def _ty_unicat(self, node) -> formatter.ListObj:
         return formatter.HList(
-            self._gen_invoke(self._gen_opname('unicat'), self._gen_lit(node.v)),
+            self._gen_invoke(
+                self._gen_opname('unicat'), self._gen_lit(node.v)
+            ),
             self._map['end'],
         )

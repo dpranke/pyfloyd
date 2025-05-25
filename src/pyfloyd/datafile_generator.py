@@ -71,8 +71,7 @@ class DatafileGenerator(generator.Generator):
             default_df = 'python'
         path = self._find_datafile(default_df)
         self._load_datafiles(path)
-        for t, v in self.datafile['templates'].items():
-            self._interpreter.define(t, v)
+        self._process_templates()
 
         # TODO: Figure out how to correctly handle non-multi-char literals.
         if grammar.ch_needed and not grammar.str_needed:
@@ -129,10 +128,7 @@ class DatafileGenerator(generator.Generator):
         df = datafile.loads(
             df_str,
             parse_bareword=self._parse_bareword,
-            custom_tags={
-                '@': self._to_at_exp,
-                'q': self._to_quoted_list
-            },
+            custom_tags={'@': self._to_at_exp, 'q': self._to_quoted_list},
         )
         if 'inherit' in df:
             for base in df['inherit']:
@@ -166,7 +162,18 @@ class DatafileGenerator(generator.Generator):
             f'Uexpected tag fn invocation: '
             f'ty={ty} tag={tag} obj={repr(obj)}, as_key={as_key}'
         )
-        return [['symbol', 'list'] + obj]
+        return [['symbol', 'quote'], obj]
+
+    def _process_templates(self):
+        data = self.datafile
+        funcs = {}
+        for t, v in data['templates'].items():
+            if isinstance(v, list) and len(v) > 0 and v[0] == '@fn':
+                funcs[t] = v[1:]
+            else:
+                self._interpreter.define('_t_name', t)
+                self._interpreter.define(t, v)
+                self._interpreter.define('_t_name', t)
 
     def _eval_node(
         self, expr: Any, env: lisp_interpreter.Env
@@ -227,7 +234,7 @@ class DatafileGenerator(generator.Generator):
         """Invoke the template named in arg 1, passing it the remaining args."""
         first = self._interpreter.eval(args[0], env)
         obj = env.get(first)
-        if lisp_interpreter.is_str(obj):
+        if not lisp_interpreter.is_fn(obj):
             return obj
         return self._interpreter.eval([['symbol', first]] + args[1:], env)
 

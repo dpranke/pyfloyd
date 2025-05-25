@@ -23,7 +23,8 @@ inherit: ['base']
 templates: {
 
 #
-# Basic block structure of the file
+# The basic block structure of the file is given in the `generate` template
+# in base. This section contains the pieces generate references.
 #
 
 default_header: @"
@@ -184,7 +185,6 @@ main_footer: d'''
 # Rules for methods in the parser class
 #
 
-# TODO: Handle self._externs properly.
 parser_constructor: @'''
     def __init__(self, text, path):
         self._text = text
@@ -205,9 +205,9 @@ parser_constructor: @'''
                 [vl_l [map_items operator_state grammar.operators]]]
             [vl]]
 
-    '''  # parse_constructor
+    '''  # parser_constructor
 
-externs = [fn [] [vl 'self._externs = {'
+externs: [fn [] [vl 'self._externs = {'
                      [ind_l [map_items [fn [k v]
                                            [strcat "'"
                                                    k
@@ -453,90 +453,89 @@ n_star: [fn [node]
 # Built-in operators and rules
 #
 
-o_ch: d'''
-    def _o_ch(self, ch):
-        p = self._pos
-        if p < self._end and self._text[p] == ch:
-            self._o_succeed(ch, self._pos + 1)
-        else:
-            self._o_fail()
-    '''
+meth: [fn [params body] [if [equal params '']
+                            [vl [hl 'def _' _t_name '(self):']
+                                [ind body]]
+                            [vl [hl 'def _' _t_name '(self, ' params '):']
+                                [ind body]]]]
 
-o_offsets: d'''
-    def _o_offsets(self, pos):
-        lineno = 1
-        colno = 1
-        for i in range(pos):
-            if self._text[i] == '\\n':
-                lineno += 1
+o_ch: [meth 'ch' d"
+           p = self._pos
+           if p < self._end and self._text[p] == ch:
+               self._o_succeed(ch, self._pos + 1)
+           else:
+               self._o_fail()
+           "]
+
+o_offsets: [meth 'pos' d'''
+                lineno = 1
                 colno = 1
-            else:
-                colno += 1
-        return lineno, colno
-    '''
+                for i in range(pos):
+                    if self._text[i] == '\\n':
+                        lineno += 1
+                        colno = 1
+                    else:
+                        colno += 1
+                return lineno, colno
+                ''']
 
-o_error: d'''
-    def _o_error(self):
-        lineno, colno = self._o_offsets(self._errpos)
-        if self._errpos == len(self._text):
-            thing = 'end of input'
-        else:
-            thing = repr(self._text[self._errpos]).replace("'", '"')
-        path = self._path
-        return f'{path}:{lineno} Unexpected {thing} at column {colno}'
-    '''
+o_error: [meth '' d'''
+              lineno, colno = self._o_offsets(self._errpos)
+              if self._errpos == len(self._text):
+                  thing = 'end of input'
+              else:
+                  thing = repr(self._text[self._errpos]).replace("'", '"')
+              path = self._path
+              return f'{path}:{lineno} Unexpected {thing} at column {colno}'
+              ''']
 
-o_fail: d'''
-    def _o_fail(self):
-        self._val = None
-        self._failed = True
-        self._errpos = max(self._errpos, self._pos)
-    '''
+o_fail: [meth '' d'''
+              self._val = None
+              self._failed = True
+              self._errpos = max(self._errpos, self._pos)
+              ''']
 
-o_leftrec: d'''
-    def _o_leftrec(self, rule, rule_name, left_assoc):
-        pos = self._pos
-        key = (rule_name, pos)
-        seed = self._seeds.get(key)
-        if seed:
-            self._val, self._failed, self._pos = seed
-            return
-        if rule_name in self._blocked:
-            self._val = None
-            self._failed = True
-            return
-        current = (None, True, self._pos)
-        self._seeds[key] = current
-        if left_assoc:
-            self._blocked.add(rule_name)
-        while True:
-            rule()
-            if self._pos > current[2]:
-                current = (self._val, self._failed, self._pos)
-                self._seeds[key] = current
-                self._pos = pos
-            else:
-                del self._seeds[key]
-                self._val, self._failed, self._pos = current
-                if left_assoc:
-                    self._blocked.remove(rule_name)
-                return
-    '''
+o_leftrec: [meth 'rule, rule_name, left_assoc' d'''
+                  pos = self._pos
+                  key = (rule_name, pos)
+                  seed = self._seeds.get(key)
+                  if seed:
+                      self._val, self._failed, self._pos = seed
+                      return
+                  if rule_name in self._blocked:
+                      self._val = None
+                      self._failed = True
+                      return
+                  current = (None, True, self._pos)
+                  self._seeds[key] = current
+                  if left_assoc:
+                      self._blocked.add(rule_name)
+                  while True:
+                      rule()
+                      if self._pos > current[2]:
+                          current = (self._val, self._failed, self._pos)
+                          self._seeds[key] = current
+                          self._pos = pos
+                      else:
+                          del self._seeds[key]
+                          self._val, self._failed, self._pos = current
+                          if left_assoc:
+                              self._blocked.remove(rule_name)
+                          return
+                  ''']
 
-o_lookup: d'''
-    def _o_lookup(self, var):
-        i = len(self._scopes) - 1
-        while i >= 0:
-            if var in self._scopes[i]:
-                return self._scopes[i][var]
-            i -= 1
-        if var in self._externs:
-            return self._externs[var]
-        assert False, f'unknown var {var}'
-    '''
+o_lookup: [meth 'var' d'''
+                i = len(self._scopes) - 1
+                while i >= 0:
+                    if var in self._scopes[i]:
+                        return self._scopes[i][var]
+                    i -= 1
+                if var in self._externs:
+                    return self._externs[var]
+                assert False, f'unknown var {var}'
+                ''']
 
-o_memoize: d'''
-    def _o_memoize(self, rule_name, fn):
+o_memoize: [meth 'rule_name, fn' d'''
         p = self._pos
         r = self._cache.setdefault(p, {}).get(rule_name)
         if r:
@@ -544,10 +543,9 @@ o_memoize: d'''
             return
         fn()
         self._cache[p][rule_name] = (self._val, self._failed, self._pos)
-    '''
+        ''']
 
-o_operator: d'''
-    def _o_operator(self, rule_name):
+o_operator: [meth 'rule_name' d'''
         o = self._operators[rule_name]
         pos = self._pos
         key = (rule_name, self._pos)
@@ -586,162 +584,100 @@ o_operator: d'''
         if o.current_depth == 0:
             o.current_prec = 0
         self._val, self._failed, self._pos = current
-    '''
+        ''']
 
-o_range: d'''
-    def _o_range(self, i, j):
-        p = self._pos
-        if p != self._end and ord(i) <= ord(self._text[p]) <= ord(j):
-            self._o_succeed(self._text[p], self._pos + 1)
-        else:
-            self._o_fail()
-    '''
+o_range: [meth 'i, j' d'''
+               p = self._pos
+               if p != self._end and ord(i) <= ord(self._text[p]) <= ord(j):
+                   self._o_succeed(self._text[p], self._pos + 1)
+               else:
+                   self._o_fail()
+               ''']
 
-o_rewind: d'''
-    def _o_rewind(self, newpos):
-        self._o_succeed(None, newpos)
-    '''
+o_rewind: [meth 'newpos' 'self._o_succeed(None, newpos)']
 
-o_str: d'
-    def _o_str(self, s):
-        for ch in s:
-            self._o_ch(ch)
-            if self._failed:
-                return
-        self._val = s
-    '
+o_str: [meth 's' d'''
+             for ch in s:
+                 self._o_ch(ch)
+                 if self._failed:
+                     return
+             self._val = s
+             ''']
 
-o_succeed: d'''
-    def _o_succeed(self, v, newpos=None):
-        self._val = v
-        self._failed = False
-        if newpos is not None:
-            self._pos = newpos
-    '''
+o_succeed: [meth 'v, newpos=None' d"
+                self._val = v
+                self._failed = False
+                if newpos is not None:
+                    self._pos = newpos
+                "]
 
-o_unicat: d'''
-    def _o_unicat(self, cat):
-        p = self._pos
-        if p < self._end and unicodedata.category(self._text[p]) == cat:
-            self._o_succeed(self._text[p], self._pos + 1)
-        else:
-            self._o_fail()
-    '''
+o_unicat: [
+    meth 'cat' d"
+         p = self._pos
+         if p < self._end and unicodedata.category(self._text[p]) == cat:
+             self._o_succeed(self._text[p], self._pos + 1)
+         else:
+             self._o_fail()
+         "]
 
-r_any: d'''
-    def _r_any(self):
+r_any: [
+    meth '' d"
         if self._pos < self._end:
             self._o_succeed(self._text[self._pos], self._pos + 1)
         else:
             self._o_fail()
-    '''
+        "]
 
-r_end: d'''
-    def _r_end(self):
-        if self._pos == self._end:
-            self._o_succeed(None)
-        else:
-            self._o_fail()
-    '''
+r_end: [meth '' d"
+             if self._pos == self._end:
+                 self._o_succeed(None)
+             else:
+                 self._o_fail()
+             "]
 
-#
-# Built-in functions
-#
+fn_atof: [meth 's' d"
+               if '.' in s or 'e' in s or 'E' in s:
+                   return float(s)
+               return int(s)
+               "]
 
-fn_atof: d"
-    def _fn_atof(self, s):
-        if '.' in s or 'e' in s or 'E' in s:
-            return float(s)
-        return int(s)
-    "
+fn_atoi: [meth 'a, base' 'return int(a, base)']
 
-fn_atoi: d'
-    def _fn_atoi(self, a, base):
-        return int(a, base)
-    '
+fn_atou: [meth 'a, base' 'return chr(int(a, base))']
 
-fn_atou: d'
-    def _fn_atou(self, a, base):
-        return chr(int(a, base))
-    '
+fn_cat: [meth 'strs' "return ''.join(strs)"]
 
-fn_cat: d'''
-    def _fn_cat(self, strs):
-        return ''.join(strs)
-    '''
+fn_concat: [meth 'xs, ys' 'return xs + ys']
 
-fn_concat: d'
-    def _fn_concat(self, xs, ys):
-        return xs + ys
-    '
+fn_cons: [meth 'hd, tl' 'return [hd] + tl']
 
-fn_cons: d'
-    def _fn_cons(self, hd, tl):
-        return [hd] + tl
-    '
+fn_dedent: [meth 's' 'return s']
 
-fn_dedent: d'
-    def _fn_dedent(self, s):
-        return s
-    '
+fn_dict: [meth 'pairs' 'return dict(pairs)']
 
-fn_dict: d'
-    def _fn_dict(self, pairs):
-        return dict(pairs)
-    '
+fn_itou: [meth 'n' 'return chr(n)']
 
-fn_itou: d'
-    def _fn_itou(self, n):
-        return chr(n)
-    '
+fn_join: [meth 's, vs' 'return s.join(vs)']
 
-fn_join: d'
-    def _fn_join(self, s, vs):
-        return s.join(vs)
-    '
+fn_otou: [meth 's' 'return chr(int(s, base=8))']
 
-fn_otou: d'
-    def _fn_otou(self, s):
-        return chr(int(s, base=8))
-    '
+fn_scat: [meth 'hd, tl' 'return self._fn_cat(self._fn_cons(hd, tl))']
 
-fn_scat: d'
-    def _fn_scat(self, hd, tl):
-        return self._fn_cat(self._fn_cons(hd, tl))
-    '
+fn_scons: [meth 'hd, tl' 'return [hd] + tl']
 
-fn_scons: d'
-    def _fn_scons(self, hd, tl):
-        return [hd] + tl
-    '
+fn_strcat: [meth 'a, b' 'return a + b']
 
-fn_strcat: d'
-    def _fn_strcat(self, a, b):
-        return a + b
-    '
+fn_unicode_lookup: [meth 's' 'return unicodedata.lookup(s)']
 
-fn_unicode_lookup: d'
-    def _fn_unicode_lookup(self, s):
-        return unicodedata.lookup(s)
-    '
+fn_utoi: [meth 's' 'return ord(s)']
 
-fn_utoi: d'
-    def _fn_utoi(self, s):
-        return ord(s)
-    '
+fn_xtoi: [meth 's' 'return int(s, base=16)']
 
-fn_xtoi: d'
-    def _fn_xtoi(self, s):
-        return int(s, base=16)
-    '
+fn_xtou: [meth 's' 'return chr(int(s, base=16))']
 
-fn_xtou: d'
-    def _fn_xtou(self, s):
-        return chr(int(s, base=16))
-    '
 
 #
-# various constants
+# Various constants
 #
 
 c_true:   'True'
@@ -770,3 +706,4 @@ call:      [fn [name args] [tri [strcat [method_name name] '(']
                                 ')']]
 
 }
+

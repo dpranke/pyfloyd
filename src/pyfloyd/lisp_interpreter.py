@@ -248,6 +248,7 @@ class Interpreter:
         self.env.set('true', True)
         self.env.set('false', False)
         self.env.set('null', None)
+        self.define_native_fn('define', self.fexpr_define, is_fexpr=True)
         self.define_native_fn('equal', self.f_equal, types=['any', 'any'])
         self.define_native_fn('if', self.fexpr_if, is_fexpr=True)
         self.define_native_fn('in', self.f_in, types=['any', 'any'])
@@ -314,6 +315,11 @@ class Interpreter:
                 return val
         raise InterpreterError("Don't know how to evaluate `{expr}`")
 
+    def fexpr_define(self, args, env):
+        head, body = args
+        name = self.eval(head, env)
+        self.env.set(name, self.eval(body, env))
+
     def f_equal(self, args, env):
         del env
         return args[0] == args[1]
@@ -354,7 +360,7 @@ class Interpreter:
             fn, exprs = args
             sep = None
         check(is_fn(fn), f"First arg to map isn't a function: `{fn}`")
-        check(is_list(exprs), f"Second arg to map isn't a list: `{exprs}`")
+        check(is_list([exprs]), f"Second arg to map isn't a list: `{exprs}`")
         results = []
         for expr in exprs:
             results.append(fn.call([expr], env))
@@ -438,4 +444,4 @@ class Interpreter:
         del env
         # The difference from `f_list`, above, is that the args will
         # not have been evaluated here.
-        return list(args)
+        return args[0]
