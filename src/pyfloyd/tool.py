@@ -99,6 +99,12 @@ def main(argv=None, host=None):
     except KeyboardInterrupt:
         host.print('Interrupted, exiting.', file=host.stderr)
         return 130  # SIGINT
+    except datafile.DatafileError as exc:
+        if args and args.post_mortem:
+            traceback.print_exception(exc)
+            pdb.post_mortem()
+        print(str(exc), file=host.stderr)
+        return 1
     except Exception as exc:  # pylint: disable=broad-exception-caught
         if args and args.post_mortem:
             traceback.print_exception(exc)

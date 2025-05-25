@@ -56,6 +56,22 @@ class ArgparseAppendAction(argparse.Action):
         setattr(namespace, self.dest, opts)
 
 
+class DatafileError(ValueError):
+    """Exception raised when a datafile is semantically invalid.
+
+    This is a subclass of ValueError, and so can be caught by code
+    that catches ValueError.
+    """
+
+
+class DatafileParseError(DatafileError):
+    """Exception raised when a datafile is syntactically invalid.
+
+    This is a subclass of ValueError, and so can be caught by code
+    that catches ValueError.
+    """
+
+
 quote_tokens = ('```', '"""', "'''", '`', '"', "'")
 
 _bare_word_re = re.compile(r'^[^\\\s\[\]\(\)\{\}:\'"`]+$')
@@ -81,6 +97,7 @@ def load(
     allow_numwords: bool = False,
     start: Optional[int] = None,
     custom_tags: Optional[dict[str, Any]] = None,
+    filename: Optional[str] = None,
 ) -> Any:
     """Deserialize ``fp`` (a ``.read()``-supporting file-like object
     containing a Floyd datafile) to a Python object.
@@ -114,14 +131,14 @@ def load(
 
     Raises:
       TypeError: if given an invalid document.
-      ValueError: if given an invalid document.
+      DatafileParseError: if given an invalid document.
       UnicodeDecodeError: if given a byte string that is not a
           legal UTF-8 document (or the equivalent, if using a different
           `encoding`). This matches the `json` module.
     """
 
     s = fp.read()
-    val, err, _ = parse(
+    return loads(
         s,
         encoding=encoding,
         cls=cls,
@@ -134,10 +151,8 @@ def load(
         allow_numwords=allow_numwords,
         start=start,
         custom_tags=custom_tags,
+        filename=filename,
     )
-    if err:
-        raise ValueError(err)
-    return val
 
 
 def loads(
@@ -156,6 +171,7 @@ def loads(
     allow_numwords: bool = False,
     start: Optional[int] = None,
     custom_tags: Optional[dict[str, Any]] = None,
+    filename: Optional[str] = None,
 ):
     """Deserialize ``s`` (a string containing a Floyd datafile) to a Python
     object.
@@ -176,7 +192,8 @@ def loads(
 
     Raises
         - `TypeError` if given an invalid document.
-        - `ValueError` if given an invalid document.
+        - `DatafileParseError` if given a syntactically invalid document.
+        - `DatafileError` if given a semantically invalid document.
         - `UnicodeDecodeError` if given a byte string that is not a
           legal UTF-8 document (or the equivalent, if using a different
           `encoding`). This matches the `json` module.
@@ -195,9 +212,10 @@ def loads(
         allow_numwords=allow_numwords,
         start=start,
         custom_tags=custom_tags,
+        filename=filename,
     )
     if err:
-        raise ValueError(err)
+        raise DatafileError(err)
     return val
 
 
@@ -217,6 +235,7 @@ def parse(
     parse_bareword: Optional[Callable[[str, bool], Any]] = None,
     start: Optional[int] = None,
     custom_tags: Optional[dict[str, Any]] = None,
+    filename: Optional[str] = None,
 ):
     """Parse ```s``, returning positional information along with a value.
 
@@ -242,19 +261,19 @@ def parse(
         legal UTF-8 document (or the equivalent, if using a different
         `encoding`). This matches the `json` module.
 
-    Note that this does *not* raise a `ValueError`; instead any error is
+    Note that this does *not* raise a `DatafileError`; instead any error is
     returned as the second value in the tuple.
 
     You can use this method to read in a series of values from a string
     `s` as follows:
 
-        >>> import floyd_datafile
+        >>> from pyfloyd import datafile
         >>> s = '1 2 3 4'
         >>> values = []
         >>> start = 0
         >>> while True:
-        ...     v, err, pos = floyd_datafile.parse(s, start=start,
-        ...                                        allow_trailing=True)
+        ...     v, err, pos = datafile.parse(s, start=start,
+        ...                                  allow_trailing=True)
         ...     if v:
         ...         values.append(v)
         ...         start = pos
@@ -263,7 +282,7 @@ def parse(
         ...             # whitespace
         ...             break
         ...         continue
-        ...     raise ValueError(err)
+        ...     raise datafile.DatafileParseError(err)
         >>> values
         [1, 2, 3, 4]
 
@@ -282,6 +301,7 @@ def parse(
         parse_bareword=parse_bareword,
         start=start,
         custom_tags=custom_tags,
+        filename=filename,
     )
 
 
@@ -312,6 +332,7 @@ class Decoder:
         allow_numwords=False,
         start=0,
         custom_tags: Optional[dict[str, Any]] = None,
+        filename: Optional[str] = None,
     ) -> Tuple[Any, Optional[str], Optional[int]]:
         self._allow_trailing = allow_trailing
         self._allow_numwords = allow_numwords
@@ -322,18 +343,20 @@ class Decoder:
         self._parse_bareword = parse_bareword or self.parse_bareword
         self._custom_tags = custom_tags or {}
 
+        filename = filename or '<string>'
+
         if isinstance(s, bytes):
             encoding = encoding or 'utf-8'
             s = s.decode(encoding)
 
         if not s:
-            raise ValueError('Empty strings are not legal Floyd datafiles')
+            raise DatafileError('Empty strings are not legal Floyd datafiles')
         start = start or 0
         externs = {
             'allow_trailing': self._allow_trailing,
             'allow_numwords': self._allow_numwords,
         }
-        ast, err, pos = parser.parse(s, '<string>', externs)
+        ast, err, pos = parser.parse(s, filename, externs)
         if err:
             return None, err, pos
 
@@ -342,7 +365,7 @@ class Decoder:
 
     def parse_array(self, tag, objs):
         if tag:
-            raise ValueError(f'Unsupported array tag {tag}')
+            raise DatafileError(f'Unsupported array tag {tag}')
         return objs
 
     def parse_number(self, s):
@@ -392,17 +415,17 @@ class Decoder:
 
     def parse_string_list(self, tag, strs):
         if tag:
-            raise ValueError(f'Unsupported string_list tag {tag}')
+            raise DatafileError(f'Unsupported string_list tag {tag}')
         return ''.join(strs)
 
     def parse_object_pairs(self, tag, pairs):
         if tag:
-            raise ValueError(f'Unsupported object tag {tag}')
+            raise DatafileError(f'Unsupported object tag {tag}')
         keys = set()
         key_pairs = []
         for key, val in pairs:
             if key in keys:
-                raise ValueError(f'Duplicate key "{key}" found in object')
+                raise DatafileError(f'Duplicate key "{key}" found in object')
             keys.add(key)
             key_pairs.append((key, val))
         if self._parse_object_pairs:
@@ -458,7 +481,7 @@ class Decoder:
             if tag in self._custom_tags:
                 return self._custom_tags[tag](ty, tag, vals)
             return self.parse_array(tag, [self._walk_ast(el) for el in v])
-        raise ValueError('unknown el: ' + el)  # pragma: no cover
+        raise DatafileError('unknown el: ' + el)  # pragma: no cover
 
 
 def decode_escape(s, i):
@@ -504,7 +527,7 @@ def decode_escape(s, i):
             x = x * 8 + int(s[i + 2], base=8)
             j += 1
         return j, chr(x)
-    raise ValueError(f'Bad escape in str {repr(s)} at pos {i}')
+    raise DatafileError(f'Bad escape in str {repr(s)} at pos {i}')
 
 
 def _check(s, i, n, fn):
@@ -560,7 +583,7 @@ def dedent(s):
     # on the first line of a multiline string. We should try to fix this
     # to support three before widely publicizing the format.
     if lines[0] and not lines[0].isspace():
-        raise ValueError(
+        raise DatafileError(
             "Multiline strings can't have any text on the same "
             'line as the opening quote'
         )
@@ -718,7 +741,7 @@ class Encoder:
 
         May raise `TypeError` if the object is the wrong type to be
         encoded (i.e., your custom routine can't handle it either), and
-        `ValueError` if there's something wrong with the value.
+        `DatafileError` if there's something wrong with the value.
 
         If `as_key` is true, the return value should be something that
         can be used as a key, i.e., either a bare word that isn't a
@@ -765,7 +788,7 @@ class Encoder:
 
     def _encode_float(self, obj: float, *, as_key: bool) -> str:
         if obj == float('inf') or obj == float('-inf') or math.isnan(obj):
-            raise ValueError('Illegal datafile value: f{obj}')
+            raise DatafileError('Illegal datafile value: f{obj}')
         return f'"{repr(obj)}"' if as_key else repr(obj)
 
     def _encode_str(self, obj: str, *, as_key: bool) -> str:
@@ -780,7 +803,7 @@ class Encoder:
         # it'd have to do so directly in a subclass of Encoder.
         i = id(obj)
         if i in seen:
-            raise ValueError('Circular reference detected.')
+            raise DatafileError('Circular reference detected.')
         seen.add(i)
 
         if self.indent:
@@ -834,7 +857,7 @@ class Encoder:
             key_str = self.encode(key, seen, level, as_key=True)
 
             if key_str in new_keys:
-                raise ValueError(f'duplicate key {repr(key)}')
+                raise DatafileError(f'duplicate key {repr(key)}')
             new_keys.add(key_str)
 
             if first_key:

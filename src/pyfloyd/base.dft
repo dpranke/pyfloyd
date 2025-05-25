@@ -41,12 +41,9 @@ generate: @"
         [vl '' '' operator_state_class]
         [vl]]
 
-
     @result_class
 
-
     @parse_function
-
 
     @parser_class[]
     @if[generator_options.main main_footer default_footer]

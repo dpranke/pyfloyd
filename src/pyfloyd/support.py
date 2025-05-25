@@ -53,6 +53,9 @@ class Host:
         file = file or self.stdout
         print(*args, end=end, file=file, flush=flush)
 
+    def relpath(self, path):
+        os.path.relpath(path)
+
     def rmtree(self, path):
         shutil.rmtree(path)
 

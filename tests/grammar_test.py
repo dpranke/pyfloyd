@@ -1204,12 +1204,15 @@ class _GeneratedParserWrapper:
 
 
 class GeneratorMixin:
+    template: Optional[str] = None
+
     def compile(self, grammar, path='<string>', memoize=False, externs=None):
         source_code, err, endpos = pyfloyd.generate(
             textwrap.dedent(grammar),
             path=path,
             options=pyfloyd.GeneratorOptions(
                 language=self.language,
+                template=self.template,
                 main=True,
                 memoize=memoize,
             ),

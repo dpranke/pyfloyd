@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
+import shutil
 import unittest
 
 from . import grammar_test
@@ -23,7 +23,15 @@ class Tests(
     grammar_test.GeneratorMixin,
     grammar_test.GrammarTestsMixin,
 ):
-    cmd = [sys.executable]
+    cmd = [shutil.which('node')]
     language = 'datafile'
-    template = 'python'
-    ext = '.py'
+    template = 'javascript'
+    ext = '.js'
+    floyd_externs = {'unicode_names': False}
+
+    @grammar_test.skip('integration')
+    def test_json5_special_floats(self):
+        # TODO: `Infinity` and `NaN` are legal Python values and legal
+        # JavaScript values, but they are not legal JSON values, and so
+        # we can't read them in from output that is JSON.
+        pass

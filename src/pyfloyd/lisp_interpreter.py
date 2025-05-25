@@ -324,6 +324,7 @@ class Interpreter:
         self.env.set(name, self.eval(body, env))
 
     def f_cons(self, args, env):
+        del env
         return [args[0]] + args[1]
 
     def f_equal(self, args, env):

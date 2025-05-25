@@ -521,11 +521,12 @@ class Runner:
             + [
                 '-m',
                 'pyfloyd',
+                '--memoize',
+                '-l',
+                'datafile',
                 '-o',
                 new_file,
-                '--memoize',
                 '-c',
-                '--python',
                 grammar,
             ]
         )

@@ -23,7 +23,6 @@ class Tests(
     grammar_test.GeneratorMixin,
     grammar_test.GrammarTestsMixin,
 ):
-    maxDiff = None
     cmd = [sys.executable]
     language = 'python'
     ext = '.py'

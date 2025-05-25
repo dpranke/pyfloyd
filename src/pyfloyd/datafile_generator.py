@@ -67,7 +67,7 @@ class DatafileGenerator(generator.Generator):
         interp.define_native_fn('vl', self.f_vl)
         interp.define_native_fn('vl_l', self.f_vl_l)
 
-        default_template = options.generator_options.get('file', 'python')
+        default_template = options.get('template', 'python')
         path = self._find_datafile(default_template)
         self._load_datafiles(path)
         self.name = self.datafile['name']
@@ -88,7 +88,7 @@ class DatafileGenerator(generator.Generator):
 
         def _walk(node) -> set[str]:
             local_vars: set[str] = set()
-            local_vars.update(set(df_locals.get(node.t, [])))
+            local_vars.update(set(sym[1] for sym in df_locals.get(node.t, [])))
             for c in node.ch:
                 local_vars.update(_walk(c))
             return local_vars
@@ -108,11 +108,14 @@ class DatafileGenerator(generator.Generator):
         return path
 
     def _load_datafiles(self, name):
-        df_str = self.host.read_text_file(self._find_datafile(name))
+        path = self._find_datafile(name)
+        filename = self.host.relpath(path)
+        df_str = self.host.read_text_file(path)
         df = datafile.loads(
             df_str,
             parse_bareword=self._parse_bareword,
             custom_tags={'@': self._to_at_exp, 'q': self._to_quoted_list},
+            filename=filename,
         )
         if 'inherit' in df:
             for base in df['inherit']:
@@ -120,7 +123,8 @@ class DatafileGenerator(generator.Generator):
         self._merge_datafile(df)
 
     def _merge_datafile(self, df):
-        for df_key in self.datafile.keys():
+        # pylint: disable=consider-using-dict-items
+        for df_key in self.datafile:
             if df_key in df:
                 if df_key in self.df_keys_to_merge:
                     for k, v in df[df_key].items():
