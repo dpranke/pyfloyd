@@ -268,7 +268,7 @@ class Interpreter:
         self.define_native_fn(
             'replace', self.f_replace, types=['str', 'str', 'str']
         )
-        self.define_native_fn('to_string', self.f_to_string, types=['num'])
+        self.define_native_fn('to_string', self.f_to_string, types=['any'])
         self.define_native_fn(
             'slice', self.f_slice, types=['list', 'num', 'num']
         )
@@ -452,7 +452,12 @@ class Interpreter:
         return UserFn(self, params, body, env, is_fexpr=False, name=name)
 
     def fexpr_if(self, args, env):
-        cond, t_expr, f_expr = args
+        cond = args[0]
+        t_expr = args[1]
+        if len(args) == 3:
+            f_expr = args[2]
+        else:
+            f_expr = ['symbol', 'null']
         res = self.eval(cond, env)
         if res:
             return self.eval(t_expr, env)
