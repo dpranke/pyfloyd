@@ -146,8 +146,9 @@ class HList(FormatObj):
     def __init__(self, *objs):
         super().__init__()
         for obj in objs:
-            if isinstance(objs[0], self.__class__):
-                assert isinstance(obj, FormatObj)
+            if isinstance(objs[0], self.__class__) and isinstance(
+                obj, FormatObj
+            ):
                 self.objs.extend(obj.objs)
             else:
                 self.objs.append(obj)
