@@ -62,9 +62,6 @@ fn_name:   [fn [name] [strcat 'fn_' name]]
 # Return the identifier for a local variable like `x` or `$1`. Usually `v_x` or `v_1`.
 local_var: [fn [name] [strcat 'v_' [replace name '$' '_']]]
 
-# Returns a string that will reference a field or method on the main object.
-thisref: [fn [name] ['self.' name]]
-
 # The name for a rule in the output; rules names either correspond to a production
 # in the grammar, in which case it will be named with an `r_` prefix (e.g.
 # `grammar` -> `r_grammar`), or a derived subrule (part of the production), in
@@ -80,9 +77,16 @@ call:      [fn [name args] [tri [strcat [method_name name] '(']
 call_op:   [fn [name args] [call [op_name name] args]]
 call_rule: [fn [name args] [call [rule_name name] args]]
 
-succeed: [fn args [hl [call [op_name 'succeed'] args] c_end]]
-rewind: [fn [pos] [hl [call [op_name 'rewind'] [list pos] c_end]]]
-fail: [fn [] [hl [call [op_name 'fail'] q[]] c_end]]
+succeed: [fn args [hl [call [op_name 'succeed'] args] t_end]]
+rewind: [fn [pos] [hl [call [op_name 'rewind'] [list pos] t_end]]]
+fail: [fn [] [hl [call [op_name 'fail'] q[]] t_end]]
+
+break_if_failed: [fn [node] [if node.can_fail [t_if failed t_break]]]
+break_if_not_failed: [fn [node] [if node.can_fail
+                                    [t_if [hl t_not failed] t_break]]]
+return_if_failed: [fn [node] [if node.can_fail [t_if failed t_return]]]
+return_if_not_failed: [fn [node] [if node.can_fail
+                                     [t_if [hl t_not failed] t_return]]]
 
 # Helper methods that must be overridden in sub-grammars:
 
@@ -152,9 +156,28 @@ n_apply: [fn [node]
              [if node.memoize
                  [hl [call_op 'memoize' [list [lit node.rule_name]
                                               [method_name node.rule_name]]]
-                     c_end]
-                 [hl [call_rule node.rule_name q[]] c_end]]]
+                     t_end]
+                 [hl [call_rule node.rule_name q[]] t_end]]]
 
+n_choice: [fn [node] [vl [t_assign 'pos' f_pos]
+                         [vl_l [map [fn [c] [vl [stmts c]
+                                                [return_if_not_failed c]
+                                                [rewind 'pos']]]
+                                    [slice node.ch 0 -1]]]
+                         [stmts [getitem node.ch -1]]]]
+
+n_count: [fn [node] [vl [t_assign 'vs' '[]']
+                        [t_assign 'i' '0']
+                        [t_assign 'cmin' [to_string [getitem node.v 0]]]
+                        [t_assign 'cmax' [to_string [getitem node.v 1]]]
+                        [t_while 'i < cmax'
+                                 [vl [stmts node.child]
+                                     [t_if failed
+                                           [vl [t_if 'i >= cmin' [succeed 'vs']]
+                                               t_return]]
+                                     [t_append 'vs' f_val]
+                                     [hl 'i += 1' t_end]]]
+                        [succeed 'vs']]]
 n_e_arr: [fn [node] [if [is_empty node.ch]
                         '[]'
                         [tri '['
@@ -163,7 +186,7 @@ n_e_arr: [fn [node] [if [is_empty node.ch]
 
 n_e_call: [fn [node] [tri '(' [comma [map [fn [c] [expr c]] node.ch]] ')']]
 
-n_e_const: [fn [node] [invoke [strcat 'c_' node.v]]]
+n_e_const: [fn [node] [invoke [strcat 't_' node.v]]]
 
 n_e_getitem: [fn [node] [tri '[' [expr node.child] ']']]
 
@@ -179,7 +202,7 @@ n_e_lit: [fn [node] [lit node.v]]
 
 n_e_minus: [fn [node] [tree [expr node.left] '-' [expr node.right]]]
 
-n_e_not: [fn [node] [tree null c_not [expr node.child]]]
+n_e_not: [fn [node] [tree null t_not [expr node.child]]]
 
 n_e_num: [fn [node] node.v]
 
@@ -189,29 +212,110 @@ n_e_plus: [fn [node] [tree [expr node.left] '+' [expr node.right]]]
 
 n_e_qual: [fn [node] [saw [map [fn [n] [invoke_node n]] node.ch]]]
 
-n_empty: [fn [node] [succeed c_null]]
+n_empty: [fn [node] [succeed t_null]]
 
-n_equals: [fn [node] [hl [call_op 'str' [list [expr node.child]] c_end]]]
+n_ends_in: [fn [node] [t_while t_true
+                          [vl [stmts node.child]
+                              [break_if_not_failed node]
+                              [call_rule 'r_any' q[]]
+                              [t_if failed t_break]]]]
+
+n_equals: [fn [node] [hl [call_op 'str' [list [expr node.child]] t_end]]]
+
+n_label: [fn [node] [vl [stmts node.child]
+                        [return_if_failed node.child]
+                        [if node.outer_scope
+                            [vl [t_assign_outer node.name f_val]]
+                            [vl [t_assign [local_var node.name] f_val]]]]]
 
 n_leftrec: [fn [node] [hl [call_op 'leftrec'
                                    [list [method_name node.child.v]
                                          [lit node.v]
-                                         [if node.left_assoc c_true c_false]]]
-                           c_end]]
+                                         [if node.left_assoc t_true t_false]]]
+                           t_end]]
 
 n_lit: [fn [node] [hl [if [equal [strlen node.v] 1]
                           [call_op 'ch' [list [lit node.v]]]
                           [call_op 'str' [list [lit node.v]]]]
-                      c_end]]
+                      t_end]]
 
-n_operator: [fn [node] [hl [call_op 'operator' [list [lit node.v]] c_end]]]
+n_not: [fn [node] [vl [t_assign 'pos' f_pos]
+                      [t_assign 'errpos' [fld 'errpos']]
+                      [stmts node.child]
+                      [t_ifelse failed
+                                [vl [succeed t_null 'pos']]
+                                [vl [rewind 'pos']
+                                    [t_assign [fld 'errpos'] 'errpos']
+                                    [fail]]]]]
+
+n_not_one: [fn [node] [vl [n_not node]
+                          [t_if [hl t_not failed] [call_rule 'r_any' q[]]]]]
+
+n_operator: [fn [node] [hl [call_op 'operator' [list [lit node.v]] t_end]]]
+
+n_opt: [fn [node] [vl [t_assign 'pos' f_pos]
+                      [stmts node.child]
+                      [t_ifelse failed
+                                [vl [succeed '[]']]
+                                [vl [succeed [hl '[' f_val ']']]]]]]
 
 n_paren: [fn [node] [stmts node.child]]
 
+n_plus: [fn [node]
+            [vl [t_assign 'vs' '[]']
+                [stmts node.child]
+                [return_if_failed node.child]
+                [t_append 'vs' f_val]
+                [t_while t_true
+                    [vl [t_assign 'pos' f_pos]
+                        [stmts node.child]
+                        [t_if [t_or failed [t_eq f_pos 'pos']]
+                              [vl [rewind 'pos']
+                                  t_break]]
+                        [t_append 'vs' f_val]]]
+                [succeed 'vs']]]
+
+n_pred: [fn [node]
+            [vl [t_assign 'v' [expr node.child]]
+                [t_ifelifelse [t_istrue 'v'] [succeed 'v']
+                              [t_isfalse 'v'] [fail]
+                              [t_throw [lit 'Bad predicate value']]]]]
+
 n_range: [fn [node] [hl [call_op 'range'
                                  [list [lit node.start] [lit node.stop]]]
-                        c_end]]
+                        t_end]]
 
-n_unicat: [fn [node] [hl [call_op 'unicat' [list [lit node.v]]] c_end]]
+n_run: [fn [node]
+           [vl [t_assign 'start' f_pos]
+               [stmts node.child]
+               [return_if_failed node.child]
+               [t_assign 'end' f_pos]
+               [t_assign f_val [t_substr [fld 'text'] 'start' 'end']]]]
+
+n_scope: [fn [node] [vl [t_append [fld 'scopes'] t_newmap]
+                        [stmts node.child]
+                        [t_pop [fld 'scopes']]]]
+
+n_seq: [fn [node]
+           [vl [t_local_vars [map [fn [v] [local_var v]] node.vars]]
+               [stmts [getitem node.ch 0]]
+               [return_if_failed [getitem node.ch 0]]
+               [vl_l [map [fn [c] [vl [stmts c]
+                                      [return_if_failed c]]]
+                          [slice node.ch 1 -1]]]
+               [stmts [getitem node.ch -1]]]]
+
+n_star: [fn [node]
+            [vl [t_assign 'vs' '[]']
+                [t_while t_true
+                      [vl [t_assign 'pos' f_pos]
+                          [stmts node.child]
+                          [t_if [t_or failed [t_eq f_pos 'pos']]
+                                [vl [rewind 'pos']
+                                    t_break]]
+                          [t_append 'vs' f_val]]]
+                [succeed 'vs']]]
+
+n_unicat: [fn [node] [hl [call_op 'unicat' [list [lit node.v]]] t_end]]
 
 }

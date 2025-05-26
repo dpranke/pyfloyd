@@ -28,19 +28,6 @@ inherit: ['base']
 templates: {
 
 #
-# Various constants
-#
-
-c_true:   'True'
-c_false:  'False'
-c_null:   'None'
-c_not:    'not '  # the not / `!` operator
-c_end:    ''      # statement terminator
-
-t_return:  'return;'
-t_break:   'break;'
-
-#
 # Helper rules
 #
 
@@ -63,59 +50,57 @@ meth: [fn params [if [equal [length params] 1]
 rule_method: [fn [rule node] [vl [strcat 'def _' rule '(self):']
                                  [ind [invoke_node node]]]]
 
+block: [fn [head body] [vl [hl head ':'] [ind body]]]
+
 
 # Reference different kinds of variable names.
 
-# Returns a field or method on the generated parse object.
 fld: [fn [name] [strcat 'self._' name]]
 
 method_name: [fn [name] [fld name]]
 
-failed: [fld 'failed']
+extern: [fn [name] [strcat 'self._externs[' [lit name] ']']]
 
+# Returns a field or method on the generated parse object.
 f_pos: [fld 'pos']
 f_errpos: [fld 'errpos']
 f_val: [fld 'val']
+failed: [fld 'failed']
 
-t_append: [fn [lst val] [hl lst '.append(' val ')' c_end]]
-t_pop: [fn [lst] [hl lst '.pop()']]
+#
+# Helpers for generating text portably
+#
 
-t_substr: [fn [s start end] [hl s '[' start ':' end ']']]
-
-extern: [fn [name] [strcat 'self._externs[' [lit name] ']']]
-
-t_assign: [fn [var val] [hl var ' = ' val c_end]]
+t_assign: [fn [var val] [hl var ' = ' val t_end]]
 t_assign_outer: [fn [var val] 
                     [hl "self._scopes[-1]['" var "'] = " val]]
-
-block: [fn [head body] [vl [hl head ':'] [ind body]]]
-
-t_while: [fn [cond body] [block [hl 'while ' cond] body]]
-
+t_append: [fn [lst val] [hl lst '.append(' val ')' t_end]]
+t_break:   'break'
+t_end: ''  # statement terminator (not used in Python)
+t_false: 'False'
+t_newmap: '{}'
+t_null: 'None'
+t_not: 'not '  # the logical operator
+t_true: 'True'
+t_eq: [fn [x y] [hl x ' == ' y]]
 t_if: [fn [cond body] [block [hl 'if ' cond] body]]
 t_ifelse: [fn [cond if_body e_body]
               [vl [block [hl 'if ' cond] if_body]
                   [block 'else' e_body]]]
-
 t_ifelifelse: [fn [cond if_body elif_cond elif_body e_body]
               [vl [block [hl 'if ' cond] if_body]
                   [block [hl 'elif ' elif_cond] elif_body]
                   [block 'else' e_body]]]
-
 t_istrue: [fn [v] [hl v ' is True']]
 t_isfalse: [fn [v] [hl v ' is False']]
-                  
-t_throw: [fn [msg] [hl 'raise _ParsingRuntimeError(' msg ')' c_end]]
-
+t_local_vars: [fn [v] [vl]]
+t_local_vars2: [fn [v] [vl]]
 t_or: [fn [x y] [hl x ' or ' y]]
-t_eq: [fn [x y] [hl x ' == ' y]]
-
-break_if_failed: [fn [node] [if node.can_fail [t_if failed t_break]]]
-break_if_not_failed: [fn [node] [if node.can_fail
-                                    [t_if [hl c_not failed] t_break]]]
-return_if_failed: [fn [node] [if node.can_fail [t_if failed t_return]]]
-return_if_not_failed: [fn [node] [if node.can_fail
-                                     [t_if [hl c_not failed] t_return]]]
+t_pop: [fn [lst] [hl lst '.pop()']]
+t_return:  'return'
+t_substr: [fn [s start end] [hl s '[' start ':' end ']']]
+t_throw: [fn [msg] [hl 'raise _ParsingRuntimeError(' msg ')' t_end]]
+t_while: [fn [cond body] [block [hl 'while ' cond] body]]
 
 #
 # The basic block structure of the file is given in the `generate` template
@@ -399,79 +384,8 @@ parse_without_exception: @'''
     '''
 
 #
-# Rules for each node in the AST
+# Language-specific rules for nodes in the AST.
 #
-
-n_choice: [fn [node] [vl [t_assign 'pos' f_pos]
-                         [vl_l [map [fn [c] [vl [stmts c]
-                                                [return_if_not_failed c]
-                                                [rewind 'pos']]]
-                                    [slice node.ch 0 -1]]]
-                         [stmts [getitem node.ch -1]]]]
-
-n_count: [fn [node] [vl [t_assign 'vs' '[]']
-                        [t_assign 'i' '0']
-                        [t_assign 'cmin' [to_string [getitem node.v 0]]]
-                        [t_assign 'cmax' [to_string [getitem node.v 1]]]
-                        [t_while 'i < cmax'
-                                 [vl [stmts node.child]
-                                     [t_if failed
-                                           [vl [t_if 'i >= cmin' [succeed 'vs']]
-                                               t_return]]
-                                     [t_append 'vs' f_val]
-                                     [hl 'i += 1' c_end]]]
-                        [succeed 'vs']]]
-
-
-n_ends_in: [fn [node] [t_while c_true
-                          [vl [stmts node.child]
-                              [break_if_not_failed node]
-                              [call_rule 'r_any' q[]]
-                              [t_if failed t_break]]]]
-
-n_label: [fn [node] [vl [stmts node.child]
-                        [return_if_failed node.child]
-                        [if node.outer_scope
-                            [vl [t_assign_outer node.name f_val]]
-                            [vl [t_assign [local_var node.name] f_val]]]]]
-
-n_not: [fn [node] [vl [t_assign 'pos' f_pos]
-                      [t_assign 'errpos' [fld 'errpos']]
-                      [stmts node.child]
-                      [t_ifelse failed
-                                [vl [succeed c_null 'pos']]
-                                [vl [rewind 'pos']
-                                    [t_assign [fld 'errpos'] 'errpos']
-                                    [fail]]]]]
-
-n_not_one: [fn [node] [vl [n_not node]
-                          [t_if [hl c_not failed] [call_rule 'r_any' q[]]]]]
-
-n_opt: [fn [node] [vl [t_assign 'pos' f_pos]
-                      [stmts node.child]
-                      [t_ifelse failed
-                                [vl [succeed '[]']]
-                                [vl [succeed [hl '[' f_val ']']]]]]]
-
-n_plus: [fn [node]
-            [vl [t_assign 'vs' '[]']
-                [stmts node.child]
-                [return_if_failed node.child]
-                [t_append 'vs' f_val]
-                [t_while c_true
-                    [vl [t_assign 'pos' f_pos]
-                        [stmts node.child]
-                        [t_if [t_or failed [t_eq f_pos 'pos']]
-                              [vl [rewind 'pos']
-                                  t_break]]
-                        [t_append 'vs' f_val]]]
-                [succeed 'vs']]]
-
-n_pred: [fn [node]
-            [vl [t_assign 'v' [expr node.child]]
-                [t_ifelifelse [t_istrue 'v'] [succeed 'v']
-                              [t_isfalse 'v'] [fail]
-                              [t_throw [lit 'Bad predicate value']]]]]
 
 n_regexp: [fn [node]
               [vl [t_assign 'rexp' [lit node.v]]
@@ -483,25 +397,6 @@ n_regexp: [fn [node]
                   '    return'
                   [fail]]]
 
-n_run: [fn [node]
-           [vl [t_assign 'start' f_pos]
-               [stmts node.child]
-               [return_if_failed node.child]
-               [t_assign 'end' f_pos]
-               [t_assign f_val [t_substr [fld 'text'] 'start' 'end']]]]
-
-n_scope: [fn [node] [vl [t_append [fld 'scopes'] '{}']
-                        [stmts node.child]
-                        [t_pop [fld 'scopes']]]]
-
-n_seq: [fn [node]
-           [vl [stmts [getitem node.ch 0]]
-               [return_if_failed [getitem node.ch 0]]
-               [vl_l [map [fn [c] [vl [stmts c]
-                                      [return_if_failed c]]]
-                          [slice node.ch 1 -1]]]
-               [stmts [getitem node.ch -1]]]]
-
 n_set: [fn [node]
            [vl [t_assign 'rexp' [lit [strcat '[' node.v ']']]]
                [t_if 'rexp not in self._regexps'
@@ -512,20 +407,24 @@ n_set: [fn [node]
                          t_return]]
                [fail]]]
 
-n_star: [fn [node]
-            [vl [t_assign 'vs' '[]']
-                [t_while c_true
-                      [vl [t_assign 'pos' f_pos]
-                          [stmts node.child]
-                          [t_if [t_or failed [t_eq f_pos 'pos']]
-                                [vl [rewind 'pos']
-                                    t_break]]
-                          [t_append 'vs' f_val]]]
-                [succeed 'vs']]]
-
 #
 # Built-in operators and rules
 #
+
+r_any: [
+    meth d"
+        if self._pos < self._end:
+            self._o_succeed(self._text[self._pos], self._pos + 1)
+        else:
+            self._o_fail()
+        "]
+
+r_end: [meth d"
+             if self._pos == self._end:
+                 self._o_succeed(None)
+             else:
+                 self._o_fail()
+             "]
 
 o_ch: [meth 'ch' d"
            pos = self._pos
@@ -687,21 +586,6 @@ o_unicat: [
          else:
              self._o_fail()
          "]
-
-r_any: [
-    meth d"
-        if self._pos < self._end:
-            self._o_succeed(self._text[self._pos], self._pos + 1)
-        else:
-            self._o_fail()
-        "]
-
-r_end: [meth d"
-             if self._pos == self._end:
-                 self._o_succeed(None)
-             else:
-                 self._o_fail()
-             "]
 
 fn_atof: [meth 's' d"
                if '.' in s or 'e' in s or 'E' in s:

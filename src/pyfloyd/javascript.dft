@@ -43,6 +43,93 @@ local_vars: {
 
 templates = {
 
+#
+# Helper rules
+#
+
+# Define a method based on the template name (used for builtins)
+meth: [fn params [if [equal [length params] 1]
+                     [vl [hl _t_name '() {']
+                         [ind [getitem params 0]]
+                         [hl '}']]
+                     [vl [hl _t_name '(' [getitem params 0] ') {']
+                         [ind [getitem params 1]]
+                         [hl '}']]]]
+
+# define a method for the given rule
+rule_method: [fn [rule node] [vl [strcat rule '() {']
+                                 [ind [vl [t_local_vars node.local_vars]
+                                          [stmts node]]]
+                                 '}']]
+
+# How to refer to different types of identifiers:
+
+# Returns a field or method on the generated parse object.
+fld: [fn [name] [strcat 'this.' name]]
+
+f_pos: [fld 'pos']
+f_errpos: [fld 'errpos']
+f_val: [fld 'val']
+failed: [fld 'failed']
+
+extern: [fn [name] [strcat "this.externs.get(" [lit name] ")"]]
+
+method_name: [fn [name] [fld name]]
+
+block: [fn [head body] [vl [hl head ' {'] [ind body] '}']]
+
+# Invoke a method on the parser object.
+call: [fn [name args] [tri [strcat [method_name name] '(']
+                           [comma args]
+                           ')']]
+
+#
+# Helper methods for generating text portably.
+#
+
+t_assign: [fn [var val] [hl var ' = ' val t_end]]
+t_assign_outer: [fn [var val] 
+                    [hl "this.scopes[this.scopes.length - 1]."
+                        "set('"
+                        var
+                        "', "
+                        val
+                        ")" 
+                        t_end]]
+
+t_append: [fn [lst val] [hl lst '.push(' val ')' t_end]]
+t_break:  'break;'
+t_end: ';'  # statement terminator
+t_false: 'false'
+t_newmap: 'new Map()'
+t_not: '!'  # the logical operator
+t_null: 'null'
+t_true: 'true'
+t_eq: [fn [x y] [hl x ' === ' y]]
+t_if: [fn [cond body] [block [hl 'if (' cond ')'] body]]
+t_ifelse: [fn [cond if_body e_body]
+              [vl [block [hl 'if (' cond ')'] if_body]
+                  [block 'else' e_body]]]
+t_ifelifelse: [fn [cond if_body elif_cond elif_body e_body]
+              [vl [block [hl 'if (' cond ')'] if_body]
+                  [block [hl 'else if (' elif_cond ')'] elif_body]
+                  [block 'else' e_body]]]
+t_istrue: [fn [v] [hl v ' === true']]
+t_isfalse: [fn [v] [hl v ' === false']]
+t_local_vars: [fn [vars] [vl_l [map [fn [v] [hl 'let ' v t_end]]
+                                        vars]]]
+t_or: [fn [x y] [hl x ' || ' y]]
+t_pop: [fn [x] [hl x '.pop()']]
+t_return: 'return;'
+t_substr: [fn [s start end] [hl s '.substr(' start ', ' end ')']]
+t_throw: [fn [msg] [hl 'throw new ParsingRuntimeError(' msg ')' t_end]]
+t_while: [fn [cond body] [block [hl 'while (' cond ')'] body]]
+
+#
+# The basic block structure of the file is given in the `generate` template
+# in base. This section defines the templates `generate` references.
+#
+
 main_header: @"""
     #!/usr/bin/env node
     //
@@ -321,110 +408,8 @@ main_footer: d"""
     """  # main_footer
 
 #
-# Rules for each node in the AST (not defined in `base`).
+# Language-specific rules for nodes in the AST.
 #
-
-n_choice: [fn [node] [vl 'pos = this.pos;'
-                         [vl_l [map [fn [c] [vl [stmts c]
-                                                'if (!this.failed) {'
-                                                '    return;'
-                                                '}'
-                                                'this.o_rewind(pos)']]
-                                    [slice node.ch 0 -1]]]
-                         [stmts [getitem node.ch -1]]]]
-
-n_count: [fn [node] [vl 'vs = [];'
-                        'i = 0;'
-                        [hl 'cmin = ' [to_string node.start] c_end]
-                        [hl 'cmax = ' [to_string node.stop] c_end]
-                        'while (i < cmax) {'
-                        [ind [stmts node.child]
-                             'if (this.failed) {'
-                             '    if (i >= cmin) {'
-                             '      this.o_succeed(vs);'
-                             '      return;'
-                             '    }'
-                             '    return;'
-                             '}'
-                             'vs.push(this.val);'
-                             'i += 1;']
-                        '}'
-                        'this.o_succeed(vs);']]
-
-n_ends_in: [fn [node] [vl 'while (true) {'
-                          [ind [stmts node.child]]
-                          [if node.can_fail
-                              [ind 'if (!this.failed) {'
-                                   '  break;'
-                                   '}']
-                              [vl]]
-                          [ind [call_rule 'r_any' q[]]
-                               'if (this.failed) {'
-                               '  break;'
-                               '}']
-                          '}']]
-
-n_label: [fn [node] [vl [stmts node.child]
-                        [if node.child.can_fail
-                            [vl 'if (this.failed) {' '  return;' '}']
-                            [vl]]
-                        [if node.outer_scope
-                            [vl [strcat "this.scopes[this.scopes.length-1]."
-                                        "set('" node.name "', this.val);"]]
-                            [vl [strcat [varname node.name]
-                                        ' = this.val;']]]]]
-
-n_not: [fn [node] [vl 'pos = this.pos;'
-                      'errpos = this.errpos;'
-                      [stmts node.child]
-                      'if (this.failed) {'
-                      '  this.o_succeed(null, pos);'
-                      '} else {'
-                      '  this.o_rewind(pos);'
-                      '  this.errpos = errpos;'
-                      '  this.o_fail();'
-                      '}']]
-
-n_not_one: [fn [node] [vl [n_not node]
-                          'if (!this.failed) {'
-                          [ind [call_rule 'r_any' q[]]
-                          '}']]]
-
-n_opt: [fn [node] [vl 'pos = this.pos;'
-                      [stmts node.child]
-                      'if (this.failed) {'
-                      '    this.o_succeed([], pos);'
-                      '} else {'
-                      '    this.o_succeed([this.val]);'
-                      '}']]
-
-n_plus: [fn [node]
-            [vl 'vs = [];'
-                [stmts node.child]
-                'if (this.failed) {'
-                '    return;'
-                '}'
-                'vs.push(this.val);'
-                'while (true) {'
-                [ind 'pos = this.pos;'
-                     [stmts node.child]
-                     'if (this.failed || this.pos == pos) {'
-                     '  this.o_rewind(pos);'
-                     '  break;'
-                     '}'
-                     'vs.push(this.val);']
-                '}'
-                'this.o_succeed(vs);']]
-
-n_pred: [fn [node]
-            [vl [hl 'v = ' [expr node.child] ';']
-                'if (v === true) {'
-                '  this.o_succeed(v);'
-                '} else if (v === false) {'
-                '  this.o_fail();'
-                '} else {'
-                "  throw new ParsingRuntimeError('Bad predicate value');"
-                '}']]
 
 n_regexp: [fn [node]
               [vl [hl "r = new RegExp(" [lit node.v] ", 'gy');"]
@@ -435,36 +420,6 @@ n_regexp: [fn [node]
                   '  return;'
                   '}'
                   'this.o_fail();']]
-
-n_run: [fn [node]
-           [vl 'start = this.pos;'
-               [stmts node.child]
-               [if node.child.can_fail
-                   [vl 'if (this.failed) {'
-                       '  return;'
-                       '}']
-                   [vl]]
-               'end = this.pos;'
-               'this.val = this.text.substr(start, end);']]
-
-n_scope: [fn [node] [vl 'this.scopes.push(new Map());'
-                        [stmts node.child]
-                        'this.scopes.pop();'
-                        ]]
-
-n_seq: [fn [node]
-           [vl [vl_l [map [fn [v] [hl 'let ' [varname v] ';']]
-                          node.vars]]
-               [stmts [getitem node.ch 0]]
-               [if [getattr [getitem node.ch 0] 'can_fail']
-                   [vl 'if (this.failed) {' '  return;' '}']
-                   [vl]]
-               [vl_l [map [fn [c] [vl [stmts c]
-                                      [if c.can_fail
-                                          [vl 'if (this.failed) {' '  return;' '}']
-                                          [vl]]]]
-                          [slice node.ch 1 -1]]]
-               [stmts [getitem node.ch -1]]]]
 
 n_set: [fn [node]
            [vl [hl "r = new RegExp(" 
@@ -478,31 +433,9 @@ n_set: [fn [node]
                '}'
                'this.o_fail();']]
 
-n_star: [fn [node]
-            [vl 'vs = [];'
-                'while(true) {'
-                '    pos = this.pos;'
-                [ind [stmts node.child]
-                     'if (this.failed || this.pos == pos) {'
-                     '    this.o_rewind(pos);'
-                     '    break;'
-                     '}'
-                     'vs.push(this.val);']
-                '}'
-                'this.o_succeed(vs);']]
-
 #
 # Built-in operators and rules
 #
-
-# Define a method based on the template name (used for builtins)
-meth: [fn params [if [equal [length params] 1]
-                     [vl [hl _t_name '() {']
-                         [ind [getitem params 0]]
-                         [hl '}']]
-                     [vl [hl _t_name '(' [getitem params 0] ') {']
-                         [ind [getitem params 1]]
-                         [hl '}']]]]
 
 r_any: [meth d"""
     if (this.pos < this.end) {
@@ -760,40 +693,5 @@ fn_utoi: [meth 's' 'return s.charCodeAt(0);']
 fn_xtoi: [meth 's' 'return Number.parseInt(s, 16);']
 
 fn_xtou: [meth 's' 'return String.fromCharCode(Number.parseInt(s, 16));']
-
-#
-# Various constants
-#
-
-c_true: 'true'
-c_false: 'false'
-c_null: 'null'
-c_not: '!'  # the operator
-c_end: ';'  # statement terminator
-
-#
-# Helper rules
-#
-
-# How to refer to different types of identifiers:
-
-varname: [fn [name] [strcat 'v_' [replace name '$' '_']]]
-
-extern: [fn [name] [strcat "this.externs.get(" [lit name] ")"]]
-
-method_name: [fn [name] [strcat 'this.' name]]
-
-
-# define a method for the given rule
-rule_method: [fn [rule node] [vl [strcat rule '() {']
-                                 [ind [vl [vl_l [map [fn [v] [hl 'let ' v c_end]]
-                                                     node.local_vars]]
-                                          [stmts node]]]
-                                 '}']]
-
-# Invoke a method on the parser object.
-call: [fn [name args] [tri [strcat [method_name name] '(']
-                           [comma args]
-                           ')']]
 
 }
