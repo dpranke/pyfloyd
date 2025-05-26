@@ -28,8 +28,98 @@ inherit: ['base']
 templates: {
 
 #
+# Various constants
+#
+
+c_true:   'True'
+c_false:  'False'
+c_null:   'None'
+c_not:    'not '  # the not / `!` operator
+c_end:    ''      # statement terminator
+
+t_return:  'return;'
+t_break:   'break;'
+
+#
+# Helper rules
+#
+
+# Defines a method on the generated parser object corresponding to the given.
+# template name `params` may be either
+# of length 1, in which case the method takes no arguments and the param
+# is the formater.El for the body, or 2, in which case the first argument is a
+# string with the parameter names (and optional values) and the second is the
+# body. `_t_name` can be used to refer to the name of the template.
+meth: [fn params [if [equal [length params] 1]
+                     [vl [hl 'def _' _t_name '(self):']
+                         [ind [getitem params 0]]]
+                     [vl [hl 'def _'
+                             _t_name
+                             '(self, '
+                             [getitem params 0]
+                             '):']
+                         [ind [getitem params 1]]]]]
+
+rule_method: [fn [rule node] [vl [strcat 'def _' rule '(self):']
+                                 [ind [invoke_node node]]]]
+
+
+# Reference different kinds of variable names.
+
+# Returns a field or method on the generated parse object.
+fld: [fn [name] [strcat 'self._' name]]
+
+method_name: [fn [name] [fld name]]
+
+failed: [fld 'failed']
+
+f_pos: [fld 'pos']
+f_errpos: [fld 'errpos']
+f_val: [fld 'val']
+
+t_append: [fn [lst val] [hl lst '.append(' val ')' c_end]]
+t_pop: [fn [lst] [hl lst '.pop()']]
+
+t_substr: [fn [s start end] [hl s '[' start ':' end ']']]
+
+extern: [fn [name] [strcat 'self._externs[' [lit name] ']']]
+
+t_assign: [fn [var val] [hl var ' = ' val c_end]]
+t_assign_outer: [fn [var val] 
+                    [hl "self._scopes[-1]['" var "'] = " val]]
+
+block: [fn [head body] [vl [hl head ':'] [ind body]]]
+
+t_while: [fn [cond body] [block [hl 'while ' cond] body]]
+
+t_if: [fn [cond body] [block [hl 'if ' cond] body]]
+t_ifelse: [fn [cond if_body e_body]
+              [vl [block [hl 'if ' cond] if_body]
+                  [block 'else' e_body]]]
+
+t_ifelifelse: [fn [cond if_body elif_cond elif_body e_body]
+              [vl [block [hl 'if ' cond] if_body]
+                  [block [hl 'elif ' elif_cond] elif_body]
+                  [block 'else' e_body]]]
+
+t_istrue: [fn [v] [hl v ' is True']]
+t_isfalse: [fn [v] [hl v ' is False']]
+                  
+t_throw: [fn [msg] [hl 'raise _ParsingRuntimeError(' msg ')' c_end]]
+
+t_or: [fn [x y] [hl x ' or ' y]]
+t_eq: [fn [x y] [hl x ' == ' y]]
+
+break_if_failed: [fn [node] [if node.can_fail [t_if failed t_break]]]
+break_if_not_failed: [fn [node] [if node.can_fail
+                                    [t_if [hl c_not failed] t_break]]]
+return_if_failed: [fn [node] [if node.can_fail [t_if failed t_return]]]
+return_if_not_failed: [fn [node] [if node.can_fail
+                                     [t_if [hl c_not failed] t_return]]]
+
+#
 # The basic block structure of the file is given in the `generate` template
-# in base. This section contains the pieces generate references.
+# in base. This section defines the templates `generate` references.
 #
 
 default_header: @"
@@ -121,11 +211,10 @@ imports: [vl [if generator_options.main
                  [vl 'import argparse'
                      'import json'
                      'import os'
-                     'import sys']
-                 [vl]]
-             [if grammar.re_needed 'import re' null]
+                     'import sys']]
+             [if grammar.re_needed 'import re']
              'from typing import Any, Dict, NamedTuple, Optional'
-             [if grammar.unicodedata_needed 'import unicodedata' null]]
+             [if grammar.unicodedata_needed 'import unicodedata']]
 
 result_class: d'''
     class Result(NamedTuple):
@@ -201,7 +290,7 @@ main_footer: d'''
     '''
 
 #
-# Rules for methods in the parser class
+# Templates for methods in the generated parser class.
 #
 
 parser_constructor: @'''
@@ -214,15 +303,15 @@ parser_constructor: @'''
         self._pos = 0
         self._val = None
         @if[[is_empty grammar.externs] [vl 'self._externs = {}'] [externs]]
-        @if[generator_options.memoize 'self._cache = {}' null]
-        @if[grammar.seeds_needed 'self._seeds = {}' null]
-        @if[grammar.leftrec_needed 'self._blocked = set()' null]
-        @if[grammar.re_needed 'self._regexps = {}' null]
-        @if[grammar.lookup_needed 'self._scopes = []' null]
+        @if[generator_options.memoize 'self._cache = {}']
+        @if[grammar.seeds_needed 'self._seeds = {}']
+        @if[grammar.leftrec_needed 'self._blocked = set()']
+        @if[grammar.re_needed 'self._regexps = {}']
+        @if[grammar.lookup_needed 'self._scopes = []']
         @if[grammar.operator_needed
             [vl 'self._operators = {}'
-                [vl_l [map_items operator_state grammar.operators]]]
-            [vl]]
+                [vl_l [map_items operator_state grammar.operators]]]]
+            
 
     '''  # parser_constructor
 
@@ -306,184 +395,141 @@ parse_without_exception: @'''
 
         if self._failed:
             return Result(None, self._o_error(), self._errpos)
-        return Result(self._val, None, self._pos)
+        return Result(@f_val, None, @f_pos)
     '''
 
 #
 # Rules for each node in the AST
 #
 
-n_choice: [fn [node] [vl 'p = self._pos'
+n_choice: [fn [node] [vl [t_assign 'pos' f_pos]
                          [vl_l [map [fn [c] [vl [stmts c]
-                                                'if not self._failed:'
-                                                '    return'
-                                                'self._o_rewind(p)']]
+                                                [return_if_not_failed c]
+                                                [rewind 'pos']]]
                                     [slice node.ch 0 -1]]]
                          [stmts [getitem node.ch -1]]]]
 
-n_count: [fn [node] [vl 'vs = []'
-                        'i = 0'
-                        [strcat 'cmin, cmax = ['
-                                [to_string [getitem node.v 0]]
-                                ', '
-                                [to_string [getitem node.v 1]]
-                                ']']
-                        'while i < cmax:'
-                        [ind [stmts node.child]
-                             'if self._failed:'
-                             '    if i >= cmin:'
-                             '        self._o_succeed(vs)'
-                             '        return'
-                             '    return'
-                             'vs.append(self._val)'
-                             'i += 1']
-                        'self._o_succeed(vs)']]
+n_count: [fn [node] [vl [t_assign 'vs' '[]']
+                        [t_assign 'i' '0']
+                        [t_assign 'cmin' [to_string [getitem node.v 0]]]
+                        [t_assign 'cmax' [to_string [getitem node.v 1]]]
+                        [t_while 'i < cmax'
+                                 [vl [stmts node.child]
+                                     [t_if failed
+                                           [vl [t_if 'i >= cmin' [succeed 'vs']]
+                                               t_return]]
+                                     [t_append 'vs' f_val]
+                                     [hl 'i += 1' c_end]]]
+                        [succeed 'vs']]]
 
 
-n_ends_in: [fn [node] [vl 'while True:'
-                          [ind [stmts node.child]]
-                          [if node.can_fail
-                              [ind 'if not self._failed:'
-                                   '    break']
-                              [vl]]
-                          [ind [call_rule 'r_any' q[]]
-                               'if self._failed:'
-                               '    break']]]
+n_ends_in: [fn [node] [t_while c_true
+                          [vl [stmts node.child]
+                              [break_if_not_failed node]
+                              [call_rule 'r_any' q[]]
+                              [t_if failed t_break]]]]
 
 n_label: [fn [node] [vl [stmts node.child]
-                        [if node.child.can_fail
-                            [vl 'if self._failed:' '    return']
-                            [vl]]
+                        [return_if_failed node.child]
                         [if node.outer_scope
-                            [vl [strcat "self._scopes[-1]['"
-                                        node.name
-                                        "']"
-                                        ' = self._val']]
-                            [vl [strcat [varname node.name]
-                                        ' = self._val']]]]]
+                            [vl [t_assign_outer node.name f_val]]
+                            [vl [t_assign [local_var node.name] f_val]]]]]
 
-n_not: [fn [node] [vl 'p = self._pos'
-                      'errpos = self._errpos'
+n_not: [fn [node] [vl [t_assign 'pos' f_pos]
+                      [t_assign 'errpos' [fld 'errpos']]
                       [stmts node.child]
-                      'if self._failed:'
-                      '    self._o_succeed(None, p)'
-                      'else:'
-                      '    self._o_rewind(p)'
-                      '    self._errpos = errpos'
-                      '    self._o_fail()']]
+                      [t_ifelse failed
+                                [vl [succeed c_null 'pos']]
+                                [vl [rewind 'pos']
+                                    [t_assign [fld 'errpos'] 'errpos']
+                                    [fail]]]]]
 
 n_not_one: [fn [node] [vl [n_not node]
-                          'if not self._failed:'
-                          [ind [call_rule 'r_any' q[]]]]]
+                          [t_if [hl c_not failed] [call_rule 'r_any' q[]]]]]
 
-n_opt: [fn [node] [vl 'p = self._pos'
-                         [stmts node.child]
-                         'if self._failed:'
-                         '    self._o_succeed([], p)'
-                         'else:'
-                         '    self._o_succeed([self._val])']]
+n_opt: [fn [node] [vl [t_assign 'pos' f_pos]
+                      [stmts node.child]
+                      [t_ifelse failed
+                                [vl [succeed '[]']]
+                                [vl [succeed [hl '[' f_val ']']]]]]]
 
 n_plus: [fn [node]
-            [vl 'vs = []'
+            [vl [t_assign 'vs' '[]']
                 [stmts node.child]
-                'if self._failed:'
-                '    return'
-                'vs.append(self._val)'
-                'while True:'
-                [ind 'p = self._pos'
+                [return_if_failed node.child]
+                [t_append 'vs' f_val]
+                [t_while c_true
+                    [vl [t_assign 'pos' f_pos]
                         [stmts node.child]
-                        'if self._failed or self._pos == p:'
-                        '    self._o_rewind(p)'
-                        '    break'
-                        'vs.append(self._val)']
-                'self._o_succeed(vs)']]
+                        [t_if [t_or failed [t_eq f_pos 'pos']]
+                              [vl [rewind 'pos']
+                                  t_break]]
+                        [t_append 'vs' f_val]]]
+                [succeed 'vs']]]
 
 n_pred: [fn [node]
-            [vl [hl 'v = ' [expr node.child]]
-                'if v is True:'
-                '    self._o_succeed(v)'
-                'elif v is False:'
-                '    self._o_fail()'
-                'else:'
-                "    raise _ParsingRuntimeError('Bad predicate value')"]]
+            [vl [t_assign 'v' [expr node.child]]
+                [t_ifelifelse [t_istrue 'v'] [succeed 'v']
+                              [t_isfalse 'v'] [fail]
+                              [t_throw [lit 'Bad predicate value']]]]]
 
 n_regexp: [fn [node]
-              [vl [hl 'p = ' [lit node.v]]
-                  'if p not in self._regexps:'
-                  '    self._regexps[p] = re.compile(p)'
-                  'm = self._regexps[p].match(self._text, self._pos)'
+              [vl [t_assign 'rexp' [lit node.v]]
+                  'if rexp not in self._regexps:'
+                  '    self._regexps[rexp] = re.compile(rexp)'
+                  'm = self._regexps[rexp].match(self._text, self._pos)'
                   'if m:'
                   '    self._o_succeed(m.group(0), m.end())'
                   '    return'
-                  'self._o_fail()']]
+                  [fail]]]
 
 n_run: [fn [node]
-           [vl 'start = self._pos'
+           [vl [t_assign 'start' f_pos]
                [stmts node.child]
-               [if node.child.can_fail
-                   [vl 'if self._failed:'
-                       '    return']
-                   [vl]]
-               'end = self._pos'
-               'self._val = self._text[start:end]']]
+               [return_if_failed node.child]
+               [t_assign 'end' f_pos]
+               [t_assign f_val [t_substr [fld 'text'] 'start' 'end']]]]
 
-n_scope: [fn [node] [vl 'self._scopes.append({})'
+n_scope: [fn [node] [vl [t_append [fld 'scopes'] '{}']
                         [stmts node.child]
-                        'self._scopes.pop()'
-                        ]]
+                        [t_pop [fld 'scopes']]]]
 
 n_seq: [fn [node]
            [vl [stmts [getitem node.ch 0]]
-               [if [getattr [getitem node.ch 0] 'can_fail']
-                   [vl 'if self._failed:'
-                       '    return']
-                   [vl]]
+               [return_if_failed [getitem node.ch 0]]
                [vl_l [map [fn [c] [vl [stmts c]
-                                      [if c.can_fail
-                                          [vl 'if self._failed:'
-                                              '    return']
-                                          [vl]]]]
+                                      [return_if_failed c]]]
                           [slice node.ch 1 -1]]]
                [stmts [getitem node.ch -1]]]]
 
 n_set: [fn [node]
-           [vl [hl 'p = ' [lit [strcat '[' node.v ']']]]
-               'if p not in self._regexps:'
-               '    self._regexps[p] = re.compile(p)'
-               'm = self._regexps[p].match(self._text, self._pos)'
-               'if m:'
-               '    self._o_succeed(m.group(0), m.end())'
-               '    return'
-               'self._o_fail()']]
+           [vl [t_assign 'rexp' [lit [strcat '[' node.v ']']]]
+               [t_if 'rexp not in self._regexps'
+                     'self._regexps[rexp] = re.compile(rexp)']
+               'm = self._regexps[rexp].match(self._text, self._pos)'
+               [t_if 'm'
+                     [vl [succeed 'm.group(0)' 'm.end()']
+                         t_return]]
+               [fail]]]
 
 n_star: [fn [node]
-            [vl 'vs = []'
-                'while True:'
-                '    p = self._pos'
-                [ind [stmts node.child]
-                     'if self._failed or self._pos == p:'
-                     '    self._o_rewind(p)'
-                     '    break'
-                     'vs.append(self._val)']
-                'self._o_succeed(vs)']]
+            [vl [t_assign 'vs' '[]']
+                [t_while c_true
+                      [vl [t_assign 'pos' f_pos]
+                          [stmts node.child]
+                          [t_if [t_or failed [t_eq f_pos 'pos']]
+                                [vl [rewind 'pos']
+                                    t_break]]
+                          [t_append 'vs' f_val]]]
+                [succeed 'vs']]]
 
 #
 # Built-in operators and rules
 #
 
-meth: [fn params [if [equal [length params] 1]
-                     [vl [hl 'def _' _t_name '(self):']
-                         [ind [getitem params 0]]]
-                     [vl [hl 'def _'
-                             _t_name
-                             '(self, '
-                             [getitem params 0]
-                             '):']
-                         [ind [getitem params 1]]]]]
-
 o_ch: [meth 'ch' d"
-           p = self._pos
-           if p < self._end and self._text[p] == ch:
+           pos = self._pos
+           if pos < self._end and self._text[pos] == ch:
                self._o_succeed(ch, self._pos + 1)
            else:
                self._o_fail()
@@ -558,13 +604,13 @@ o_lookup: [meth 'var' d'''
                 ''']
 
 o_memoize: [meth 'rule_name, fn' d'''
-        p = self._pos
-        r = self._cache.setdefault(p, {}).get(rule_name)
-        if r:
-            self._val, self._failed, self._pos = r
+        pos = self._pos
+        result = self._cache.setdefault(pos, {}).get(rule_name)
+        if result:
+            self._val, self._failed, self._pos = result
             return
         fn()
-        self._cache[p][rule_name] = (self._val, self._failed, self._pos)
+        self._cache[pos][rule_name] = (self._val, self._failed, self._pos)
         ''']
 
 o_operator: [meth 'rule_name' d'''
@@ -609,9 +655,9 @@ o_operator: [meth 'rule_name' d'''
         ''']
 
 o_range: [meth 'i, j' d'''
-               p = self._pos
-               if p != self._end and ord(i) <= ord(self._text[p]) <= ord(j):
-                   self._o_succeed(self._text[p], self._pos + 1)
+               pos = self._pos
+               if pos != self._end and ord(i) <= ord(self._text[pos]) <= ord(j):
+                   self._o_succeed(self._text[pos], self._pos + 1)
                else:
                    self._o_fail()
                ''']
@@ -635,9 +681,9 @@ o_succeed: [meth 'v, newpos=None' d"
 
 o_unicat: [
     meth 'cat' d"
-         p = self._pos
-         if p < self._end and unicodedata.category(self._text[p]) == cat:
-             self._o_succeed(self._text[p], self._pos + 1)
+         pos = self._pos
+         if pos < self._end and unicodedata.category(self._text[pos]) == cat:
+             self._o_succeed(self._text[pos], self._pos + 1)
          else:
              self._o_fail()
          "]
@@ -697,35 +743,4 @@ fn_xtoi: [meth 's' 'return int(s, base=16)']
 
 fn_xtou: [meth 's' 'return chr(int(s, base=16))']
 
-
-#
-# Various constants
-#
-
-c_true:   'True'
-c_false:  'False'
-c_null:   'None'
-c_not:    'not '  # the not / `!` operator
-c_end:    ''      # statement terminator
-
-#
-# Helper rules
-#
-
-rule_method: [fn [rule node] [vl [strcat 'def _' rule '(self):']
-                                 [ind [invoke_node node]]]]
-
-
-# Reference different kinds of variable names.
-extern:    [fn [name] [strcat 'self._externs[' [lit name] ']']]
-varname:   [fn [name] [strcat 'v_' [replace name '$', '_']]]
-
-method_name: [fn [name] [strcat 'self._' name]]
-
-# Invoke a method on the parser object.
-call:      [fn [name args] [tri [strcat [method_name name] '(']
-                                [comma args]
-                                ')']]
-
 }
-

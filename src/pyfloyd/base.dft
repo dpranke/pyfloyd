@@ -31,7 +31,78 @@ line_length = 79
 
 templates = {
 
-# 'generate' is invoked to generate the file from the AST.
+#
+# Helper methods
+#
+
+# Generates code for a host expression node in the AST. Returns a `formatter.El`.
+expr:      [fn [node] [invoke [node_name node.t] node]]
+
+# Generates code for a statement node in the AST. Returns a `formatter.El`.
+stmts:     [fn [node] [invoke [node_name node.t] node]]
+
+# Invokes a template that takes a single argument, an AST node.
+invoke_node: [fn [node] [invoke [node_name node.t] node]]
+
+# Templates for how to refer to different kinds of things.
+
+# Returns the identifier for a method or template used for a particular type of AST
+# node during code generation. It does not refer to things in the generated output.
+node_name: [fn [name] [strcat 'n_' name]]
+
+# Returns the identifier used for built-in operators like `succeed` and `leftrec` in
+# the output. May be used both to identify a template and as part of identifying
+# a method in the generated output.
+op_name:   [fn [name] [strcat 'o_' name]]
+
+# The name used for a built-in function like `strcat`. Maybe be used both to 
+# identify a template and as part of identifying a method in the generated output.
+fn_name:   [fn [name] [strcat 'fn_' name]]
+
+# Return the identifier for a local variable like `x` or `$1`. Usually `v_x` or `v_1`.
+local_var: [fn [name] [strcat 'v_' [replace name '$' '_']]]
+
+# Returns a string that will reference a field or method on the main object.
+thisref: [fn [name] ['self.' name]]
+
+# The name for a rule in the output; rules names either correspond to a production
+# in the grammar, in which case it will be named with an `r_` prefix (e.g.
+# `grammar` -> `r_grammar`), or a derived subrule (part of the production), in
+# which case it'll be named with an `s_` prefix.
+rule_name: [fn [name] name]
+
+# Returns a formatter.El that will invoke a method on the parser object.
+call:      [fn [name args] [tri [strcat [method_name name] '(']
+                                [comma args]
+                                ')']]
+
+# Invoke specific kinds of methods on the generated parser object.
+call_op:   [fn [name args] [call [op_name name] args]]
+call_rule: [fn [name args] [call [rule_name name] args]]
+
+succeed: [fn args [hl [call [op_name 'succeed'] args] c_end]]
+rewind: [fn [pos] [hl [call [op_name 'rewind'] [list pos] c_end]]]
+fail: [fn [] [hl [call [op_name 'fail'] q[]] c_end]]
+
+# Helper methods that must be overridden in sub-grammars:
+
+# Generates the code that defines a rule method on the parser.
+rule_method: null
+
+# Returns a string that will return the value of an extern like `allow_trailing`.
+# Might return something like `this.externs['allow_trailing']`.
+extern: null
+
+#
+# Starting rule
+#
+
+#
+# 'generate' is invoked to generate the file from the AST. It 
+# establishes the general layout of the file and defines the major
+# sections that a language needs to implement.
+#
+
 generate: @"
     @if[generator_options.main [main_header] [default_header]]
     @if[grammar.exception_needed 
@@ -75,7 +146,7 @@ parse_method: [fn [] [if grammar.exception_needed
 # Rules for nodes in the AST that are basically the same across languages
 #
 
-n_action: [fn [node] [succeed [list [expr node.child]]]]
+n_action: [fn [node] [succeed [expr node.child]]]
 
 n_apply: [fn [node]
              [if node.memoize
@@ -102,7 +173,7 @@ n_e_ident: [fn [node] [if [equal node.kind 'outer']
                               [extern node.v]
                               [if [equal node.kind 'function']
                                   [method_name [fn_name node.v]]
-                                  [varname node.v]]]]]
+                                  [local_var node.v]]]]]
 
 n_e_lit: [fn [node] [lit node.v]]
 
@@ -118,7 +189,7 @@ n_e_plus: [fn [node] [tree [expr node.left] '+' [expr node.right]]]
 
 n_e_qual: [fn [node] [saw [map [fn [n] [invoke_node n]] node.ch]]]
 
-n_empty: [fn [node] [succeed [list c_null]]]
+n_empty: [fn [node] [succeed c_null]]
 
 n_equals: [fn [node] [hl [call_op 'str' [list [expr node.child]] c_end]]]
 
@@ -142,30 +213,5 @@ n_range: [fn [node] [hl [call_op 'range'
                         c_end]]
 
 n_unicat: [fn [node] [hl [call_op 'unicat' [list [lit node.v]]] c_end]]
-
-#
-# Helper methods
-#
-
-# Generate code for a host expression node.
-expr:      [fn [node] [invoke [node_name node.t] node]]
-
-# Generate code for a statement node (i.e., type of rule).
-stmts:     [fn [node] [invoke [node_name node.t] node]]
-
-# Invokes a template that takes a single argument, an AST node.
-invoke_node: [fn [node] [invoke [node_name node.t] node]]
-
-# Returns the method name corresponding to different kinds of functions.
-node_name: [fn [name] [strcat 'n_' name]]
-op_name:   [fn [name] [strcat 'o_' name]]
-fn_name:   [fn [name] [strcat 'fn_' name]]
-rule_name: [fn [name] name]
-
-# Invoke specific kinds of methods on the parser object.
-call_op:   [fn [name args] [call [op_name name] args]]
-call_rule: [fn [name args] [call [rule_name name] args]]
-
-succeed: [fn [args] [hl [call [op_name 'succeed'] args] c_end]]
 
 }
