@@ -207,35 +207,32 @@ externs: [fn [] [if [is_empty grammar.externs]
                     [vl 'self._externs = {}']
                     [vl 'self._externs = {'
                         [ind_l [map_items [fn [k v]
-                                              [strcat "'"
-                                                      k
-                                                      "': "
-                                                      [to_string v]
-                                                      ","]]
+                                              [hl [lit k]
+                                                  ": "
+                                                  [if v 'True' 'False']
+                                                  ","]]
                                           grammar.externs]]
                         '}']]]
 
 operator_state: [fn [rule o]
                     [vl 'o = _OperatorState()'
-                        'o.prec_ops = {'
-                        [operator_prec o]
-                        '}'
+                        [operator_prec_ops o]
                         'o.precs = sorted(o.prec_ops, reverse=True)'
                         [operator_rassoc o]
-                        'o.choices = {'
-                        [ind_l [operator_choices o]]
-                        '}'
-                        [strcat "self._operators['" rule "'] = o"]]]
+                        [operator_choices o]
+                        [hl 'self._operators[' [lit rule] '] = o']]]
 
-operator_prec: [fn [o]
-                   [ind_l [map [fn [prec]
-                                 [hl [to_string prec]
-                                     ': ['
-                                     [hl_l [map [fn [op] [strcat "'" op "'"]]
-                                                [getitem o.prec_ops prec]
-                                                ', ']]
-                                     '],']]
-                             [sort [keys o.prec_ops]]]]]
+operator_prec_ops: [fn [o]
+                       [vl 'o.prec_ops = {'
+                           [ind_l [map [fn [prec]
+                                         [hl [to_string prec]
+                                             ': ['
+                                             [hl_l [map [fn [op] [lit op]]
+                                                        [getitem o.prec_ops prec]
+                                                        ', ']]
+                                             '],']]
+                                       [sort [keys o.prec_ops]]]]
+                           '}']]
 
 operator_rassoc: [fn [o]
                      [hl 'o.rassoc = set(['
@@ -243,9 +240,14 @@ operator_rassoc: [fn [o]
                                       o.rassoc]]
                          '])']]
 
-operator_choices: [fn [o] [map_items [fn [op meth]
-                                         [strcat "'" op "': self._" meth ","]]
-                                     o.choices]]
+operator_choices: [fn [o] [vl 'o.choices = {'
+                              [ind_l [map_items [fn [op meth]
+                                                    [hl [lit op]
+                                                        ': self._'
+                                                        meth
+                                                        ',']]
+                                                o.choices]]
+                              '}']]
 
 parse_with_exception: @"""
     def parse(self, externs: Externs = None, start: int = 0):

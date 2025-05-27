@@ -174,52 +174,54 @@ parser_constructor: @"""
     }
     """  # parser_constructor
       
-externs: [fn [] [vl 'this.externs = new Map();'
-                    [vl_l [map_items [fn [k v]
-                                         [strcat "this.externs.set('"
-                                                 k
-                                                 "', " [if v 'true' 'false']
-                                                 ");"]]
-                                     grammar.externs]]]]
+externs: [fn [] [if [is_empty grammar.externs]
+                    [vl 'this.externs = new Map();']
+                    [vl 'this.externs = new Map(['
+                        [ind_l [map_items [fn [k v]
+                                              [hl '['
+                                                  [lit k]
+                                                   ', '
+                                                  [if v 'true' 'false']
+                                                  '], ']]
+                                          grammar.externs]]
+                        ']);']]]
 
 operator_state: [fn [rule o]
                     [vl 'o = new OperatorState();'
-                        'o.precOps = new Map();'
-                        [operator_prec o]
+                        [operator_prec_ops o]
                         [hl 'o.precs = [...o.precOps.keys()].sort('
                             '(a, b) => b - a);']
                         [operator_rassoc o]
-                        'o.choices = new Map();'
-                        [ind_l [operator_choices o]]
+                        [operator_choices o]
                         [hl 'this.operators[' [lit rule] '] = o;']]]
 
-operator_prec: [fn [o]
-                   [vl_l [map [fn [prec]
-                                  [hl 'o.precOps.set(' [to_string prec] ', ['
-                                      [hl_l [map [fn [op] [lit op]]
-                                                 [getitem o.prec_ops prec]
-                                                 ', ']]
-                                      ']);']]
-                              [sort [keys o.prec_ops]]]]]
+operator_prec_ops: [fn [o]
+                       [vl 'o.precOps = new Map();'
+                           [vl_l [map [fn [prec]
+                                          [hl 'o.precOps.set(' [to_string prec] ', ['
+                                              [hl_l [map [fn [op] [lit op]]
+                                                         [getitem o.prec_ops prec]
+                                                         ', ']]
+                                              ']);']]
+                                      [sort [keys o.prec_ops]]]]]]
 
 operator_rassoc: [fn [o]
                      [hl 'o.rassoc = new Set(['
-                         [comma  [map [fn [op] [strcat "'" op "'"]]
-                                      o.rassoc]]
-                         '])']]
+                         [comma [map [fn [op] [lit op]] o.rassoc]]
+                         ']);']]
 
-operator_choices: [fn [o]
-                      [map_items [fn [op meth]
-                                     [hl "o.choices.set(" 
-                                         [lit op] 
-                                         ", this."
-                                         meth
-                                         ");"]]
-                                 o.choices]]
+operator_choices: [fn [o] [vl 'o.choices = new Map();'
+                              [vl_l [map_items [fn [op meth]
+                                                   [hl "o.choices.set("
+                                                       [lit op]
+                                                       ", this."
+                                                       meth
+                                                       ");"]]
+                                               o.choices]]]]
  
 parse_with_exception: @"""
     parse(externs = null) {
-      externs = externs || new Map();
+      externs = externs || new Map()  ;
       let errors = '';
       for (let key of externs.keys()) {
         if (!this.externs.has(key)) {
@@ -631,7 +633,7 @@ fn_dedent: [meth 's' 'return s;']
 fn_dict: [meth 'pairs' d"""
     let m = new Map();
     for (let [k, v] of pairs) {
-      m.set(k, v);
+      m[k] = v;  // TODO: m.set(k, v) doesn't work?
     }
     return m;
     """]
