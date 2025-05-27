@@ -280,7 +280,6 @@ parser_constructor: @'''
         @if[grammar.operator_needed
             [vl 'self._operators = {}'
                 [vl_l [map_items operator_state grammar.operators]]]]
-            
 
     '''  # parser_constructor
 
@@ -488,12 +487,14 @@ o_lookup: [meth 'var' d'''
 
 o_memoize: [meth 'rule_name, fn' d'''
         pos = self._pos
-        result = self._cache.setdefault(pos, {}).get(rule_name)
-        if result:
-            self._val, self._failed, self._pos = result
+        if pos not in self._cache:
+            self._cache[pos] = {}
+        c = self._cache[pos]
+        if rule_name in c:
+            self._val, self._failed, self._pos = c[rule_name]
             return
         fn()
-        self._cache[pos][rule_name] = (self._val, self._failed, self._pos)
+        c[rule_name] = (self._val, self._failed, self._pos)
         ''']
 
 o_operator: [meth 'rule_name' d'''

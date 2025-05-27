@@ -513,12 +513,13 @@ o_memoize: [meth 'rule_name, fn' d"""
     if (!this.cache.has(pos)) {
       this.cache.set(pos, new Map());
     }
-    if (this.cache.get(pos).has(rule_name)) {
-      [this.val, this.failed, this.pos] = this.cache.get(pos).get(rule_name);
+    let c = this.cache.get(pos);
+    if (c.has(rule_name)) {
+      [this.val, this.failed, this.pos] = c.get(rule_name);
       return;
     }
     fn.call(this);
-    this.cache.get(pos).set(rule_name, [this.val, this.failed, this.pos]);
+    c.set(rule_name, [this.val, this.failed, this.pos]);
    """]
 
 o_operator: [meth 'rule_name' d"""
