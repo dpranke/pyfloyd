@@ -132,14 +132,12 @@ extern: null
 # sections that a language needs to implement.
 #
 
-generate: @"
+generate: @"""
     @if[generator_options.main [main_header] [default_header]]
     @if[grammar.exception_needed 
-        [vl '' '' parsing_runtime_exception_class]
-        [vl]]
+        [vl '' '' parsing_runtime_exception_class]]
     @if[grammar.operators
-        [vl '' '' operator_state_class]
-        [vl]]
+        [vl '' '' operator_state_class]]
 
     @result_class
 
@@ -147,9 +145,10 @@ generate: @"
 
     @parser_class[]
     @if[generator_options.main main_footer default_footer]
-    "
+    """
 
-parser_methods: [fn [] [vl [parse_method]
+parser_methods: [fn [] [vl [parser_constructor]
+                           [parse_method]
                            [vl_l [map_items [fn [rule node]
                                                 [vl ''
                                                     [rule_method rule node]]]
@@ -172,7 +171,7 @@ parse_method: [fn [] [if grammar.exception_needed
                          [parse_without_exception]]]
 
 #
-# Rules for nodes in the AST that are basically the same across languages
+# Rules for nodes in the AST that are basically the same across languages.
 #
 
 n_action: [fn [node] [succeed [expr node.child]]]
