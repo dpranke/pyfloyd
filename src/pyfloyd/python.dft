@@ -31,25 +31,6 @@ templates: {
 # Helper rules
 #
 
-# Defines a method on the generated parser object corresponding to the given.
-# template name `params` may be either
-# of length 1, in which case the method takes no arguments and the param
-# is the formater.El for the body, or 2, in which case the first argument is a
-# string with the parameter names (and optional values) and the second is the
-# body. `_t_name` can be used to refer to the name of the template.
-meth: [fn params [if [equal [length params] 1]
-                     [vl [hl 'def _' _t_name '(self):']
-                         [ind [getitem params 0]]]
-                     [vl [hl 'def _'
-                             _t_name
-                             '(self, '
-                             [getitem params 0]
-                             '):']
-                         [ind [getitem params 1]]]]]
-
-rule_method: [fn [rule node] [vl [strcat 'def _' rule '(self):']
-                                 [ind [invoke_node node]]]]
-
 block: [fn [head body] [vl [hl head ':'] [ind body]]]
 
 
@@ -78,6 +59,9 @@ t_append: [fn [lst val] [hl lst '.append(' val ')' t_end]]
 t_break:   'break'
 t_end: ''  # statement terminator (not used in Python)
 t_false: 'False'
+t_meth_def: 'def _'
+t_meth_params: [fn [params]
+                   [if [equal params ''] 'self' [strcat 'self, ' params]]]
 t_newmap: '{}'
 t_null: 'None'
 t_not: 'not '  # the logical operator
@@ -93,8 +77,8 @@ t_ifelifelse: [fn [cond if_body elif_cond elif_body e_body]
                   [block 'else' e_body]]]
 t_istrue: [fn [v] [hl v ' is True']]
 t_isfalse: [fn [v] [hl v ' is False']]
-t_local_vars: [fn [v] [vl]]
-t_local_vars2: [fn [v] [vl]]
+t_declare_local_vars: [fn [node] [vl]]
+t_declare_vars: [fn [v] [vl]]
 t_or: [fn [x y] [hl x ' or ' y]]
 t_pop: [fn [lst] [hl lst '.pop()']]
 t_return:  'return'

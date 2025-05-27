@@ -24,43 +24,13 @@ starting_template: 'generate'
 
 inherit: ['base']
 
-# List the names of each local variable used in a given AST node;
-# the generator will use this map to walk the AST and populate the
-# list of vars that need to be declared up front in each rule.
-local_vars: {
-    choice: [pos]
-    count: [cmin cmax i vs]
-    not: [errpos pos]
-    not_one: [errpos pos]
-    opt: [pos]
-    plus: [pos vs]
-    pred: [v]
-    regexp: [found r]
-    run: [end start]
-    set: [found r]
-    star: [pos vs]
-}
-
 templates = {
 
 #
 # Helper rules
 #
 
-# Define a method based on the template name (used for builtins)
-meth: [fn params [if [equal [length params] 1]
-                     [vl [hl _t_name '() {']
-                         [ind [getitem params 0]]
-                         [hl '}']]
-                     [vl [hl _t_name '(' [getitem params 0] ') {']
-                         [ind [getitem params 1]]
-                         [hl '}']]]]
-
-# define a method for the given rule
-rule_method: [fn [rule node] [vl [strcat rule '() {']
-                                 [ind [vl [t_local_vars node.local_vars]
-                                          [stmts node]]]
-                                 '}']]
+block: [fn [head body] [vl [hl head ' {'] [ind body] '}']]
 
 # How to refer to different types of identifiers:
 
@@ -75,13 +45,6 @@ failed: [fld 'failed']
 extern: [fn [name] [strcat "this.externs.get(" [lit name] ")"]]
 
 method_name: [fn [name] [fld name]]
-
-block: [fn [head body] [vl [hl head ' {'] [ind body] '}']]
-
-# Invoke a method on the parser object.
-call: [fn [name args] [tri [strcat [method_name name] '(']
-                           [comma args]
-                           ')']]
 
 #
 # Helper methods for generating text portably.
@@ -116,8 +79,11 @@ t_ifelifelse: [fn [cond if_body elif_cond elif_body e_body]
                   [block 'else' e_body]]]
 t_istrue: [fn [v] [hl v ' === true']]
 t_isfalse: [fn [v] [hl v ' === false']]
-t_local_vars: [fn [vars] [vl_l [map [fn [v] [hl 'let ' v t_end]]
-                                        vars]]]
+t_declare_local_vars: [fn [node] [t_declare_vars node.local_vars]]
+t_declare_vars: [fn [vars] [vl_l [map [fn [v] [hl 'let ' v t_end]]
+                                      vars]]]
+t_meth_def: ''
+t_meth_params: [fn [params] params]
 t_or: [fn [x y] [hl x ' || ' y]]
 t_pop: [fn [x] [hl x '.pop()']]
 t_return: 'return;'

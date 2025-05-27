@@ -29,20 +29,48 @@ indent = 2
 # Maximum line length; can use `null` for no maximum.
 line_length = 79
 
+# List the names of each local variable used in a given AST node;
+# the generator will use this map to walk the AST and populate the
+# list of vars that need to be declared up front in each rule.
+local_vars: {
+    choice: [pos]
+    count: [cmin cmax i vs]
+    not: [errpos pos]
+    not_one: [errpos pos]
+    opt: [pos]
+    plus: [pos vs]
+    pred: [v]
+    regexp: [found r]
+    run: [end start]
+    set: [found r]
+    star: [pos vs]
+}
+
 templates = {
 
 #
 # Helper methods
 #
 
+meth: [fn params [block [hl t_meth_def
+                            _t_name
+                             '('
+                             [t_meth_params [if [equal [length params] 2]
+                                                [getitem params 0]
+                                                '']]
+                             ')']
+                        [getitem params -1]]]
+
+rule_method: [fn [rule node]
+                 [block [hl t_meth_def rule '(' [t_meth_params ''] ')']
+                        [vl [t_declare_local_vars node]
+                            [stmts node]]]]
+
 # Generates code for a host expression node in the AST. Returns a `formatter.El`.
 expr:      [fn [node] [invoke [node_name node.t] node]]
 
 # Generates code for a statement node in the AST. Returns a `formatter.El`.
 stmts:     [fn [node] [invoke [node_name node.t] node]]
-
-# Invokes a template that takes a single argument, an AST node.
-invoke_node: [fn [node] [invoke [node_name node.t] node]]
 
 # Templates for how to refer to different kinds of things.
 
@@ -89,9 +117,6 @@ return_if_not_failed: [fn [node] [if node.can_fail
                                      [t_if [hl t_not failed] t_return]]]
 
 # Helper methods that must be overridden in sub-grammars:
-
-# Generates the code that defines a rule method on the parser.
-rule_method: null
 
 # Returns a string that will return the value of an extern like `allow_trailing`.
 # Might return something like `this.externs['allow_trailing']`.
@@ -210,7 +235,7 @@ n_e_paren: [fn [node] [expr node.child]]
 
 n_e_plus: [fn [node] [tree [expr node.left] '+' [expr node.right]]]
 
-n_e_qual: [fn [node] [saw [map [fn [n] [invoke_node n]] node.ch]]]
+n_e_qual: [fn [node] [saw [map [fn [c] [expr c]] node.ch]]]
 
 n_empty: [fn [node] [succeed t_null]]
 
@@ -297,7 +322,7 @@ n_scope: [fn [node] [vl [t_append [fld 'scopes'] t_newmap]
                         [t_pop [fld 'scopes']]]]
 
 n_seq: [fn [node]
-           [vl [t_local_vars [map [fn [v] [local_var v]] node.vars]]
+           [vl [t_declare_vars [map [fn [v] [local_var v]] node.vars]]
                [stmts [getitem node.ch 0]]
                [return_if_failed [getitem node.ch 0]]
                [vl_l [map [fn [c] [vl [stmts c]
