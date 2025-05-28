@@ -314,6 +314,7 @@ class Interpreter:
             if v:
                 self._succeed(v)
                 return
+            assert False, f"Function '{node.v}()' isn't implemented"
         if node.kind == 'local':
             self._succeed(self._scopes[-1][v])
             return
@@ -565,6 +566,14 @@ class Interpreter:
 
     def _fn_cat(self, val):
         return ''.join(val)
+
+    def _fn_colno(self):
+        colno = 0
+        if self._pos == self._end:
+            colno += 1
+        while self._pos >= colno and self._text[self._pos - colno] != '\n':
+            colno += 1
+        return colno
 
     def _fn_concat(self, xs, ys):
         return xs + ys

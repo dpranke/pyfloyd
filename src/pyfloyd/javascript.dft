@@ -625,6 +625,18 @@ fn_atou: [meth 'a, base'
 
 fn_cat: [meth 'ss' "return ss.join('');"]
 
+fn_colno: [
+    meth d"""
+          let colno = 0;
+          if (this.pos == this.end) {
+            colno += 1;
+          }
+          while (this.pos >= colno && this.text[this.pos - colno] != '\\n') {
+            colno += 1;
+          }
+          return colno;
+          """]
+
 fn_concat: [meth 'xs, ys' 'return xs.concat(ys);']
 
 fn_cons: [meth 'hd, tl' 'return [hd].concat(tl);']

@@ -407,6 +407,12 @@ given types (using Python's type annotation syntax):
   Returns the string produced by joining all of the elements of `ss`
   together with empty strings. Equivalent to `join('', ss)`.
 
+* `colno(): int`<br>`
+  Returns the current (1-based) column number in the text at the point
+  where the function is called. If the text is empty, returns 1. If
+  at the end of the text, returns 1 + the colno of the last character
+  in the file.
+
 * `concat(x:[Result], y:[Result]): [Result]`<br>
   Returns an array containing all of the elements of `x` followed by
   all of the elements of `y`.

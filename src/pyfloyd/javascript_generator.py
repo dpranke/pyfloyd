@@ -908,6 +908,18 @@ _BUILTINS = {
           return ss.join('');
         }
         """,
+    'fn_colno': """
+        fn_colno() {
+          let colno = 0;
+          if (this.pos == this.end) {
+            colno += 1;
+          }
+          while (this.pos >= colno && this.text[this.pos - colno] != '\\n') {
+            colno += 1;
+          }
+          return colno;
+        }
+        """,
     'fn_concat': """
         fn_concat(xs, ys) {
           return xs.concat(ys);

@@ -35,6 +35,7 @@ BUILTIN_FUNCTIONS = (
     'atou',
     'cat',
     'concat',
+    'colno',
     'cons',
     'dedent',
     'dict',

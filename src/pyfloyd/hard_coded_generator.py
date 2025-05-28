@@ -183,11 +183,6 @@ class HardCodedGenerator(generator.Generator):
         return formatter.Triangle('[', formatter.Comma(*args), ']')
 
     def _ty_e_call(self, node: m_grammar.Node) -> formatter.Triangle:
-        # There are no built-in functions that take no arguments, so make
-        # sure we're not being called that way.
-        # TODO: Figure out if we need this routine or not when we also
-        # fix the quals.
-        assert len(node.ch) != 0
         args = [self._gen_expr(c) for c in node.ch]
         return formatter.Triangle('(', formatter.Comma(*args), ')')
 

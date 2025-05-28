@@ -368,6 +368,15 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
     def test_fn_cat(self):
         self.check("g = -> cat(['1', '2'])", text='', out='12')
 
+    def test_fn_colno(self):
+        g = "g = ('a' | '\n')* -> colno()"
+        self.check(g, text='', out=1)
+        self.check(g, text='a', out=2)
+        self.check(g, text='aaa', out=4)
+        self.check(g, text='aa\n', out=1)
+        self.check(g, text='aa\nb', out=1)
+        self.check(g, text='aa\nab', out=2)
+
     def test_fn_concat(self):
         self.check('g = -> concat([1], [2])', text='', out=[1, 2])
 

@@ -826,6 +826,15 @@ _BUILTINS = {
         def _fn_cat(self, strs):
             return ''.join(strs)
         """,
+    'fn_colno': """
+        def _fn_colno(self):
+            colno = 0
+            if self._pos == self._end:
+                colno += 1
+            while self._pos >= colno and self._text[self._pos - colno] != '\\n':
+                colno += 1
+            return colno
+        """,
     'fn_concat': """
         def _fn_concat(self, xs, ys):
             return xs + ys

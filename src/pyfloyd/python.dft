@@ -53,7 +53,7 @@ failed: [fld 'failed']
 #
 
 t_assign: [fn [var val] [hl var ' = ' val t_end]]
-t_assign_outer: [fn [var val] 
+t_assign_outer: [fn [var val]
                     [hl "self._scopes[-1]['" var "'] = " val]]
 t_append: [fn [lst val] [hl lst '.append(' val ')' t_end]]
 t_break:   'break'
@@ -565,6 +565,16 @@ fn_atoi: [meth 'a, base' 'return int(a, base)']
 fn_atou: [meth 'a, base' 'return chr(int(a, base))']
 
 fn_cat: [meth 'strs' "return ''.join(strs)"]
+
+fn_colno: [
+    meth d"""
+          colno = 0
+          if self._pos == self._end:
+              colno += 1
+          while self._pos >= colno and self._text[self._pos - colno] != '\\n':
+              colno += 1
+          return colno
+          """]
 
 fn_concat: [meth 'xs, ys' 'return xs + ys']
 
