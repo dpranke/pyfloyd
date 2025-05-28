@@ -1,3 +1,29 @@
+# Copyright 2025 Dirk Pranke. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# This grammar describes the "Floyd datafile" file format (also known
+# as just "datafile" for short). The format is a strict superset of
+# JSON, designed for human use with three things in mind:
+# - Minimize punctuation whereever possible.
+# - Support multiline strings as cleanly as possible.
+# - Provide a mechanism for extensibility (via a 'tag' mechanism).
+#
+# For more details on the format, see docs/grammar.md.
+
+
+%externs     = memoize                                -> true
+
 %whitespace  = [ \n\r\t]+
 
 %comment     = ('#'|'//') ^eol*

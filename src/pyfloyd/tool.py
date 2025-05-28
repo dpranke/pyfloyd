@@ -56,10 +56,11 @@ def main(argv=None, host=None):
             return 1
 
         externs = {}
-        for d in args.define:
-            vs = datafile.loads(d)
-            externs.update(vs)
+        for exts in args.externs:
+            d = datafile.loads(exts)
+            externs.update(d)
 
+        options = pyfloyd.generator_options_from_args(args, argv)
         contents = None
         ext = None
         if args.ast or args.full_ast:
@@ -84,14 +85,15 @@ def main(argv=None, host=None):
                 if args.output and args.output != '-':
                     ext = host.splitext(args.output)[1]
                     args.template = pyfloyd.KNOWN_TEMPLATES.get(ext)
-            options = pyfloyd.generator_options_from_args(args, argv)
             v, err, _ = pyfloyd.generate(
                 grammar, path=args.grammar, options=options
             )
             if v is not None:
                 contents, ext = v
         else:
-            contents, err, _ = _interpret_grammar(host, args, grammar, externs)
+            contents, err, _ = _interpret_grammar(
+                host, args, grammar, externs, options
+            )
             ext = None
 
         if err:
@@ -141,8 +143,8 @@ def _parse_args(host, argv):
         help='compile grammar instead of interpreting it',
     )
     ap.add_argument(
-        '-D',
-        '--define',
+        '-E',
+        '--externs',
         action='append',
         metavar='datafile-string',
         default=[],
@@ -208,7 +210,7 @@ def _read_grammar(host, args):
     return grammar_txt, None
 
 
-def _interpret_grammar(host, args, grammar, externs):
+def _interpret_grammar(host, args, grammar, externs, options):
     if args.input == '-':
         path, contents = ('<stdin>', host.stdin.read())
     else:
@@ -220,7 +222,7 @@ def _interpret_grammar(host, args, grammar, externs):
         grammar_path=args.grammar,
         path=path,
         externs=externs,
-        memoize=args.memoize,
+        memoize=options.memoize,
     )
     if err:
         return None, err, endpos

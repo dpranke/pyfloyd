@@ -125,7 +125,7 @@ class ToolTest(unittest.TestCase):
             # doesn't have a main. It also omits the `-o` flag
             # to get coverage of the code path where we use the default
             # output path and extension.
-            tool.main(['-c', '--memoize', '--javascript', path])
+            tool.main(['-c', '-G', 'memoize = true', '--javascript', path])
 
             host.write_text_file(d + '/foo.inp', 'foofoo')
 
@@ -214,7 +214,7 @@ class ToolTest(unittest.TestCase):
     def test_memoize(self):
         host = support.FakeHost()
         host.write_text_file('grammar.g', 'grammar = "Hello" end -> true')
-        ret = tool.main(['-c', '--memoize', 'grammar.g'], host=host)
+        ret = tool.main(['-c', '-G', 'memoize = true', 'grammar.g'], host=host)
         self.assertEqual(ret, 0)
         self.assertEqual(host.stdout.getvalue(), '')
         self.assertEqual(host.stderr.getvalue(), '')

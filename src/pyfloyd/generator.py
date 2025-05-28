@@ -40,7 +40,7 @@ class GeneratorOptions(attr_dict.AttrDict):
         self.language = None
         self.line_length = None
         self.main = False
-        self.memoize = False
+        self.memoize = None
         self.output_as_format_tree = False
         self.as_json = False
         self.template = None
@@ -96,9 +96,11 @@ class Generator:
                 for c in node.ch:
                     _walk(c)
 
-        # TODO: Pull this from the grammar.
         if self.options.memoize is None:
-            self.options.memoize = False
+            if 'memoize' in self.grammar.externs:
+                self.options.memoize = self.grammar.externs['memoize']
+            else:
+                self.options.memoize = False
 
         if self.options.memoize:
             self.grammar.needed_operators = sorted(
@@ -186,16 +188,6 @@ def add_arguments(
         type=int,
         default=options.line_length,
         help='Line length to use (default is language-specific)',
-    )
-    parser.add_argument(
-        '--memoize',
-        dest='memoize',
-        action=argparse.BooleanOptionalAction,
-        default=options.memoize,
-        help=(
-            'Memoize parse results (default is grammar-specific, '
-            'off if not specified)'
-        ),
     )
     parser.add_argument(
         '-m',

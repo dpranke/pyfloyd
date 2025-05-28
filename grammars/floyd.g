@@ -1,6 +1,7 @@
 // This is the primary description of the Floyd parser grammar.
 
-%externs    = unicode                      -> true
+%externs    = memoize                      -> true
+            | unicode                      -> true
             | unicode_categories           -> true
             | unicode_names                -> true
 
