@@ -24,5 +24,4 @@ class Tests(
     grammar_test.GrammarTestsMixin,
 ):
     cmd = [sys.executable]
-    language = 'python'
-    ext = '.py'
+    generator = 'python'

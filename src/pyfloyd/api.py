@@ -15,7 +15,6 @@
 # pylint: disable=too-many-positional-arguments
 
 import argparse
-import os
 from typing import Any, NamedTuple, Optional, Protocol, Sequence, Union
 
 from pyfloyd import (
@@ -41,17 +40,15 @@ _generators = (
     python_generator.PythonGenerator,
 )
 
-DEFAULT_LANGUAGE = 'python'
 
-DEFAULT_TEMPLATE = os.path.join(os.path.dirname(__file__), 'python.dft')
+DEFAULT_GENERATOR = 'datafile'
+DEFAULT_LANGUAGE = datafile_generator.DEFAULT_LANGUAGE
+DEFAULT_TEMPLATE = datafile_generator.DEFAULT_TEMPLATE
+KNOWN_LANGUAGES = datafile_generator.KNOWN_LANGUAGES
+KNOWN_TEMPLATES = datafile_generator.KNOWN_TEMPLATES
 
-EXT_TO_LANG = {gen.ext: gen.name for gen in _generators}
 
-LANGUAGE_MAP = {gen.name.lower(): gen for gen in _generators}
-
-SUPPORTED_LANGUAGES = tuple(gen.name.lower() for gen in _generators)
-
-Externs = Optional[dict[str, Any]]
+Externs = dict[str, Any]
 
 GeneratorOptions = generator.GeneratorOptions
 
@@ -62,18 +59,15 @@ Host = support.Host
 Result = grammar_parser.Result
 
 
-def add_generator_arguments(
-    parser: argparse.ArgumentParser, default_language=DEFAULT_LANGUAGE
-):
-    return generator.add_arguments(parser, default_language, _generators)
+def add_generator_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add flags to control code generation to an ArgumentParser object."""
+    generator.add_arguments(parser, _generators)
 
 
 def generator_options_from_args(
-    args: argparse.Namespace,
-    argv: Sequence[str],
-    language: str = DEFAULT_LANGUAGE,
-):
-    return generator.options_from_args(args, argv, language)
+    args: argparse.Namespace, argv: Sequence[str]
+) -> GeneratorOptions:
+    return generator.options_from_args(args, argv)
 
 
 class ParserInterface(Protocol):
@@ -87,7 +81,7 @@ class ParserInterface(Protocol):
         self,
         text: str,
         path: str = '<string>',
-        externs: Externs = None,
+        externs: Optional[Externs] = None,
     ) -> Result:
         """Parse a string and return a result.
 
@@ -119,7 +113,7 @@ def compile_to_parser(  # pylint: disable=redefined-builtin
     grammar: str,
     path: str = '<string>',
     memoize: bool = False,
-    externs: Externs = None,
+    externs: Optional[Externs] = None,
 ) -> CompiledResult:
     """Compile the grammar into an object that can parse strings.
 
@@ -141,15 +135,12 @@ def generate(
     grammar: str,
     path: str = '<string>',
     options: Optional[Union[GeneratorOptions, dict[str, Any]]] = None,
-    externs: Externs = None,
+    externs: Optional[Externs] = None,
 ) -> Result:
     """Generate the source code of a parser.
 
     This generates the text of a parser. The text will be a module
     with a public `Result` type and a public `parse()` function.
-
-    `options.language` specifies the language to use for the generated
-    parser. By default the language will be `DEFAULT_LANGUAGE`.
 
     If `options.main` is True, then the generated parser file will also have a
     `main()` function that is called if the text is invoked directly. (i.e.,
@@ -168,9 +159,10 @@ def generate(
     `path` represents an optional string that can be included in error
     messages, e.g., as a path to the file containing the grammar.
 
-    If successful the `.val` member of the result will be the source
-    code for the parser. If the grammar had errors, the `.err` member of
-    the result will describe the errors.
+    If successful the `.val` member of the result will be a tuple of the
+    source code for the parser and the recommended file extension.
+    If the grammar had errors, the `.err` member of the result will describe
+    the errors.
     """
 
     result = grammar_parser.parse(grammar, path, externs)
@@ -188,20 +180,13 @@ def generate(
             assert options is None or isinstance(options, dict)
             options = generator.GeneratorOptions(**options)
 
-    if options.language is None:
-        options.language = DEFAULT_LANGUAGE
-
     for cls in _generators:
-        if options.language.lower() == cls.name.lower():
+        if options.generator.lower() == cls.name.lower():
             gen = cls(support.Host(), grammar_obj, options)
             text = gen.generate()
-            return Result(text)
+            return Result((text, gen.ext))
 
-    supp = ' and '.join(f'"{lang}"' for lang in SUPPORTED_LANGUAGES)
-    err = (
-        f'Unsupported language "{options.language}"\n'
-        f'Only {supp.lower()} are supported.\n'
-    )
+    err = f'Unsupported generator "{options.generator}"'
     return Result(None, err, 0)
 
 
@@ -210,7 +195,7 @@ def parse(
     text: str,
     grammar_path: str = '<string>',
     path: str = '<string>',
-    externs: Externs = None,
+    externs: Optional[Externs] = None,
     memoize: bool = False,
 ) -> Result:
     """Match an input text against the specified grammar.

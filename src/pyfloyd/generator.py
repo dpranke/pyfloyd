@@ -26,18 +26,24 @@ from pyfloyd import (
 )
 
 
+DEFAULT_GENERATOR = 'datafile'
+
+
 class GeneratorOptions(attr_dict.AttrDict):
     def __init__(self, *args, **kwargs):
         self.argv = []
         self.command_line = ''
         self.dialect = ''
+        self.generator = pyfloyd.DEFAULT_GENERATOR
         self.generator_options = {}
         self.indent = None
         self.language = None
         self.line_length = None
         self.main = False
         self.memoize = False
-        self.template = pyfloyd.DEFAULT_TEMPLATE
+        self.output_as_format_tree = False
+        self.as_json = False
+        self.template = None
         self.version = pyfloyd.__version__
         self.unicodedata_needed = None
         super().__init__(*args, **kwargs)
@@ -106,40 +112,31 @@ class Generator:
 
 def add_arguments(
     parser: argparse.ArgumentParser,
-    default_language: str,
     generators: Sequence[type[Generator]],
-):
-    options = GeneratorOptions(language=default_language)
+) -> None:
+    options = GeneratorOptions()
     parser.add_argument(
-        '-l',
-        '--language',
+        '-g',
+        '--generator',
         action='store',
         choices=[gen.name.lower() for gen in generators],
-        default=default_language,
-        help=(
-            'Language to generate (derived from the output '
-            'file extension if necessary)'
-        ),
+        default=pyfloyd.DEFAULT_GENERATOR,
+        help=f'Generator to use (default is {pyfloyd.DEFAULT_GENERATOR})',
     )
-    for gen in generators:
-        if gen.name.lower() == default_language.lower():
+    for lang in pyfloyd.KNOWN_LANGUAGES:
+        ext = pyfloyd.KNOWN_LANGUAGES[lang]
+        tmpl = pyfloyd.KNOWN_TEMPLATES[ext]
+        if lang.lower() == pyfloyd.DEFAULT_LANGUAGE.lower():
             def_str = ' (the default)'
         else:
             def_str = ''
-
-        if gen.help_str:
-            help_str = gen.help_str + def_str
-        else:
-            help_str = f'Generate {gen.name} code' + def_str
-        help_str += def_str
-        exts = ['--' + gen.name.lower()]
-        if gen.ext:
-            exts.append('--' + gen.ext)
+        help_str = f'Generate {lang} code (using templates)' + def_str
         parser.add_argument(
-            *exts,
+            '--' + lang,
+            '--' + ext[1:],
             action='store_const',
-            dest='language',
-            const=gen.name.lower(),
+            dest='template',
+            const=tmpl,
             help=help_str,
         )
     parser.add_argument(
@@ -163,13 +160,13 @@ def add_arguments(
         help='Pass arbitrary options to the generator',
     )
     parser.add_argument(
-        '--formatter-list',
-        '--fl',
+        '--output-as-format-tree',
+        '--ft',
         action='store_true',
         default=False,
         help=(
-            'Return the formatter tree as a list of objects of objects '
-            'instead of as a string'
+            'Return the generated output as a tree of format objects '
+            'instead of as a formatted string'
         ),
     )
     parser.add_argument(
@@ -178,7 +175,10 @@ def add_arguments(
         '--datafile-template',
         action='store',
         default=options.template,
-        help='datafile template to use for code generation',
+        help=(
+            f'datafile template to use for code generation '
+            f'(default is "{pyfloyd.DEFAULT_TEMPLATE}")'
+        ),
     )
     parser.add_argument(
         '--line-length',
@@ -209,11 +209,9 @@ def add_arguments(
     )
 
 
-def options_from_args(
-    args: argparse.Namespace, argv: Sequence[str], language: str
-):
+def options_from_args(args: argparse.Namespace, argv: Sequence[str]):
     """Returns a dict containing the value of the generator args."""
-    d = GeneratorOptions(language=language)
+    d = GeneratorOptions()
     vs = vars(args)
     for name in d:
         if name in vs:

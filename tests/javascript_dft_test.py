@@ -24,9 +24,8 @@ class Tests(
     grammar_test.GrammarTestsMixin,
 ):
     cmd = [shutil.which('node')]
-    language = 'datafile'
+    generator = 'datafile'
     template = 'javascript'
-    ext = '.js'
     floyd_externs = {'unicode_names': False}
 
     @grammar_test.skip('integration')

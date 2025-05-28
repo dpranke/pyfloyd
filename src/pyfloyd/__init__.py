@@ -66,11 +66,11 @@ from pyfloyd.api import (  # noqa: F401 (unused-import)
     Grammar,
     ParserInterface,
     Result,
+    DEFAULT_GENERATOR,
     DEFAULT_LANGUAGE,
     DEFAULT_TEMPLATE,
-    EXT_TO_LANG,
-    LANGUAGE_MAP,
-    SUPPORTED_LANGUAGES,
+    KNOWN_LANGUAGES,
+    KNOWN_TEMPLATES,
     __version__,
 )
 

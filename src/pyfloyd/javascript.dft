@@ -16,7 +16,7 @@
 # It depends on a base set of templates used by fairly similar languages.
 
 name = 'JavaScript'
-ext = 'js'
+ext = '.js'
 indent = 2 
 line_length = 79
 

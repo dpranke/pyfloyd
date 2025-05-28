@@ -24,7 +24,7 @@ from pyfloyd import support
 
 class PythonGenerator(hard_coded_generator.HardCodedGenerator):
     name = 'Python'
-    ext = 'py'
+    ext = '.py'
     line_length = 79
     indent = 4
 

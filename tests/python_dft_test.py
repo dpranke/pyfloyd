@@ -24,6 +24,6 @@ class Tests(
     grammar_test.GrammarTestsMixin,
 ):
     cmd = [sys.executable]
-    language = 'datafile'
+    generator = 'datafile'
     template = 'python'
     ext = '.py'

@@ -522,8 +522,6 @@ class Runner:
                 '-m',
                 'pyfloyd',
                 '--memoize',
-                '-l',
-                'datafile',
                 '-o',
                 new_file,
                 '-c',

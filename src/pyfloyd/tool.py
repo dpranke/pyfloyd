@@ -19,7 +19,6 @@ import argparse
 import importlib.util
 import io
 import json
-import os
 import pathlib
 import pdb
 import pprint
@@ -61,6 +60,8 @@ def main(argv=None, host=None):
             vs = datafile.loads(d)
             externs.update(vs)
 
+        contents = None
+        ext = None
         if args.ast or args.full_ast:
             ast, err = pyfloyd.dump_ast(
                 grammar,
@@ -79,21 +80,26 @@ def main(argv=None, host=None):
         elif args.pretty_print:
             contents, err = pyfloyd.pretty_print(grammar, args.grammar)
         elif args.compile:
-            options = pyfloyd.generator_options_from_args(
-                args, argv, language=None
-            )
-            contents, err, _ = pyfloyd.generate(
+            if args.template is None:
+                if args.output and args.output != '-':
+                    ext = host.splitext(args.output)[1]
+                    args.template = pyfloyd.KNOWN_TEMPLATES.get(ext)
+            options = pyfloyd.generator_options_from_args(args, argv)
+            v, err, _ = pyfloyd.generate(
                 grammar, path=args.grammar, options=options
             )
+            if v is not None:
+                contents, ext = v
         else:
             contents, err, _ = _interpret_grammar(host, args, grammar, externs)
+            ext = None
 
         if err:
             host.print(err, file=host.stderr)
             return 1
-        _write(host, args.output, contents)
-        if args.compile and args.main and args.output != '-':
-            host.make_executable(args.output)
+        path = _write(host, args, contents, ext)
+        if args.compile and args.main and path != '-':
+            host.make_executable(path)
         return 0
 
     except KeyboardInterrupt:
@@ -188,21 +194,8 @@ def _parse_args(host, argv):
         host.print('You must specify a grammar.')
         return None, 2
 
-    if not args.language:
-        if args.output:
-            ext = os.path.splitext(args.output)[1]
-            args.language = pyfloyd.EXT_TO_LANG[ext].name
-        else:
-            args.language = pyfloyd.DEFAULT_LANGUAGE
-            ext = pyfloyd.LANGUAGE_MAP[args.language].ext
-    else:
-        ext = pyfloyd.LANGUAGE_MAP[args.language].ext
-
-    if not args.output:
-        if args.compile:
-            args.output = host.splitext(args.grammar)[0] + '.' + ext
-        else:
-            args.output = '-'
+    if not args.output and not args.compile:
+        args.output = '-'
 
     return args, None
 
@@ -236,11 +229,17 @@ def _interpret_grammar(host, args, grammar, externs):
     return out, None, endpos
 
 
-def _write(host, path, contents):
-    if path == '-':
+def _write(host, args, contents, ext):
+    if args.output and args.output != '-':
+        host.write_text_file(args.output, contents)
+        return args.output
+
+    if args.output == '-':
         host.print(contents, end='')
-    else:
-        host.write_text_file(path, contents)
+        return '-'
+    path = host.splitext(args.grammar)[0] + ext
+    host.write_text_file(path, contents)
+    return path
 
 
 if __name__ == '__main__':  # pragma: no cover

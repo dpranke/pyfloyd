@@ -34,9 +34,11 @@ class APITest(unittest.TestCase):
         self.assertEqual(err, '<string>:1 Unexpected end of input at column 4')
 
     def test_generate(self):
-        txt, err, _ = pyfloyd.generate('grammar = "Hello" end -> true')
+        v, err, _ = pyfloyd.generate('grammar = "Hello" end -> true')
         self.assertIsNone(err)
+        txt, ext = v
         scope = {}
+        self.assertEqual(ext, '.py')
         exec(txt, scope)  # pylint: disable=exec-used
         parse_fn = scope['parse']
         result = parse_fn('Hello', '<string>')
@@ -48,18 +50,12 @@ class APITest(unittest.TestCase):
         self.assertIsNone(txt)
         self.assertEqual(err, '<string>:1 Unexpected end of input at column 4')
 
-    def test_generate_unsupported_language(self):
-        txt, err, _ = pyfloyd.generate(
-            'g =', options=pyfloyd.GeneratorOptions(language='q')
-        )
+    def test_generate_unsupported_generator(self):
+        options = pyfloyd.GeneratorOptions()
+        options.generator = 'q'
+        txt, err, _ = pyfloyd.generate('g =', options=options)
         self.assertIsNone(txt)
-        self.assertEqual(
-            err,
-            (
-                'Unsupported language "q"\n'
-                'Only "datafile" and "javascript" and "python" are supported.\n'
-            ),
-        )
+        self.assertEqual(err, 'Unsupported generator "q"')
 
     def test_parse(self):
         result = pyfloyd.parse('grammar = "Hello, world" end', 'Hello, world')

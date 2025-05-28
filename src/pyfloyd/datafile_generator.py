@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 from typing import Any
 
 from pyfloyd import (
@@ -25,9 +26,21 @@ from pyfloyd import (
 )
 
 
+DEFAULT_TEMPLATE = 'python'
+
+DEFAULT_LANGUAGE = DEFAULT_TEMPLATE[:-4]
+
+KNOWN_TEMPLATES = {
+    '.py': 'python',
+    '.js': 'javascript',
+}
+
+KNOWN_LANGUAGES = {v: k for k, v in KNOWN_TEMPLATES.items()}
+
+
 class DatafileGenerator(generator.Generator):
     name = 'datafile'
-    help_str = 'Generator code from a datafile template'
+    help_str = 'Generate code from a datafile template'
     indent = '    '
 
     def __init__(
@@ -54,8 +67,11 @@ class DatafileGenerator(generator.Generator):
         interp.env.set('generator_options', self.options)
         interp.define_native_fn('invoke', self.f_invoke)
 
-        default_template = options.get('template', 'python')
-        path = self._find_datafile(default_template)
+        template = options.get('template', 'python')
+        if template is None:
+            template = DEFAULT_TEMPLATE
+
+        path = self._find_datafile(template)
         self._load_datafiles(path)
         self.name = self.datafile['name']
         self.ext = self.datafile['ext']
@@ -87,8 +103,7 @@ class DatafileGenerator(generator.Generator):
     def _find_datafile(self, name):
         if self.host.exists(name):
             return name
-        _, ext = self.host.splitext(name)
-        if ext == '':
+        if self.host.splitext(name)[1] == '':
             name += '.dft'
         path = self.host.join(self.host.dirname(__file__), name)
         if not self.host.exists(path):
@@ -173,7 +188,9 @@ class DatafileGenerator(generator.Generator):
         obj = self._interpreter.eval(
             [['symbol', self.datafile['starting_template']]]
         )
-        if self.options.generator_options.get('as_ll'):
+        if self.options.as_json:
+            return json.dumps(obj.to_list(), indent=self.options.indent)
+        if self.options.output_as_format_tree:
             fmt_fn = formatter.flatten_as_lisplist
         else:
             fmt_fn = formatter.flatten
