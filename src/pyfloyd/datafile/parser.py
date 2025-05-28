@@ -990,12 +990,17 @@ class _Parser:
         self._o_memoize('r_tsq', self._r_tsq)
         if self._failed:
             return
-        self._s_raw_str_2()
+        v__1 = self._val
+        if self._failed:
+            return
+        self._o_succeed(self._fn_colno())
         v__2 = self._val
+        self._s_raw_str_2()
+        v__3 = self._val
         self._o_memoize('r_tsq', self._r_tsq)
         if self._failed:
             return
-        self._o_succeed(v__2)
+        self._o_succeed([v__1, v__2, v__3])
 
     def _s_raw_str_2(self):
         start = self._pos
@@ -1028,12 +1033,17 @@ class _Parser:
         self._o_memoize('r_tdq', self._r_tdq)
         if self._failed:
             return
-        self._s_raw_str_5()
+        v__1 = self._val
+        if self._failed:
+            return
+        self._o_succeed(self._fn_colno())
         v__2 = self._val
+        self._s_raw_str_5()
+        v__3 = self._val
         self._o_memoize('r_tdq', self._r_tdq)
         if self._failed:
             return
-        self._o_succeed(v__2)
+        self._o_succeed([v__1, v__2, v__3])
 
     def _s_raw_str_5(self):
         start = self._pos
@@ -1066,12 +1076,17 @@ class _Parser:
         self._o_memoize('r_tbq', self._r_tbq)
         if self._failed:
             return
-        self._s_raw_str_8()
+        v__1 = self._val
+        if self._failed:
+            return
+        self._o_succeed(self._fn_colno())
         v__2 = self._val
+        self._s_raw_str_8()
+        v__3 = self._val
         self._o_memoize('r_tbq', self._r_tbq)
         if self._failed:
             return
-        self._o_succeed(v__2)
+        self._o_succeed([v__1, v__2, v__3])
 
     def _s_raw_str_8(self):
         start = self._pos
@@ -1104,12 +1119,17 @@ class _Parser:
         self._o_memoize('r_sq', self._r_sq)
         if self._failed:
             return
-        self._s_raw_str_11()
+        v__1 = self._val
+        if self._failed:
+            return
+        self._o_succeed(self._fn_colno())
         v__2 = self._val
+        self._s_raw_str_11()
+        v__3 = self._val
         self._o_memoize('r_sq', self._r_sq)
         if self._failed:
             return
-        self._o_succeed(v__2)
+        self._o_succeed([v__1, v__2, v__3])
 
     def _s_raw_str_11(self):
         start = self._pos
@@ -1142,12 +1162,17 @@ class _Parser:
         self._o_memoize('r_dq', self._r_dq)
         if self._failed:
             return
-        self._s_raw_str_14()
+        v__1 = self._val
+        if self._failed:
+            return
+        self._o_succeed(self._fn_colno())
         v__2 = self._val
+        self._s_raw_str_14()
+        v__3 = self._val
         self._o_memoize('r_dq', self._r_dq)
         if self._failed:
             return
-        self._o_succeed(v__2)
+        self._o_succeed([v__1, v__2, v__3])
 
     def _s_raw_str_14(self):
         start = self._pos
@@ -1180,12 +1205,17 @@ class _Parser:
         self._o_memoize('r_bq', self._r_bq)
         if self._failed:
             return
-        self._s_raw_str_17()
+        v__1 = self._val
+        if self._failed:
+            return
+        self._o_succeed(self._fn_colno())
         v__2 = self._val
+        self._s_raw_str_17()
+        v__3 = self._val
         self._o_memoize('r_bq', self._r_bq)
         if self._failed:
             return
-        self._o_succeed(v__2)
+        self._o_succeed([v__1, v__2, v__3])
 
     def _s_raw_str_17(self):
         start = self._pos
@@ -1224,12 +1254,14 @@ class _Parser:
         self._scopes[-1]['lq'] = self._val
         if self._failed:
             return
+        self._o_succeed(self._fn_colno())
+        v_c = self._val
         self._s_raw_str_23()
-        v__3 = self._val
+        v_s = self._val
         self._o_str(self._o_lookup('lq'))
         if self._failed:
             return
-        self._o_succeed(v__3)
+        self._o_succeed([self._fn_strcat('L', self._o_lookup('lq')), v_c, v_s])
 
     def _s_raw_str_20(self):
         start = self._pos
@@ -1303,6 +1335,8 @@ class _Parser:
         self._o_ch('[')
         if self._failed:
             return
+        self._o_succeed(self._fn_colno())
+        v_c = self._val
         self._s_raw_str_27()
         v_s = self._val
         self._o_ch(']')
@@ -1314,7 +1348,22 @@ class _Parser:
         self._o_ch(']')
         if self._failed:
             return
-        self._o_succeed(v_s)
+        self._o_succeed(
+            [
+                self._fn_strcat(
+                    '[',
+                    self._fn_strcat(
+                        self._fn_join(
+                            '',
+                            self._o_lookup('eqs'),
+                        ),
+                        ']',
+                    ),
+                ),
+                v_c,
+                v_s,
+            ]
+        )
 
     def _s_raw_str_26(self):
         vs = []
@@ -1419,12 +1468,17 @@ class _Parser:
         self._o_memoize('r_tsq', self._r_tsq)
         if self._failed:
             return
-        self._s_str_2()
+        v__1 = self._val
+        if self._failed:
+            return
+        self._o_succeed(self._fn_colno())
         v__2 = self._val
+        self._s_str_2()
+        v__3 = self._val
         self._o_memoize('r_tsq', self._r_tsq)
         if self._failed:
             return
-        self._o_succeed(v__2)
+        self._o_succeed([v__1, v__2, v__3])
 
     def _s_str_2(self):
         start = self._pos
@@ -1464,12 +1518,17 @@ class _Parser:
         self._o_memoize('r_tdq', self._r_tdq)
         if self._failed:
             return
-        self._s_str_7()
+        v__1 = self._val
+        if self._failed:
+            return
+        self._o_succeed(self._fn_colno())
         v__2 = self._val
+        self._s_str_7()
+        v__3 = self._val
         self._o_memoize('r_tdq', self._r_tdq)
         if self._failed:
             return
-        self._o_succeed(v__2)
+        self._o_succeed([v__1, v__2, v__3])
 
     def _s_str_7(self):
         start = self._pos
@@ -1509,12 +1568,17 @@ class _Parser:
         self._o_memoize('r_tbq', self._r_tbq)
         if self._failed:
             return
-        self._s_str_12()
+        v__1 = self._val
+        if self._failed:
+            return
+        self._o_succeed(self._fn_colno())
         v__2 = self._val
+        self._s_str_12()
+        v__3 = self._val
         self._o_memoize('r_tbq', self._r_tbq)
         if self._failed:
             return
-        self._o_succeed(v__2)
+        self._o_succeed([v__1, v__2, v__3])
 
     def _s_str_12(self):
         start = self._pos
@@ -1554,12 +1618,17 @@ class _Parser:
         self._o_memoize('r_sq', self._r_sq)
         if self._failed:
             return
-        self._s_str_17()
+        v__1 = self._val
+        if self._failed:
+            return
+        self._o_succeed(self._fn_colno())
         v__2 = self._val
+        self._s_str_17()
+        v__3 = self._val
         self._o_memoize('r_sq', self._r_sq)
         if self._failed:
             return
-        self._o_succeed(v__2)
+        self._o_succeed([v__1, v__2, v__3])
 
     def _s_str_17(self):
         start = self._pos
@@ -1599,12 +1668,17 @@ class _Parser:
         self._o_memoize('r_dq', self._r_dq)
         if self._failed:
             return
-        self._s_str_22()
+        v__1 = self._val
+        if self._failed:
+            return
+        self._o_succeed(self._fn_colno())
         v__2 = self._val
+        self._s_str_22()
+        v__3 = self._val
         self._o_memoize('r_dq', self._r_dq)
         if self._failed:
             return
-        self._o_succeed(v__2)
+        self._o_succeed([v__1, v__2, v__3])
 
     def _s_str_22(self):
         start = self._pos
@@ -1644,12 +1718,17 @@ class _Parser:
         self._o_memoize('r_bq', self._r_bq)
         if self._failed:
             return
-        self._s_str_27()
+        v__1 = self._val
+        if self._failed:
+            return
+        self._o_succeed(self._fn_colno())
         v__2 = self._val
+        self._s_str_27()
+        v__3 = self._val
         self._o_memoize('r_bq', self._r_bq)
         if self._failed:
             return
-        self._o_succeed(v__2)
+        self._o_succeed([v__1, v__2, v__3])
 
     def _s_str_27(self):
         start = self._pos
@@ -1695,12 +1774,14 @@ class _Parser:
         self._scopes[-1]['lq'] = self._val
         if self._failed:
             return
+        self._o_succeed(self._fn_colno())
+        v_c = self._val
         self._s_str_35()
-        v__3 = self._val
+        v_s = self._val
         self._o_str(self._o_lookup('lq'))
         if self._failed:
             return
-        self._o_succeed(v__3)
+        self._o_succeed([self._fn_strcat('L', self._o_lookup('lq')), v_c, v_s])
 
     def _s_str_32(self):
         start = self._pos
@@ -1781,6 +1862,8 @@ class _Parser:
         self._o_ch('[')
         if self._failed:
             return
+        self._o_succeed(self._fn_colno())
+        v_c = self._val
         self._s_str_41()
         v_s = self._val
         self._o_ch(']')
@@ -1792,7 +1875,22 @@ class _Parser:
         self._o_ch(']')
         if self._failed:
             return
-        self._o_succeed(v_s)
+        self._o_succeed(
+            [
+                self._fn_strcat(
+                    '[',
+                    self._fn_strcat(
+                        self._fn_join(
+                            '',
+                            self._o_lookup('eqs'),
+                        ),
+                        ']',
+                    ),
+                ),
+                v_c,
+                v_s,
+            ]
+        )
 
     def _s_str_40(self):
         vs = []
@@ -2494,8 +2592,22 @@ class _Parser:
         if newpos is not None:
             self._pos = newpos
 
+    def _fn_colno(self):
+        colno = 0
+        if self._pos == self._end:
+            colno += 1
+        while self._pos >= colno and self._text[self._pos - colno] != '\n':
+            colno += 1
+        return colno
+
     def _fn_concat(self, xs, ys):
         return xs + ys
 
+    def _fn_join(self, s, vs):
+        return s.join(vs)
+
     def _fn_scons(self, hd, tl):
         return [hd] + tl
+
+    def _fn_strcat(self, a, b):
+        return a + b

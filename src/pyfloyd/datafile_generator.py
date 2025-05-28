@@ -140,7 +140,7 @@ class DatafileGenerator(generator.Generator):
             f'Uexpected tag fn invocation: '
             f'ty={ty} tag={tag} obj={repr(obj)}, as_key={as_key}'
         )
-        s = datafile.dedent(obj)
+        s = datafile.dedent(obj[2], colno=obj[1])
         return [['symbol', 'fn'], [], [['symbol', 'at_exp'], s]]
 
     def _to_quoted_list(self, ty, tag, obj, as_key=False):

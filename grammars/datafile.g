@@ -83,29 +83,54 @@ bareword     = ~('true' | 'false' | 'null' | number)
 
 numword      = <number (^(punct | %whitespace))+>     -> ['numword', '', $1]
 
-raw_str      = tsq <(^tsq)*> tsq                      -> $2
-             | tdq <(^tdq)*> tdq                      -> $2
-             | tbq <(^tbq)*> tbq                      -> $2
-             | sq <(^sq)*> sq                         -> $2
-             | dq <(^dq)*> dq                         -> $2
-             | bq <(^bq)*> bq                         -> $2
-             | 'L' <sq '='+ sq>:lq
-               <(^(={lq}))*> ={lq}                    -> $3
-             | '[' '='+:eqs '['
+# The AST for a raw string or a string returns the text of the opening
+# quote and the colno following the opening quote. The latter is used
+# to be able to dedent multiline strings with text on the first line
+# properly. The former isn't currently used but could be useful to
+# round-trip the pretty-printed string properly.
+raw_str      = tsq (-> colno()) <(^tsq)*> tsq         -> [$1, $2, $3]
+             | tdq (-> colno()) <(^tdq)*> tdq         -> [$1, $2, $3]
+             | tbq (-> colno()) <(^tbq)*> tbq         -> [$1, $2, $3]
+             | sq  (-> colno()) <(^sq)*>  sq          -> [$1, $2, $3]
+             | dq  (-> colno()) <(^dq)*>  dq          -> [$1, $2, $3]
+             | bq  (-> colno()) <(^bq)*>  bq          -> [$1, $2, $3]
+             | 'L'
+               <sq '='+ sq>:lq
+               (-> colno()):c
+               <(^(={lq}))*>:s
+               ={lq}
+               ->                             [strcat('L', lq), c, s]
+             | '['
+               '='+:eqs
+               '['
+               (-> colno()):c
                <(^(']' ={eqs} ']'))*>:s
-               ']' ={eqs} ']'                         -> s
+               ']'
+               ={eqs}
+               ']'
+               ->    [strcat('[', strcat(join('', eqs), ']')), c, s]
 
-str          = tsq <(~tsq bchar)*> tsq                -> $2
-             | tdq <(~tdq bchar)*> tdq                -> $2
-             | tbq <(~tbq bchar)*> tbq                -> $2
-             | sq <(~sq bchar)*> sq                   -> $2
-             | dq <(~dq bchar)*> dq                   -> $2
-             | bq <(~bq bchar)*> bq                   -> $2
-             | 'L' <sq '='+ sq>:lq
-               <(~(={lq}) bchar)*> ={lq}              -> $3
-             | '[' '='+:eqs '['
+str          = tsq (-> colno()) <(~tsq bchar)*> tsq   -> [$1, $2, $3]
+             | tdq (-> colno()) <(~tdq bchar)*> tdq   -> [$1, $2, $3]
+             | tbq (-> colno()) <(~tbq bchar)*> tbq   -> [$1, $2, $3]
+             | sq  (-> colno()) <(~sq bchar)*>  sq    -> [$1, $2, $3]
+             | dq  (-> colno()) <(~dq bchar)*>  dq    -> [$1, $2, $3]
+             | bq  (-> colno()) <(~bq bchar)*>  bq    -> [$1, $2, $3]
+             | 'L'
+               <sq '='+ sq>:lq
+               (-> colno()):c
+               <(~(={lq}) bchar)*>:s
+               ={lq}
+               ->                             [strcat('L', lq), c, s]
+             | '['
+               '='+:eqs
+               '['
+               (-> colno()):c
                <(~(']' ={eqs} ']') bchar)*>:s
-               ']' ={eqs} ']'                         -> s
+               ']'
+               ={eqs}
+               ']'
+               ->     [strcat('[', strcat(join('', eqs), ']')), c, s]
 
 punct        = /(L'=+')|[\/#'"`\[\](){}:=,]/
 

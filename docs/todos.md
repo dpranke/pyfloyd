@@ -1,13 +1,15 @@
 # Things TODO (semi-prioritized)
 
-* Support template reuse, sharing, inheritance.
+* Support template reuse/sharing.
+  - Currently one template can "inherit" from another (basically overriding
+    the definitions in the former), but it might be good to also be able to
+    reuse definitions from a template without bringing everything from the
+    template in and without overridding everything in the template.
 
 * Replace hard-coded grammar pretty-printing with template-based
   pretty-printing.
 
 * Support grammar reuse, sharing, inheritance.
-
-* Convert JS code gen to templates (needs template reuse first).
 
 * Allow customizable externs that can be used as functions in addition
   to the existing support for constants. They should be able to override
@@ -16,11 +18,6 @@
 * Change the floyd parser to use proper nodes that contain line number and
   column info so that when we catch errors in analysis we can actually point
   to where the error is happening.
-
-* Maybe add `_pos` built-in rule (and _pos() built-in function),
-  `_text` built-in value or some other way for capturing position info;
-  this will allow datafiles to handle dedenting strings with text on the
-  first line properly.
 
 * Figure out how to generate a full concrete syntax tree with comments
   and whitespace properly annotated so we have a more generic DOM-like

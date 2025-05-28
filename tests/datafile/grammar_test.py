@@ -77,28 +77,18 @@ class Grammar(unittest.TestCase):
         self.check(r'r"foo\x"', r'foo\x')
 
     def test_d_str(self):
-        self.check("d'foo'", 'foo')
-
         self.check("d'\n  bar\n    baz'", 'bar\n  baz')
         self.check("d'\n  bar\n    baz\n  '", 'bar\n  baz\n')
         self.check("d'\n  \n    baz\n'", '\n  baz\n')
         self.check("d'\n  bar\n\n    baz\n'", 'bar\n\n  baz\n')
 
-        # TODO: See comments in the code for whether we should support this.
+    def test_d_str_text_on_first_line(self):
+        self.check("d'foo'", 'foo')
         self.check("d'  foo  '", 'foo')
-
-        # TODO: See comments in the code about how to support this; for now
-        # these raise errors but we should fix this ASAP.
-        self.check_fail(
-            "d'foo\n  bar'",
-            ValueError,
-            msg=(
-                "Multiline strings can't have any text on the same line "
-                'as the opening quote'
-            ),
-        )
-        self.check_fail("d'  foo  \n  bar'", ValueError)
-        self.check_fail("d'foo\n  bar \n    baz'", ValueError)
+        self.check("d'foo\n  bar'", 'foo\nbar')
+        self.check("d'  foo  \n  bar'", '  foo\nbar')
+        self.check("d'foo\n  bar \n    baz'", 'foo\nbar\n  baz')
+        self.check("  d'foo\n bar'", '   foo\nbar')
 
     def test_str(self):
         self.check('"foo"', 'foo')

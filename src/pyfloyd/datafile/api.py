@@ -396,10 +396,11 @@ class Decoder:
                 i += 1
         return ''.join(ret)
 
-    def parse_string(self, tag, s, as_key):
+    def parse_string(self, tag, v, as_key):
         del as_key
         is_rstr = 'r' in tag
         is_dstr = 'd' in tag
+        _, colno, s = v
         i = 0
         ret = []
         while i < len(s):
@@ -410,7 +411,7 @@ class Decoder:
                 ret.append(s[i])
                 i += 1
         if is_dstr:
-            return dedent(''.join(ret))
+            return dedent(''.join(ret), colno=colno)
         return ''.join(ret)
 
     def parse_string_list(self, tag, strs):
@@ -544,7 +545,7 @@ def isoct(ch):
     return '0' <= ch <= '7'
 
 
-def dedent(s):
+def dedent(s, colno=None):
     # TODO: Figure out what to do with tabs and other non-space whitespace.
     def _indent(s):
         i = 0
@@ -557,37 +558,15 @@ def dedent(s):
         return s.strip()
 
     min_indent = min(_indent(line) for line in lines[1:] if line)
-
-    # TODO: It's not clear what the best thing to do with multiline strings
-    # with text on the first line is. Examples:
-    #
-    # one = d'foo
-    #   bar'
-    # two = d'  foo
-    #   bar'
-    # three = d'  foo
-    #           bar'
-    # four  = d'  foo  '
-    #
-    # The only one of these that seems really useful is three, if it evaluated
-    # to '  foo\nbar'; that would allow you to do indented first lines
-    # without having to use an extra line. The other two just seem kinda
-    # goofy. However, we can't currently implement three correctly because
-    # the AST doesn't contain the column number the string starts at.
-    #
-    # We support evaluating four to 'foo'; that would be reasonably
-    # consistent with other things, although it's not clear why you
-    # would want to dedent a single-line string at all.
-    #
-    # For now, just raise an error if there is ever non-blank text
-    # on the first line of a multiline string. We should try to fix this
-    # to support three before widely publicizing the format.
     if lines[0] and not lines[0].isspace():
-        raise DatafileError(
-            "Multiline strings can't have any text on the same "
-            'line as the opening quote'
-        )
-    r = ''
+        first_indent = colno - 1 + _indent(lines[0])
+        min_indent = min(min_indent, first_indent)
+        if min_indent < first_indent:
+            r = ' ' * (first_indent - min_indent) + lines[0].strip() + '\n'
+        else:
+            r = lines[0][_indent(lines[0]) :].rstrip() + '\n'
+    else:
+        r = ''
     if lines[1:-1]:
         r += (
             '\n'.join(line[min_indent:].rstrip() for line in lines[1:-1])
