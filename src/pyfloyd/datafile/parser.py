@@ -22,11 +22,11 @@ class _ParsingRuntimeError(Exception):
 class Result(NamedTuple):
     """The result returned from a `parse()` call.
 
-    If the parse is successful, `val` will contain the returned value, if any
-    and `pos` will indicate the point in the text where the parser stopped.
-    If the parse is unsuccessful, `err` will contain a string describing
-    any errors that occurred during the parse and `pos` will indicate
-    the location of the farthest error in the text.
+    If the parse is successful, `val` will contain the returned value, if
+    any and `pos` will indicate the point in the text where the parser
+    stopped.  If the parse is unsuccessful, `err` will contain a string
+    describing any errors that occurred during the parse and `pos` will
+    indicate the location of the farthest error in the text.
     """
 
     val: Any = None
@@ -391,7 +391,6 @@ class _Parser:
         self._s_number_17()
 
     def _s_number_14(self):
-        pos = self._pos
         self._s_number_15()
         if self._failed:
             self._o_succeed([])
@@ -407,7 +406,6 @@ class _Parser:
         self._o_ch('+')
 
     def _s_number_16(self):
-        pos = self._pos
         self._o_memoize('r_frac', self._r_frac)
         if self._failed:
             self._o_succeed([])
@@ -415,7 +413,6 @@ class _Parser:
             self._o_succeed([self._val])
 
     def _s_number_17(self):
-        pos = self._pos
         self._o_memoize('r_exp', self._r_exp)
         if self._failed:
             self._o_succeed([])
@@ -489,7 +486,6 @@ class _Parser:
         self._o_memoize('r_digit_sep', self._r_digit_sep)
 
     def _s_frac_1(self):
-        pos = self._pos
         self._o_memoize('r_digit', self._r_digit)
         if self._failed:
             self._o_succeed([])
@@ -513,7 +509,6 @@ class _Parser:
         self._o_ch('E')
 
     def _s_exp_2(self):
-        pos = self._pos
         self._s_exp_3()
         if self._failed:
             self._o_succeed([])
@@ -529,7 +524,6 @@ class _Parser:
         self._o_ch('-')
 
     def _s_exp_4(self):
-        pos = self._pos
         self._o_memoize('r_digit', self._r_digit)
         if self._failed:
             self._o_succeed([])
@@ -674,7 +668,6 @@ class _Parser:
         self._o_memoize('r_string', self._r_string)
 
     def _s_string_list_3(self):
-        pos = self._pos
         self._s_string_list_4()
         if self._failed:
             self._o_succeed([])
@@ -2103,7 +2096,6 @@ class _Parser:
         self._o_succeed(['array', v__1, self._fn_concat(v__3, v__4)])
 
     def _s_array_1(self):
-        pos = self._pos
         self._o_memoize('r_value', self._r_value)
         if self._failed:
             self._o_succeed([])
@@ -2126,7 +2118,6 @@ class _Parser:
         self._o_memoize('r_value', self._r_value)
 
     def _s_array_4(self):
-        pos = self._pos
         self._s_array_5()
         if self._failed:
             self._o_succeed([])
@@ -2138,7 +2129,6 @@ class _Parser:
         self._o_ch(',')
 
     def _s_array_6(self):
-        pos = self._pos
         self._s_array_7()
         if self._failed:
             self._o_succeed([])
@@ -2199,7 +2189,6 @@ class _Parser:
         self._o_succeed(['object', v__1, self._fn_concat(v__3, v__4)])
 
     def _s_object_1(self):
-        pos = self._pos
         self._o_memoize('r_member', self._r_member)
         if self._failed:
             self._o_succeed([])
@@ -2222,7 +2211,6 @@ class _Parser:
         self._o_memoize('r_member', self._r_member)
 
     def _s_object_4(self):
-        pos = self._pos
         self._s_object_5()
         if self._failed:
             self._o_succeed([])
@@ -2234,7 +2222,6 @@ class _Parser:
         self._o_ch(',')
 
     def _s_object_6(self):
-        pos = self._pos
         self._s_object_7()
         if self._failed:
             self._o_succeed([])
@@ -2468,17 +2455,6 @@ class _Parser:
         if var in self._externs:
             return self._externs[var]
         assert False, f'unknown var {var}'
-
-    def _o_memoize(self, rule_name, fn):
-        pos = self._pos
-        if pos not in self._cache:
-            self._cache[pos] = {}
-        c = self._cache[pos]
-        if rule_name in c:
-            self._val, self._failed, self._pos = c[rule_name]
-            return
-        fn()
-        c[rule_name] = (self._val, self._failed, self._pos)
 
     def _o_memoize(self, rule_name, fn):
         pos = self._pos

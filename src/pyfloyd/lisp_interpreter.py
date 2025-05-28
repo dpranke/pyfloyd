@@ -44,7 +44,7 @@ def is_dict(el: Any) -> bool:
 
 
 def is_fn(el: Any) -> bool:
-    return isinstance(el, Fn)
+    return isinstance(el, _Fn)
 
 
 def is_foreign(el: Any, env: 'Env') -> bool:
@@ -174,37 +174,49 @@ class Env:
 EvalFn = Callable[[list[Any], Env], Any]
 
 
-class Fn:
+class _Fn:
     def __init__(
-        self,
-        interp: 'Interpreter',
-        env: Env,
-        is_fexpr: bool,
-        name: str,
-        types: Optional[list[CheckerType]],
+        self, name: str, types: Optional[list[CheckerType]], is_fexpr: bool
     ):
-        self.interp = interp
-        self.env = env or self.interp.env
-        self.is_fexpr = is_fexpr
         self.name = name
         self.types = types
+        self.is_fexpr = is_fexpr
 
     def call(self, args, env):
         raise NotImplementedError
 
 
-class NativeFn(Fn):
+class SimpleFn(_Fn):
+    def __init__(
+        self,
+        func: Callable[[list[Any]], Any],
+        name: str,
+        types: Optional[list[CheckerType]] = None,
+    ):
+        super().__init__(name, types, is_fexpr=False)
+        self.func = func
+
+    def call(self, args, env):
+        del env
+        if self.types:
+            typecheck(self.name, self.types, args)
+        return self.func(args)
+
+
+class NativeFn(_Fn):
     def __init__(
         self,
         interp: 'Interpreter',
         func: EvalFn,
-        env: Optional[Env] = None,
-        is_fexpr: bool = True,
         name: str = '<native fn>',
         types: Optional[list[CheckerType]] = None,
+        env: Optional[Env] = None,
+        is_fexpr: bool = False,
     ):
         env = env or interp.global_env
-        super().__init__(interp, env, is_fexpr, name, types)
+        super().__init__(name, types, is_fexpr)
+        self.env = env
+        self.interp = interp
         self.func = func
 
     def call(self, args, env):
@@ -213,19 +225,22 @@ class NativeFn(Fn):
         return self.func(args, env)
 
 
-class UserFn(Fn):
+class UserFn(_Fn):
     def __init__(
         self,
         interp: 'Interpreter',
         params: Union[str, list[str]],
         body: Any,
         env: Optional[Env] = None,
-        is_fexpr: bool = True,
+        is_fexpr: bool = False,
         name: str = '<user fn>',
         types: Optional[list[CheckerType]] = None,
     ):
         env = env or interp.global_env
-        super().__init__(interp, env, is_fexpr, name, types)
+        super().__init__(name, types, is_fexpr)
+        self.env = env
+        self.interp = interp
+        self.is_fexpr = is_fexpr
         self.params = params
         self.body = body
 
@@ -249,35 +264,44 @@ class Interpreter:
         self.env.set('true', True)
         self.env.set('false', False)
         self.env.set('null', None)
-        self.define_native_fn('cons', self.f_cons, types=['any', 'list'])
-        self.define_native_fn('define', self.fexpr_define, is_fexpr=True)
-        self.define_native_fn('equal', self.f_equal, types=['any', 'any'])
-        self.define_native_fn('if', self.fexpr_if, is_fexpr=True)
-        self.define_native_fn('in', self.f_in, types=['any', 'any'])
-        self.define_native_fn('is_empty', self.f_is_empty)
         self.define_native_fn('fn', self.fexpr_fn, is_fexpr=True)
-        self.define_native_fn('getattr', self.f_getattr, types=['any', 'any'])
-        self.define_native_fn('getitem', self.f_getitem, types=['any', 'any'])
-        self.define_native_fn('join', self.f_join, types=['str', 'list'])
-        self.define_native_fn('keys', self.f_keys)
-        self.define_native_fn('length', self.f_length)
-        self.define_native_fn('list', self.f_list)
+        self.define_native_fn('define', self.fexpr_define, is_fexpr=True)
+        self.define_native_fn('if', self.fexpr_if, is_fexpr=True)
+        self.define_native_fn('quote', self.fexpr_quote, is_fexpr=True)
+
+        self.define_simple_fn('cons', f_cons, types=['any', 'list'])
+        self.define_simple_fn('equal', f_equal, types=['any', 'any'])
+        self.define_simple_fn('in', f_in, types=['any', 'any'])
+        self.define_simple_fn('is_empty', f_is_empty)
+        self.define_simple_fn('getattr', f_getattr, types=['any', 'any'])
+        self.define_simple_fn('getitem', f_getitem, types=['any', 'any'])
+        self.define_simple_fn('join', f_join, types=['str', 'list'])
+        self.define_simple_fn('keys', f_keys, types=['dict'])
+        self.define_simple_fn('length', f_length)
+        self.define_simple_fn('list', f_list)
+        self.define_simple_fn(
+            'replace', f_replace, types=['str', 'str', 'str']
+        )
+        self.define_simple_fn('to_string', f_to_string, types=['any'])
+        self.define_simple_fn('slice', f_slice, types=['list', 'num', 'num'])
+        self.define_simple_fn('sort', f_sort, types=['list'])
+        self.define_simple_fn('strcat', f_strcat)
+        self.define_simple_fn('strlen', f_strlen, types=['str'])
+
         self.define_native_fn('map', self.f_map)
         self.define_native_fn('map_items', self.f_map_items)
-        self.define_native_fn('quote', self.fexpr_quote, is_fexpr=True)
-        self.define_native_fn(
-            'replace', self.f_replace, types=['str', 'str', 'str']
-        )
-        self.define_native_fn('to_string', self.f_to_string, types=['any'])
-        self.define_native_fn(
-            'slice', self.f_slice, types=['list', 'num', 'num']
-        )
-        self.define_native_fn('sort', self.f_sort, types=['list'])
-        self.define_native_fn('strcat', self.f_strcat)
-        self.define_native_fn('strlen', self.f_strlen, types=['str'])
 
     def add_foreign_handler(self, func: Any):
         self.foreign_handlers.append(func)
+
+    def define_simple_fn(
+        self,
+        name: str,
+        func: Callable[[list[Any]], Any],
+        types: Optional[list[CheckerType]] = None,
+    ) -> None:
+        fn = SimpleFn(func, name, types)
+        self.env.set(name, fn)
 
     def define_native_fn(
         self,
@@ -286,7 +310,7 @@ class Interpreter:
         is_fexpr: bool = False,
         types: Optional[list[CheckerType]] = None,
     ) -> None:
-        fn = NativeFn(self, func, self.global_env, is_fexpr, name, types)
+        fn = NativeFn(self, func, name, types, is_fexpr=is_fexpr)
         self.env.set(name, fn)
 
     def define(self, name: str, expr: Any) -> None:
@@ -316,48 +340,44 @@ class Interpreter:
             handled, val = handler(expr, env)
             if handled:
                 return val
-        raise InterpreterError("Don't know how to evaluate `{expr}`")
+        raise InterpreterError(f"Don't know how to evaluate `{expr}`")
 
     def fexpr_define(self, args, env):
         head, body = args
         name = self.eval(head, env)
         self.env.set(name, self.eval(body, env))
 
-    def f_cons(self, args, env):
-        del env
-        return [args[0]] + args[1]
+    def fexpr_fn(self, args, env):
+        param_symbols, body = args
+        if len(param_symbols) and param_symbols[0] == 'symbol':
+            params = symbol(param_symbols)
+        else:
+            params = []
+            for expr in param_symbols:
+                params.append(symbol(expr))
+        if env.bound('_t_name'):
+            name = env.get('_t_name')
+            if name == '':
+                name = None
+        return UserFn(self, params, body, env, is_fexpr=False, name=name)
 
-    def f_equal(self, args, env):
-        del env
-        return args[0] == args[1]
+    def fexpr_if(self, args, env):
+        cond = args[0]
+        t_expr = args[1]
+        if len(args) == 3:
+            f_expr = args[2]
+        else:
+            f_expr = ['symbol', 'null']
+        res = self.eval(cond, env)
+        if res:
+            return self.eval(t_expr, env)
+        return self.eval(f_expr, env)
 
-    def f_getattr(self, args, env):
+    def fexpr_quote(self, args, env):
         del env
-        return getattr(args[0], args[1])
-
-    def f_getitem(self, args, env):
-        del env
-        return args[0][args[1]]
-
-    def f_in(self, args, env):
-        del env
-        key, d = args
-        return key in d
-
-    def f_is_empty(self, args, env):
-        del env
-        check(is_list(args[0]) or is_dict(args[0]))
-        return len(args[0]) == 0
-
-    def f_join(self, args, env):
-        del env
-        sep = args[0]
-        rest = args[1]
-        return sep.join(rest)
-
-    def f_keys(self, args, env):
-        del env
-        return list(args[0].keys())
+        # The difference from `f_list`, above, is that the args will
+        # not have been evaluated here.
+        return args[0]
 
     def f_map(self, args, env):
         if len(args) == 3:
@@ -403,68 +423,81 @@ class Interpreter:
             return sep.join(results)
         return results
 
-    def f_length(self, args, env):
-        del env
-        return len(args[0])
 
-    def f_list(self, args, env):
-        del env
-        return list(args)
+def f_cons(args):
+    hd, tl = args
+    return [hd] + tl
 
-    def f_replace(self, args, env):
-        del env
-        s, old, new = args
-        return s.replace(old, new)
 
-    def f_slice(self, args, env):
-        del env
-        lis, start, stop = args
-        return lis[start:stop]
+def f_equal(args):
+    x, y = args
+    return x == y
 
-    def f_sort(self, args, env):
-        del env
-        return sorted(args[0])
 
-    def f_strcat(self, args, env):
-        del env
-        return ''.join(args)
+def f_getattr(args):
+    obj, attr = args
+    return getattr(obj, attr)
 
-    def f_strlen(self, args, env):
-        del env
-        return len(args[0])
 
-    def f_to_string(self, args, env):
-        del env
-        return f'{args[0]}'
+def f_getitem(args):
+    obj, index = args
+    return obj[index]
 
-    def fexpr_fn(self, args, env):
-        param_symbols, body = args
-        if len(param_symbols) and param_symbols[0] == 'symbol':
-            params = symbol(param_symbols)
-        else:
-            params = []
-            for expr in param_symbols:
-                params.append(symbol(expr))
-        if env.bound('_t_name'):
-            name = env.get('_t_name')
-            if name == '':
-                name = None
-        return UserFn(self, params, body, env, is_fexpr=False, name=name)
 
-    def fexpr_if(self, args, env):
-        cond = args[0]
-        t_expr = args[1]
-        if len(args) == 3:
-            f_expr = args[2]
-        else:
-            f_expr = ['symbol', 'null']
-        res = self.eval(cond, env)
-        if res:
-            return self.eval(t_expr, env)
-        return self.eval(f_expr, env)
+def f_in(args):
+    key, obj = args
+    return key in obj
 
-    def fexpr_quote(self, args, env):
-        del env
-        # The difference from `f_list`, above, is that the args will
-        # not have been evaluated here.
-        return args[0]
+
+def f_is_empty(args):
+    obj = args[0]
+    check(is_list(obj) or is_dict(obj))
+    return len(obj) == 0
+
+
+def f_join(args):
+    sep, rest = args
+    return sep.join(rest)
+
+
+def f_keys(args):
+    d = args[0]
+    return list(d.keys())
+
+
+def f_length(args):
+    lis = args[0]
+    return len(lis)
+
+
+def f_list(args):
+    return list(args)
+
+
+def f_replace(args):
+    s, old, new = args
+    return s.replace(old, new)
+
+
+def f_slice(args):
+    lis, start, stop = args
+    return lis[start:stop]
+
+
+def f_sort(args):
+    lis = args[0]
+    return sorted(lis)
+
+
+def f_strcat(args):
+    return ''.join(args)
+
+
+def f_strlen(args):
+    s = args[0]
+    return len(s)
+
+
+def f_to_string(args):
+    obj = args[0]
+    return f'{obj}'

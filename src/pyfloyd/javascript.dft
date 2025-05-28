@@ -64,8 +64,8 @@ t_assign_outer: [fn [var val]
 t_append: [fn [lst val] [hl lst '.push(' val ')' t_end]]
 t_break:  'break;'
 t_declare_local_vars: [fn [node] [t_declare_vars node.local_vars]]
-t_declare_vars: [fn [vars] [vl_l [map [fn [v] [hl 'let ' v t_end]]
-                                      vars]]]
+t_declare_vars: [fn [vars] [vl [map [fn [v] [hl 'let ' v t_end]]
+                                    vars]]]
 t_end: ';'  # statement terminator
 t_eq: [fn [x y] [hl x ' === ' y]]
 t_false: 'false'
@@ -89,6 +89,7 @@ t_pop: [fn [x] [hl x '.pop()']]
 t_return: 'return;'
 t_substr: [fn [s start end] [hl s '.substr(' start ', ' end ')']]
 t_throw: [fn [msg] [hl 'throw new ParsingRuntimeError(' msg ')' t_end]]
+t_toplevel_extra_sep: null
 t_true: 'true'
 t_while: [fn [cond body] [block [hl 'while (' cond ')'] body]]
 
@@ -170,20 +171,20 @@ parser_constructor: @"""
       @if[grammar.operator_needed
          [vl 'this.operators = {};'
              'let o;'
-             [vl_l [map_items operator_state grammar.operators]]]]
+             [map_items operator_state grammar.operators]]]
     }
     """  # parser_constructor
       
 externs: [fn [] [if [is_empty grammar.externs]
                     [vl 'this.externs = new Map();']
                     [vl 'this.externs = new Map(['
-                        [ind_l [map_items [fn [k v]
-                                              [hl '['
-                                                  [lit k]
-                                                   ', '
-                                                  [if v 'true' 'false']
-                                                  '], ']]
-                                          grammar.externs]]
+                        [ind [map_items [fn [k v]
+                                            [hl '['
+                                                [lit k]
+                                                ', '
+                                                [if v 'true' 'false']
+                                                '], ']]
+                                        grammar.externs]]
                         ']);']]]
 
 operator_state: [fn [rule o]
@@ -197,13 +198,13 @@ operator_state: [fn [rule o]
 
 operator_prec_ops: [fn [o]
                        [vl 'o.precOps = new Map();'
-                           [vl_l [map [fn [prec]
-                                          [hl 'o.precOps.set(' [to_string prec] ', ['
-                                              [hl_l [map [fn [op] [lit op]]
-                                                         [getitem o.prec_ops prec]
-                                                         ', ']]
-                                              ']);']]
-                                      [sort [keys o.prec_ops]]]]]]
+                           [map [fn [prec]
+                                    [hl 'o.precOps.set(' [to_string prec] ', ['
+                                        [map [fn [op] [lit op]]
+                                             [getitem o.prec_ops prec]
+                                             ', ']
+                                        ']);']]
+                                [sort [keys o.prec_ops]]]]]
 
 operator_rassoc: [fn [o]
                      [hl 'o.rassoc = new Set(['
@@ -211,13 +212,13 @@ operator_rassoc: [fn [o]
                          ']);']]
 
 operator_choices: [fn [o] [vl 'o.choices = new Map();'
-                              [vl_l [map_items [fn [op meth]
-                                                   [hl "o.choices.set("
-                                                       [lit op]
-                                                       ", this."
-                                                       meth
-                                                       ");"]]
-                                               o.choices]]]]
+                              [map_items [fn [op meth]
+                                             [hl "o.choices.set("
+                                                 [lit op]
+                                                 ", this."
+                                                 meth
+                                                 ");"]]
+                                         o.choices]]]
  
 parse_with_exception: @"""
     parse(externs = null) {

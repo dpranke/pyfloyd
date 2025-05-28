@@ -18,6 +18,7 @@ from pyfloyd.formatter import (
     flatten,
     flatten_as_lisplist,
     from_list,
+    # process_indents,
     to_list,
     to_lisplist,
     Comma,
@@ -101,9 +102,34 @@ class Tests(unittest.TestCase):
         obj = HList('1', HList('2', '3'))
         self.assertEqual(['123'], flatten(obj))
 
+    def test_hlist_collapsing(self):
+        obj = HList()
+        self.assertEqual(obj.objs, [])
+        obj = HList(HList())
+        self.assertEqual(obj.objs, [])
+        obj = HList('1', HList('2', '3'))
+        self.assertEqual(obj.objs, ['1', '2', '3'])
+        obj = HList(['1', '2'], '3', HList('4'))
+        self.assertEqual(obj.objs, ['1', '2', '3', '4'])
+
     def test_indent(self):
         obj = Indent(VList('1', '2'))
         self.assertEqual(['    1', '    2'], flatten(obj))
+
+    def test_indent_collapsing(self):
+        self.assertEqual(Indent().objs, [])
+        self.assertEqual(Indent([]).objs, [])
+        self.assertEqual(Indent(None).objs, [])
+        self.assertEqual(Indent(None, [], VList()).objs, [])
+        self.assertEqual(
+            Indent('1', None, ['2', '3'], VList('4'), VList()).objs,
+            ['1', '2', '3', '4'],
+        )
+
+        # test that indents are *not* collapsed.
+        self.assertEqual(
+            Indent('foo', Indent('bar')).objs, ['foo', Indent('bar')]
+        )
 
     def test_line_too_long(self):
         long_str = (
@@ -307,6 +333,21 @@ class Tests(unittest.TestCase):
         vl += VList('1', '2')
         self.assertEqual(['foo', 'bar', '', 'baz', '1', '2'], flatten(vl))
 
+    def test_vlist_collapsing(self):
+        self.assertEqual(VList().objs, [])
+        self.assertEqual(VList([]).objs, [])
+        self.assertEqual(VList(None).objs, [])
+        self.assertEqual(VList(None, [], VList()).objs, [])
+        self.assertEqual(
+            VList('1', None, ['2', '3'], VList('4'), VList()).objs,
+            ['1', '2', '3', '4'],
+        )
+
+        # test that indents are *not* collapsed.
+        self.assertEqual(
+            VList('foo', Indent('bar')).objs, ['foo', Indent('bar')]
+        )
+
 
 class AsListTests(unittest.TestCase):
     def check(
@@ -332,7 +373,7 @@ class AsListTests(unittest.TestCase):
             Comma('1', '2', Indent('bar')),
             ['comma', '1', '2', ['ind', 'bar']],
             LL('comma', '1', '2', LL('ind', 'bar')),
-            ['[comma 1 2 [ind bar]]'],
+            ["[comma '1' '2' [ind 'bar']]"],
         )
 
     def test_hlist(self):
@@ -340,18 +381,18 @@ class AsListTests(unittest.TestCase):
             HList('foo', Indent('bar')),
             ['hl', 'foo', ['ind', 'bar']],
             LL('hl', 'foo', LL('ind', 'bar')),
-            ['[hl foo [ind bar]]'],
+            ["[hl 'foo' [ind 'bar']]"],
         )
 
     def test_indent(self):
         self.check(
-            Indent('foo'), ['ind', 'foo'], LL('ind', 'foo'), ['[ind foo]']
+            Indent('foo'), ['ind', 'foo'], LL('ind', 'foo'), ["[ind 'foo']"]
         )
         self.check(
             Indent(VList('foo', 'bar')),
-            ['ind', ['vl', 'foo', 'bar']],
-            LL('ind', LL('vl', 'foo', 'bar')),
-            ['[ind [vl foo bar]]'],
+            ['ind', 'foo', 'bar'],
+            LL('ind', 'foo', 'bar'),
+            ["[ind 'foo' 'bar']"],
         )
 
     def test_saw(self):
@@ -359,27 +400,73 @@ class AsListTests(unittest.TestCase):
             Saw('foo', Triangle('(', '4', ')')),
             ['saw', 'foo', ['tri', '(', '4', ')']],
             LL('saw', 'foo', LL('tri', '(', '4', ')')),
-            ["[saw foo [tri '(' 4 ')']]"],
+            ["[saw 'foo' [tri '(' '4' ')']]"],
         )
 
     def test_str(self):
-        self.check('foo', 'foo', 'foo', ['foo'])
-        self.check('foo\n', 'foo\n', 'foo\n', ['foo'])
-        self.check('foo\nbar', 'foo\nbar', 'foo\nbar', ['foo', 'bar'])
-        self.check('foo\nbar\n', 'foo\nbar\n', 'foo\nbar\n', ['foo', 'bar'])
+        self.check('foo', 'foo', 'foo', ["'foo'"])
+        self.check('foo\n', 'foo\n', 'foo\n', ["'foo'"])
+        self.check(
+            'foo\nbar',
+            'foo\nbar',
+            'foo\nbar',
+            ['(', "    'foo'", "    'bar'", ')'],
+        )
+        self.check(
+            'foo\nbar\n',
+            'foo\nbar\n',
+            'foo\nbar\n',
+            ['(', "    'foo'", "    'bar'", ')'],
+        )
 
     def test_tree(self):
         self.check(
             Tree('1', '+', Tree('2', '+', '3')),
             ['tree', '1', '+', ['tree', '2', '+', '3']],
             LL('tree', '1', '+', LL('tree', '2', '+', '3')),
-            ['[tree 1 + [tree 2 + 3]]'],
+            ["[tree '1' '+' [tree '2' '+' '3']]"],
         )
 
     def test_vlist(self):
         self.check(
+            VList(),
+            ['vl'],
+            LL('vl'),
+            ['[vl]'],
+        )
+        self.check(VList([]), ['vl'], LL('vl'), ['[vl]'])
+
+        self.check(
+            VList('1'),
+            ['vl', '1'],
+            LL('vl', '1'),
+            ["[vl '1']"],
+        )
+        self.check(
+            VList('1', '2'),
+            ['vl', '1', '2'],
+            LL('vl', '1', '2'),
+            ["[vl '1' '2']"],
+        )
+
+        self.check(
+            VList('1', None, ['2', '3'], VList('4'), VList()),
+            ['vl', '1', '2', '3', '4'],
+            LL('vl', '1', '2', '3', '4'),
+            ["[vl '1' '2' '3' '4']"],
+        )
+
+        self.check(
+            VList('foo', VList('bar')),
+            ['vl', 'foo', 'bar'],
+            LL('vl', 'foo', 'bar'),
+            ["[vl 'foo' 'bar']"],
+        )
+
+        # test that indents are *not* collapsed.
+        self.check(
             VList('foo', Indent('bar')),
             ['vl', 'foo', ['ind', 'bar']],
             LL('vl', 'foo', LL('ind', 'bar')),
-            ['[vl foo [ind bar]]'],
+            ["[vl 'foo' [ind 'bar']]"],
         )

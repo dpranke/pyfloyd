@@ -84,6 +84,7 @@ t_pop: [fn [lst] [hl lst '.pop()']]
 t_return:  'return'
 t_substr: [fn [s start end] [hl s '[' start ':' end ']']]
 t_throw: [fn [msg] [hl 'raise _ParsingRuntimeError(' msg ')' t_end]]
+t_toplevel_extra_sep: ''
 t_while: [fn [cond body] [block [hl 'while ' cond] body]]
 
 #
@@ -174,7 +175,6 @@ parse_function: d'''
         text.
         """
         return _Parser(text, path).parse(externs, start)
-
     '''  # parse_function
 
 parser_class: @"""
@@ -199,19 +199,19 @@ parser_constructor: @"""
         @if[grammar.lookup_needed 'self._scopes = []']
         @if[grammar.operator_needed
             [vl 'self._operators = {}'
-                [vl_l [map_items operator_state grammar.operators]]]]
+                [map_items operator_state grammar.operators]]]
 
     """  # parser_constructor
 
 externs: [fn [] [if [is_empty grammar.externs]
                     [vl 'self._externs = {}']
                     [vl 'self._externs = {'
-                        [ind_l [map_items [fn [k v]
-                                              [hl [lit k]
-                                                  ": "
-                                                  [if v 'True' 'False']
-                                                  ","]]
-                                          grammar.externs]]
+                        [ind [map_items [fn [k v]
+                                            [hl [lit k]
+                                                ": "
+                                                [if v 'True' 'False']
+                                                ","]]
+                                        grammar.externs]]
                         '}']]]
 
 operator_state: [fn [rule o]
@@ -224,14 +224,14 @@ operator_state: [fn [rule o]
 
 operator_prec_ops: [fn [o]
                        [vl 'o.prec_ops = {'
-                           [ind_l [map [fn [prec]
-                                         [hl [to_string prec]
-                                             ': ['
-                                             [hl_l [map [fn [op] [lit op]]
-                                                        [getitem o.prec_ops prec]
-                                                        ', ']]
-                                             '],']]
-                                       [sort [keys o.prec_ops]]]]
+                           [ind [map [fn [prec]
+                                       [hl [to_string prec]
+                                           ': ['
+                                           [map [fn [op] [lit op]]
+                                                [getitem o.prec_ops prec]
+                                                ', ']
+                                           '],']]
+                                     [sort [keys o.prec_ops]]]]
                            '}']]
 
 operator_rassoc: [fn [o]
@@ -241,12 +241,12 @@ operator_rassoc: [fn [o]
                          '])']]
 
 operator_choices: [fn [o] [vl 'o.choices = {'
-                              [ind_l [map_items [fn [op meth]
-                                                    [hl [lit op]
-                                                        ': self._'
-                                                        meth
-                                                        ',']]
-                                                o.choices]]
+                              [ind [map_items [fn [op meth]
+                                                  [hl [lit op]
+                                                      ': self._'
+                                                      meth
+                                                      ',']]
+                                              o.choices]]
                               '}']]
 
 parse_with_exception: @"""
@@ -293,6 +293,8 @@ parse_without_exception: @"""
 default_footer: null
 
 main_footer: d"""
+
+
     def main(
         argv=sys.argv[1:],
         stdin=sys.stdin,
@@ -315,8 +317,8 @@ main_footer: d"""
         args = arg_parser.parse_args(argv)
 
         if args.code is not None:
-           msg = args.code
-           path = '<code>'
+            msg = args.code
+            path = '<code>'
         elif not args.file or args.file[1] == '-':
             path = '<stdin>'
             fp = stdin

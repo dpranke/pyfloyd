@@ -15,13 +15,12 @@
 from typing import Any
 
 from pyfloyd import (
-    at_exp_parser,
+    at_exp,
     datafile,
     formatter,
     generator,
     grammar as m_grammar,
     lisp_interpreter,
-    string_literal,
     support,
 )
 
@@ -53,19 +52,7 @@ class DatafileGenerator(generator.Generator):
         interp.add_foreign_handler(self._eval_node)
         interp.env.set('grammar', grammar)
         interp.env.set('generator_options', self.options)
-        interp.define_native_fn('at_exp', self.f_at_exp, types=['str'])
-        interp.define_native_fn('comma', self.f_comma)
-        interp.define_native_fn('hl', self.f_hl)
-        interp.define_native_fn('hl_l', self.f_hl_l, types=['list'])
-        interp.define_native_fn('ind', self.f_ind)
-        interp.define_native_fn('ind_l', self.f_ind_l, types=['list'])
         interp.define_native_fn('invoke', self.f_invoke)
-        interp.define_native_fn('lit', self.f_lit)
-        interp.define_native_fn('saw', self.f_saw)
-        interp.define_native_fn('tree', self.f_tree)
-        interp.define_native_fn('tri', self.f_tri)
-        interp.define_native_fn('vl', self.f_vl)
-        interp.define_native_fn('vl_l', self.f_vl_l)
 
         default_template = options.get('template', 'python')
         path = self._find_datafile(default_template)
@@ -77,8 +64,9 @@ class DatafileGenerator(generator.Generator):
             self.options.indent = ' ' * self.options.indent
         self.options.line_length = self.datafile.get('line_length', 79)
 
+        at_exp.bind_at_exps(interp, self.options.indent)
+
         self._process_templates()
-        self._derive_memoize()
         self._derive_local_vars()
 
     def _derive_local_vars(self):
@@ -128,7 +116,17 @@ class DatafileGenerator(generator.Generator):
             if df_key in df:
                 if df_key in self.df_keys_to_merge:
                     for k, v in df[df_key].items():
-                        self.datafile[df_key][k] = v
+                        if (
+                            df_key == 'templates'
+                            and isinstance(v, str)
+                            and '\n' in v
+                        ):
+                            obj = formatter.split_to_objs(
+                                v, self.options.indent
+                            )
+                        else:
+                            obj = v
+                        self.datafile[df_key][k] = obj
                 else:
                     self.datafile[df_key] = df[df_key]
 
@@ -182,42 +180,6 @@ class DatafileGenerator(generator.Generator):
         lines = fmt_fn(obj, self.options.line_length, self.options.indent)
         return '\n'.join(lines) + '\n'
 
-    def f_at_exp(self, args, env) -> Any:
-        exprs, err, _ = at_exp_parser.parse(args[0], '-')
-        lisp_interpreter.check(
-            err is None, f'Unexpected at_exp parse error: {err}'
-        )
-        values = [self._interpreter.eval(expr, env) for expr in exprs]
-        return _process_at_exp_values(values)
-
-    def f_comma(self, args, env) -> Any:
-        del env
-        return formatter.Comma(*args[0])
-
-    def f_hl(self, args, env) -> Any:
-        """Returns an HList of the args passed to the function."""
-        del env
-        return formatter.HList(*args)
-
-    def f_hl_l(self, args, env) -> Any:
-        """Returns an Hlist of the list in the first arg."""
-        del env
-        return formatter.HList(*args[0])
-
-    def f_ind(self, args, env) -> Any:
-        """Returns an indented VList of the args passed to the function."""
-        del env
-        vl = formatter.VList()
-        vl += args
-        return formatter.Indent(vl)
-
-    def f_ind_l(self, args, env) -> Any:
-        """Returns an indented VList of the list in the first arg."""
-        del env
-        vl = formatter.VList()
-        vl += args[0]
-        return formatter.Indent(vl)
-
     def f_invoke(self, args, env) -> Any:
         """Invoke the template named in arg 1, passing it the remaining args."""
         first = self._interpreter.eval(args[0], env)
@@ -225,103 +187,3 @@ class DatafileGenerator(generator.Generator):
         if not lisp_interpreter.is_fn(obj):
             return obj
         return self._interpreter.eval([['symbol', first]] + args[1:], env)
-
-    def f_lit(self, args, env) -> Any:
-        del env
-        return string_literal.encode(args[0])
-
-    def f_saw(self, args, env) -> Any:
-        del env
-        return formatter.Saw(*args[0])
-
-    def f_tree(self, args, env) -> Any:
-        del env
-        return formatter.Tree(*args)
-
-    def f_tri(self, args, env) -> Any:
-        del env
-        return formatter.Triangle(*args)
-
-    def f_vl(self, args, env) -> Any:
-        del env
-        vl = formatter.VList()
-        vl += args
-        return vl
-
-    def f_vl_l(self, args, env) -> Any:
-        del env
-        vl = formatter.VList()
-        vl += args[0]
-        return vl
-
-
-def _process_at_exp_values(values):
-    results = []
-
-    # If the only thing on the line was a newline, keep it.
-    if values == ['\n']:
-        return formatter.VList('')
-
-    # Iterate through the list of objects returned from evaluating the
-    # at-exp string. Whenever we hit a newline, look at the values since
-    # the last newline and decide what to do with them.
-    current_values = []
-    for v in values:
-        if v == '\n':
-            results.extend(_process_one_line_of_values(current_values))
-            current_values = []
-        else:
-            current_values.append(v)
-
-    # Also process any arguments following the last newline (or, all
-    # of the arguments, if there was no newline).
-    if len(current_values) != 0:
-        results.extend(_process_one_line_of_values(current_values))
-    vl = formatter.VList()
-    for result in results:
-        vl += result
-    return vl
-
-
-def _process_one_line_of_values(values):
-    # Drop the line if appropriate (see below). This allows embedded
-    # at-exps and functions to avoid trailing newlines and unwanted
-    # blank lines resulting in the output.
-    if _should_drop_the_line(values):
-        return []
-
-    # If there is just one value on the line and it is a FormatObj, return it.
-    if len(values) == 1 and isinstance(values[0], formatter.FormatObj):
-        return [values[0]]
-
-    # If the set is a series of spaces followed by a FormatObj,
-    # indent and return the format obj.
-    if (
-        len(values) == 2
-        and isinstance(values[0], str)
-        and values[0].isspace()
-        and isinstance(values[1], formatter.FormatObj)
-    ):
-        return [formatter.Indent(values[1])]
-
-    # If everything is a string or an HList, return an HList containing them.
-    if all(isinstance(v, (str, formatter.HList)) for v in values):
-        return [formatter.HList(*values)]
-
-    assert False, f'unexpected line of values: {repr(values)}'
-
-
-# A line of values should be dropped (or skipped) when:
-# - At least one value is either None or a VList with no elements.
-# - Any other values are whitespace.
-def _should_drop_the_line(values):
-    has_empty_value = False
-    has_non_empty_string = False
-    for v in values:
-        if v is None:
-            has_empty_value = True
-        if isinstance(v, formatter.VList) and v.is_empty():
-            has_empty_value = True
-        if isinstance(v, str) and not v.isspace():
-            has_non_empty_string = True
-    return has_empty_value and not has_non_empty_string

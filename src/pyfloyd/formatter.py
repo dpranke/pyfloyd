@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import inspect
 from typing import Any, Callable, Optional, Sequence, Union
 
@@ -32,6 +33,84 @@ class FormatObj:
 
     def __init__(self, *objs):
         self.objs = list(objs)
+
+    def _optimize(self, objs, cls, indent):
+        objs = self._collapse(objs, cls)
+        objs = self._split_objs(objs, indent)
+        objs = self._collapse(objs, cls)
+        objs = self._simplify_hlists(objs)
+        objs = self._merge_indents(objs)
+        return objs
+
+    def _split_objs(self, objs, indent):
+        split_objs = []
+        for obj in objs:
+            if (
+                isinstance(obj, str)
+                and (obj.startswith(' ') or '\n' in obj)
+                and indent is not None
+            ):
+                split_objs.append(split_to_objs(obj, indent))
+            else:
+                split_objs.append(obj)
+        return split_objs
+
+    def _collapse(self, objs, cls):
+        if objs is None:
+            return []
+        new_objs = []
+        for obj in objs:
+            if obj is None:
+                continue
+            if obj.__class__ == cls:
+                new_objs.extend(self._collapse(obj.objs, cls))
+            elif isinstance(obj, list):
+                new_objs.extend(self._collapse(obj, cls))
+            else:
+                new_objs.append(obj)
+        return new_objs
+
+    def _simplify_hlists(self, objs):
+        new_objs = []
+        for obj in objs:
+            if isinstance(obj, HList):
+                if len(obj.objs) == 0:
+                    obj = ''
+                elif len(obj.objs) == 1 and isinstance(obj.objs[0], str):
+                    obj = obj.objs[0]
+                elif all(isinstance(o, str) for o in obj.objs):
+                    obj = ''.join(obj.objs)
+            new_objs.append(obj)
+        return new_objs
+
+    def _merge_indents(self, objs):
+        if not objs:
+            return []
+        new_objs = [objs[0]]
+        for obj in objs[1:]:
+            if isinstance(new_objs[-1], Indent):
+                if isinstance(obj, Indent):
+                    x = new_objs[-1]
+                    y = obj
+                    # Append the objs to the innermost common indent.
+                    while isinstance(x.objs[-1], Indent) and isinstance(
+                        y.objs[-1], Indent
+                    ):
+                        x = x.objs[-1]
+                        y = y.objs[-1]
+                    # Make a copy to keep from modifying the original
+                    # the next time through the loop.
+                    x.objs = x.objs + copy.deepcopy(y.objs)
+                    continue
+                if isinstance(obj, str) and obj == '':
+                    new_objs[-1].objs.append(obj)
+                    continue
+            if isinstance(obj, Indent):
+                new_objs.append(copy.deepcopy(obj))
+            else:
+                new_objs.append(obj)
+        assert _lines(objs) == _lines(new_objs)
+        return new_objs
 
     def __eq__(self, other):
         return (
@@ -63,6 +142,80 @@ class FormatObj:
         raise NotImplementedError
 
 
+# For backward compatibility. TODO: remove this.
+ListObj = FormatObj
+
+
+class HList(FormatObj):
+    tag = 'hl'
+
+    def __init__(self, *objs):
+        super().__init__()
+        new_objs = self._collapse(objs, cls=self.__class__)
+        self.objs = self._simplify_hlists(new_objs)
+
+    def fmt(
+        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
+    ) -> list[str]:
+        lines: list[str] = []
+        if len(self.objs) == 0:
+            return ['']
+
+        lines.extend(fmt_fn(self.objs[0], length, indent))
+        for obj in self.objs[1:]:
+            if obj is None:
+                continue
+            if isinstance(obj, str):
+                lines[-1] += obj
+            else:
+                new_l = None if length is None else length - len(lines[-1])
+                sublines = obj.fmt(new_l, indent, fmt_fn)
+                if sublines:
+                    lines[-1] += sublines[0]
+                    if len(sublines) > 1:
+                        lines.extend(sublines[1:])
+        return lines
+
+
+class VList(FormatObj):
+    tag = 'vl'
+
+    def __init__(self, *objs, indent=None):
+        super().__init__()
+        self.indent = indent
+        self.objs = self._optimize(objs, self.__class__, indent)
+
+    def __iadd__(self, obj):
+        self.objs.extend(self._optimize([obj], self.__class__, self.indent))
+        return self
+
+    def fmt(
+        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
+    ) -> list[str]:
+        lines = []
+        for obj in self.objs:
+            if obj is not None:
+                lines.extend(fmt_fn(obj, length, indent))
+        return lines
+
+
+class Indent(VList):
+    tag = 'ind'
+
+    def __init__(self, *objs, indent=None):
+        super().__init__([], indent=indent)
+        new_objs = self._optimize(objs, VList, indent)
+        self.objs = new_objs
+
+    def fmt(
+        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
+    ) -> list[str]:
+        new_l = _new_length(length, len(indent))
+        lines = super().fmt(new_l, indent, fmt_fn)
+        new_lines = ['' if line == '' else indent + line for line in lines]
+        return new_lines
+
+
 class _MultipleObj(FormatObj):
     "An object that can be formatted in multiple non-trivially different ways."
 
@@ -89,10 +242,6 @@ class _MultipleObj(FormatObj):
         self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
     ) -> list[str]:
         raise NotImplementedError
-
-
-# For backward compatibility. TODO: remove this.
-ListObj = FormatObj
 
 
 class Comma(_MultipleObj):
@@ -140,59 +289,6 @@ class Comma(_MultipleObj):
         return lines
 
 
-class HList(FormatObj):
-    tag = 'hl'
-
-    def __init__(self, *objs):
-        super().__init__()
-        for obj in objs:
-            if isinstance(objs[0], self.__class__) and isinstance(
-                obj, FormatObj
-            ):
-                self.objs.extend(obj.objs)
-            else:
-                self.objs.append(obj)
-
-    def fmt(
-        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> list[str]:
-        lines: list[str] = []
-        if len(self.objs) == 0:
-            return ['']
-
-        lines.extend(fmt_fn(self.objs[0], length, indent))
-        for obj in self.objs[1:]:
-            if obj is None:
-                continue
-            if isinstance(obj, str):
-                lines[-1] += obj
-            else:
-                new_l = None if length is None else length - len(lines[-1])
-                sublines = obj.fmt(new_l, indent, fmt_fn)
-                if sublines:
-                    lines[-1] += sublines[0]
-                    if len(sublines) > 1:
-                        lines.extend(sublines[1:])
-        return lines
-
-
-class Indent(FormatObj):
-    tag = 'ind'
-
-    def fmt(
-        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> list[str]:
-        new_l = None if length is None else length - len(indent)
-        lines = []
-        assert len(self.objs) > 0 and isinstance(self.objs[0], FormatObj)
-        for line in self.objs[0].fmt(new_l, indent, fmt_fn):
-            if line:
-                lines.append(indent + line)
-            else:
-                lines.append(line)
-        return lines
-
-
 class LispList(_MultipleObj):
     """Format as a list, lisp-style.
 
@@ -215,10 +311,8 @@ class LispList(_MultipleObj):
     ) -> Optional[str]:
         s = '['
         if self.objs:
-            r = _fmt_single_line(self.objs[0], length, indent, fmt_fn)
-            if r is None:
-                return r
-            s += r
+            # r = _fmt_single_line(self.objs[0], length, indent, fmt_fn)
+            s += self.objs[0]
             if len(self.objs) > 1:
                 for obj in self.objs[1:]:
                     if obj is None:
@@ -436,26 +530,6 @@ class Tree(_MultipleObj):
         return lines
 
 
-class VList(FormatObj):
-    tag = 'vl'
-
-    def __iadd__(self, obj):
-        if isinstance(obj, list):
-            self.objs.extend(obj)
-        else:
-            self.objs.append(obj)
-        return self
-
-    def fmt(
-        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> list[str]:
-        lines = []
-        for obj in self.objs:
-            if obj is not None:
-                lines.extend(fmt_fn(obj, length, indent))
-        return lines
-
-
 def _fmt(obj: El, length: Union[int, None], indent: str) -> list[str]:
     if obj is None:
         return []
@@ -490,10 +564,13 @@ def _fmt_quote(obj: El, length: Union[int, None], indent: str) -> list[str]:
     if obj is None:
         return []
     if isinstance(obj, str):
-        return [
-            datafile.encode_string(line, escape_newlines=True)
+        lines = [
+            datafile.encode_quoted_string(line, escape_newlines=True)
             for line in splitlines(obj)
         ]
+        if len(lines) > 1:
+            return ['('] + [indent + line for line in lines] + [')']
+        return lines
     return obj.fmt(length, indent, _fmt_quote)
 
 
@@ -555,6 +632,19 @@ def from_list(obj: Any) -> El:
     return cls(*args)
 
 
+def split_to_objs(s, indent):
+    objs = []
+    lines = splitlines(s)
+    for line in lines:
+        level = indent_level(line, indent)
+        obj = line[len(indent) * level :]
+        while level > 0:
+            obj = Indent(obj)
+            level -= 1
+        objs.append(obj)
+    return VList(objs)
+
+
 def splitlines(s, skip_empty=False):
     if s == '':
         if skip_empty:
@@ -572,3 +662,24 @@ def splitlines(s, skip_empty=False):
 
 def _new_length(l1: Union[int, None], l2: int) -> Union[int, None]:
     return l1 if l1 is None else l1 - l2
+
+
+def indent_level(obj, indent: str) -> int:
+    if isinstance(obj, str):
+        while obj.startswith(indent):
+            return 1 + indent_level(obj[len(indent) :], indent)
+    elif isinstance(obj, HList):
+        return indent_level(obj.objs[0], indent)
+    return 0
+
+
+def _lines(objs):
+    i = 0
+    for obj in objs:
+        if isinstance(obj, list):
+            i += _lines(obj)
+        elif isinstance(obj, FormatObj):
+            i += _lines(obj.objs)
+        else:
+            i += 1
+    return i

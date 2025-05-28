@@ -22,11 +22,11 @@ class _ParsingRuntimeError(Exception):
 class Result(NamedTuple):
     """The result returned from a `parse()` call.
 
-    If the parse is successful, `val` will contain the returned value, if any
-    and `pos` will indicate the point in the text where the parser stopped.
-    If the parse is unsuccessful, `err` will contain a string describing
-    any errors that occurred during the parse and `pos` will indicate
-    the location of the farthest error in the text.
+    If the parse is successful, `val` will contain the returned value, if
+    any and `pos` will indicate the point in the text where the parser
+    stopped.  If the parse is unsuccessful, `err` will contain a string
+    describing any errors that occurred during the parse and `pos` will
+    indicate the location of the farthest error in the text.
     """
 
     val: Any = None
@@ -466,7 +466,6 @@ class _Parser:
         self._o_succeed(self._fn_cons(v__3, v__4))
 
     def _s_list_2(self):
-        pos = self._pos
         self._o_memoize('r_ws', self._r_ws)
         if self._failed:
             self._o_succeed([])
@@ -491,7 +490,6 @@ class _Parser:
         self._o_memoize('r_expr', self._r_expr)
 
     def _s_list_5(self):
-        pos = self._pos
         self._o_memoize('r_ws', self._r_ws)
         if self._failed:
             self._o_succeed([])
@@ -509,7 +507,6 @@ class _Parser:
         self._o_succeed([])
 
     def _s_list_7(self):
-        pos = self._pos
         self._o_memoize('r_ws', self._r_ws)
         if self._failed:
             self._o_succeed([])
@@ -586,17 +583,6 @@ class _Parser:
         self._val = None
         self._failed = True
         self._errpos = max(self._errpos, self._pos)
-
-    def _o_memoize(self, rule_name, fn):
-        pos = self._pos
-        if pos not in self._cache:
-            self._cache[pos] = {}
-        c = self._cache[pos]
-        if rule_name in c:
-            self._val, self._failed, self._pos = c[rule_name]
-            return
-        fn()
-        c[rule_name] = (self._val, self._failed, self._pos)
 
     def _o_memoize(self, rule_name, fn):
         pos = self._pos

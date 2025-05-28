@@ -135,36 +135,40 @@ extern: null
 generate: @"""
     @if[generator_options.main [main_header] [default_header]]
     @if[grammar.exception_needed 
-        [vl '' '' parsing_runtime_exception_class]]
+        [vl '' t_toplevel_extra_sep parsing_runtime_exception_class]]
     @if[grammar.operators
-        [vl '' '' operator_state_class]]
+        [vl '' t_toplevel_extra_sep operator_state_class]]
 
+    @t_toplevel_extra_sep
     @result_class
 
+    @t_toplevel_extra_sep
     @parse_function
 
+    @t_toplevel_extra_sep
     @parser_class[]
     @if[generator_options.main main_footer default_footer]
     """
 
 parser_methods: [fn [] [vl [parser_constructor]
+
                            [parse_method]
-                           [vl_l [map_items [fn [rule node]
-                                                [vl ''
-                                                    [rule_method rule node]]]
-                                            grammar.rules]]
-                           [vl_l [map [fn [name]
-                                          [vl '\n'
-                                              [invoke [strcat 'r_' name]]]]
-                                      grammar.needed_builtin_rules]]
-                           [vl_l [map [fn [name]
+                           [map_items [fn [rule node]
                                           [vl ''
-                                              [invoke [op_name name]]]]
-                                      grammar.needed_operators]]
-                           [vl_l [map [fn [name]
-                                          [vl '\n'
-                                              [invoke [fn_name name]]]]
-                                      grammar.needed_builtin_functions]]]]
+                                              [rule_method rule node]]]
+                                      grammar.rules]
+                           [map [fn [name]
+                                    [vl ''
+                                        [invoke [strcat 'r_' name]]]]
+                                grammar.needed_builtin_rules]
+                           [map [fn [name]
+                                    [vl ''
+                                        [invoke [op_name name]]]]
+                                grammar.needed_operators]
+                           [map [fn [name]
+                                    [vl ''
+                                        [invoke [fn_name name]]]]
+                                grammar.needed_builtin_functions]]]
 
 parse_method: [fn [] [if grammar.exception_needed
                          [parse_with_exception]
@@ -184,10 +188,10 @@ n_apply: [fn [node]
                  [hl [call_rule node.rule_name q[]] t_end]]]
 
 n_choice: [fn [node] [vl [t_assign 'pos' f_pos]
-                         [vl_l [map [fn [c] [vl [stmts c]
-                                                [return_if_not_failed c]
-                                                [rewind 'pos']]]
-                                    [slice node.ch 0 -1]]]
+                         [map [fn [c] [vl [stmts c]
+                                          [return_if_not_failed c]
+                                          [rewind 'pos']]]
+                              [slice node.ch 0 -1]]
                          [stmts [getitem node.ch -1]]]]
 
 n_count: [fn [node] [vl [t_assign 'vs' '[]']
@@ -277,8 +281,7 @@ n_not_one: [fn [node] [vl [n_not node]
 
 n_operator: [fn [node] [hl [call_op 'operator' [list [lit node.v]] t_end]]]
 
-n_opt: [fn [node] [vl [t_assign 'pos' f_pos]
-                      [stmts node.child]
+n_opt: [fn [node] [vl [stmts node.child]
                       [t_ifelse failed
                                 [vl [succeed '[]']]
                                 [vl [succeed [hl '[' f_val ']']]]]]]
@@ -324,9 +327,9 @@ n_seq: [fn [node]
            [vl [t_declare_vars [map [fn [v] [local_var v]] node.vars]]
                [stmts [getitem node.ch 0]]
                [return_if_failed [getitem node.ch 0]]
-               [vl_l [map [fn [c] [vl [stmts c]
-                                      [return_if_failed c]]]
-                          [slice node.ch 1 -1]]]
+               [map [fn [c] [vl [stmts c]
+                                [return_if_failed c]]]
+                    [slice node.ch 1 -1]]
                [stmts [getitem node.ch -1]]]]
 
 n_star: [fn [node]
