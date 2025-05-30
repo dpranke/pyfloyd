@@ -224,12 +224,12 @@ class _MultipleObj(FormatObj):
     ) -> list[str]:
         """Returns a list of strings, each representing a line."""
         s = self.fmt_single_line(None, indent, fmt_fn)
-        if s is not None and (length is None or len(s) < length):
+        if s is not None and (length is None or len(s) <= length):
             return [s]
         lines = self.fmt_multiple_lines(None, indent, fmt_fn)
         if length is None:
             return lines
-        if all((line is not None and len(line) < length) for line in lines):
+        if all((line is not None and len(line) <= length) for line in lines):
             return lines
         return self.fmt_multiple_lines(length, indent, fmt_fn)
 
@@ -381,19 +381,27 @@ class Saw(_MultipleObj):
     tag = 'saw'
 
     def __init__(self, s, *args):
-        super().__init__(s, *args)
+        super().__init__()
+        assert isinstance(s, (str, Triangle))
         for arg in args:
             assert isinstance(arg, Triangle)
+
+        if isinstance(s, str):
+            objs = [s]
+        else:
+            objs = list(s.objs)
+        for arg in args:
+            objs[-1] += arg.objs[0]
+            objs.append(arg.objs[1])
+            objs.append(arg.objs[2])
+        self.objs = objs
 
     def fmt_single_line(
         self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
     ) -> Optional[str]:
-        s = _fmt_single_line(self.objs[0], length, indent, fmt_fn)
-        if s is None:
-            return s
-        for obj in self.objs[1:]:
-            new_l = _new_length(length, len(s))
-            r = _fmt_single_line(obj, new_l, indent, fmt_fn)
+        s = ''
+        for obj in self.objs:
+            r = _fmt_single_line(obj, length, indent, fmt_fn)
             if r is None:
                 return r
             s += r
@@ -402,17 +410,27 @@ class Saw(_MultipleObj):
     def fmt_multiple_lines(
         self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
     ) -> list[str]:
-        t = self.objs[1]
-        assert isinstance(t, Triangle)
-        assert isinstance(t.left, str)
         lines = fmt_fn(self.objs[0], length, indent)
-        for obj in self.objs[1:]:
-            new_l = _new_length(length, len(lines[-1]))
-            sub_lines = fmt_fn(obj, new_l, indent)
-            lines[-1] += sub_lines[0]
-            lines.extend(indent + line for line in sub_lines[1:-1])
-            if len(sub_lines) > 1:
-                lines.append(sub_lines[-1])
+        i = 1
+        while i < len(self.objs) - 1:
+            offset = len(lines[-1]) + len(self.objs[i + 1])
+            new_l = _new_length(length, offset)
+            sub_lines = fmt_fn(self.objs[i], new_l, indent)
+            if (
+                length
+                and len(sub_lines) == 1
+                and len(lines[-1]) + offset <= length
+            ):
+                lines[-1] += sub_lines[0] + self.objs[i + 1]
+                i += 2
+                continue
+            assert indent is not None
+            new_l = _new_length(length, len(indent))
+            lines.extend(
+                indent + line for line in fmt_fn(self.objs[i], new_l, indent)
+            )
+            lines.append(self.objs[i + 1])
+            i += 2
         return lines
 
 

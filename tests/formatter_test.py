@@ -66,6 +66,87 @@ class Tests(unittest.TestCase):
             repr(Comma('1', Triangle('[', Comma('2'), ']'))),
         )
 
+    def test_complex(self):
+        obj = Saw(
+            'self._o_succeed',
+            Triangle(
+                '(',
+                Triangle(
+                    '[',
+                    Comma(
+                        Saw(
+                            'self._fn_strcat',
+                            Triangle(
+                                '(',
+                                Comma(
+                                    "'L'",
+                                    Saw(
+                                        'self._o_lookup',
+                                        Triangle('(', Comma("'lq'"), ')'),
+                                    ),
+                                ),
+                                ')',
+                            ),
+                        ),
+                        'v_c',
+                        'v_s',
+                    ),
+                    ']',
+                ),
+                ')',
+            ),
+        )
+        self.assertEqual(
+            [
+                (
+                    "self._o_succeed([self._fn_strcat('L', "
+                    "self._o_lookup('lq')), v_c, v_s])"
+                ),
+            ],
+            flatten(obj, 71),
+        )
+
+    def test_complex_2(self):
+        lines = flatten(
+            Saw(
+                'self._succeed',
+                Triangle(
+                    '(',
+                    Saw(
+                        'self.xtou',
+                        Triangle(
+                            '(',
+                            Comma(
+                                Tree(
+                                    "self._get('long_variable_1')",
+                                    '+',
+                                    Tree(
+                                        "self._get('long_variable_2')",
+                                        '+',
+                                        "self._get('long_variable_3')",
+                                    ),
+                                )
+                            ),
+                            ')',
+                        ),
+                    ),
+                    ')',
+                ),
+            )
+        )
+        self.assertEqual(
+            [
+                'self._succeed(',
+                '    self.xtou(',
+                "        self._get('long_variable_1')",
+                "        + self._get('long_variable_2')",
+                "        + self._get('long_variable_3')",
+                '    )',
+                ')',
+            ],
+            lines,
+        )
+
     def test_from_list(self):
         obj = [
             'comma',
@@ -153,47 +234,6 @@ class Tests(unittest.TestCase):
             flatten(lis, length=14),
         )
 
-    def test_mix(self):
-        lines = flatten(
-            Saw(
-                'self._succeed',
-                Triangle(
-                    '(',
-                    Saw(
-                        'self.xtou',
-                        Triangle(
-                            '(',
-                            Comma(
-                                Tree(
-                                    "self._get('long_variable_1')",
-                                    '+',
-                                    Tree(
-                                        "self._get('long_variable_2')",
-                                        '+',
-                                        "self._get('long_variable_3')",
-                                    ),
-                                )
-                            ),
-                            ')',
-                        ),
-                    ),
-                    ')',
-                ),
-            )
-        )
-        self.assertEqual(
-            [
-                'self._succeed(',
-                '    self.xtou(',
-                "        self._get('long_variable_1')",
-                "        + self._get('long_variable_2')",
-                "        + self._get('long_variable_3')",
-                '    )',
-                ')',
-            ],
-            lines,
-        )
-
     def test_saw(self):
         # test short triangle cases.
         t = Saw('foo', Triangle('(', '0', ')'))
@@ -202,9 +242,13 @@ class Tests(unittest.TestCase):
         t = Saw('foo', Triangle('(', '0', ')'), Triangle('(', '0', ')'))
         self.assertEqual(['foo(0)(0)'], flatten(t))
 
+        # Test case where the first arg isn't a string.
+        t = Saw(Triangle('[', Comma('1'), ']'), Triangle('[', '0', ']'))
+        self.assertEqual(['[1][0]'], flatten(t))
+
         # Test the three different cases for a saw with one long triangle.
         t = Saw(
-            'foo',
+            'foobar',
             Triangle(
                 '(',
                 Comma(
@@ -218,33 +262,35 @@ class Tests(unittest.TestCase):
         )
         self.assertEqual(
             [
-                'foo(self._long_rule_1, self._long_rule_2, self._long_3, '
-                'self._long4)',
+                (
+                    'foobar(self._long_rule_1, self._long_rule_2, self._long_3, '
+                    'self._long4)'
+                ),
             ],
-            flatten(t, length=75),
+            flatten(t, length=74),
         )
 
         self.assertEqual(
             [
-                'foo(',
+                'foobar(',
                 (
                     '    self._long_rule_1, self._long_rule_2, self._long_3, '
                     'self._long4'
                 ),
                 ')',
             ],
-            flatten(t, length=67),
+            flatten(t, length=70),
         )
         self.assertEqual(
             [
-                'foo(',
+                'foobar(',
                 '    self._long_rule_1,',
                 '    self._long_rule_2,',
                 '    self._long_3,',
                 '    self._long4,',
                 ')',
             ],
-            flatten(t, length=60),
+            flatten(t, length=66),
         )
 
         t = Saw(
@@ -398,9 +444,15 @@ class AsListTests(unittest.TestCase):
     def test_saw(self):
         self.check(
             Saw('foo', Triangle('(', '4', ')')),
-            ['saw', 'foo', ['tri', '(', '4', ')']],
-            LL('saw', 'foo', LL('tri', '(', '4', ')')),
-            ["[saw 'foo' [tri '(' '4' ')']]"],
+            ['saw', 'foo(', '4', ')'],
+            LL('saw', 'foo(', '4', ')'),
+            ["[saw 'foo(' '4' ')']"],
+        )
+        self.check(
+            Saw('foo', Triangle('(', '4', ')'), Triangle('[', 'a', ']')),
+            ['saw', 'foo(', '4', ')[', 'a', ']'],
+            LL('saw', 'foo(', '4', ')[', 'a', ']'),
+            ["[saw 'foo(' '4' ')[' 'a' ']']"],
         )
 
     def test_str(self):
