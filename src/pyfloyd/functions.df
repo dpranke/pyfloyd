@@ -210,6 +210,13 @@ functions = {
               """
         body: 'return x == y'
     }
+    ftoa: {
+        params: [[f float]]
+        ret: str
+        doc: d"""Returns the string representation of the floating point
+             number."""
+        body: 'return str(f)'
+    }
     ftoi: {
         params: [[f float]]
         ret: int

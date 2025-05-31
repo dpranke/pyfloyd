@@ -73,6 +73,10 @@ given types (using Python's type annotation syntax):
 * `equal(x: any, y: any) -> bool`<br>
     Returns whether the two values are equal.
 
+* `ftoa(f: float) -> str`<br>
+        Returns the string representation of the floating point
+    number.
+
 * `ftoi(f: float) -> int`<br>
     Returns the integer equivalent of the floating point number.
     Values are truncated towards zero (i.e., `int(3.5)` returns
