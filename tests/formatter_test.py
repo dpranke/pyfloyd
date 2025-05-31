@@ -18,10 +18,10 @@ from pyfloyd.formatter import (
     flatten,
     flatten_as_lisplist,
     from_list,
-    # process_indents,
     to_list,
     to_lisplist,
     Comma,
+    Hang,
     HList,
     Indent,
     LispList as LL,
@@ -29,6 +29,7 @@ from pyfloyd.formatter import (
     Triangle,
     Tree,
     VList,
+    Wrap,
 )
 
 
@@ -169,6 +170,30 @@ class Tests(unittest.TestCase):
             VList('12', '13'),
         )
         self.assertEqual(lis, expected_obj)
+
+    def test_hang(self):
+        obj = Hang([], ' ')
+        self.assertEqual([], flatten(obj))
+
+        obj = Hang(['1'], ' ')
+        self.assertEqual(['1'], flatten(obj))
+
+        obj = Hang(['1', '2'], ' ')
+        self.assertEqual(['1 2'], flatten(obj))
+
+        obj = Hang(['very', 'long', 'argument'], ' ')
+        self.assertEqual(['very long argument'], flatten(obj, length=None))
+        self.assertEqual(['very long argument'], flatten(obj, length=50))
+        self.assertEqual(
+            ['very long', '     argument'], flatten(obj, length=10)
+        )
+
+        # Test that the first two arguments are always on the first line,
+        # even if that makes the line be too long.
+        self.assertEqual(
+            ['very long', '     argument'], flatten(obj, length=6)
+        )
+
 
     def test_hlist(self):
         obj = HList()
@@ -393,6 +418,38 @@ class Tests(unittest.TestCase):
         self.assertEqual(
             VList('foo', Indent('bar')).objs, ['foo', Indent('bar')]
         )
+
+    def test_wrap(self):
+        args = ['prefix ', ' suffix', 'first  ', ' last  ']
+
+        w = Wrap('str', *args)
+        self.assertEqual(['first  str last'], flatten(w))
+
+        w = Wrap(HList(), *args)
+        self.assertEqual(['first   last'], flatten(w))
+
+        w = Wrap(HList('foo', 'bar'), *args)
+        self.assertEqual(['first  foobar last'], flatten(w))
+
+        w = Wrap(VList('foo', 'bar'), *args)
+        self.assertEqual(
+            [
+                'first  foo suffix',
+                'prefix bar last'
+            ],
+            flatten(w)
+        )
+
+        w = Wrap(Hang(['foo', 'bar', 'baz'], ' '), '#  ', ' \\', '# `', '`')
+        self.assertEqual(['# `foo bar baz`'], flatten(w))
+        self.assertEqual(
+            [
+                '# `foo bar \\',
+                '#      baz`'
+            ],
+            flatten(w, length=10)
+        )
+
 
 
 class AsListTests(unittest.TestCase):

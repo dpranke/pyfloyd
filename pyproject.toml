@@ -90,6 +90,11 @@ disable = [
    "too-many-locals",
    "too-many-public-methods",
    "too-many-return-statements",
+
+   # This will potentially complain on correct code like
+   #  `foo, bar = baz` if baz is a list, and there's no way to
+   # tell it that this is correct other than disabling the warning :(.
+   "unbalanced-tuple-unpacking",
 ]
 
 [tool.pylint.reports]

@@ -2,6 +2,7 @@
 #    https://github.com/dpranke/pyfloyd
 #
 #    `pyfloyd -o src/pyfloyd/lisp_parser.py grammars/lisp.g`
+#
 
 import re
 from typing import Any, Dict, NamedTuple, Optional

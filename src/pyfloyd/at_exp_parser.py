@@ -2,6 +2,7 @@
 #    https://github.com/dpranke/pyfloyd
 #
 #    `pyfloyd -o src/pyfloyd/at_exp_parser.py grammars/at_exp.g`
+#
 
 import re
 from typing import Any, Dict, NamedTuple, Optional

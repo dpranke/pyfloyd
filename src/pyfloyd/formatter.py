@@ -31,8 +31,9 @@ _FmtFn = Callable[[El, Union[None, int], str], list[str]]
 class FormatObj:
     tag: str = ''
 
-    def __init__(self, *objs):
+    def __init__(self, *objs, indent=None):
         self.objs = list(objs)
+        self.indent = indent
 
     def _optimize(self, objs, cls, indent):
         objs = self._collapse(objs, cls)
@@ -147,10 +148,17 @@ ListObj = FormatObj
 
 
 class HList(FormatObj):
+    """Takes a list of objects and lays them out horizontally.
+
+    The objects are considered to be atomic concatenated and will not be
+    split by subsequent formatting, but any object that can be formatted
+    multiple ways itself will be handled. If any object produces multiple
+    lines, subsequent objects will be laid out on the same last line."""
+
     tag = 'hl'
 
-    def __init__(self, *objs):
-        super().__init__()
+    def __init__(self, *objs, indent=None):
+        super().__init__(indent=indent)
         new_objs = self._collapse(objs, cls=self.__class__)
         self.objs = self._simplify_hlists(new_objs)
 
@@ -178,6 +186,8 @@ class HList(FormatObj):
 
 
 class VList(FormatObj):
+    """Takes a list of objects and lays them out vertically."""
+
     tag = 'vl'
 
     def __init__(self, *objs, indent=None):
@@ -196,6 +206,40 @@ class VList(FormatObj):
         for obj in self.objs:
             if obj is not None:
                 lines.extend(fmt_fn(obj, length, indent))
+        return lines
+
+
+class Wrap(FormatObj):
+    """Wraps an object with text on both sides.
+
+    It takes an object and four parameters: the text to use as a prefix on
+    most lines, the text to use as a suffix on most lines, the text to use
+    as a prefix on just the first line, and the text to use as the suffix
+    on the last line. The two prefix strings must be the same length.
+    The two suffix strings may be different lengths. Any trailing whitespace
+    will be stripped."""
+
+    tag = 'wrap'
+
+    def __init__(self, *objs, indent=None):
+        super().__init__(*objs, indent=indent)
+        assert len(objs) == 5
+
+    def fmt(self, length: Union[int, None], indent: str, fmt_fn: _FmtFn):
+        obj, prefix, suffix, first, last = self.objs
+        new_l = _new_length(length, len(prefix) + max(len(suffix), len(last)))
+        sub_lines = fmt_fn(obj, new_l, indent)
+        if not sub_lines:
+            return sub_lines
+
+        if len(sub_lines) == 1:
+            lines = [(first + sub_lines[0] + last).rstrip()]
+        else:
+            lines = [(first + sub_lines[0] + suffix).rstrip()]
+            for line in sub_lines[1:-1]:
+                lines.append((prefix + line + suffix).rstrip())
+            lines.append((prefix + sub_lines[-1] + last).rstrip())
+
         return lines
 
 
@@ -243,6 +287,52 @@ class _MultipleObj(FormatObj):
         self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
     ) -> list[str]:
         raise NotImplementedError
+
+
+class Hang(FormatObj):
+    """Wrap a list of objects across multiple lines, separating them
+    with a given separator.
+
+    The second and subsequent lines will be indented to align with the
+    *second* argument, e.g. .[foo bar baz] will format as
+
+        [foo bar
+             baz]
+
+    """
+
+    tag = 'hang'
+
+    def fmt(
+        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
+    ) -> list[str]:
+        objs = self.objs[0]
+        sep = self.objs[1]
+        if len(objs) == 0:
+            return []
+
+        lines: list[str] = []
+        lines.extend(fmt_fn(objs[0], length, indent))
+        hang = len(lines[-1]) + 1
+        if len(objs) > 1:
+            second = fmt_fn(objs[1], length, indent)
+            assert len(second) == 1
+            lines[-1] += sep + second[0]
+            for obj in objs[2:]:
+                if obj is None:
+                    continue
+
+                # NOTE: Don't know how to handle anything where a single obj
+                # requires multiple lines.
+                new_l = _new_length(length, len(lines[-1]) - len(sep))
+                sublines = fmt_fn(obj, None, indent)
+                assert len(sublines) == 1
+                if not new_l or len(sublines[0]) < new_l:
+                    lines[-1] += sep + sublines[0]
+                    continue
+                lines[-1] += sep
+                lines.append(' ' * hang + sublines[0])
+        return [line.rstrip() for line in lines]
 
 
 class Comma(_MultipleObj):
@@ -381,8 +471,8 @@ class Saw(_MultipleObj):
 
     tag = 'saw'
 
-    def __init__(self, s, *args):
-        super().__init__()
+    def __init__(self, s, *args, indent=None):
+        super().__init__(indent=indent)
         assert isinstance(s, (str, Triangle))
         for arg in args:
             assert isinstance(arg, Triangle)
@@ -438,8 +528,8 @@ class Saw(_MultipleObj):
 class Triangle(_MultipleObj):
     tag = 'tri'
 
-    def __init__(self, left, mid, right):
-        super().__init__(left, mid, right)
+    def __init__(self, left, mid, right, indent=None):
+        super().__init__(left, mid, right, indent=indent)
         self.left, self.mid, self.right = left, mid, right
         assert isinstance(self.objs[0], str)
         assert isinstance(self.objs[2], str)
@@ -477,8 +567,8 @@ class Tree(_MultipleObj):
 
     tag = 'tree'
 
-    def __init__(self, left, op, right):
-        super().__init__(left, op, right)
+    def __init__(self, left, op, right, indent=None):
+        super().__init__(left, op, right, indent=indent)
         self.left, self.op, self.right = left, op, right
 
     def fmt_single_line(

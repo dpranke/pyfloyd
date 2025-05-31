@@ -38,6 +38,7 @@ class AtExprHandler:
         self.use_format_objs = use_format_objs
         interp.define_native_fn('at_exp', self.f_at_exp, types=['str'])
         interp.define_native_fn('comma', self.f_comma)
+        interp.define_native_fn('hang', self.f_hang)
         interp.define_native_fn('hl', self.f_hl)
         interp.define_native_fn('ind', self.f_ind)
         interp.define_native_fn('lit', self.f_lit)
@@ -45,6 +46,7 @@ class AtExprHandler:
         interp.define_native_fn('tree', self.f_tree)
         interp.define_native_fn('tri', self.f_tri)
         interp.define_native_fn('vl', self.f_vl)
+        interp.define_native_fn('wrap', self.f_wrap)
         interp.add_foreign_handler(self._eval_format_obj)
 
     def _eval_format_obj(
@@ -69,6 +71,10 @@ class AtExprHandler:
     def f_comma(self, args, env) -> Any:
         del env
         return formatter.Comma(*args[0])
+
+    def f_hang(self, args, env) -> Any:
+        del env
+        return formatter.Hang(*args, indent=self.indent)
 
     def f_hl(self, args, env) -> Any:
         del env
@@ -98,6 +104,10 @@ class AtExprHandler:
     def f_vl(self, args, env) -> Any:
         del env
         return formatter.VList(args, indent=self.indent)
+
+    def f_wrap(self, args, env) -> Any:
+        del env
+        return formatter.Wrap(*args, indent=self.indent)
 
 
 def process_values(values, indent):

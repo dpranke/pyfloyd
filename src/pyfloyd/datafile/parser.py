@@ -2,6 +2,7 @@
 #    https://github.com/dpranke/pyfloyd
 #
 #    `pyfloyd -o src/pyfloyd/datafile/parser.py grammars/datafile.g`
+#
 
 import re
 from typing import Any, Dict, NamedTuple, Optional

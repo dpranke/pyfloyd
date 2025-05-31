@@ -57,6 +57,14 @@ templates = {
 # Helper methods
 #
 
+# Formats the command line used to generate the output.
+wrap_argv: [fn [first prefix]
+               [wrap [hang [cons 'pyfloyd' generator_options.argv] ' ']
+                     prefix
+                     ' \\'
+                     first
+                     '`']]
+
 # Returns a method definition, assuming nothing about the name of the
 # method. The param_names should be a list of strings, and the body
 # is the method text; the body may span multiple lines.
