@@ -37,27 +37,6 @@ from pyfloyd import functions
 from . import parser
 
 
-class ArgparseStoreAction(argparse.Action):
-    def __call__(self, *args, **kwargs):
-        _, namespace, text, flag = args
-        d = loads(text)
-        if not isinstance(d, dict):
-            raise ValueError(f'Bad option string for {flag}: {repr(text)}')
-        setattr(namespace, self.dest, d)
-
-
-class ArgparseAppendAction(argparse.Action):
-    def __call__(self, *args, **kwargs):
-        _, namespace, text, flag = args
-        opts = getattr(namespace, self.dest, {})
-        opts = opts or {}
-        d = loads(text)
-        if not isinstance(d, dict):
-            raise ValueError(f'Bad option string for {flag}: {repr(text)}')
-        opts.update(d)
-        setattr(namespace, self.dest, opts)
-
-
 class DatafileError(ValueError):
     """Exception raised when a datafile is semantically invalid.
 

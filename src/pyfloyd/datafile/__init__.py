@@ -61,8 +61,6 @@ from .api import (  # noqa: F401 (unused-import)
     load,
     loads,
     parse,
-    ArgparseAppendAction,
-    ArgparseStoreAction,
     DatafileError,
     DatafileParseError,
     Decoder,

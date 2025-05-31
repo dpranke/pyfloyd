@@ -47,11 +47,13 @@ grammars: dict[str, str] = {
 
 templates: dict[str, list] = {
     'docs/functions.md': [
+        '-t',
         '-T',
         'docs/functions.md.dft',
         'src/pyfloyd/functions.df',
     ],
     'src/pyfloyd/functions.py': [
+        '-t',
         '-T',
         'src/pyfloyd/functions.py.dft',
         'src/pyfloyd/functions.df',

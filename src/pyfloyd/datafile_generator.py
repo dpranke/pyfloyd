@@ -77,7 +77,7 @@ class DatafileGenerator(generator.Generator):
         self.name = self.data.name
         self.ext = self.data.ext
 
-        at_exp.bind_at_exps(interp, self.data.indent)
+        at_exp.bind_at_exps(interp, self.indent)
         for k, v in self.data.items():
             if k != 'templates':
                 interp.env.set(k, v)
@@ -204,12 +204,12 @@ class DatafileGenerator(generator.Generator):
     def generate(self) -> str:
         obj = self._interpreter.eval([['symbol', self.data.starting_template]])
         if self.options.as_json:
-            return json.dumps(obj.to_list(), indent=self.options.indent)
+            return json.dumps(obj.to_list(), indent=self.indent)
         if self.options.output_as_format_tree:
             fmt_fn = formatter.flatten_as_lisplist
         else:
             fmt_fn = formatter.flatten
-        lines = fmt_fn(obj, self.options.line_length, self.options.indent)
+        lines = fmt_fn(obj, self.options.line_length, self.indent)
         return '\n'.join(lines) + '\n'
 
     def f_invoke(self, args, env) -> Any:

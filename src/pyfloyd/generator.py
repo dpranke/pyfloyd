@@ -34,7 +34,6 @@ class GeneratorOptions(attr_dict.AttrDict):
         self.command_line = ''
         self.dialect = ''
         self.generator = pyfloyd.DEFAULT_GENERATOR
-        self.generator_options = {}
         self.indent = None
         self.language = None
         self.line_length = None
@@ -86,27 +85,29 @@ class Generator:
         self.options = self.data.generator_options
 
         if self.options.indent is not None:
+            if isinstance(self.options.indent, int):
+                self.data.indent = ' ' * self.options.indent
+            else:
+                self.data.indent = self.options.indent
+            self.indent = self.data.indent
+        elif self.data.indent is not None:
             if isinstance(self.data.indent, int):
                 self.data.indent = ' ' * self.data.indent
             self.indent = self.data.indent
         else:
             if isinstance(self.indent, int):
                 self.indent = ' ' * self.indent
-            self.options.indent = self.indent
             self.data.indent = self.indent
 
         if self.options.line_length is not None:
-            self.line_length = self.options.line_length
-            self.data.line_length = self.line_length
+            self.line_length = self.data.line_length = self.options.line_length
+        elif self.data.line_length is not None:
+            self.line_length = self.data.line_length
         else:
-            self.options.line_length = self.line_length
+            self.data.line_length = self.line_length
 
-        assert (self.indent == self.data.indent) and (
-            self.indent == self.options.indent
-        )
-        assert (self.line_length == self.data.line_length) and (
-            self.line_length == self.options.line_length
-        )
+        assert self.indent == self.data.indent
+        assert self.line_length == self.data.line_length
 
     def _process_grammar(self, local_var_map):
         grammar = self.data.grammar
@@ -198,20 +199,21 @@ def add_arguments(
     parser.add_argument(
         '--indent',
         action='store',
-        default=options.indent,
+        default=None,
         help='indentation to use in output (default is language-specific)',
     )
     parser.add_argument(
         '-L',
         '--dialect',
         action='store',
-        default=options.dialect,
+        default=None,
         help='Dialect (variant) of the language or template to use',
     )
     parser.add_argument(
         '--generator-options',
         '-G',
-        action=datafile.ArgparseAppendAction,
+        action='append',
+        default = [],
         metavar='DATAFILE-STRING',
         help='Pass arbitrary options to the generator',
     )
@@ -240,7 +242,7 @@ def add_arguments(
         '--line-length',
         action='store',
         type=int,
-        default=options.line_length,
+        default=None,
         help='Line length to use (default is language-specific)',
     )
     parser.add_argument(
@@ -266,14 +268,20 @@ def options_from_args(args: argparse.Namespace, argv: Sequence[str]):
                 # the actual version string.
                 continue
             d[name] = vs[name]
-    if hasattr(args, 'generator_options'):
-        if isinstance(args.generator_options, dict):
-            d.update(args.generator_options)
-        elif isinstance(args.generator_options, list):
-            for opt_str in args.generator_options:
-                opt_d = datafile.loads(opt_str)
-                d.update(opt_d)
+    if hasattr(args, 'generator_options') and args.generator_options:
+        for opt_str in args.generator_options:
+            opt_d = datafile.loads(opt_str)
+            d.update(opt_d)
 
     d.argv = argv[1:] if argv else sys.argv[1:]
     d.command_line = shlex.join(d['argv'])
+    if args.indent is None:
+        pass
+    elif args.indent.isspace():
+        d.indent = args.indent
+    elif args.indent.isdigit():
+        d.indent = int(args.indent) * ' '
+    else:
+        d.indent = args.indent
+
     return d

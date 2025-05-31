@@ -210,6 +210,7 @@ class Indent(VList):
     def fmt(
         self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
     ) -> list[str]:
+        assert indent is not None
         new_l = _new_length(length, len(indent))
         lines = super().fmt(new_l, indent, fmt_fn)
         new_lines = ['' if line == '' else indent + line for line in lines]
@@ -656,7 +657,10 @@ def split_to_objs(s, indent):
     objs = []
     lines = splitlines(s)
     for line in lines:
-        level = indent_level(line, indent)
+        if indent is None or indent == '':
+            level = 0
+        else:
+            level = indent_level(line, indent)
         obj = line[len(indent) * level :]
         while level > 0:
             obj = Indent(obj)

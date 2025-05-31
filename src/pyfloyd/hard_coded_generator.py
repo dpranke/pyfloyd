@@ -60,7 +60,7 @@ class HardCodedGenerator(generator.Generator):
 
     def _fmt(self, obj: formatter.FormatObj) -> str:
         text = (
-            '\n'.join(formatter.flatten(obj, indent=self.options.indent))
+            '\n'.join(formatter.flatten(obj, indent=self.indent))
             + '\n'
         )
         return text

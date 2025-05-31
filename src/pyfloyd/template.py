@@ -32,6 +32,22 @@ def main(
     parser = argparse.ArgumentParser()
     generator.add_arguments(parser)
     parser.add_argument(
+        '-k',
+        '--key',
+        action='store',
+        default='data',
+        help='Data will be accessible under this key',
+    )
+    parser.add_argument(
+        '-t',
+        '--top-level',
+        action='store_const',
+        const=None,
+        dest='key',
+        help='Store data into the top-level environment',
+    )
+
+    parser.add_argument(
         '-o',
         '--output',
         action='store',
@@ -65,8 +81,12 @@ def main(
 
     try:
         df = datafile.load(fp, filename=path)
+        if args.key is None:
+            data = df
+        else:
+            data = {args.key: df}
 
-        dfg = datafile_generator.DatafileGenerator(host, df, options=options)
+        dfg = datafile_generator.DatafileGenerator(host, data, options=options)
         s = dfg.generate()
 
         if args.output == '-':
