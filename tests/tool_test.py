@@ -147,7 +147,9 @@ class ToolTest(unittest.TestCase):
         host = support.FakeHost()
         host.write_text_file('grammar.g', 'grammar = "Hello" end -> true')
         host.write_text_file('input.txt', 'Hello')
-        self.assertEqual(tool.main(['-I', 'grammar.g', '-i', 'input.txt'], host), 0)
+        self.assertEqual(
+            tool.main(['-I', 'grammar.g', '-i', 'input.txt'], host), 0
+        )
         self.assertEqual(host.stdout.getvalue(), 'true\n')
         self.assertEqual(host.stderr.getvalue(), '')
 

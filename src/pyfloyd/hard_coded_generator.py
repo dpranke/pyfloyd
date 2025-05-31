@@ -59,10 +59,9 @@ class HardCodedGenerator(generator.Generator):
         return vl
 
     def _fmt(self, obj: formatter.FormatObj) -> str:
-        text = (
-            '\n'.join(formatter.flatten(obj, indent=self.indent))
-            + '\n'
-        )
+        indent = self.indent
+        assert isinstance(indent, str) and indent
+        text = '\n'.join(formatter.flatten(obj, indent=indent)) + '\n'
         return text
 
     def generate(self) -> str:

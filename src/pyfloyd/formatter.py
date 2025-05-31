@@ -657,10 +657,7 @@ def split_to_objs(s, indent):
     objs = []
     lines = splitlines(s)
     for line in lines:
-        if indent is None or indent == '':
-            level = 0
-        else:
-            level = indent_level(line, indent)
+        level = indent_level(line, indent)
         obj = line[len(indent) * level :]
         while level > 0:
             obj = Indent(obj)

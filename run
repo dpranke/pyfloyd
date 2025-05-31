@@ -570,7 +570,6 @@ class Runner:
                 'pyfloyd',
                 '-o',
                 new_file,
-                '-c',
                 grammar,
             ]
         )

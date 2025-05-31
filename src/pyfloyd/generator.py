@@ -213,7 +213,7 @@ def add_arguments(
         '--generator-options',
         '-G',
         action='append',
-        default = [],
+        default=[],
         metavar='DATAFILE-STRING',
         help='Pass arbitrary options to the generator',
     )

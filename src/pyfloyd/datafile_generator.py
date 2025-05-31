@@ -203,13 +203,15 @@ class DatafileGenerator(generator.Generator):
 
     def generate(self) -> str:
         obj = self._interpreter.eval([['symbol', self.data.starting_template]])
+        indent = self.indent
+        assert isinstance(indent, str) and indent
         if self.options.as_json:
-            return json.dumps(obj.to_list(), indent=self.indent)
+            return json.dumps(obj.to_list(), indent=indent)
         if self.options.output_as_format_tree:
             fmt_fn = formatter.flatten_as_lisplist
         else:
             fmt_fn = formatter.flatten
-        lines = fmt_fn(obj, self.options.line_length, self.indent)
+        lines = fmt_fn(obj, self.line_length, indent=indent)
         return '\n'.join(lines) + '\n'
 
     def f_invoke(self, args, env) -> Any:

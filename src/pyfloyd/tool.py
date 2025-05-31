@@ -170,22 +170,20 @@ def _parse_args(host, argv):
         help=f'print current version ({pyfloyd.__version__})',
     )
     ap.add_argument(
-        'grammar',
-        nargs='?',
-        help='grammar file to interpret or compile'
+        'grammar', nargs='?', help='grammar file to interpret or compile'
     )
     ap.add_argument(
         '-I',
         '--interpret',
         action='store_true',
-        help='interpret the grammar instead of compiling it'
+        help='interpret the grammar instead of compiling it',
     )
     ap.add_argument(
         '-i',
         '--input',
         action='store',
         default='-',
-        help='path to read data from'
+        help='path to read data from',
     )
     ap.add_argument('--post-mortem', '--pm', action='store_true')
 
