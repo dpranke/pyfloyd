@@ -32,6 +32,8 @@ from typing import (
     Union,
 )
 
+from pyfloyd import functions
+
 from . import parser
 
 
@@ -545,39 +547,8 @@ def isoct(ch):
     return '0' <= ch <= '7'
 
 
-def dedent(s, colno=None):
-    # TODO: Figure out what to do with tabs and other non-space whitespace.
-    def _indent(s):
-        i = 0
-        while i < len(s) and s[i] == ' ':
-            i += 1
-        return i
-
-    lines = s.splitlines()
-    if len(lines) < 2:
-        return s.strip()
-
-    min_indent = min(_indent(line) for line in lines[1:] if line)
-    if lines[0] and not lines[0].isspace():
-        first_indent = colno - 1 + _indent(lines[0])
-        min_indent = min(min_indent, first_indent)
-        if min_indent < first_indent:
-            r = ' ' * (first_indent - min_indent) + lines[0].strip() + '\n'
-        else:
-            r = lines[0][_indent(lines[0]) :].rstrip() + '\n'
-    else:
-        r = ''
-    if lines[1:-1]:
-        r += (
-            '\n'.join(line[min_indent:].rstrip() for line in lines[1:-1])
-            + '\n'
-        )
-    if not lines[-1].isspace():
-        r += lines[-1][min_indent:]
-        if s.endswith('\n'):
-            r += '\n'
-
-    return r
+def dedent(s, colno=-1):
+    return functions.f_dedent(s, colno)
 
 
 def dump(

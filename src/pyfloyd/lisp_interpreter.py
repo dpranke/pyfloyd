@@ -13,8 +13,10 @@
 # limitations under the License.
 
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from typing import Any, Optional, Union
+
+from pyfloyd import functions
 
 
 class InterpreterError(Exception):
@@ -31,45 +33,27 @@ def check(flag: bool, msg: str = ''):
         raise InterpreterError(msg)
 
 
-def is_atom(el: Any) -> bool:
-    return isinstance(el, (bool, int, float, str)) or el is None
-
-
-def is_bool(el: Any) -> bool:
-    return isinstance(el, bool)
-
-
-def is_dict(el: Any) -> bool:
-    return isinstance(el, dict)
-
-
 def is_fn(el: Any) -> bool:
     return isinstance(el, _Fn)
 
 
 def is_foreign(el: Any, env: 'Env') -> bool:
     del env
-    return not (is_atom(el) or is_list(el) or is_dict(el) or is_fn(el))
-
-
-def is_list(el: Any) -> bool:
-    return isinstance(el, Sequence)
-
-
-def is_null(el: Any) -> bool:
-    return el is None
-
-
-def is_number(el: Any) -> bool:
-    return isinstance(el, (int, float))
-
-
-def is_str(el: Any) -> bool:
-    return isinstance(el, str)
+    return not (
+        functions.f_is_atom(el)
+        or functions.f_is_list(el)
+        or functions.f_is_dict(el)
+        or is_fn(el)
+    )
 
 
 def is_symbol(el: Any) -> bool:
-    return is_list(el) and len(el) == 2 and el[0] == 'symbol' and is_str(el[1])
+    return (
+        functions.f_is_list(el)
+        and len(el) == 2
+        and el[0] == 'symbol'
+        and functions.f_is_str(el[1])
+    )
 
 
 def symbol(el: Any) -> str:
@@ -81,12 +65,13 @@ CheckerType = Union[str, tuple[Callable[[Any], bool]]]
 
 _typecheckers: dict[str, tuple[Callable[[Any], bool], str]] = {
     'any': (lambda x: True, 'any'),
-    'bool': (is_bool, 'bool'),
-    'dict': (is_dict, 'dict'),
+    'bool': (functions.f_is_bool, 'bool'),
+    'dict': (functions.f_is_dict, 'dict'),
     'fn': (is_fn, 'function'),
-    'list': (is_list, 'list'),
-    'num': (is_number, 'number'),
-    'str': (is_str, 'string'),
+    'int': (functions.f_is_number, 'number'),
+    'list': (functions.f_is_list, 'list'),
+    'num': (functions.f_is_number, 'number'),
+    'str': (functions.f_is_str, 'string'),
     'sym': (is_symbol, 'symbol'),
 }
 
@@ -143,9 +128,14 @@ class Env:
                 return False
             v = self.get(symbols[0])
             for sym in symbols[1:]:
-                if not hasattr(v, sym):
-                    return False
-                v = getattr(v, sym)
+                if isinstance(v, dict):
+                    if sym not in v:
+                        return False
+                    v = v[sym]
+                else:
+                    if not hasattr(v, sym):
+                        return False
+                    v = getattr(v, sym)
             return True
 
         if key in self.values:
@@ -160,7 +150,10 @@ class Env:
             symbols = key.split('.')
             v = self.get(symbols[0])
             for sym in symbols[1:]:
-                v = getattr(v, sym)
+                if isinstance(v, dict):
+                    v = v[sym]
+                else:
+                    v = getattr(v, sym)
             return v
         if key in self.values:
             return self.values[key]
@@ -200,7 +193,7 @@ class SimpleFn(_Fn):
         del env
         if self.types:
             typecheck(self.name, self.types, args)
-        return self.func(args)
+        return self.func(*args)
 
 
 class NativeFn(_Fn):
@@ -268,25 +261,15 @@ class Interpreter:
         self.define_native_fn('define', self.fexpr_define, is_fexpr=True)
         self.define_native_fn('if', self.fexpr_if, is_fexpr=True)
         self.define_native_fn('quote', self.fexpr_quote, is_fexpr=True)
+        self.define_native_fn('and', self.fexpr_and, is_fexpr=True)
+        self.define_native_fn('or', self.fexpr_or, is_fexpr=True)
 
-        self.define_simple_fn('cons', f_cons, types=['any', 'list'])
-        self.define_simple_fn('equal', f_equal, types=['any', 'any'])
-        self.define_simple_fn('in', f_in, types=['any', 'any'])
-        self.define_simple_fn('is_empty', f_is_empty)
-        self.define_simple_fn('getattr', f_getattr, types=['any', 'any'])
-        self.define_simple_fn('getitem', f_getitem, types=['any', 'any'])
-        self.define_simple_fn('join', f_join, types=['str', 'list'])
-        self.define_simple_fn('keys', f_keys, types=['dict'])
-        self.define_simple_fn('length', f_length)
-        self.define_simple_fn('list', f_list)
-        self.define_simple_fn(
-            'replace', f_replace, types=['str', 'str', 'str']
-        )
-        self.define_simple_fn('to_string', f_to_string, types=['any'])
-        self.define_simple_fn('slice', f_slice, types=['list', 'num', 'num'])
-        self.define_simple_fn('sort', f_sort, types=['list'])
-        self.define_simple_fn('strcat', f_strcat)
-        self.define_simple_fn('strlen', f_strlen, types=['str'])
+        for name, obj in functions.ALL.items():
+            if name not in functions.UNDEFINED:
+                if hasattr(obj, 'func'):
+                    self.define_simple_fn(name, obj.func)
+                else:
+                    self.define_simple_fn(name, obj)
 
         self.define_native_fn('map', self.f_map)
         self.define_native_fn('map_items', self.f_map_items)
@@ -318,13 +301,13 @@ class Interpreter:
 
     def eval(self, expr: Any, env: Optional[Env] = None) -> Any:
         env = env or self.env
-        if is_atom(expr) or is_dict(expr):
+        if functions.f_is_atom(expr) or functions.f_is_dict(expr):
             return expr
         if is_symbol(expr):
             sym = symbol(expr)
             check(env.bound(sym), f"Unbound symbol '{sym}'")
             return env.get(sym)
-        if is_list(expr):
+        if functions.f_is_list(expr):
             first = expr[0]
             rest = expr[1:]
             fn = self.eval(first, env)
@@ -341,6 +324,12 @@ class Interpreter:
             if handled:
                 return val
         raise InterpreterError(f"Don't know how to evaluate `{expr}`")
+
+    def fexpr_and(self, args, env):
+        first = self.eval(args[0], env)
+        if not first:
+            return False
+        return self.eval(args[1], env)
 
     def fexpr_define(self, args, env):
         head, body = args
@@ -373,6 +362,12 @@ class Interpreter:
             return self.eval(t_expr, env)
         return self.eval(f_expr, env)
 
+    def fexpr_or(self, args, env):
+        first = self.eval(args[0], env)
+        if first:
+            return first
+        return self.eval(args[1], env)
+
     def fexpr_quote(self, args, env):
         del env
         # The difference from `f_list`, above, is that the args will
@@ -382,20 +377,26 @@ class Interpreter:
     def f_map(self, args, env):
         if len(args) == 3:
             fn, exprs, sep = args
-            check(is_str(sep), f"Third arg to map isn't a string: `{sep}`")
+            check(
+                functions.f_is_str(sep),
+                f"Third arg to map isn't a string: `{sep}`",
+            )
         else:
             fn, exprs = args
             sep = None
         check(is_fn(fn), f"First arg to map isn't a function: `{fn}`")
-        check(is_list([exprs]), f"Second arg to map isn't a list: `{exprs}`")
+        check(
+            functions.f_is_list([exprs]),
+            f"Second arg to map isn't a list: `{exprs}`",
+        )
         results = []
         for expr in exprs:
             results.append(fn.call([expr], env))
         if sep is not None:
-            for i, result in enumerate(results):
+            for i, result in enumerate(results, start=1):
                 check(
-                    is_str(result),
-                    f'Arg #{i} to map is not a string: {repr(result)}',
+                    functions.f_is_str(result),
+                    f'Result #{i} from map is not a string: {repr(result)}',
                 )
             return sep.join(results)
         return results
@@ -404,100 +405,28 @@ class Interpreter:
         if len(args) == 3:
             fn, d, sep = args
             check(
-                is_str(sep), f"Third arg to map_items isn't a string: `{sep}`"
+                functions.f_is_str(sep),
+                f"Third arg to `map_items()` isn't a string: `{sep}`",
             )
         else:
             fn, d = args
             sep = None
-        check(is_fn(fn), f"First arg to map_items isn't a function: `{fn}`")
-        check(is_dict(d), f"Second arg to map_items isn't a dict: `{fn}`")
+        check(
+            is_fn(fn), f"First arg to `map_items()` isn't a function: `{fn}`"
+        )
+        check(
+            functions.f_is_dict(d),
+            f"Second arg to `map_items()` isn't a dict: `{fn}`",
+        )
+
         results = []
         for k, v in d.items():
             results.append(fn.call([k, v], env))
         if sep is not None:
             for i, result in enumerate(results):
                 check(
-                    is_str(result),
+                    functions.f_is_str(result),
                     f'Arg #{i} to map_items is not a string: {repr(result)}',
                 )
             return sep.join(results)
         return results
-
-
-def f_cons(args):
-    hd, tl = args
-    return [hd] + tl
-
-
-def f_equal(args):
-    x, y = args
-    return x == y
-
-
-def f_getattr(args):
-    obj, attr = args
-    return getattr(obj, attr)
-
-
-def f_getitem(args):
-    obj, index = args
-    return obj[index]
-
-
-def f_in(args):
-    key, obj = args
-    return key in obj
-
-
-def f_is_empty(args):
-    obj = args[0]
-    check(is_list(obj) or is_dict(obj))
-    return len(obj) == 0
-
-
-def f_join(args):
-    sep, rest = args
-    return sep.join(rest)
-
-
-def f_keys(args):
-    d = args[0]
-    return list(d.keys())
-
-
-def f_length(args):
-    lis = args[0]
-    return len(lis)
-
-
-def f_list(args):
-    return list(args)
-
-
-def f_replace(args):
-    s, old, new = args
-    return s.replace(old, new)
-
-
-def f_slice(args):
-    lis, start, stop = args
-    return lis[start:stop]
-
-
-def f_sort(args):
-    lis = args[0]
-    return sorted(lis)
-
-
-def f_strcat(args):
-    return ''.join(args)
-
-
-def f_strlen(args):
-    s = args[0]
-    return len(s)
-
-
-def f_to_string(args):
-    obj = args[0]
-    return f'{obj}'

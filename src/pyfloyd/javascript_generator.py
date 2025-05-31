@@ -14,7 +14,7 @@
 
 # pylint: disable=too-many-lines
 
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 from pyfloyd import datafile
 from pyfloyd import formatter
@@ -33,11 +33,11 @@ class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
     def __init__(
         self,
         host: support.Host,
-        grammar: gram.Grammar,
+        data: dict[str, Any],
         options: generator.GeneratorOptions,
     ):
-        super().__init__(host, grammar, options)
-        self.options.indent = '  '
+        assert 'grammar' in data
+        super().__init__(host, data, options)
         self._map: dict[str, str] = {
             'end': ';',
             'false': 'false',
@@ -54,7 +54,7 @@ class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
             self._builtin_methods[k] = datafile.dedent(v)
 
         # Keep this updated and in sync with the text of each node type.
-        self._local_vars: dict[str, list[str]] = {
+        local_var_map: dict[str, list[str]] = {
             'choice': ['pos'],
             'count': ['cmin', 'cmax', 'i', 'vs'],
             'not': ['errpos', 'pos'],
@@ -67,7 +67,7 @@ class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
             'set': ['found', 'r'],
             'star': ['pos', 'vs'],
         }
-        self._derive_local_vars()
+        self._process_grammar(local_var_map)
 
     def generate(self) -> str:
         if self.options.main:
@@ -969,9 +969,9 @@ _BUILTINS = {
           return a.concat(b);
         }
         """,
-    'fn_unicode_lookup': """
-        fn_unicode_lookup(s) {
-          throw new ParsingRuntimeError('Unsupported function "unicode_lookup"');
+    'fn_ulookup': """
+        fn_ulookup(s) {
+          throw new ParsingRuntimeError('Unsupported function "ulookup"');
         }
         """,
     'fn_utoi': """

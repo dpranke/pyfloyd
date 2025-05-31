@@ -29,30 +29,6 @@ class OperatorState:
         self.choices: dict[str, str] = {}
 
 
-BUILTIN_FUNCTIONS = (
-    'atof',
-    'atoi',
-    'atou',
-    'cat',
-    'concat',
-    'colno',
-    'cons',
-    'dedent',
-    'dict',
-    'float',
-    'int',
-    'itou',
-    'join',
-    'otou',
-    'scat',
-    'scons',
-    'strcat',
-    'unicode_lookup',
-    'utoi',
-    'xtou',
-)
-
-
 BUILTIN_RULES = (
     'any',
     'end',

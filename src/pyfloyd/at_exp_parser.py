@@ -95,7 +95,7 @@ class _Parser:
         self._r_opt_end()
         if self._failed:
             return
-        self._o_succeed(v__1)
+        self._o_succeed(v__1, self._pos)
 
     def _s_grammar_1(self):
         vs = []
@@ -106,7 +106,7 @@ class _Parser:
                 self._o_rewind(pos)
                 break
             vs.append(self._val)
-        self._o_succeed(vs)
+        self._o_succeed(vs, self._pos)
 
     def _r_term(self):
         pos = self._pos
@@ -140,7 +140,7 @@ class _Parser:
         pos = self._pos
         v = self._externs['allow_trailing']
         if v is True:
-            self._o_succeed(v)
+            self._o_succeed(v, self._pos)
         elif v is False:
             self._o_fail()
         else:
@@ -195,7 +195,9 @@ class _Parser:
         v__3 = self._val
         if self._failed:
             return
-        self._o_succeed(self._fn_concat(self._fn_cons(v__1, v__2), [v__3]))
+        self._o_succeed(
+            self._fn_concat(self._fn_cons(v__1, v__2), [v__3]), self._pos
+        )
 
     def _s_at_expr_2(self):
         self._r_opt_id()
@@ -206,7 +208,7 @@ class _Parser:
         v__2 = self._val
         if self._failed:
             return
-        self._o_succeed(self._fn_cons(v__1, v__2))
+        self._o_succeed(self._fn_cons(v__1, v__2), self._pos)
 
     def _s_at_expr_3(self):
         self._r_opt_id()
@@ -217,7 +219,7 @@ class _Parser:
         v__2 = self._val
         if self._failed:
             return
-        self._o_succeed([v__1, v__2])
+        self._o_succeed([v__1, v__2], self._pos)
 
     def _s_at_expr_4(self):
         self._r_id()
@@ -226,7 +228,7 @@ class _Parser:
         v__1 = self._val
         if self._failed:
             return
-        self._o_succeed(v__1)
+        self._o_succeed(v__1, self._pos)
 
     def _s_at_expr_5(self):
         self._r_string()
@@ -235,7 +237,7 @@ class _Parser:
         v__1 = self._val
         if self._failed:
             return
-        self._o_succeed(v__1)
+        self._o_succeed(v__1, self._pos)
 
     def _r_opt_id(self):
         pos = self._pos
@@ -243,7 +245,7 @@ class _Parser:
         if not self._failed:
             return
         self._o_rewind(pos)
-        self._o_succeed(['symbol', 'lisp'])
+        self._o_succeed(['symbol', 'lisp'], self._pos)
 
     def _r_id(self):
         self._s_id_1()
@@ -252,7 +254,7 @@ class _Parser:
         v__1 = self._val
         if self._failed:
             return
-        self._o_succeed(['symbol', v__1])
+        self._o_succeed(['symbol', v__1], self._pos)
 
     def _s_id_1(self):
         rexp = '[a-zA-Z_][\\.a-zA-Z0-9_]*'
@@ -292,13 +294,13 @@ class _Parser:
         self._o_str('true')
         if self._failed:
             return
-        self._o_succeed(True)
+        self._o_succeed(True, self._pos)
 
     def _s_expr_2(self):
         self._o_str('false')
         if self._failed:
             return
-        self._o_succeed(False)
+        self._o_succeed(False, self._pos)
 
     def _r_number(self):
         pos = self._pos
@@ -312,7 +314,7 @@ class _Parser:
         self._o_ch('0')
         if self._failed:
             return
-        self._o_succeed(0)
+        self._o_succeed(0, self._pos)
 
     def _s_number_2(self):
         self._s_number_3()
@@ -321,7 +323,7 @@ class _Parser:
         v__1 = self._val
         if self._failed:
             return
-        self._o_succeed(self._fn_atoi(v__1, 10))
+        self._o_succeed(self._fn_atoi(v__1, 10), self._pos)
 
     def _s_number_3(self):
         rexp = '[1-9][0-9]*'
@@ -350,7 +352,7 @@ class _Parser:
         self._o_ch('"')
         if self._failed:
             return
-        self._o_succeed(self._fn_join('', v__2))
+        self._o_succeed(self._fn_join('', v__2), self._pos)
 
     def _s_string_2(self):
         vs = []
@@ -361,7 +363,7 @@ class _Parser:
                 self._o_rewind(pos)
                 break
             vs.append(self._val)
-        self._o_succeed(vs)
+        self._o_succeed(vs, self._pos)
 
     def _s_string_3(self):
         self._o_ch("'")
@@ -372,7 +374,7 @@ class _Parser:
         self._o_ch("'")
         if self._failed:
             return
-        self._o_succeed(self._fn_join('', v__2))
+        self._o_succeed(self._fn_join('', v__2), self._pos)
 
     def _s_string_4(self):
         vs = []
@@ -383,7 +385,7 @@ class _Parser:
                 self._o_rewind(pos)
                 break
             vs.append(self._val)
-        self._o_succeed(vs)
+        self._o_succeed(vs, self._pos)
 
     def _r_dqch(self):
         pos = self._pos
@@ -397,7 +399,7 @@ class _Parser:
         self._o_str('\\"')
         if self._failed:
             return
-        self._o_succeed('"')
+        self._o_succeed('"', self._pos)
 
     def _s_dqch_2(self):
         rexp = '[^"]'
@@ -421,7 +423,7 @@ class _Parser:
         self._o_str("\\'")
         if self._failed:
             return
-        self._o_succeed("'")
+        self._o_succeed("'", self._pos)
 
     def _s_sqch_2(self):
         rexp = "[^']"
@@ -458,14 +460,14 @@ class _Parser:
         self._o_ch(']')
         if self._failed:
             return
-        self._o_succeed(self._fn_cons(v__3, v__4))
+        self._o_succeed(self._fn_cons(v__3, v__4), self._pos)
 
     def _s_list_2(self):
         self._r_ws()
         if self._failed:
-            self._o_succeed([])
+            self._o_succeed([], self._pos)
         else:
-            self._o_succeed([self._val])
+            self._o_succeed([self._val], self._pos)
 
     def _s_list_3(self):
         vs = []
@@ -476,7 +478,7 @@ class _Parser:
                 self._o_rewind(pos)
                 break
             vs.append(self._val)
-        self._o_succeed(vs)
+        self._o_succeed(vs, self._pos)
 
     def _s_list_4(self):
         self._r_ws()
@@ -487,9 +489,9 @@ class _Parser:
     def _s_list_5(self):
         self._r_ws()
         if self._failed:
-            self._o_succeed([])
+            self._o_succeed([], self._pos)
         else:
-            self._o_succeed([self._val])
+            self._o_succeed([self._val], self._pos)
 
     def _s_list_6(self):
         self._o_ch('[')
@@ -499,14 +501,14 @@ class _Parser:
         self._o_ch(']')
         if self._failed:
             return
-        self._o_succeed([])
+        self._o_succeed([], self._pos)
 
     def _s_list_7(self):
         self._r_ws()
         if self._failed:
-            self._o_succeed([])
+            self._o_succeed([], self._pos)
         else:
-            self._o_succeed([self._val])
+            self._o_succeed([self._val], self._pos)
 
     def _r_braces(self):
         self._o_ch('{')
@@ -517,7 +519,7 @@ class _Parser:
         self._o_ch('}')
         if self._failed:
             return
-        self._o_succeed(v__2)
+        self._o_succeed(v__2, self._pos)
 
     def _s_braces_1(self):
         start = self._pos
@@ -544,7 +546,7 @@ class _Parser:
                 self._o_rewind(pos)
                 break
             vs.append(self._val)
-        self._o_succeed(vs)
+        self._o_succeed(vs, self._pos)
 
     def _r_any(self):
         if self._pos < self._end:
@@ -554,7 +556,7 @@ class _Parser:
 
     def _r_end(self):
         if self._pos == self._end:
-            self._o_succeed(None)
+            self._o_succeed(None, self._pos)
         else:
             self._o_fail()
 
@@ -600,14 +602,13 @@ class _Parser:
                 return
         self._val = s
 
-    def _o_succeed(self, v, newpos=None):
+    def _o_succeed(self, v, newpos):
         self._val = v
         self._failed = False
-        if newpos is not None:
-            self._pos = newpos
+        self._pos = newpos
 
-    def _fn_atoi(self, a, base):
-        return int(a, base)
+    def _fn_atoi(self, s, base):
+        return int(s, base)
 
     def _fn_concat(self, xs, ys):
         return xs + ys
@@ -615,5 +616,5 @@ class _Parser:
     def _fn_cons(self, hd, tl):
         return [hd] + tl
 
-    def _fn_join(self, s, vs):
-        return s.join(vs)
+    def _fn_join(self, sep, strs):
+        return sep.join(strs)

@@ -177,12 +177,13 @@ def generate(
         if options is None:
             options = generator.GeneratorOptions()
         else:
-            assert options is None or isinstance(options, dict)
+            assert isinstance(options, dict)
             options = generator.GeneratorOptions(**options)
 
     for cls in _generators:
         if options.generator.lower() == cls.name.lower():
-            gen = cls(support.Host(), grammar_obj, options)
+            data = {'grammar': grammar_obj}
+            gen = cls(support.Host(), data, options)
             text = gen.generate()
             return Result((text, gen.ext))
 

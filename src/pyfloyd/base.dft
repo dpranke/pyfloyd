@@ -32,19 +32,24 @@ line_length = 79
 # List the names of each local variable used in a given AST node;
 # the generator will use this map to walk the AST and populate the
 # list of vars that need to be declared up front in each rule.
-local_vars: {
-    choice: [pos]
-    count: [cmin cmax i vs]
-    not: [errpos pos]
-    not_one: [errpos pos]
-    opt: [pos]
-    plus: [pos vs]
-    pred: [v]
-    regexp: [found r]
-    run: [end start]
-    set: [found r]
-    star: [pos vs]
+declare_local_vars = true
+
+local_var_map = {
+    choice: ['pos']
+    count: ['cmin' 'cmax' 'i' 'vs']
+    not: ['errpos' 'pos']
+    not_one: ['errpos' 'pos']
+    opt: ['pos']
+    plus: ['pos' 'vs']
+    pred: ['v']
+    regexp: ['found' 'r']
+    run: ['end' 'start']
+    set: ['found' 'r']
+    star: ['pos' 'vs']
 }
+
+
+datafiles = ['functions']
 
 templates = {
 
@@ -52,14 +57,22 @@ templates = {
 # Helper methods
 #
 
-meth: [fn params [block [hl t_meth_def
-                            _t_name
-                             '('
-                             [t_meth_params [if [equal [length params] 2]
-                                                [getitem params 0]
-                                                '']]
-                             ')']
-                        [getitem params -1]]]
+# Returns a method definition, assuming nothing about the name of the
+# method. The param_names should be a list of strings, and the body
+# is the method text; the body may span multiple lines.
+def_method: [fn [name param_names body]
+                [block [hl t_meth_def
+                           name
+                           [tri '('
+                                [comma [if [equal t_meth_self '']
+                                           param_names
+                                           [cons t_meth_self param_names]]]
+                                ')']]
+                       body]]
+
+# Returns a method definitions for a templated built-in operator or rule.
+# A thin wrapper around `def_method` that uses _t_name for the name.
+meth: [fn [params body] [def_method _t_name params body]]
 
 rule_method: [fn [rule node]
                  [block [hl t_meth_def rule '(' [t_meth_params ''] ')']
@@ -74,26 +87,29 @@ stmts:     [fn [node] [invoke [node_name node.t] node]]
 
 # Templates for how to refer to different kinds of things.
 
-# Returns the identifier for a method or template used for a particular type of AST
-# node during code generation. It does not refer to things in the generated output.
+# Returns the identifier for a method or template used for a particular type
+# of AST node during code generation. It does not refer to things in the
+# generated output.
 node_name: [fn [name] [strcat 'n_' name]]
 
-# Returns the identifier used for built-in operators like `succeed` and `leftrec` in
-# the output. May be used both to identify a template and as part of identifying
-# a method in the generated output.
+# Returns the identifier used for built-in operators like `succeed` and
+# `leftrec` in the output. May be used both to identify a template and as
+# part of identifying a method in the generated output.
 op_name:   [fn [name] [strcat 'o_' name]]
 
-# The name used for a built-in function like `strcat`. Maybe be used both to 
-# identify a template and as part of identifying a method in the generated output.
+# The name used for a built-in function like `strcat`. Maybe be used both to
+# identify a template and as part of identifying a method in the generated
+# output.
 fn_name:   [fn [name] [strcat 'fn_' name]]
 
-# Return the identifier for a local variable like `x` or `$1`. Usually `v_x` or `v_1`.
+# Return the identifier for a local variable like `x` or `$1`. Usually `v_x`
+# or `v_1`.
 local_var: [fn [name] [strcat 'v_' [replace name '$' '_']]]
 
-# The name for a rule in the output; rules names either correspond to a production
-# in the grammar, in which case it will be named with an `r_` prefix (e.g.
-# `grammar` -> `r_grammar`), or a derived subrule (part of the production), in
-# which case it'll be named with an `s_` prefix.
+# The name for a rule in the output; rules names either correspond to a
+# production in the grammar, in which case it will be named with an
+# `r_` prefix (e.g. `grammar` -> `r_grammar`), or a derived subrule
+# (part of the production), in which case it'll be named with an `s_` prefix.
 rule_name: [fn [name] name]
 
 # Returns a formatter.El that will invoke a method on the parser object.
@@ -105,7 +121,7 @@ call:      [fn [name args] [tri [strcat [method_name name] '(']
 call_op:   [fn [name args] [call [op_name name] args]]
 call_rule: [fn [name args] [call [rule_name name] args]]
 
-succeed: [fn args [hl [call [op_name 'succeed'] args] t_end]]
+succeed: [fn [val pos] [hl [call [op_name 'succeed'] [list val pos] t_end]]]
 rewind: [fn [pos] [hl [call [op_name 'rewind'] [list pos] t_end]]]
 fail: [fn [] [hl [call [op_name 'fail'] q[]] t_end]]
 
@@ -165,20 +181,20 @@ parser_methods: [fn [] [vl [parser_constructor]
                                     [vl ''
                                         [invoke [op_name name]]]]
                                 grammar.needed_operators]
-                           [map [fn [name]
-                                    [vl ''
-                                        [invoke [fn_name name]]]]
+                           [map builtin_fn
                                 grammar.needed_builtin_functions]]]
 
 parse_method: [fn [] [if grammar.exception_needed
                          [parse_with_exception]
                          [parse_without_exception]]]
 
+builtin_fn: [fn [name] [vl '' [invoke [fn_name name]]]]
+
 #
 # Rules for nodes in the AST that are basically the same across languages.
 #
 
-n_action: [fn [node] [succeed [expr node.child]]]
+n_action: [fn [node] [succeed [expr node.child] f_pos]]
 
 n_apply: [fn [node]
              [if node.memoize
@@ -192,20 +208,21 @@ n_choice: [fn [node] [vl [t_assign 'pos' f_pos]
                                           [return_if_not_failed c]
                                           [rewind 'pos']]]
                               [slice node.ch 0 -1]]
-                         [stmts [getitem node.ch -1]]]]
+                         [stmts [item node.ch -1]]]]
 
 n_count: [fn [node] [vl [t_assign 'vs' '[]']
                         [t_assign 'i' '0']
-                        [t_assign 'cmin' [to_string [getitem node.v 0]]]
-                        [t_assign 'cmax' [to_string [getitem node.v 1]]]
+                        [t_assign 'cmin' [itoa [item node.v 0]]]
+                        [t_assign 'cmax' [itoa [item node.v 1]]]
                         [t_while 'i < cmax'
                                  [vl [stmts node.child]
                                      [t_if failed
-                                           [vl [t_if 'i >= cmin' [succeed 'vs']]
+                                           [vl [t_if 'i >= cmin' 
+                                                     [succeed 'vs' f_pos]]
                                                t_return]]
                                      [t_append 'vs' f_val]
                                      [hl 'i += 1' t_end]]]
-                        [succeed 'vs']]]
+                        [succeed 'vs' f_pos]]]
 n_e_arr: [fn [node] [if [is_empty node.ch]
                         '[]'
                         [tri '['
@@ -240,7 +257,7 @@ n_e_plus: [fn [node] [tree [expr node.left] '+' [expr node.right]]]
 
 n_e_qual: [fn [node] [saw [map [fn [c] [expr c]] node.ch]]]
 
-n_empty: [fn [node] [succeed t_null]]
+n_empty: [fn [node] [succeed t_null f_pos]]
 
 n_ends_in: [fn [node] [t_while t_true
                           [vl [stmts node.child]
@@ -283,8 +300,8 @@ n_operator: [fn [node] [hl [call_op 'operator' [list [lit node.v]] t_end]]]
 
 n_opt: [fn [node] [vl [stmts node.child]
                       [t_ifelse failed
-                                [vl [succeed '[]']]
-                                [vl [succeed [hl '[' f_val ']']]]]]]
+                                [vl [succeed '[]' f_pos]]
+                                [vl [succeed [hl '[' f_val ']'] f_pos]]]]]
 
 n_paren: [fn [node] [stmts node.child]]
 
@@ -300,11 +317,11 @@ n_plus: [fn [node]
                               [vl [rewind 'pos']
                                   t_break]]
                         [t_append 'vs' f_val]]]
-                [succeed 'vs']]]
+                [succeed 'vs' f_pos]]]
 
 n_pred: [fn [node]
             [vl [t_assign 'v' [expr node.child]]
-                [t_ifelifelse [t_istrue 'v'] [succeed 'v']
+                [t_ifelifelse [t_istrue 'v'] [succeed 'v' f_pos]
                               [t_isfalse 'v'] [fail]
                               [t_throw [lit 'Bad predicate value']]]]]
 
@@ -325,12 +342,12 @@ n_scope: [fn [node] [vl [t_append [fld 'scopes'] t_newmap]
 
 n_seq: [fn [node]
            [vl [t_declare_vars [map [fn [v] [local_var v]] node.vars]]
-               [stmts [getitem node.ch 0]]
-               [return_if_failed [getitem node.ch 0]]
+               [stmts [item node.ch 0]]
+               [return_if_failed [item node.ch 0]]
                [map [fn [c] [vl [stmts c]
                                 [return_if_failed c]]]
                     [slice node.ch 1 -1]]
-               [stmts [getitem node.ch -1]]]]
+               [stmts [item node.ch -1]]]]
 
 n_star: [fn [node]
             [vl [t_assign 'vs' '[]']
@@ -341,7 +358,7 @@ n_star: [fn [node]
                                 [vl [rewind 'pos']
                                     t_break]]
                           [t_append 'vs' f_val]]]
-                [succeed 'vs']]]
+                [succeed 'vs' f_pos]]]
 
 n_unicat: [fn [node] [hl [call_op 'unicat' [list [lit node.v]]] t_end]]
 

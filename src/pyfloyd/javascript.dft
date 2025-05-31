@@ -80,6 +80,7 @@ t_ifelifelse: [fn [cond if_body elif_cond elif_body e_body]
 t_istrue: [fn [v] [hl v ' === true']]
 t_isfalse: [fn [v] [hl v ' === false']]
 t_meth_def: ''
+t_meth_self: ''
 t_meth_params: [fn [params] params]
 t_newmap: 'new Map()'
 t_not: '!'  # the logical operator
@@ -175,7 +176,7 @@ parser_constructor: @"""
     }
     """  # parser_constructor
       
-externs: [fn [] [if [is_empty grammar.externs]
+externs: [fn [] [if [dict_is_empty grammar.externs]
                     [vl 'this.externs = new Map();']
                     [vl 'this.externs = new Map(['
                         [ind [map_items [fn [k v]
@@ -199,9 +200,9 @@ operator_state: [fn [rule o]
 operator_prec_ops: [fn [o]
                        [vl 'o.precOps = new Map();'
                            [map [fn [prec]
-                                    [hl 'o.precOps.set(' [to_string prec] ', ['
+                                    [hl 'o.precOps.set(' [itoa prec] ', ['
                                         [map [fn [op] [lit op]]
-                                             [getitem o.prec_ops prec]
+                                             [get o.prec_ops prec]
                                              ', ']
                                         ']);']]
                                 [sort [keys o.prec_ops]]]]]
@@ -401,7 +402,7 @@ n_set: [fn [node]
 # Built-in operators and rules
 #
 
-r_any: [meth d"""
+r_any: [meth q[] d"""
     if (this.pos < this.end) {
       this.o_succeed(this.text[this.pos], this.pos + 1);
     } else {
@@ -409,15 +410,15 @@ r_any: [meth d"""
     }
     """]
 
-r_end: [meth d"""
+r_end: [meth q[] d"""
     if (this.pos === this.end) {
-      this.o_succeed(null);
+      this.o_succeed(null, this.pos);
     } else {
       this.o_fail();
     }
     """]
 
-o_ch: [meth 'c' d"""
+o_ch: [meth q['c'] d"""
     let pos = this.pos;
     if (pos < this.end && this.text[pos] === c) {
       this.o_succeed(c, this.pos + 1);
@@ -426,7 +427,7 @@ o_ch: [meth 'c' d"""
     }
     """]
 
-o_offsets: [meth 'pos' d"""
+o_offsets: [meth q['pos'] d"""
     let lineno = 1;
     let colno = 1;
     for (let i = 0; i < pos; i++) {
@@ -440,7 +441,7 @@ o_offsets: [meth 'pos' d"""
     return [lineno, colno];
     """]
 
-o_error: [meth d"""
+o_error: [meth q[] d"""
     let [lineno, colno] = this.o_offsets(this.errpos);
     let thing;
     if (this.errpos === this.end) {
@@ -451,13 +452,13 @@ o_error: [meth d"""
     return `${this.path}:${lineno} Unexpected ${thing} at column ${colno}`;
     """]
 
-o_fail: [meth d"""
+o_fail: [meth q[] d"""
     this.val = undefined;
     this.failed = true;
     this.errpos = Math.max(this.errpos, this.pos);
     """]
 
-o_leftrec: [meth 'rule, rule_name, left_assoc' d"""
+o_leftrec: [meth q['rule' 'rule_name' 'left_assoc'] d"""
     let pos = this.pos;
     let key = [rule_name, pos];
     let seed = this.seeds[key];
@@ -492,7 +493,7 @@ o_leftrec: [meth 'rule, rule_name, left_assoc' d"""
     }
     """]  # o_leftrec
     
-o_lookup: [meth 'v' d"""
+o_lookup: [meth q['v'] d"""
     let l = this.scopes.length - 1;
     while (l >= 0) {
       if (this.scopes[l].has(v)) {
@@ -506,7 +507,7 @@ o_lookup: [meth 'v' d"""
     throw new ParsingRuntimeError(`Unknown var "${v}"`);
     """]
 
-o_memoize: [meth 'rule_name, fn' d"""
+o_memoize: [meth q['rule_name' 'fn'] d"""
     let pos = this.pos;
     if (!this.cache.has(pos)) {
       this.cache.set(pos, new Map());
@@ -520,7 +521,7 @@ o_memoize: [meth 'rule_name, fn' d"""
     c.set(rule_name, [this.val, this.failed, this.pos]);
    """]
 
-o_operator: [meth 'rule_name' d"""
+o_operator: [meth q['rule_name'] d"""
     let o = this.operators[rule_name];
     let pos = this.pos;
     let key = [rule_name, pos];
@@ -568,7 +569,7 @@ o_operator: [meth 'rule_name' d"""
     [this.val, this.failed, this.pos] = current;
     """]  # o_operator
 
-o_range: [meth 'i, j' d"""
+o_range: [meth q['i' 'j'] d"""
     let pos = this.pos;
     if (pos == this.end) {
       this.o_fail();
@@ -582,9 +583,9 @@ o_range: [meth 'i, j' d"""
     }
     """]
 
-o_rewind: [meth 'newpos' 'this.o_succeed(null, newpos);']
+o_rewind: [meth q['newpos'] 'this.o_succeed(null, newpos);']
 
-o_str: [meth 's' d"""
+o_str: [meth q['s'] d"""
    for (let ch of s) {
      this.o_ch(ch);
      if (this.failed) {
@@ -594,7 +595,7 @@ o_str: [meth 's' d"""
    this.val = s;
    """]
 
-o_succeed: [meth 'v, newpos = null' d"""
+o_succeed: [meth q['v' 'newpos'] d"""
    this.val = v;
    this.failed = false;
    if (newpos !== null) {
@@ -602,7 +603,7 @@ o_succeed: [meth 'v, newpos = null' d"""
    }
    """]
 
-o_unicat: [meth 'cat' d"""
+o_unicat: [meth q['cat'] d"""
     if (this.pos == this.end) {
       this.o_fail();
       return
@@ -616,17 +617,17 @@ o_unicat: [meth 'cat' d"""
     }
     """]
 
-fn_atof: [meth 'a' 'return parseFloat(a);']
+fn_atof: [meth q['a'] 'return parseFloat(a);']
 
-fn_atoi: [meth 'a, base' 'return parseInt(a, base);']
+fn_atoi: [meth q['a' 'base'] 'return parseInt(a, base);']
 
-fn_atou: [meth 'a, base' 
+fn_atou: [meth q['a' 'base']
                'return String.fromCharCode(Number.parseInt(a, base));']
 
-fn_cat: [meth 'ss' "return ss.join('');"]
+fn_cat: [meth q['ss'] "return ss.join('');"]
 
 fn_colno: [
-    meth d"""
+    meth q[] d"""
           let colno = 0;
           if (this.pos == this.end) {
             colno += 1;
@@ -637,13 +638,13 @@ fn_colno: [
           return colno;
           """]
 
-fn_concat: [meth 'xs, ys' 'return xs.concat(ys);']
+fn_concat: [meth q['xs' 'ys'] 'return xs.concat(ys);']
 
-fn_cons: [meth 'hd, tl' 'return [hd].concat(tl);']
+fn_cons: [meth q['hd' 'tl'] 'return [hd].concat(tl);']
 
-fn_dedent: [meth 's' 'return s;']
+fn_dedent: [meth q['s'] 'return s;']
 
-fn_dict: [meth 'pairs' d"""
+fn_dict: [meth q['pairs'] d"""
     let m = new Map();
     for (let [k, v] of pairs) {
       m[k] = v;  // TODO: m.set(k, v) doesn't work?
@@ -651,24 +652,24 @@ fn_dict: [meth 'pairs' d"""
     return m;
     """]
 
-fn_itou: [meth 'n' 'return String.fromCharCode(n);']
+fn_itou: [meth q['n'] 'return String.fromCharCode(n);']
 
-fn_join: [meth 's, vs' 'return vs.join(s);']
+fn_join: [meth q['s' 'vs'] 'return vs.join(s);']
 
-fn_scat: [meth 'ss' "return ss.join('');"]
+fn_scat: [meth q['ss'] "return ss.join('');"]
 
-fn_scons: [meth 'hd, tl' 'return [hd].concat(tl);']
+fn_scons: [meth q['hd' 'tl'] 'return [hd].concat(tl);']
 
-fn_strcat: [meth 'a, b' 'return a.concat(b);']
+fn_strcat: [meth q['a' 'b'] 'return a.concat(b);']
 
-fn_unicode_lookup: [meth 's' d"""
-    throw new ParsingRuntimeError('Unsupported function "unicode_lookup"');
+fn_ulookup: [meth q['s'] d"""
+    throw new ParsingRuntimeError('Unsupported function "ulookup"');
     """]
 
-fn_utoi: [meth 's' 'return s.charCodeAt(0);']
+fn_utoi: [meth q['s'] 'return s.charCodeAt(0);']
 
-fn_xtoi: [meth 's' 'return Number.parseInt(s, 16);']
+fn_xtoi: [meth q['s'] 'return Number.parseInt(s, 16);']
 
-fn_xtou: [meth 's' 'return String.fromCharCode(Number.parseInt(s, 16));']
+fn_xtou: [meth q['s'] 'return String.fromCharCode(Number.parseInt(s, 16));']
 
 }

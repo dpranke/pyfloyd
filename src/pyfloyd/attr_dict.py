@@ -13,6 +13,10 @@
 # limitations under the License.
 
 
+def adict(*args, **kwargs):
+    return AttrDict(*args, **kwargs)
+
+
 class AttrDict(dict):
     """A very simple subclass of dict that permits direct reference to keys.
 

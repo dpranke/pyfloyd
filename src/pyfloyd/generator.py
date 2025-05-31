@@ -15,13 +15,12 @@
 import argparse
 import shlex
 import sys
-from typing import Optional, Sequence, Union
+from typing import Any, Optional, Sequence, Union
 
 import pyfloyd
 from pyfloyd import (
     attr_dict,
     datafile,
-    grammar as m_grammar,
     support,
 )
 
@@ -59,36 +58,85 @@ class Generator:
     def __init__(
         self,
         host: support.Host,
-        grammar: m_grammar.Grammar,
+        data: dict[str, Any],
         options: GeneratorOptions,
     ):
         self.host = host
-        self.grammar = grammar
-        self.options = options
+        data = data or {}
+        self.data = attr_dict.AttrDict(
+            name=self.name,
+            starting_template=None,
+            grammar=None,
+            indent=self.indent,
+            line_length=self.line_length,
+            ext=self.ext,
+            local_vars={},
+            templates={},
+            generator_options=options,
+        )
+        for k, v in data.items():
+            self.data[k] = v
 
-        # Derive option values from the grammar if need be;
-        # they will also be overridden by the codegen templates.
-        if self.options.line_length is None:
-            self.options.line_length = self.line_length
-        if self.options.indent is None:
+        self.grammar = self.data.grammar
+        self.options = options
+        self._update_options(options)
+
+    def _update_options(self, options):
+        self.data.generator_options = options
+        self.options = self.data.generator_options
+
+        if self.options.indent is not None:
+            if isinstance(self.data.indent, int):
+                self.data.indent = ' ' * self.data.indent
+            self.indent = self.data.indent
+        else:
+            if isinstance(self.indent, int):
+                self.indent = ' ' * self.indent
             self.options.indent = self.indent
-        if isinstance(self.options.indent, int):
-            self.options.indent = ' ' * self.options.indent
-        self.options.unicodedata_needed = (
-            grammar.unicat_needed
-            or 'unicode_lookup' in self.grammar.needed_builtin_functions
+            self.data.indent = self.indent
+
+        if self.options.line_length is not None:
+            self.line_length = self.options.line_length
+            self.data.line_length = self.line_length
+        else:
+            self.options.line_length = self.line_length
+
+        assert (self.indent == self.data.indent) and (
+            self.indent == self.options.indent
+        )
+        assert (self.line_length == self.data.line_length) and (
+            self.line_length == self.options.line_length
         )
 
+    def _process_grammar(self, local_var_map):
+        grammar = self.data.grammar
+        self.data.generator_options.unicodedata_needed = (
+            grammar.unicat_needed
+            or 'unicode_lookup' in grammar.needed_builtin_functions
+            or 'ulookup' in grammar.needed_builtin_functions
+        )
+
+        self._derive_local_vars(grammar, local_var_map)
         self._derive_memoize()
 
     def _derive_memoize(self):
+        grammar = self.grammar
+        if self.data.generator_options.memoize is None:
+            if 'memoize' in grammar.externs:
+                memoize = grammar.externs['memoize']
+            else:
+                memoize = False
+            self.data.generator_options.memoize = memoize
+        if not self.data.generator_options.memoize:
+            return
+
         def _walk(node):
             if node.t == 'apply':
                 if node.rule_name.startswith('r_'):
                     name = node.rule_name[2:]
                     node.memoize = (
                         name not in self.grammar.operators
-                        and name not in self.grammar.leftrec_rules
+                        and name not in grammar.leftrec_rules
                     )
                 else:
                     node.memoize = False
@@ -96,17 +144,21 @@ class Generator:
                 for c in node.ch:
                     _walk(c)
 
-        if self.options.memoize is None:
-            if 'memoize' in self.grammar.externs:
-                self.options.memoize = self.grammar.externs['memoize']
-            else:
-                self.options.memoize = False
+        grammar.needed_operators = sorted(
+            grammar.needed_operators + ['memoize']
+        )
+        _walk(grammar.ast)
 
-        if self.options.memoize:
-            self.grammar.needed_operators = sorted(
-                self.grammar.needed_operators + ['memoize']
-            )
-            _walk(self.grammar.ast)
+    def _derive_local_vars(self, grammar, local_var_map):
+        def _walk(node) -> set[str]:
+            local_vars: set[str] = set()
+            local_vars.update(set(local_var_map.get(node.t, [])))
+            for c in node.ch:
+                local_vars.update(_walk(c))
+            return local_vars
+
+        for _, node in grammar.rules.items():
+            node.local_vars = _walk(node)
 
     def generate(self) -> str:
         raise NotImplementedError
@@ -114,33 +166,35 @@ class Generator:
 
 def add_arguments(
     parser: argparse.ArgumentParser,
-    generators: Sequence[type[Generator]],
+    generators: Optional[Sequence[type[Generator]]] = None,
 ) -> None:
     options = GeneratorOptions()
-    parser.add_argument(
-        '-g',
-        '--generator',
-        action='store',
-        choices=[gen.name.lower() for gen in generators],
-        default=pyfloyd.DEFAULT_GENERATOR,
-        help=f'Generator to use (default is {pyfloyd.DEFAULT_GENERATOR})',
-    )
-    for lang in pyfloyd.KNOWN_LANGUAGES:
-        ext = pyfloyd.KNOWN_LANGUAGES[lang]
-        tmpl = pyfloyd.KNOWN_TEMPLATES[ext]
-        if lang.lower() == pyfloyd.DEFAULT_LANGUAGE.lower():
-            def_str = ' (the default)'
-        else:
-            def_str = ''
-        help_str = f'Generate {lang} code (using templates)' + def_str
+    if generators:
         parser.add_argument(
-            '--' + lang,
-            '--' + ext[1:],
-            action='store_const',
-            dest='template',
-            const=tmpl,
-            help=help_str,
+            '-g',
+            '--generator',
+            action='store',
+            choices=[gen.name.lower() for gen in generators],
+            default=pyfloyd.DEFAULT_GENERATOR,
+            help=f'Generator to use (default is {pyfloyd.DEFAULT_GENERATOR})',
         )
+        for lang in pyfloyd.KNOWN_LANGUAGES:
+            ext = pyfloyd.KNOWN_LANGUAGES[lang]
+            tmpl = pyfloyd.KNOWN_TEMPLATES[ext]
+            if lang.lower() == pyfloyd.DEFAULT_LANGUAGE.lower():
+                def_str = ' (the default)'
+            else:
+                def_str = ''
+            help_str = f'Generate {lang} code (using templates)' + def_str
+            parser.add_argument(
+                '--' + lang,
+                '--' + ext[1:],
+                action='store_const',
+                dest='template',
+                const=tmpl,
+                help=help_str,
+            )
+
     parser.add_argument(
         '--indent',
         action='store',

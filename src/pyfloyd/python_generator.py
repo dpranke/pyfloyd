@@ -14,6 +14,8 @@
 
 # pylint: disable=too-many-lines
 
+from typing import Any, Optional, Union
+
 from pyfloyd import datafile
 from pyfloyd import formatter
 from pyfloyd import generator
@@ -23,19 +25,19 @@ from pyfloyd import support
 
 
 class PythonGenerator(hard_coded_generator.HardCodedGenerator):
-    name = 'Python'
-    ext = '.py'
-    line_length = 79
-    indent = 4
+    name: str = 'Python'
+    ext: str = '.py'
+    indent: Union[int, str] = 4
+    line_length: Optional[int] = 79
 
     def __init__(
         self,
         host: support.Host,
-        grammar: gram.Grammar,
+        data: dict[str, Any],
         options: generator.GeneratorOptions,
     ):
-        super().__init__(host, grammar, options)
-        self._indent = '    '
+        assert 'grammar' in data
+        super().__init__(host, data, options)
         self._map = {
             'end': '',
             'false': 'False',
@@ -52,7 +54,7 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
             self._builtin_methods[k] = datafile.dedent(v)
 
         # Python doesn't need to declare local vars.
-        self._local_vars = {}
+        self._process_grammar(local_var_map={})
 
     def generate(self) -> str:
         vl = formatter.VList()
@@ -844,7 +846,7 @@ _BUILTINS = {
             return [hd] + tl
         """,
     'fn_dedent': """
-        def _fn_dedent(self, s):
+        def _fn_dedent(self, s, colno):
             return s
         """,
     'fn_dict': """
@@ -874,6 +876,10 @@ _BUILTINS = {
     'fn_strcat': """
         def _fn_strcat(self, a, b):
             return a + b
+        """,
+    'fn_ulookup': """
+        def _fn_ulookup(self, s):
+            return unicodedata.lookup(s)
         """,
     'fn_unicode_lookup': """
         def _fn_unicode_lookup(self, s):

@@ -28,6 +28,9 @@ class Host:
         self.stdout = sys.stdout
         self.stderr = sys.stderr
 
+    def abspath(self, *comps):
+        return os.path.abspath(self.join(*comps))
+
     def chdir(self, *comps):
         return os.chdir(self.join(*comps))
 

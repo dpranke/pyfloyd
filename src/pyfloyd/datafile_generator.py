@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import json
-from typing import Any
+from typing import Any, Union
 
 from pyfloyd import (
     at_exp,
@@ -26,7 +26,7 @@ from pyfloyd import (
 )
 
 
-DEFAULT_TEMPLATE = 'python'
+DEFAULT_TEMPLATE = 'python.dft'
 
 DEFAULT_LANGUAGE = DEFAULT_TEMPLATE[:-4]
 
@@ -39,111 +39,128 @@ KNOWN_LANGUAGES = {v: k for k, v in KNOWN_TEMPLATES.items()}
 
 
 class DatafileGenerator(generator.Generator):
-    name = 'datafile'
-    help_str = 'Generate code from a datafile template'
-    indent = '    '
+    name: str = 'datafile'
+    help_str: str = 'Generate code from a datafile template'
+    indent: Union[int, str] = 4
+    line_length: int = 79
 
     def __init__(
         self,
         host: support.Host,
-        grammar: m_grammar.Grammar,
+        data: dict['str', Any],
         options: generator.GeneratorOptions,
     ):
-        super().__init__(host, grammar, options)
-        self.datafile: dict[str, Any] = {
-            'name': None,
-            'starting_template': None,
-            'indent': 2,
-            'ext': None,
-            'local_vars': {},
-            'templates': {},
-        }
-        self.df_keys_to_merge = {'local_vars', 'templates'}
-        options.generator_options = options.generator_options or {}
+        # Do not pass the options to the base class; we want to
+        # hold off on processing them until after we've loaded all
+        # of the data.
+        super().__init__(host, data, generator.GeneratorOptions())
+        self._loaded_datafiles: set[str] = set()
 
         self._interpreter = interp = lisp_interpreter.Interpreter()
         interp.add_foreign_handler(self._eval_node)
-        interp.env.set('grammar', grammar)
-        interp.env.set('generator_options', self.options)
         interp.define_native_fn('invoke', self.f_invoke)
 
-        template = options.get('template', 'python')
+        template = options.get('template', DEFAULT_TEMPLATE)
         if template is None:
             template = DEFAULT_TEMPLATE
+        keys_to_merge = {'local_vars', 'templates'}
+        if self.host.splitext(template)[1] == '':
+            template = template + '.dft'
+        self._load_datafile(template, keys_to_merge)
 
-        path = self._find_datafile(template)
-        self._load_datafiles(path)
-        self.name = self.datafile['name']
-        self.ext = self.datafile['ext']
-        self.options.indent = self.datafile['indent']
-        if isinstance(self.options.indent, int):
-            self.options.indent = ' ' * self.options.indent
-        self.options.line_length = self.datafile.get('line_length', 79)
+        self.grammar = self.data.grammar
 
-        at_exp.bind_at_exps(interp, self.options.indent)
+        # Merge in the user-supplied generator options once all of the
+        # templates and associated datafiles have been loaded; when set,
+        # these override everything else.
+        self._update_options(options)
+        self.name = self.data.name
+        self.ext = self.data.ext
 
+        at_exp.bind_at_exps(interp, self.data.indent)
+        for k, v in self.data.items():
+            if k != 'templates':
+                interp.env.set(k, v)
         self._process_templates()
-        self._derive_local_vars()
 
-    def _derive_local_vars(self):
-        df_locals = self.datafile.get('local_vars', {})
-        if not df_locals:
+        if self.data.grammar:
+            if self.data.declare_local_vars:
+                local_var_map = self.data.local_var_map
+            else:
+                local_var_map = {}
+            self._process_grammar(local_var_map)
+
+    def _load_datafile(self, name, keys_to_merge, as_template=True):
+        if name in self._loaded_datafiles:
             return
 
-        def _walk(node) -> set[str]:
-            local_vars: set[str] = set()
-            local_vars.update(set(sym[1] for sym in df_locals.get(node.t, [])))
-            for c in node.ch:
-                local_vars.update(_walk(c))
-            return local_vars
+        if name == '-':
+            df_str = self.host.stdin.read()
+            filename = '<stdin>'
+        else:
+            if self.host.exists(name):
+                path = name
+            else:
+                path = self.host.join(self.host.dirname(__file__), name)
+                if not self.host.exists(path):
+                    raise ValueError(f"template file '{name}' not found")
+            filename = self.host.relpath(path)
+            df_str = self.host.read_text_file(path)
 
-        for _, node in self.grammar.rules.items():
-            node.local_vars = _walk(node)
+        if as_template:
+            df = datafile.loads(
+                df_str,
+                parse_bareword=self._parse_bareword,
+                custom_tags={'@': self._to_at_exp, 'q': self._to_quoted_list},
+                filename=filename,
+            )
+        else:
+            df = datafile.loads(df_str, filename=filename)
 
-    def _find_datafile(self, name):
-        if self.host.exists(name):
-            return name
-        if self.host.splitext(name)[1] == '':
-            name += '.dft'
-        path = self.host.join(self.host.dirname(__file__), name)
-        if not self.host.exists(path):
-            raise ValueError(f"template file '{name}' not found")
-        return path
+        self._loaded_datafiles.add(name)
 
-    def _load_datafiles(self, name):
-        path = self._find_datafile(name)
-        filename = self.host.relpath(path)
-        df_str = self.host.read_text_file(path)
-        df = datafile.loads(
-            df_str,
-            parse_bareword=self._parse_bareword,
-            custom_tags={'@': self._to_at_exp, 'q': self._to_quoted_list},
-            filename=filename,
-        )
+        # Load definitions from any base templates; do this before
+        # we process anything else in this file.
         if 'inherit' in df:
             for base in df['inherit']:
-                self._load_datafiles(base)
-        self._merge_datafile(df)
+                if self.host.splitext(base)[1] == '':
+                    base = base + '.dft'
+                self._load_datafile(base, keys_to_merge)
 
-    def _merge_datafile(self, df):
-        # pylint: disable=consider-using-dict-items
-        for df_key in self.datafile:
-            if df_key in df:
-                if df_key in self.df_keys_to_merge:
-                    for k, v in df[df_key].items():
-                        if (
-                            df_key == 'templates'
-                            and isinstance(v, str)
-                            and '\n' in v
-                        ):
-                            obj = formatter.split_to_objs(
-                                v, self.options.indent
-                            )
-                        else:
-                            obj = v
-                        self.datafile[df_key][k] = obj
-                else:
-                    self.datafile[df_key] = df[df_key]
+        # Now load any data required by *this* datafile; it will overwrite
+        # any data loaded from any previous datafiles.
+        if 'datafiles' in self.data:
+            for dataf in self.data.datafiles:
+                if self.host.splitext(dataf)[1] == '':
+                    dataf = dataf + '.df'
+                self._load_datafile(dataf, keys_to_merge, as_template=False)
+
+        # Lastly, merge the values defined in *this* datafile.
+        self._merge_datafile(df, keys_to_merge)
+
+    def _merge_datafile(self, df, keys_to_merge):
+        if 'indent' in df and df['indent'] is not None:
+            if isinstance(df['indent'], int):
+                indent = df['indent'] * ' '
+            else:
+                indent = df['indent']
+        else:
+            indent = self.indent
+
+        for df_key in df.keys():
+            if df_key in self.data and df_key in keys_to_merge:
+                for k, v in df[df_key].items():
+                    if (
+                        df_key == 'templates'
+                        and isinstance(v, str)
+                        and '\n' in v
+                    ):
+                        obj = formatter.split_to_objs(v, indent)
+                    else:
+                        obj = v
+                    self.data[df_key][k] = obj
+            else:
+                self.data[df_key] = df[df_key]
 
     def _parse_bareword(self, s: str, as_key: bool) -> Any:
         if as_key:
@@ -166,7 +183,7 @@ class DatafileGenerator(generator.Generator):
         return [['symbol', 'quote'], obj]
 
     def _process_templates(self):
-        data = self.datafile
+        data = self.data
         funcs = {}
         for t, v in data['templates'].items():
             if isinstance(v, list) and len(v) > 0 and v[0] == '@fn':
@@ -185,9 +202,7 @@ class DatafileGenerator(generator.Generator):
         return False, None
 
     def generate(self) -> str:
-        obj = self._interpreter.eval(
-            [['symbol', self.datafile['starting_template']]]
-        )
+        obj = self._interpreter.eval([['symbol', self.data.starting_template]])
         if self.options.as_json:
             return json.dumps(obj.to_list(), indent=self.options.indent)
         if self.options.output_as_format_tree:

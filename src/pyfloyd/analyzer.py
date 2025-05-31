@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from pyfloyd import functions
 from pyfloyd import grammar as m_grammar
 
 
@@ -87,7 +88,7 @@ def analyze(ast, rewrite_subrules: bool) -> m_grammar.Grammar:
     g.needed_builtin_functions = sorted(set(g.needed_builtin_functions))
     g.needed_operators = sorted(set(g.needed_operators))
     g.unicodedata_needed = (
-        g.unicat_needed or 'unicode_lookup' in g.needed_builtin_functions
+        g.unicat_needed or 'ulookup' in g.needed_builtin_functions
     )
     g.seeds_needed = g.leftrec_needed or g.operator_needed
 
@@ -253,7 +254,7 @@ class _Analyzer:
     def check_for_unknown_functions(self, node):
         if node.t == 'e_qual' and node.ch[1].t == 'e_call':
             function_name = node.ch[0].v
-            if function_name not in m_grammar.BUILTIN_FUNCTIONS:
+            if function_name not in functions.ALL:
                 self.errors.append(
                     f'Unknown function "{function_name}" called'
                 )
@@ -311,7 +312,7 @@ class _Analyzer:
                 references.add(var_name)
             elif var_name in self.grammar.externs:
                 node.kind = 'extern'
-            elif var_name in m_grammar.BUILTIN_FUNCTIONS:
+            elif var_name in functions.ALL:
                 node.kind = 'function'
                 self.grammar.needed_builtin_functions.append(var_name)
             else:

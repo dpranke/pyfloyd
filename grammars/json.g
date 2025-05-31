@@ -1,8 +1,8 @@
 %whitespace    = [ \n\r\t]
 
-%tokens        = string number 
+%tokens        = string number
 
-grammar        = value end                            -> $1 
+grammar        = value end                            -> $1
 
 value          = object                               -> dict($1)
                | array                                -> $1

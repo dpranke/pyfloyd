@@ -1,0 +1,36 @@
+starting_template: 'generate'
+
+templates: {
+
+generate: @"""
+# Functions
+
+## Builtin
+
+The host language has the following built-in functions with the
+given types (using Python's type annotation syntax):
+
+@vl[[map_items [fn [k v] [func k v]] functions]]
+"""
+
+func: [fn [k v] [at_exp d"""
+                        * `@k(@params[v.params]) -> @v.ret`<br>
+                        @ind[v.doc]
+
+                        """]]
+
+params: [fn [params] [hl [map [fn [param]
+                                  [if [equal [len param] 3]
+                                      [strcat [item param 0]
+                                              ': '
+                                              [item param 1]
+                                              ' = '
+                                              [if [is_str [item param 2]]
+                                                  [strcat "'" [item param 2] "'"]
+                                                  [itoa [item param 2]]]]
+                                      [strcat [item param 0]
+                                              ': '
+                                              [item param 1]]]]
+                              params ', ']]]
+
+}

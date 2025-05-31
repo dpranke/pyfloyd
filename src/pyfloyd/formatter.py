@@ -280,7 +280,7 @@ class Comma(_MultipleObj):
         if not self.objs:
             return ['']
 
-        new_l = None if length is None else length - 1
+        new_l = None if length is None else length
         lines = []
         for obj in self.objs:
             lines += fmt_fn(obj, new_l, indent)
@@ -459,7 +459,9 @@ class Triangle(_MultipleObj):
     ) -> list[str]:
         lines = fmt_fn(self.objs[0], length, indent)
         new_l = _new_length(length, len(indent))
-        lines.extend(fmt_fn(self.objs[1], new_l, indent))
+        lines.extend(
+            indent + line for line in fmt_fn(self.objs[1], new_l, indent)
+        )
         lines.extend(fmt_fn(self.objs[2], length, indent))
         return lines
 

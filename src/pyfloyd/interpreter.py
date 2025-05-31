@@ -17,6 +17,7 @@ from typing import Any
 import unicodedata
 
 from pyfloyd import (
+    functions,
     grammar as m_grammar,
     grammar_parser,
 )
@@ -52,6 +53,7 @@ class Interpreter:
         self._operators: dict[str, m_grammar.OperatorState] = {}
         self._regexps: dict[str, re.Pattern] = {}
         self._externs: dict[str, Any] = grammar.externs
+        self._functions = functions.ALL
 
     def parse(
         self, text: str, path: str = '<string>', externs=None
@@ -76,10 +78,15 @@ class Interpreter:
         if errors:
             return grammar_parser.Result(None, errors.strip(), 0)
 
-        self._interpret(self._grammar.rules[self._grammar.starting_rule])
-        if self._failed:
-            return self._format_error()
-        return grammar_parser.Result(self._val, None, self._pos)
+        try:
+            self._interpret(self._grammar.rules[self._grammar.starting_rule])
+            if self._failed:
+                return self._format_error()
+            return grammar_parser.Result(self._val, None, self._pos)
+        except functions.UserError as exc:
+            return grammar_parser.Result(None, str(exc), self._pos)
+        except functions.HostError as exc:
+            return grammar_parser.Result(None, str(exc), self._pos)
 
     def _interpret(self, node):
         fn = getattr(self, f'_ty_{node.t}', None)
@@ -310,6 +317,9 @@ class Interpreter:
             self._succeed(self._externs[v])
             return
         if node.kind == 'function':
+            if node.v in self._functions and self._functions[node.v]:
+                self._succeed(self._functions[node.v])
+                return
             v = getattr(self, '_fn_' + node.v, None)
             if v:
                 self._succeed(v)
@@ -553,63 +563,10 @@ class Interpreter:
         else:
             self._fail()
 
-    def _fn_atof(self, val):
-        if '.' in val or 'e' in val or 'E' in val:
-            return float(val)
-        return int(val)
-
-    def _fn_atoi(self, val, base):
-        return int(val, base=base)
-
-    def _fn_atou(self, val, base):
-        return chr(int(val, base))
-
-    def _fn_cat(self, val):
-        return ''.join(val)
-
-    def _fn_colno(self):
+    def _fn_colno(self) -> int:
         colno = 0
         if self._pos == self._end:
             colno += 1
         while self._pos >= colno and self._text[self._pos - colno] != '\n':
             colno += 1
         return colno
-
-    def _fn_concat(self, xs, ys):
-        return xs + ys
-
-    def _fn_cons(self, hd, tl):
-        return [hd] + tl
-
-    def _fn_dedent(self, s):
-        return s
-
-    def _fn_dict(self, val):
-        return dict(val)
-
-    def _fn_float(self, val):
-        return float(val)
-
-    def _fn_int(self, val):
-        return int(val)
-
-    def _fn_itou(self, val):
-        return chr(val)
-
-    def _fn_join(self, val, vs):
-        return val.join(vs)
-
-    def _fn_scat(self, xs):
-        return ''.join(xs)
-
-    def _fn_scons(self, hd, tl):
-        return [hd] + tl
-
-    def _fn_strcat(self, a, b):
-        return a + b
-
-    def _fn_utoi(self, val):
-        return ord(val)
-
-    def _fn_xtou(self, s):
-        return chr(int(s, base=16))

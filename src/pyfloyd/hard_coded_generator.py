@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Union
+from typing import Any, Union
 
 from pyfloyd import (
     datafile,
@@ -28,25 +28,13 @@ class HardCodedGenerator(generator.Generator):
     def __init__(
         self,
         host: support.Host,
-        grammar: m_grammar.Grammar,
+        data: dict[str, Any],
         options: generator.GeneratorOptions,
     ):
-        super().__init__(host, grammar, options)
+        super().__init__(host, data, options)
         # Expected to be overridden in subclasses
         self._map: dict[str, str] = {}
         self._builtin_methods: dict[str, str] = {}
-        self._local_vars: dict[str, list[str]] = {}
-
-    def _derive_local_vars(self):
-        def _walk(node) -> set[str]:
-            local_vars: set[str] = set()
-            local_vars.update(set(self._local_vars.get(node.t, [])))
-            for c in node.ch:
-                local_vars.update(_walk(c))
-            return local_vars
-
-        for _, node in self.grammar.rules.items():
-            node.local_vars = _walk(node)
 
     def _defmt(self, s: str, dedented=False) -> formatter.VList:
         if dedented:

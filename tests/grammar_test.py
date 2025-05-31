@@ -129,8 +129,8 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
 
     def test_big_int(self):
         self.check(
-            # 'grammar = { float("505874924095815700") }',
-            'grammar = -> atof("505874924095815700")',
+            # 'grammar = { ftoi("505874924095815700") }',
+            'grammar = -> atoi("505874924095815700", 10)',
             text='',
             out=505874924095815700,
         )
@@ -384,7 +384,11 @@ class GrammarTestsMixin:  # pylint: disable=too-many-public-methods
         self.check('g = -> cons(1, [2, 3])', text='', out=[1, 2, 3])
 
     def test_fn_dedent(self):
-        self.check('g = -> dedent("foo")', text='', out='foo')
+        self.check(
+            'g = -> dedent("\n  foo\n    bar\n", -1)',
+            text='',
+            out='foo\n  bar\n',
+        )
 
     def test_fn_dict(self):
         self.check(

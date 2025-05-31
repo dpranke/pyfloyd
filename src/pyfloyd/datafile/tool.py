@@ -64,13 +64,17 @@ def main(argv=None, host=None):
         except ValueError:
             pass
 
-    obj = datafile.loads(inp)
-    if args.as_json:
-        s = json.dumps(obj, indent=args.indent)
-    else:
-        s = datafile.dumps(obj, indent=args.indent)
-    host.print(s)
-    return 0
+    try:
+        obj = datafile.loads(inp, filename=args.file)
+        if args.as_json:
+            s = json.dumps(obj, indent=args.indent)
+        else:
+            s = datafile.dumps(obj, indent=args.indent)
+        host.print(s)
+        return 0
+    except datafile.DatafileError as exc:
+        print(exc)
+        return 1
 
 
 class _HostedArgumentParser(argparse.ArgumentParser):

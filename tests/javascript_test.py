@@ -27,6 +27,15 @@ class Tests(
     generator = 'javascript'
     floyd_externs = {'unicode_names': False}
 
+    def test_fn_dedent(self):
+        # TODO: `dedent` isn't implemented properly in the hardcoded
+        # JS generator yet.
+        self.check(
+            'g = -> dedent("\n  foo\n     bar\n", -1)',
+            text='',
+            out='\n  foo\n     bar\n',
+        )
+
     @grammar_test.skip('integration')
     def test_json5_special_floats(self):
         # TODO: `Infinity` and `NaN` are legal Python values and legal
