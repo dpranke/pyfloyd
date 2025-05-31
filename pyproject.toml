@@ -42,8 +42,9 @@ Issues = "https://github.com/dpranke/pyfloyd/issues"
 Changelog = "https://github.com/dpranke/pyfloyd/blob/master/README.md"
 
 [project.scripts]
-fdf = "pyfloyd.datafile.tool:main"
-pyfloyd = "pyfloyd.tool:main"
+fld = "pyfloyd.datafile.tool:main"
+flc = "pyfloyd.tool:main"
+flt = "pyfloyd.template:main"
 
 [tool.black]
 line-length = 79

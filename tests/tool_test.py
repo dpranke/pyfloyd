@@ -16,7 +16,6 @@ import subprocess
 import sys
 import unittest
 
-import pyfloyd
 from pyfloyd import support, tool
 
 
@@ -28,7 +27,7 @@ class ToolTest(unittest.TestCase):
     def test_compile(self):
         host = support.FakeHost()
         host.write_text_file('grammar.g', 'grammar = "Hello" end -> true')
-        ret = tool.main(['-c', 'grammar.g'], host=host)
+        ret = tool.main(['grammar.g'], host=host)
         self.assertEqual(ret, 0)
         self.assertEqual(host.stdout.getvalue(), '')
         self.assertEqual(host.stderr.getvalue(), '')
@@ -44,7 +43,7 @@ class ToolTest(unittest.TestCase):
     def test_compile_error(self):
         host = support.FakeHost()
         host.write_text_file('grammar.g', 'xyz')
-        ret = tool.main(['-c', 'grammar.g'], host=host)
+        ret = tool.main(['grammar.g'], host=host)
         self.assertEqual(ret, 1)
         self.assertEqual(host.stdout.getvalue(), '')
         self.assertEqual(
@@ -52,7 +51,7 @@ class ToolTest(unittest.TestCase):
             'grammar.g:1 Unexpected end of input at column 4\n',
         )
 
-    def test_help(self):
+    def test_version(self):
         proc = subprocess.run(
             [sys.executable, '-m', 'pyfloyd', '--version'],
             capture_output=True,
@@ -71,7 +70,7 @@ class ToolTest(unittest.TestCase):
         try:
             path = d + '/grammar.g'
             host.write_text_file(path, "grammar = 'foo'* -> true\n")
-            ret = tool.main(['-c', path], host)
+            ret = tool.main([path], host)
             f = host.read_text_file(d + '/grammar.py')
             scope = {}
             exec(f, scope)
@@ -96,7 +95,7 @@ class ToolTest(unittest.TestCase):
 
             # This specifies a filename for `-o`; the other integration
             # test takes the default filename to cover both code paths.
-            tool.main(['-c', '--main', '-o', d + '/foo.py', path])
+            tool.main(['--main', '-o', d + '/foo.py', path])
 
             host.write_text_file(d + '/foo.inp', 'foofoo')
             proc = subprocess.run(
@@ -125,7 +124,7 @@ class ToolTest(unittest.TestCase):
             # doesn't have a main. It also omits the `-o` flag
             # to get coverage of the code path where we use the default
             # output path and extension.
-            tool.main(['-c', '-G', 'memoize = true', '--javascript', path])
+            tool.main(['-G', 'memoize = true', '--javascript', path])
 
             host.write_text_file(d + '/foo.inp', 'foofoo')
 
@@ -148,7 +147,7 @@ class ToolTest(unittest.TestCase):
         host = support.FakeHost()
         host.write_text_file('grammar.g', 'grammar = "Hello" end -> true')
         host.write_text_file('input.txt', 'Hello')
-        self.assertEqual(tool.main(['grammar.g', 'input.txt'], host), 0)
+        self.assertEqual(tool.main(['-I', 'grammar.g', '-i', 'input.txt'], host), 0)
         self.assertEqual(host.stdout.getvalue(), 'true\n')
         self.assertEqual(host.stderr.getvalue(), '')
 
@@ -157,7 +156,7 @@ class ToolTest(unittest.TestCase):
         host.write_text_file('grammar.g', 'grammar = "Hello" end -> true')
         host.stdin.write('Hello')
         host.stdin.seek(0)
-        ret = tool.main(['grammar.g'], host=host)
+        ret = tool.main(['-I', 'grammar.g'], host=host)
         self.assertEqual(ret, 0)
         self.assertEqual(host.stderr.getvalue(), '')
         self.assertEqual(host.stdout.getvalue(), 'true\n')
@@ -165,7 +164,7 @@ class ToolTest(unittest.TestCase):
     def test_interpret_grammar_error(self):
         host = support.FakeHost()
         host.write_text_file('grammar.g', 'xyz')
-        ret = tool.main(['grammar.g'], host=host)
+        ret = tool.main(['-I', 'grammar.g'], host=host)
         self.assertEqual(ret, 1)
         self.assertEqual(host.stdout.getvalue(), '')
         self.assertEqual(
@@ -179,7 +178,7 @@ class ToolTest(unittest.TestCase):
         host.write_text_file('grammar.g', 'grammar = "Hello" end -> true')
         host.stdin.write('Hell')
         host.stdin.seek(0)
-        self.assertEqual(tool.main(['grammar.g'], host), 1)
+        self.assertEqual(tool.main(['-I', 'grammar.g'], host), 1)
         self.assertEqual(host.stdout.getvalue(), '')
         self.assertEqual(
             host.stderr.getvalue(),
@@ -201,7 +200,7 @@ class ToolTest(unittest.TestCase):
     def test_main(self):
         host = support.FakeHost()
         host.write_text_file('grammar.g', 'grammar = "Hello" end -> true')
-        ret = tool.main(['-c', '--main', 'grammar.g'], host=host)
+        ret = tool.main(['--main', 'grammar.g'], host=host)
         self.assertEqual(ret, 0)
         self.assertEqual(host.stdout.getvalue(), '')
         self.assertEqual(host.stderr.getvalue(), '')
@@ -214,7 +213,7 @@ class ToolTest(unittest.TestCase):
     def test_memoize(self):
         host = support.FakeHost()
         host.write_text_file('grammar.g', 'grammar = "Hello" end -> true')
-        ret = tool.main(['-c', '-G', 'memoize = true', 'grammar.g'], host=host)
+        ret = tool.main(['-G', 'memoize = true', 'grammar.g'], host=host)
         self.assertEqual(ret, 0)
         self.assertEqual(host.stdout.getvalue(), '')
         self.assertEqual(host.stderr.getvalue(), '')
@@ -259,8 +258,3 @@ class ToolTest(unittest.TestCase):
         host = support.FakeHost()
         # This should fail because we're not specifying a grammar.
         self.assertEqual(tool.main([], host=host), 2)
-
-    def test_version(self):
-        host = support.FakeHost()
-        self.assertEqual(tool.main(['--version'], host=host), 0)
-        self.assertEqual(host.stdout.getvalue(), pyfloyd.__version__ + '\n')

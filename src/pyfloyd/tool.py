@@ -80,7 +80,12 @@ def main(argv=None, host=None):
                 contents = None
         elif args.pretty_print:
             contents, err = pyfloyd.pretty_print(grammar, args.grammar)
-        elif args.compile:
+        elif args.interpret:
+            contents, err, _ = _interpret_grammar(
+                host, args, grammar, externs, options
+            )
+            ext = None
+        else:
             if args.template is None:
                 if args.output and args.output != '-':
                     ext = host.splitext(args.output)[1]
@@ -90,17 +95,12 @@ def main(argv=None, host=None):
             )
             if v is not None:
                 contents, ext = v
-        else:
-            contents, err, _ = _interpret_grammar(
-                host, args, grammar, externs, options
-            )
-            ext = None
 
         if err:
             host.print(err, file=host.stderr)
             return 1
         path = _write(host, args, contents, ext)
-        if args.compile and args.main and path != '-':
+        if not args.interpret and args.main and path != '-':
             host.make_executable(path)
         return 0
 
@@ -135,12 +135,6 @@ def _parse_args(host, argv):
     )
     ap.add_argument(
         '--as-json', action='store_true', help='dump the AST as JSON'
-    )
-    ap.add_argument(
-        '-c',
-        '--compile',
-        action='store_true',
-        help='compile grammar instead of interpreting it',
     )
     ap.add_argument(
         '-E',
@@ -178,11 +172,20 @@ def _parse_args(host, argv):
     ap.add_argument(
         'grammar',
         nargs='?',
-        help='grammar file to interpret or compiled. '
-        'Usually a required argument.',
+        help='grammar file to interpret or compile'
     )
     ap.add_argument(
-        'input', nargs='?', default='-', help='path to read data from'
+        '-I',
+        '--interpret',
+        action='store_true',
+        help='interpret the grammar instead of compiling it'
+    )
+    ap.add_argument(
+        '-i',
+        '--input',
+        action='store',
+        default='-',
+        help='path to read data from'
     )
     ap.add_argument('--post-mortem', '--pm', action='store_true')
 
@@ -196,7 +199,7 @@ def _parse_args(host, argv):
         host.print('You must specify a grammar.')
         return None, 2
 
-    if not args.output and not args.compile:
+    if not args.output and (args.interpret or args.pretty_print):
         args.output = '-'
 
     return args, None

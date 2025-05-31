@@ -79,7 +79,7 @@ class Module(support.ModuleTestCase, _Tests):
 
 
 class Script(support.ScriptTestCase, _Tests):
-    script = 'fdf'
+    script = 'fld'
 
 
 class Tool(support.ScriptTestCase, _Tests):
