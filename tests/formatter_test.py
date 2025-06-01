@@ -194,7 +194,6 @@ class Tests(unittest.TestCase):
             ['very long', '     argument'], flatten(obj, length=6)
         )
 
-
     def test_hlist(self):
         obj = HList()
         self.assertEqual([''], flatten(obj))
@@ -432,24 +431,13 @@ class Tests(unittest.TestCase):
         self.assertEqual(['first  foobar last'], flatten(w))
 
         w = Wrap(VList('foo', 'bar'), *args)
-        self.assertEqual(
-            [
-                'first  foo suffix',
-                'prefix bar last'
-            ],
-            flatten(w)
-        )
+        self.assertEqual(['first  foo suffix', 'prefix bar last'], flatten(w))
 
         w = Wrap(Hang(['foo', 'bar', 'baz'], ' '), '#  ', ' \\', '# `', '`')
         self.assertEqual(['# `foo bar baz`'], flatten(w))
         self.assertEqual(
-            [
-                '# `foo bar \\',
-                '#      baz`'
-            ],
-            flatten(w, length=10)
+            ['# `foo bar \\', '#      baz`'], flatten(w, length=10)
         )
-
 
 
 class AsListTests(unittest.TestCase):

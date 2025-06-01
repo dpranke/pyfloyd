@@ -13,18 +13,56 @@
 # limitations under the License.
 
 import textwrap
-import unittest
 
 import pyfloyd
-
 
 from . import grammar_test
 
 
-class Tests(unittest.TestCase, grammar_test.GrammarTestsMixin):
+class _Mixin(grammar_test.Mixin):
     max_diff = None
 
     def compile(self, grammar, path='<string>', memoize=False, externs=None):
         return pyfloyd.compile_to_parser(
             textwrap.dedent(grammar), path, memoize=memoize, externs=externs
         )
+
+
+class Hello(_Mixin, grammar_test.HelloMixin):
+    pass
+
+
+class Rules(_Mixin, grammar_test.RulesMixin):
+    pass
+
+
+class Actions(_Mixin, grammar_test.ActionsMixin):
+    pass
+
+
+class Functions(_Mixin, grammar_test.FunctionsMixin):
+    pass
+
+
+class Comments(_Mixin, grammar_test.CommentsMixin):
+    pass
+
+
+class Pragmas(_Mixin, grammar_test.PragmasMixin):
+    pass
+
+
+class Errors(_Mixin, grammar_test.ErrorsMixin):
+    pass
+
+
+class Operators(_Mixin, grammar_test.OperatorsMixin):
+    pass
+
+
+class Recursion(_Mixin, grammar_test.RecursionMixin):
+    pass
+
+
+class Integration(_Mixin, grammar_test.IntegrationMixin):
+    pass

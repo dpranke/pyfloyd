@@ -12,22 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import shutil
-import unittest
-
 from . import grammar_test
 
 
-class Tests(
-    unittest.TestCase,
-    grammar_test.GeneratorMixin,
-    grammar_test.GrammarTestsMixin,
-):
-    cmd = [shutil.which('node')]
+class _Mixin(grammar_test.GeneratorMixin):
+    exe = 'node'
     generator = 'javascript'
     floyd_externs = {'unicode_names': False}
 
-    def test_fn_dedent(self):
+
+class Hello(_Mixin, grammar_test.HelloMixin):
+    pass
+
+
+class Rules(_Mixin, grammar_test.RulesMixin):
+    pass
+
+
+class Actions(_Mixin, grammar_test.ActionsMixin):
+    pass
+
+
+class Functions(_Mixin, grammar_test.FunctionsMixin):
+    def test_dedent(self):
         # TODO: `dedent` isn't implemented properly in the hardcoded
         # JS generator yet.
         self.check(
@@ -36,6 +43,28 @@ class Tests(
             out='\n  foo\n     bar\n',
         )
 
+
+class Comments(_Mixin, grammar_test.CommentsMixin):
+    pass
+
+
+class Pragmas(_Mixin, grammar_test.PragmasMixin):
+    pass
+
+
+class Errors(_Mixin, grammar_test.ErrorsMixin):
+    pass
+
+
+class Operators(_Mixin, grammar_test.OperatorsMixin):
+    pass
+
+
+class Recursion(_Mixin, grammar_test.RecursionMixin):
+    pass
+
+
+class Integration(_Mixin, grammar_test.IntegrationMixin):
     @grammar_test.skip('integration')
     def test_json5_special_floats(self):
         # TODO: `Infinity` and `NaN` are legal Python values and legal

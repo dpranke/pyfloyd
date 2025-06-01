@@ -12,18 +12,51 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import unittest
-
 from . import grammar_test
 
 
-class Tests(
-    unittest.TestCase,
-    grammar_test.GeneratorMixin,
-    grammar_test.GrammarTestsMixin,
-):
-    cmd = [sys.executable]
+class _Mixin(grammar_test.GeneratorMixin):
+    exe = 'python'
     generator = 'datafile'
     template = 'python'
     ext = '.py'
+
+
+class Hello(_Mixin, grammar_test.HelloMixin):
+    pass
+
+
+class Rules(_Mixin, grammar_test.RulesMixin):
+    pass
+
+
+class Actions(_Mixin, grammar_test.ActionsMixin):
+    pass
+
+
+class Functions(_Mixin, grammar_test.FunctionsMixin):
+    pass
+
+
+class Comments(_Mixin, grammar_test.CommentsMixin):
+    pass
+
+
+class Pragmas(_Mixin, grammar_test.PragmasMixin):
+    pass
+
+
+class Errors(_Mixin, grammar_test.ErrorsMixin):
+    pass
+
+
+class Operators(_Mixin, grammar_test.OperatorsMixin):
+    pass
+
+
+class Recursion(_Mixin, grammar_test.RecursionMixin):
+    pass
+
+
+class Integration(_Mixin, grammar_test.IntegrationMixin):
+    pass
