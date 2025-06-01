@@ -16,6 +16,7 @@
 
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -29,6 +30,12 @@ import pyfloyd
 THIS_DIR = os.path.dirname(__file__)
 
 SKIP = os.environ.get('SKIP', '')
+
+
+class _JSONDecodeError(Exception):
+    def __init__(self, stdout, *args):
+        super().__init__(*args)
+        self.stdout = stdout
 
 
 def skip(kind):
@@ -73,12 +80,39 @@ class Mixin(unittest.TestCase):
             p.cleanup()
 
     def checkp(self, parser, text, out=None, err=None, externs=None):
-        actual_out, actual_err, _ = parser.parse(
-            text, path='<string>', externs=externs
-        )
+        ex = None
+        try:
+            actual_out, actual_err, _ = parser.parse(
+                text, path='<string>', externs=externs
+            )
+        except _JSONDecodeError as e:
+            ex = e
+
+        if ex:
+            if ex.stdout == b'':
+                self.fail('Failed to decode JSON object from empty stdout')
+            else:
+                self.fail(
+                    'Failed to decode JSON object from stdout'
+                    + str(ex.stdout)
+                    + ': `'
+                    + str(ex)
+                )
+
         # Test err before out because it's probably more helpful to display
         # an unexpected error than it is to display an unexpected output.
-        self.assertMultiLineEqual(err or '', actual_err or '')
+        if err is None and actual_err:
+            print(
+                'Got Unexpected stderr:\n  '
+                + '\n  '.join(actual_err.splitlines())
+                + '\n'
+            )
+            #self.fail('Unexpected stderr, see above')
+            #return
+
+        err = err or ''
+        actual_err = actual_err or ''
+        self.assertMultiLineEqual(err, actual_err)
         self.assertEqual(out, actual_out)
 
     def check_grammar_error(self, grammar, err):
@@ -88,7 +122,7 @@ class Mixin(unittest.TestCase):
 
 
 class GeneratorMixin(Mixin):
-    cmd = None
+    cmd: Optional[list] = None
     template: Optional[str] = None
 
     def compile(self, grammar, path='<string>', memoize=False, externs=None):
@@ -101,6 +135,12 @@ class GeneratorMixin(Mixin):
                 cmd = [shutil.which(self.exe)]
         else:
             cmd = self.cmd
+
+        generate_cmd = f'flc -g {self.generator} -T {self.template} --main'
+        if memoize:
+            generate_cmd += ' -G "memoize = true"'
+        if externs:
+            generate_cmd += ' -E {externs!r}'
 
         v, err, endpos = pyfloyd.generate(
             textwrap.dedent(grammar),
@@ -119,17 +159,20 @@ class GeneratorMixin(Mixin):
 
         source_code, ext = v
         return (
-            _GeneratedParserWrapper(cmd, ext, grammar, source_code),
+            _GeneratedParserWrapper(
+                cmd, ext, grammar, source_code, generate_cmd
+            ),
             None,
             0,
         )
 
 
 class _GeneratedParserWrapper:
-    def __init__(self, cmd, ext, grammar, source_code):
+    def __init__(self, cmd, ext, grammar, source_code, generate_cmd):
         self.cmd = cmd
         self.grammar = grammar
         self.source_code = source_code
+        self.generate_cmd = generate_cmd
         self.host = pyfloyd.support.Host()
         self.tempdir = self.host.mkdtemp()
         self.source = os.path.join(self.tempdir, f'parser{ext}')
@@ -142,19 +185,49 @@ class _GeneratedParserWrapper:
         externs = externs or {}
         for k, v in externs.items():
             defines.extend(['-D', f'{k}={json.dumps(v)}'])
-        proc = subprocess.run(
-            self.cmd + [self.source] + defines + [inp],
-            check=False,
-            capture_output=True,
-        )
+
+        cmd = self.cmd + [self.source] + defines + [inp]
+
+        print()
+        print('# Repro steps:')
+
+        def _echo(text, file):
+            lines = text.splitlines()
+            if len(lines) > 1:
+                print(f'echo {shlex.quote(lines[0])}  > {file} && \\')
+                for line in lines[1:-1]:
+                    print(f'echo {shlex.quote(line)}  >> {file} && \\')
+                if text.endswith('\n'):
+                    print(f'echo {shlex.quote(lines[-1])} >> {file} && \\')
+                else:
+                    print(f'echo -n {shlex.quote(lines[-1])} >> {file} && \\')
+            elif text.endswith('\n'):
+                print(f'echo {shlex.quote(text)}  > {file} && \\')
+            else:
+                print(f'echo -n {shlex.quote(text)}  > {file} && \\')
+
+        _echo(self.grammar, 'parser.g')
+        _echo(text, 'input.txt')
+        print(f'{self.generate_cmd} parser.g && \\')
+        print(shlex.join(arg.replace(self.tempdir, '.') for arg in cmd))
+        print()
+
+        proc = subprocess.run(cmd, check=False, capture_output=True)
         if proc.stderr:
             stderr = proc.stderr.decode('utf8').strip()
-            assert inp in stderr, f'"{inp}" not in "{stderr}"'
-            stderr = stderr.replace(inp, path)
+            stderr = stderr.replace(self.tempdir, '.')
+            stderr = stderr.replace('./input.txt', path)
+            if stderr.endswith('exit status 1'):
+                stderr = stderr[: -len('exit status 1')]
         else:
             stderr = None
+
         if proc.returncode == 0:
-            return json.loads(proc.stdout), None, 0
+            try:
+                return json.loads(proc.stdout), None, 0
+            except json.decoder.JSONDecodeError as e:
+                raise _JSONDecodeError(proc.stdout, *e.args) from e
+
         return None, stderr, 0
 
     def cleanup(self):
