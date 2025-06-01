@@ -147,6 +147,10 @@ def f_has(d: dict[str, Any], key: str) -> bool:
     return key in d
 
 
+def f_in(lis: list[Any], v: Any) -> bool:
+    return v in lis
+
+
 def f_is_atom(el: Any) -> bool:
     return isinstance(el, (bool, int, float, str)) or el is None
 
@@ -263,6 +267,10 @@ def f_strcat(*args: str) -> str:
     return ''.join(args)
 
 
+def f_strin(s: str, sub: str) -> bool:
+    return sub in s
+
+
 def f_strlen(s: str) -> int:
     return len(s)
 
@@ -323,6 +331,7 @@ ALL = {
     'ftoi': f_ftoi,
     'get': f_get,
     'has': f_has,
+    'in': f_in,
     'is_atom': f_is_atom,
     'is_bool': f_is_bool,
     'is_dict': f_is_dict,
@@ -352,6 +361,7 @@ ALL = {
     'sort': f_sort,
     'split': f_split,
     'strcat': f_strcat,
+    'strin': f_strin,
     'strlen': f_strlen,
     'substr': f_substr,
     'throw': f_throw,

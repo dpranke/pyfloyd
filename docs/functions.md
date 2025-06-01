@@ -88,6 +88,9 @@ given types (using Python's type annotation syntax):
 * `has(d: dict[str, any], key: str) -> bool`<br>
     Returns whether the key is in the dictionary.
 
+* `in(lis: list[any], v: any) -> bool`<br>
+    Returns whether `lis` contains `v`.
+
 * `is_atom(el: any) -> bool`<br>
     Returns whether the element is a primitive type
     (null/bool/num/str).
@@ -200,6 +203,9 @@ given types (using Python's type annotation syntax):
 * `strcat(*args: str) -> str`<br>
     Returns the string concatenation of the args. Equivalent to
     `cat(args)` or `join('', args)`.
+
+* `strin(s: str, sub: str) -> bool`<br>
+    Returns whether `sub` is found in `s`.
 
 * `strlen(s: str) -> int`<br>
     Returns the length of the string.

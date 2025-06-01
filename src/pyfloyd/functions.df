@@ -244,6 +244,14 @@ functions = {
               """
         body: 'return key in d'
     }
+    in: {
+        params: [[lis 'list[any]'] [v 'any']]
+        ret: bool
+        doc: d"""
+             Returns whether `lis` contains `v`.
+             """
+        body: 'return v in lis' # 'return lis.find(v) != -1'
+    }
     is_atom: {
         params: [[el any]]
         ret: bool
@@ -511,6 +519,14 @@ functions = {
               `cat(args)` or `join('', args)`.
               """
         body: "return ''.join(args)"
+    }
+    strin: {
+        params: [[s str] [sub str]]
+        ret: bool
+        doc: d"""
+             Returns whether `sub` is found in `s`.
+             """
+        body: "return sub in s"
     }
     strlen: {
         params: [[s str]]

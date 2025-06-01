@@ -53,8 +53,8 @@ wrap_argv: [fn [] [wrap [hang [cons 'pyfloyd' generator_options.argv] ' ']
 
 func: [fn [k v] [if [has v 'body']
                     [vl [hl 'def f_'
-                            k 
-                            '(' 
+                            k
+                            '('
                             [params v.params]
                             ') -> '
                             [replace v.ret 'any' 'Any']
