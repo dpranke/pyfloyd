@@ -50,6 +50,11 @@ extern: [fn [name] [strcat "p.externs[" [lit name] "]"]]
 
 method_name: [fn [name] [fld name]]
 
+ch_lit: [fn [s] [lit s]]
+str_lit: [fn [s] [strcat '"' s '"']]
+lit: [fn [s] [strcat '"' s '"']]
+
+
 #
 # Helper methods for generating text portably.
 #
@@ -63,11 +68,21 @@ t_assign_outer: [fn [var val]
                         val
                         ")" 
                         t_end]]
-t_append: [fn [lst val] [hl lst '.push(' val ')' t_end]]
+t_append: [fn [lst val] [hl lst ' = append(' lst ', ' val ')' t_end]]
 t_break:  'break'
+
 t_declare_local_vars: [fn [node] [t_declare_vars node.local_vars]]
-t_declare_vars: [fn [vars] [vl [map [fn [v] [hl 'var ' v t_end]]
-                                    vars]]]
+
+t_declare_vars: [fn [vars]
+                    [vl [map [fn [v]
+                                 [if [strin v ' ']
+                                     [hl 'var '
+                                         [replace v 'list[any]' '[]any']]
+                                     [hl 'var ' v ' any']]]
+                             vars]]]
+
+t_empty_list: '[]any{}'
+
 t_end: ''  # statement terminator
 t_eq: [fn [x y] [hl x ' == ' y]]
 t_false: 'false'
@@ -88,7 +103,7 @@ t_newmap: 'new Map()'
 t_not: '!'  # the logical operator
 t_null: 'nil'
 t_or: [fn [x y] [hl x ' || ' y]]
-t_pop: [fn [x] [hl x '.pop()']]
+t_pop: [fn [x] [hl 'x = x[:len(x) - 1]']]
 t_return: 'return'
 t_substr: [fn [s start end] [hl s '.substr(' start ', ' end ')']]
 t_throw: [fn [msg] [hl 'panic(' msg ')']]
@@ -111,6 +126,9 @@ default_header: @"""
     import (
         "errors"
         "fmt"
+        @if[[or [in grammar.needed_builtin_functions 'join']
+                [in grammar.needed_builtin_functions 'scat']]
+            '"strings"']
     )
     """
 
@@ -126,8 +144,12 @@ main_header: @"""
     import (
         "errors"
         "fmt"
+        "encoding/json"
         "io"
         "os"
+        @if[[or [in grammar.needed_builtin_functions 'join']
+                [in grammar.needed_builtin_functions 'scat']]
+            '"strings"']
     )
 
     """
@@ -210,6 +232,7 @@ parser_class: @"""
 parser_constructor: @"""
     func NewParser(text string, path string) *Parser {
         p := Parser{text: []rune(text), path: path}
+        p.end = len(p.text)
         @externs[]
         return &p
     }
@@ -286,10 +309,8 @@ parse_with_exception: @"""
       p.r_@grammar.starting_rule()
 
       if p.failed {
-          fmt.Println("failed")
           return Result{nil, errors.New(p.o_error()), p.errpos}
       } else {
-          fmt.Println("succeeded")
           return Result{p.val, nil, p.pos}
       }
     }
@@ -327,9 +348,15 @@ main_footer: d"""
         }
         val, err := Parse(string(d), data_file)
         if err == nil {
-            fmt.Println("success: ", val)
+            b, _ := json.Marshal(val)
+            if err != nil {
+                fmt.Fprintln(os.Stderr, "Failed to marshal `%v`", val)
+            } else {
+                fmt.Fprintln(os.Stdout, string(b))
+            }
         } else {
-            fmt.Println("Error: '", err, "'")
+            fmt.Fprintln(os.Stderr, err)
+            os.Exit(1)
         }
 
     }
@@ -367,26 +394,26 @@ n_set: [fn [node]
 
 r_any: [meth q[] d"""
     if p.pos < p.end {
-      p.o_succeed(p.text[p.pos], p.pos + 1)
+        p.o_succeed(string(p.text[p.pos]), p.pos + 1)
     } else {
-      p.o_fail()
+        p.o_fail()
     }
     """]
 
 r_end: [meth q[] d"""
     if p.pos == p.end {
-      p.o_succeed(nil, p.pos)
+        p.o_succeed(nil, p.pos)
     } else {
-      p.o_fail()
+        p.o_fail()
     }
     """]
 
-o_ch: [meth q['c string'] d"""
+o_ch: [meth q['c rune'] d"""
     pos := p.pos
     if pos < p.end && p.text[pos] == c {
-      p.o_succeed(c, p.pos + 1)
+        p.o_succeed(string(c), p.pos + 1)
     } else {
-      p.o_fail()
+        p.o_fail()
     }
     """]
 
@@ -395,12 +422,12 @@ o_offsets: d"""
         lineno := 1
         colno := 1
         for i := 0 ; i < pos ; i++ {
-          if p.text[i] == '\\n' {
-            lineno += 1
-            colno = 1
-          } else {
-            colno += 1
-          }
+            if p.text[i] == '\\n' {
+                lineno += 1
+                colno = 1
+            } else {
+                colno += 1
+            }
         }
         return lineno, colno
     }
@@ -411,12 +438,12 @@ o_error: d"""
         lineno, colno := p.o_offsets(p.errpos)
         var thing string
         if p.errpos == p.end {
-          thing = "end of input"
+            thing = "end of input"
         } else {
-          thing = string(p.text[p.errpos])
+            thing = string(p.text[p.errpos])
         }
-        return (p.path + ":" + string(lineno) + " Unexpected " + thing +
-                " at column " + string(colno))
+        return fmt.Sprintf("%s:%d Unexpected %s at column %d",
+                           p.path, lineno, thing, colno)
     }
     """
 
@@ -554,7 +581,8 @@ o_range: [meth q['i int' 'j int'] d"""
 o_rewind: [meth q['newpos int'] 'p.o_succeed(nil, newpos)']
 
 o_str: [meth q['s string'] d"""
-   for ch of s {
+   runes := []rune(s)
+   for _, ch := range runes {
      p.o_ch(ch)
      if p.failed {
        return
@@ -618,15 +646,38 @@ fn_dict: [meth q['pairs [](string, any)'] d"""
     return m
     """]
 
+fn_in: d"""
+    func (p *Parser) fn_in(lis []any, v any) bool {
+        for i := range lis {
+            if lis[i] == any {
+                return true
+            }
+        }
+        return false
+    }
+    """
+
 fn_itou: [meth q['n int'] 'return String.fromCharCode(n)']
 
-fn_join: [meth q['s string' 'vs []string'] 'return vs.join(s)']
+fn_join: [def_method _t_name
+                     q['sep string' 'vs any']
+                     'string'
+                     d"""
+                     strs := make([]string, len(vs.([]any)))
+                     for i, v := range(vs.([]any)) {
+                         strs[i] = v.(string)
+                     }
+                     return strings.Join(strs, sep)
+                     """]
 
-fn_scat: [meth q['ss []string'] "return ss.join('')"]
+fn_scat: [meth q['ss []string'] 'return strings.Join("", ss)']
 
 fn_scons: [meth q['hd string' 'tl []string'] 'return [hd].concat(tl)']
 
-fn_strcat: [meth q['a string' 'b string'] 'return a.concat(b)']
+fn_strcat: [def_method _t_name
+                       q['a string' 'b string']
+                       'string'
+                       'return a + b']
 
 fn_ulookup: [meth q['s string'] d"""
     panic('Unsupported function "ulookup"')

@@ -60,6 +60,7 @@ t_assign_outer: [fn [var val]
                     [hl "self._scopes[-1]['" var "'] = " val]]
 t_append: [fn [lst val] [hl lst '.append(' val ')' t_end]]
 t_break:   'break'
+t_empty_list: '[]'
 t_end: ''  # statement terminator (not used in Python)
 t_false: 'False'
 t_meth_def: 'def _'
@@ -297,6 +298,7 @@ builtin_fn: [fn [name]
                     [vl ''
                         [def_method [fn_name name]
                                     [function_param_names name]
+                                    ''
                                     [get [get functions name] 'body']]]
                     [vl '' [invoke [fn_name name]]]]]
 

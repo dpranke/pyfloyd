@@ -35,17 +35,17 @@ line_length = 79
 declare_local_vars = true
 
 local_var_map = {
-    choice: ['pos']
-    count: ['cmin' 'cmax' 'i' 'vs']
-    not: ['errpos' 'pos']
-    not_one: ['errpos' 'pos']
-    opt: ['pos']
-    plus: ['pos' 'vs']
-    pred: ['v']
-    regexp: ['found' 'r']
-    run: ['end' 'start']
-    set: ['found' 'r']
-    star: ['pos' 'vs']
+    choice: ['pos int']
+    count: ['cmin int' 'cmax int' 'i int' 'vs list[any]']
+    not: ['errpos int' 'pos int']
+    not_one: ['errpos int' 'pos int']
+    opt: ['pos int']
+    plus: ['pos int' 'vs list[any]']
+    pred: ['v any']
+    regexp: ['found bool' 'r any']
+    run: ['end int' 'start int']
+    set: ['found bool' 'r any']
+    star: ['pos int' 'vs any']
 }
 
 
@@ -56,6 +56,9 @@ templates = {
 #
 # Helper methods
 #
+
+ch_lit: [fn [c] [lit c]]
+str_lit: [fn [s] [lit s]]
 
 # Formats the command line used to generate the output.
 wrap_argv: [fn [first prefix]
@@ -68,19 +71,19 @@ wrap_argv: [fn [first prefix]
 # Returns a method definition, assuming nothing about the name of the
 # method. The param_names should be a list of strings, and the body
 # is the method text; the body may span multiple lines.
-def_method: [fn [name param_names body]
+def_method: [fn [name param_names ret body]
                 [block [hl t_meth_def
                            name
                            [tri '('
                                 [comma [if [equal t_meth_self '']
                                            param_names
                                            [cons t_meth_self param_names]]]
-                                ')']]
+                                [strcat ')' ret]]]
                        body]]
 
 # Returns a method definitions for a templated built-in operator or rule.
 # A thin wrapper around `def_method` that uses _t_name for the name.
-meth: [fn [params body] [def_method _t_name params body]]
+meth: [fn [params body] [def_method _t_name params '' body]]
 
 rule_method: [fn [rule node]
                  [block [hl t_meth_def rule '(' [t_meth_params ''] ')']
@@ -288,8 +291,8 @@ n_leftrec: [fn [node] [hl [call_op 'leftrec'
                            t_end]]
 
 n_lit: [fn [node] [hl [if [equal [strlen node.v] 1]
-                          [call_op 'ch' [list [lit node.v]]]
-                          [call_op 'str' [list [lit node.v]]]]
+                          [call_op 'ch' [list [ch_lit node.v]]]
+                          [call_op 'str' [list [str_lit node.v]]]]
                       t_end]]
 
 n_not: [fn [node] [vl [t_assign 'pos' f_pos]
@@ -308,13 +311,13 @@ n_operator: [fn [node] [hl [call_op 'operator' [list [lit node.v]] t_end]]]
 
 n_opt: [fn [node] [vl [stmts node.child]
                       [t_ifelse failed
-                                [vl [succeed '[]' f_pos]]
+                                [vl [succeed t_empty_list f_pos]]
                                 [vl [succeed [hl '[' f_val ']'] f_pos]]]]]
 
 n_paren: [fn [node] [stmts node.child]]
 
 n_plus: [fn [node]
-            [vl [t_assign 'vs' '[]']
+            [vl [t_assign 'vs' t_empty_list]
                 [stmts node.child]
                 [return_if_failed node.child]
                 [t_append 'vs' f_val]
@@ -358,7 +361,7 @@ n_seq: [fn [node]
                [stmts [item node.ch -1]]]]
 
 n_star: [fn [node]
-            [vl [t_assign 'vs' '[]']
+            [vl [t_assign 'vs' t_empty_list]
                 [t_while t_true
                       [vl [t_assign 'pos' f_pos]
                           [stmts node.child]

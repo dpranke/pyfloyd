@@ -63,9 +63,16 @@ t_assign_outer: [fn [var val]
                         t_end]]
 t_append: [fn [lst val] [hl lst '.push(' val ')' t_end]]
 t_break:  'break;'
+
 t_declare_local_vars: [fn [node] [t_declare_vars node.local_vars]]
-t_declare_vars: [fn [vars] [vl [map [fn [v] [hl 'let ' v t_end]]
-                                    vars]]]
+t_declare_vars: [fn [vars]
+                    [vl [map [fn [v]
+                                 [if [strin v ' ']
+                                     [hl 'let ' [item [split v ' '] 0] t_end]
+                                     [hl 'let ' v t_end]]]
+                             vars]]]
+
+t_empty_list: '[]'
 t_end: ';'  # statement terminator
 t_eq: [fn [x y] [hl x ' === ' y]]
 t_false: 'false'
