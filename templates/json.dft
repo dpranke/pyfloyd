@@ -1,0 +1,40 @@
+starting_template = 'generate'
+
+line_length = 79
+
+indent = '  '
+
+data_var = 'data'
+
+templates = {
+
+generate: [fn [] [t_value data]]
+
+t_value: [fn [v] [if [is_str v]
+                     [hl '"' v '"']
+                     [if [is_int v]
+                         [itoa v 10]
+                         [if [is_float v]
+                             [ftoa v]
+                             [if [is_list v]
+                                 [t_list v]
+                                 [if [is_dict v]
+                                     [t_dict v]
+                                     [if [is_bool v]
+                                         [if v 'true' 'false']
+                                         [if [is_null v]
+                                             'null'
+                                             '<unknown value>']]]]]]]]
+
+t_dict: [fn [d]
+            [hl [tri '{'
+                      [comma [map_items [fn [k v] [hl '"' k '": ' [t_value v]]]
+                                        d]]
+                     '}']]]
+
+t_list: [fn [lis]
+            [hl [tri '['
+                      [comma [map [fn [el] [t_value el]] lis]]
+                      ']']]]
+
+}
