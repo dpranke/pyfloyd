@@ -28,6 +28,10 @@ class Rules(_Mixin, grammar_test.RulesMixin):
     pass
 
 
+class Values(_Mixin, grammar_test.ValuesMixin):
+    pass
+
+
 class Actions(_Mixin, grammar_test.ActionsMixin):
     pass
 

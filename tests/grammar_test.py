@@ -107,13 +107,15 @@ class Mixin(unittest.TestCase):
                 + '\n  '.join(actual_err.splitlines())
                 + '\n'
             )
-            #self.fail('Unexpected stderr, see above')
-            #return
+            # self.fail('Unexpected stderr, see above')
+            # return
 
         err = err or ''
         actual_err = actual_err or ''
-        self.assertMultiLineEqual(err, actual_err)
-        self.assertEqual(out, actual_out)
+        if err is not None:
+            self.assertMultiLineEqual(err, actual_err)
+        if out is not None:
+            self.assertEqual(out, actual_out)
 
     def check_grammar_error(self, grammar, err):
         p, p_err, _ = self.compile(grammar)
@@ -237,46 +239,265 @@ class _GeneratedParserWrapper:
 class HelloMixin:
     def test_in(self):
         self.check(
-            'grammar = "hello, world" -> true', text='hello, world', out=True
+            'grammar = "hello, world" -> true', 'hello, world', out=True
         )
 
     def test_out(self):
-        self.check('grammar = -> "hello, world"', text='', out='hello, world')
+        self.check('grammar = -> "hello, world"', '', out='hello, world')
 
     def test_both(self):
         self.check(
             "grammar = any+ -> strcat('hello, ', join('', $1))",
-            text='world',
+            'world',
             out='hello, world',
         )
 
 
 class RulesMixin:
+    def test_action(self):
+        self.check('grammar = -> true', '')
+
     def test_basic(self):
-        self.check('grammar = end -> true', text='', out=True)
+        self.check('grammar = end', '')
 
     def test_bind(self):
-        self.check("grammar = 'a'*:v -> v", text='aa', out=['a', 'a'])
+        self.check("grammar = 'a'*", 'aa')
 
     def test_c_style_comment(self):
-        self.check('grammar = /* foo */ end -> true', text='', out=True)
+        self.check('grammar = /* foo */ end', '')
 
     def test_choice(self):
+        self.check("grammar = 'foo' | 'bar'", 'foo')
+
+        self.check("grammar = 'foo' | 'bar'", 'bar')
+
+    def test_choice_with_rewind(self):
+        self.check("grammar = 'a' 'b' | 'a' 'c'", 'ac')
+
+    def test_count(self):
+        grammar = "grammar = 'a'{3} 'b'{1,4} end"
+        self.check(
+            grammar,
+            'a',
+            err='<string>:1 Unexpected end of input at column 2',
+        )
+        self.check(
+            grammar,
+            'aaa',
+            err='<string>:1 Unexpected end of input at column 4',
+        )
+        self.check(grammar, 'aaab')
+        self.check(
+            grammar,
+            'aaabbbbb',
+            err='<string>:1 Unexpected "b" at column 8',
+        )
+
+    def test_empty(self):
+        self.check('grammar = ', '')
+
+    def test_end(self):
+        self.check(
+            'grammar = end', 'foo', err='<string>:1 Unexpected "f" at column 1'
+        )
+
+    def test_ends_in(self):
+        g = "g = ^.'a'"
+        self.check(g, '', err='<string>:1 Unexpected end of input at column 1')
+        self.check(
+            g, 'b', err='<string>:1 Unexpected end of input at column 2'
+        )
+        self.check(g, 'ba')
+
+    def test_equals(self):
+        g = "g = ={'foo'}"
+        self.check(g, 'foo', out='foo')
+        self.check(g, 'bar', err='<string>:1 Unexpected "b" at column 1')
+
+    def test_escape_unicat(self):
+        self.check('grammar = \\p{Nd}', '1')
+
+    def test_escapes_in_string(self):
+        self.check('grammar = "\\n\\"foo"', '\n"foo')
+        self.check("grammar = '\\'foo'", "'foo")
+
+    def test_inline_seq(self):
+        # This checks that we correctly include the builtin `end` rule
+        # when it is part of a parenthesized choice.
+        self.check("g = ('foo'|end)", '')
+
+    def test_inline_parens(self):
+        # This is a regression test for a subtle bug found when working
+        # on the inlining code in the generator; the method for the second
+        # choice was overwriting the method for the first choice.
+        self.check(
+            """
+            g  = (sp '*') | (sp '+')
+            sp = ' '
+            """,
+            ' *',
+        )
+
+    def test_lit_str(self):
+        self.check("grammar = ('foo')*", 'foofoo')
+
+    def test_long_unicode_literals(self):
+        self.check("grammar = '\\U00000020'", ' ')
+
+    def test_not_one(self):
+        self.check("grammar = ^'a' 'b'", 'cb')
+        self.check(
+            "grammar = ^'a' 'b'",
+            'a',
+            err='<string>:1 Unexpected "a" at column 1',
+        )
+        self.check(
+            "grammar = ^'a' 'b'",
+            '',
+            err='<string>:1 Unexpected end of input at column 1',
+        )
+
+    def test_not_not(self):
+        self.check("grammar = ~~('a') 'a'", 'a')
+
+    def test_opt(self):
+        self.check("grammar = 'a' 'b'?", 'a')
+
+    def test_plus(self):
+        g = "grammar = 'a'+"
+        self.check(
+            g,
+            '',
+            err='<string>:1 Unexpected end of input at column 1',
+        )
+        self.check(g, 'a')
+        self.check(g, 'aa')
+
+    def test_pred(self):
+        # self.check('grammar = ?{true} end { true }', '', out=True)
+        self.check('grammar = ?{true} end', '')
         self.check(
             """\
-            grammar = 'foo' -> true
-                    | 'bar' -> false
+            grammar = ?{false} end
+                    | end
             """,
-            text='foo',
-            out=True,
+            '',
         )
+        self.check(
+            'grammar = ?{"foo"} end',
+            '',
+            err='<string>:1 Bad predicate value',
+        )
+
+    def test_range(self):
+        grammar = "g = '0'..'9'"
+        self.check(grammar, '5')
+        self.check(grammar, 'a', err='<string>:1 Unexpected "a" at column 1')
+
+    def test_regexp(self):
+        self.check('g = /.+/', 'abc')
+
+    def test_rule_with_lit_str(self):
+        self.check(
+            """\
+            grammar = foo*
+            foo     = 'foo'
+            """,
+            'foofoo',
+        )
+
+    def test_run(self):
+        self.check("g = <'a' 'b' 'c'>", 'abc')
+        self.check(
+            "g = <'a' 'b' 'c'>",
+            'd',
+            err='<string>:1 Unexpected "d" at column 1',
+        )
+
+    def test_seq(self):
+        self.check("grammar = 'foo' 'bar'", 'foobar')
+
+    def test_set(self):
+        g = 'g = [xa-e]'
+        self.check(g, 'x')
+        self.check(g, 'a')
+        self.check(g, 'b')
+        self.check(g, 'e')
+        self.check(g, '', err='<string>:1 Unexpected end of input at column 1')
+        self.check(g, 'f', err='<string>:1 Unexpected "f" at column 1')
+
+    def test_set_exclude(self):
+        self.check('g = [^ab]', 'c')
+        self.check(
+            'g = [^a]',
+            'a',
+            err='<string>:1 Unexpected "a" at column 1',
+        )
+        self.check(
+            'g = [^a]',
+            '',
+            err='<string>:1 Unexpected end of input at column 1',
+        )
+        self.check(
+            'g = [^\\]]',
+            ']',
+            err='<string>:1 Unexpected "]" at column 1',
+        )
+        self.check(
+            'g = [^]',
+            '',
+            grammar_err='<string>:1 Unexpected "]" at column 7',
+        )
+        self.check(
+            'g = [^',
+            '',
+            grammar_err='<string>:1 Unexpected end of input at column 7',
+        )
+        self.check('g = [^\\ta\\n]', 'e')
+
+    def test_set_exclude_esc_char(self):
+        self.check(
+            'g = [^\\n]',
+            '\n',
+            err='<string>:1 Unexpected "\\n" at column 1',
+        )
+
+    def test_set_escaped_right_bracket(self):
+        g = r'g = [xa-e\]]'
+        self.check(g, ']')
+
+    def test_star(self):
+        self.check("grammar = 'a'*", '')
+        self.check("grammar = 'a'*", 'a')
+        self.check("grammar = 'a'*", 'aa')
+
+    def test_star_nested(self):
+        # This checks to make sure we don't get stuck in an infinite
+        # loop where the inner star always succeeds so the outer star
+        # keeps looping. The implementation should break out if it
+        # doesn't actually consume anything.
+        self.check("grammar = ('a'*)* 'b'", 'b')
+
+
+class ValuesMixin:
+    def test_basic(self):
+        self.check('grammar = end', '', out=None)
+
+    def test_bind(self):
+        self.check("grammar = 'a'*", 'aa', out=['a', 'a'])
+
+    def test_c_style_comment(self):
+        self.check('grammar = /* foo */ end', '')
+
+    def test_choice(self):
+        self.check("grammar = 'foo' | 'bar'", 'foo', out='foo')
 
         self.check(
             """\
             grammar = 'foo' -> true
                     | 'bar' -> false
             """,
-            text='bar',
+            'bar',
             out=False,
         )
 
@@ -286,7 +507,7 @@ class RulesMixin:
             grammar = 'a' 'b' -> false
                     | 'a' 'c' -> true
             """,
-            text='ac',
+            'ac',
             out=True,
         )
 
@@ -294,28 +515,28 @@ class RulesMixin:
         grammar = "grammar = 'a'{3} 'b'{1,4} end"
         self.check(
             grammar,
-            text='a',
+            'a',
             err='<string>:1 Unexpected end of input at column 2',
         )
         self.check(
             grammar,
-            text='aaa',
+            'aaa',
             err='<string>:1 Unexpected end of input at column 4',
         )
-        self.check(grammar, text='aaab', out=None)
+        self.check(grammar, 'aaab', out=None)
         self.check(
             grammar,
-            text='aaabbbbb',
+            'aaabbbbb',
             err='<string>:1 Unexpected "b" at column 8',
         )
 
     def test_empty(self):
-        self.check('grammar = ', text='', out=None, err=None)
+        self.check('grammar = ', '', out=None, err=None)
 
     def test_end(self):
         self.check(
             'grammar = end',
-            text='foo',
+            'foo',
             out=None,
             err='<string>:1 Unexpected "f" at column 1',
         )
@@ -334,16 +555,16 @@ class RulesMixin:
         self.check(g, 'bar', err='<string>:1 Unexpected "b" at column 1')
 
     def test_escape_unicat(self):
-        self.check('grammar = \\p{Nd} -> true', text='1', out=True)
+        self.check('grammar = \\p{Nd} -> true', '1', out=True)
 
     def test_escapes_in_string(self):
-        self.check('grammar = "\\n\\"foo" -> true', text='\n"foo', out=True)
-        self.check("grammar = '\\'foo' -> true", text="'foo", out=True)
+        self.check('grammar = "\\n\\"foo" -> true', '\n"foo', out=True)
+        self.check("grammar = '\\'foo' -> true", "'foo", out=True)
 
     def test_inline_seq(self):
         # This checks that we correctly include the builtin `end` rule
         # when it is part of a parenthesized choice.
-        self.check("g = ('foo'|end) -> true", text='', out=True)
+        self.check("g = ('foo'|end) -> true", '', out=True)
 
     def test_inline_parens(self):
         # This is a regression test for a subtle bug found when working
@@ -354,16 +575,16 @@ class RulesMixin:
             g  = (sp '*') | (sp '+')
             sp = ' '
             """,
-            text=' *',
+            ' *',
             out='*',
         )
 
     def test_label(self):
-        self.check("grammar = 'foobar':v -> v", text='foobar', out='foobar')
-        self.check("grammar = 'foobar' -> $1", text='foobar', out='foobar')
+        self.check("grammar = 'foobar':v -> v", 'foobar', out='foobar')
+        self.check("grammar = 'foobar' -> $1", 'foobar', out='foobar')
         self.check(
             "grammar = 'foobar':$1 -> $1",
-            text='foobar',
+            'foobar',
             grammar_err=(
                 'Errors were found:\n'
                 '  "$1" is a reserved variable name '
@@ -372,7 +593,7 @@ class RulesMixin:
         )
         self.check(
             "grammar = 'foobar' -> $2",
-            text='foobar',
+            'foobar',
             grammar_err=(
                 'Errors were found:\n'
                 '  Variable "$2" referenced before it was available\n'
@@ -385,7 +606,7 @@ class RulesMixin:
         # or lexically scoped variables *might* work.
         # TODO: Make this work.
         g = "g = 'foo':f ('x'+ ={f})* -> true"
-        self.check(g, text='fooxfoo', out=True)
+        self.check(g, 'fooxfoo', out=True)
 
     def test_label_inner_not_in_outer(self):
         # Named variables defined in an inner sequence should *not* be
@@ -394,7 +615,7 @@ class RulesMixin:
         # TODO: Can we provide a better error here?
         self.check(
             "g = 'foo' ('x'+:x) -> cat(x)",
-            text='fooxxx',
+            'fooxxx',
             grammar_err=(
                 'Errors were found:\n'
                 '  Variable "x" never used\n'
@@ -413,7 +634,7 @@ class RulesMixin:
         """
         self.check(
             g,
-            text='fooxfoo',
+            'fooxfoo',
             grammar_err=(
                 'Errors were found:\n'
                 '  Variable "f" never used\n'
@@ -422,71 +643,69 @@ class RulesMixin:
         )
 
     def test_lit_str(self):
-        self.check("grammar = ('foo')* -> true", text='foofoo', out=True)
+        self.check("grammar = ('foo')* -> true", 'foofoo', out=True)
 
     def test_long_unicode_literals(self):
-        self.check("grammar = '\\U00000020' -> true", text=' ', out=True)
+        self.check("grammar = '\\U00000020' -> true", ' ', out=True)
 
     def test_not_one(self):
-        self.check("grammar = ^'a' 'b'-> true", text='cb', out=True)
+        self.check("grammar = ^'a' 'b'-> true", 'cb', out=True)
         self.check(
             "grammar = ^'a' 'b'-> true",
-            text='a',
+            'a',
             err='<string>:1 Unexpected "a" at column 1',
         )
         self.check(
             "grammar = ^'a' 'b'-> true",
-            text='',
+            '',
             err='<string>:1 Unexpected end of input at column 1',
         )
 
     def test_not_not(self):
-        self.check("grammar = ~~('a') 'a' -> true", text='a', out=True)
+        self.check("grammar = ~~('a') 'a' -> true", 'a', out=True)
 
     def test_opt(self):
-        self.check("grammar = 'a' 'b'? -> true", text='a', out=True)
+        self.check("grammar = 'a' 'b'? -> true", 'a', out=True)
 
     def test_paren_in_value(self):
-        self.check('grammar = -> (true)', text='', out=True)
+        self.check('grammar = -> (true)', '', out=True)
 
     def test_plus(self):
         g = "grammar = 'a'+ -> true"
         self.check(
             g,
-            text='',
+            '',
             err='<string>:1 Unexpected end of input at column 1',
         )
 
-        self.check(g, text='a', out=True)
-        self.check(g, text='aa', out=True)
+        self.check(g, 'a', out=True)
+        self.check(g, 'aa', out=True)
 
     def test_pred(self):
-        # self.check('grammar = ?{true} end { true }', text='', out=True)
-        self.check('grammar = ?{true} end -> true', text='', out=True)
+        # self.check('grammar = ?{true} end { true }', '', out=True)
+        self.check('grammar = ?{true} end -> true', '', out=True)
         self.check(
             """\
             grammar = ?{false} end -> 'a'
                     | end -> 'b'
             """,
-            text='',
+            '',
             out='b',
         )
         self.check(
             'grammar = ?{"foo"} end -> false',
-            text='',
+            '',
             out=None,
             err='<string>:1 Bad predicate value',
         )
 
     def test_range(self):
         grammar = "g = '0'..'9':d -> d"
-        self.check(grammar, text='5', out='5')
-        self.check(
-            grammar, text='a', err='<string>:1 Unexpected "a" at column 1'
-        )
+        self.check(grammar, '5', out='5')
+        self.check(grammar, 'a', err='<string>:1 Unexpected "a" at column 1')
 
     def test_regexp(self):
-        self.check('g = /.+/', text='abc', out='abc')
+        self.check('g = /.+/', 'abc', out='abc')
 
     def test_rule_with_lit_str(self):
         self.check(
@@ -494,88 +713,86 @@ class RulesMixin:
             grammar = foo* -> true
             foo     = 'foo'
             """,
-            text='foofoo',
+            'foofoo',
             out=True,
         )
 
     def test_run(self):
-        self.check("g = <'a' 'b' 'c'> -> true", text='abc', out=True)
+        self.check("g = <'a' 'b' 'c'> -> true", 'abc', out=True)
         self.check(
             "g = <'a' 'b' 'c'> -> true",
-            text='d',
+            'd',
             err='<string>:1 Unexpected "d" at column 1',
         )
 
     def test_seq(self):
-        self.check("grammar = 'foo' 'bar' -> true", text='foobar', out=True)
+        self.check("grammar = 'foo' 'bar' -> true", 'foobar', out=True)
 
     def test_set(self):
         g = 'g = [xa-e] -> true'
-        self.check(g, text='x', out=True)
-        self.check(g, text='a', out=True)
-        self.check(g, text='b', out=True)
-        self.check(g, text='e', out=True)
-        self.check(
-            g, text='', err='<string>:1 Unexpected end of input at column 1'
-        )
-        self.check(g, text='f', err='<string>:1 Unexpected "f" at column 1')
+        self.check(g, 'x', out=True)
+        self.check(g, 'a', out=True)
+        self.check(g, 'b', out=True)
+        self.check(g, 'e', out=True)
+        self.check(g, '', err='<string>:1 Unexpected end of input at column 1')
+        self.check(g, 'f', err='<string>:1 Unexpected "f" at column 1')
 
     def test_set_exclude(self):
-        self.check('g = [^ab] -> true', text='c', out=True)
+        self.check('g = [^ab] -> true', 'c', out=True)
         self.check(
             'g = [^a] -> true',
-            text='a',
+            'a',
             err='<string>:1 Unexpected "a" at column 1',
         )
         self.check(
             'g = [^a] -> true',
-            text='',
+            '',
             err='<string>:1 Unexpected end of input at column 1',
         )
         self.check(
             'g = [^\\]] -> true',
-            text=']',
+            ']',
             err='<string>:1 Unexpected "]" at column 1',
         )
         self.check(
             'g = [^] -> true',
-            text='',
+            '',
             grammar_err='<string>:1 Unexpected "]" at column 7',
         )
         self.check(
             'g = [^',
-            text='',
+            '',
             grammar_err='<string>:1 Unexpected end of input at column 7',
         )
-        self.check('g = [^\\ta\\n] -> true', text='e', out=True)
+        self.check('g = [^\\ta\\n] -> true', 'e', out=True)
 
     def test_set_exclude_esc_char(self):
         self.check(
             'g = [^\\n] -> true',
-            text='\n',
+            '\n',
             err='<string>:1 Unexpected "\\n" at column 1',
         )
 
     def test_set_escaped_right_bracket(self):
         g = r'g = [xa-e\]] -> true'
-        self.check(g, text=']', out=True)
+        self.check(g, ']', out=True)
 
     def test_star(self):
-        self.check("grammar = 'a'* -> true", text='', out=True)
-        self.check("grammar = 'a'* -> true", text='a', out=True)
-        self.check("grammar = 'a'* -> true", text='aa', out=True)
+        self.check("grammar = 'a'* -> true", '', out=True)
+        self.check("grammar = 'a'* -> true", 'a', out=True)
+        self.check("grammar = 'a'* -> true", 'aa', out=True)
 
     def test_star_nested(self):
         # This checks to make sure we don't get stuck in an infinite
         # loop where the inner star always succeeds so the outer star
         # keeps looping. The implementation should break out if it
         # doesn't actually consume anything.
-        self.check("grammar = ('a'*)* 'b' -> true", text='b', out=True)
+        self.check("grammar = ('a'*)* 'b' -> true", 'b', out=True)
 
 
 class ActionsMixin:
     def test_action(self):
-        self.check('grammar = end -> true', text='', out=True)
+        self.check('grammar = end -> true', '', out=True)
 
     def test_array(self):
         self.check(
@@ -583,7 +800,7 @@ class ActionsMixin:
             grammar = '[' value:v (',' value)*:vs ','? ']' -> concat([v], vs)
             value   = '2':v                                -> atof(v)
             """,
-            text='[2]',
+            '[2]',
             out=[2],
         )
 
@@ -591,119 +808,117 @@ class ActionsMixin:
         self.check(
             # 'grammar = { ftoi("505874924095815700") }',
             'grammar = -> atoi("505874924095815700", 10)',
-            text='',
+            '',
             out=505874924095815700,
         )
         self.check(
-            # 'grammar = { 505874924095815700 }', text='',
+            # 'grammar = { 505874924095815700 }', '',
             # out=505874924095815700
             'grammar = -> 505874924095815700',
-            text='',
+            '',
             out=505874924095815700,
         )
 
     def test_e_not(self):
-        self.check('g = -> !false', text='', out=True)
-        self.check('g = -> !true', text='', out=False)
-        self.check('g = (?{true}):x -> !x', text='', out=False)
+        self.check('g = -> !false', '', out=True)
+        self.check('g = -> !true', '', out=False)
+        self.check('g = (?{true}):x -> !x', '', out=False)
 
     def test_hex_digits_in_value(self):
-        self.check('grammar = -> 0x20', text='', out=32)
+        self.check('grammar = -> 0x20', '', out=32)
 
     def test_hex_digits_invalid(self):
         self.check(
             'grammar = -> 0xtt',
-            text='',
+            '',
             grammar_err='<string>:1 Unexpected "t" at column 16',
         )
 
     def test_ll_getitem(self):
-        self.check("grammar = end -> ['a', 'b'][1]", text='', out='b')
+        self.check("grammar = end -> ['a', 'b'][1]", '', out='b')
 
     def test_ll_minus(self):
-        self.check('grammar = end -> 1 - 4', text='', out=-3)
+        self.check('grammar = end -> 1 - 4', '', out=-3)
 
     def test_ll_num(self):
-        self.check('grammar = end -> 1', text='', out=1)
-        self.check('grammar = end -> 0x20', text='', out=32)
+        self.check('grammar = end -> 1', '', out=1)
+        self.check('grammar = end -> 0x20', '', out=32)
 
     def test_ll_plus(self):
         self.check(
             "grammar = 'a':a 'b'*:bs -> a + join('', bs)",
-            text='abb',
+            'abb',
             out='abb',
         )
 
     def test_quals(self):
-        self.check("g = -> utoi(' ')", text='', out=32)
-        self.check("g = 'x'*:l -> l[0]", text='xx', out='x')
-        self.check("g = -> ['a', 'b'][1]", text='', out='b')
-        self.check("g = -> [['a']][0][0]", text='', out='a')
+        self.check("g = -> utoi(' ')", '', out=32)
+        self.check("g = 'x'*:l -> l[0]", 'xx', out='x')
+        self.check("g = -> ['a', 'b'][1]", '', out='b')
+        self.check("g = -> [['a']][0][0]", '', out='a')
 
 
 class FunctionsMixin:
     def test_atof(self):
-        self.check("g = -> atof('1.3')", text='', out=1.3)
+        self.check("g = -> atof('1.3')", '', out=1.3)
 
     def test_atoi(self):
-        self.check("g = -> atoi('0x41', 16)", text='', out=65)
+        self.check("g = -> atoi('0x41', 16)", '', out=65)
 
     def test_atou(self):
-        self.check("g = -> atou('65', 10)", text='', out='A')
-        self.check("g = -> atou('0x41', 16)", text='', out='A')
+        self.check("g = -> atou('65', 10)", '', out='A')
+        self.check("g = -> atou('0x41', 16)", '', out='A')
 
     def test_cat(self):
-        self.check("g = -> cat(['1', '2'])", text='', out='12')
+        self.check("g = -> cat(['1', '2'])", '', out='12')
 
     def test_colno(self):
         g = "g = ('a' | '\n')* -> colno()"
-        self.check(g, text='', out=1)
-        self.check(g, text='a', out=2)
-        self.check(g, text='aaa', out=4)
-        self.check(g, text='aa\n', out=1)
-        self.check(g, text='aa\nb', out=1)
-        self.check(g, text='aa\nab', out=2)
+        self.check(g, '', out=1)
+        self.check(g, 'a', out=2)
+        self.check(g, 'aaa', out=4)
+        self.check(g, 'aa\n', out=1)
+        self.check(g, 'aa\nb', out=1)
+        self.check(g, 'aa\nab', out=2)
 
     def test_concat(self):
-        self.check('g = -> concat([1], [2])', text='', out=[1, 2])
+        self.check('g = -> concat([1], [2])', '', out=[1, 2])
 
     def test_cons(self):
-        self.check('g = -> cons(1, [2, 3])', text='', out=[1, 2, 3])
+        self.check('g = -> cons(1, [2, 3])', '', out=[1, 2, 3])
 
     def test_dedent(self):
         self.check(
             'g = -> dedent("\n  foo\n    bar\n", -1)',
-            text='',
+            '',
             out='foo\n  bar\n',
         )
 
     def test_dict(self):
         self.check(
-            "g = -> dict([['a', 1], ['b', 2]])", text='', out={'a': 1, 'b': 2}
+            "g = -> dict([['a', 1], ['b', 2]])", '', out={'a': 1, 'b': 2}
         )
 
     def disabled_test_int(self):
-        self.check('g = int(4.0)', text='', out=4)
+        self.check('g = int(4.0)', '', out=4)
 
     def test_itou(self):
-        self.check('grammar = -> itou(97)', text='', out='a')
+        self.check('grammar = -> itou(97)', '', out='a')
 
     def test_join(self):
-        self.check("g = -> join('x', ['1', '2', '3'])", text='', out='1x2x3')
+        self.check("g = -> join('x', ['1', '2', '3'])", '', out='1x2x3')
 
     def test_scons(self):
-        self.check(
-            "g = -> scons('a', ['b', 'c'])", text='', out=['a', 'b', 'c']
-        )
+        self.check("g = -> scons('a', ['b', 'c'])", '', out=['a', 'b', 'c'])
 
     def test_strcat(self):
-        self.check("g = -> strcat('foo', 'bar')", text='', out='foobar')
+        self.check("g = -> strcat('foo', 'bar')", '', out='foobar')
 
     def test_utoi(self):
-        self.check('grammar = -> utoi("a")', text='', out=97)
+        self.check('grammar = -> utoi("a")', '', out=97)
 
     def test_xtou(self):
-        self.check("g = -> xtou('0x41')", text='', out='A')
+        self.check("g = -> xtou('0x41')", '', out='A')
 
 
 class CommentsMixin:
@@ -713,16 +928,16 @@ class CommentsMixin:
             grammar = // ignore this line
                       end -> true
             """,
-            text='',
+            '',
             out=True,
         )
 
     def test_cpp_style_eol(self):
-        self.check('grammar = //\r\nend -> true', text='', out=True)
-        self.check('grammar = //\nend -> true', text='', out=True)
+        self.check('grammar = //\r\nend -> true', '', out=True)
+        self.check('grammar = //\nend -> true', '', out=True)
 
     def test_tabs_are_whitespace(self):
-        self.check("grammar\t=\t'a'\t->\ttrue", text='a', out=True)
+        self.check("grammar\t=\t'a'\t->\ttrue", 'a', out=True)
 
 
 class PragmasMixin:
@@ -734,7 +949,7 @@ class PragmasMixin:
 
             foo     = 'foo'
             """
-        self.check(grammar, text='foo\nfoo\n', out=True)
+        self.check(grammar, 'foo\nfoo\n', out=True)
 
     def test_token(self):
         self.check(
@@ -744,7 +959,7 @@ class PragmasMixin:
             foo     = bar
             bar     = 'baz'
             """,
-            text='baz',
+            'baz',
             out=True,
         )
 
@@ -756,7 +971,7 @@ class PragmasMixin:
             foo     = bar
             bar     = 'baz'
             """,
-            text='baz',
+            'baz',
             grammar_err='Errors were found:\n  Unknown token rule "quux"\n',
         )
 
@@ -767,26 +982,26 @@ class PragmasMixin:
             foo     = 'foo'
             bar     = 'bar'
             """
-        self.check(grammar, text='foobar', out=True)
+        self.check(grammar, 'foobar', out=True)
 
     def test_token_is_invalid(self):
         self.check(
             '%tokens = 1234',
-            text='',
+            '',
             grammar_err='<string>:1 Unexpected "1" at column 11',
         )
 
     def test_unknown(self):
         self.check(
             '%foo = end',
-            text='',
+            '',
             out=None,
             grammar_err=('Errors were found:\n  Unknown pragma "%foo"\n'),
         )
 
     def test_whitespace_chars(self):
-        # self.check('g = \t\n\r { true }', text='', out=True)
-        self.check('g = \t\n\r -> true', text='', out=True)
+        # self.check('g = \t\n\r { true }', '', out=True)
+        self.check('g = \t\n\r -> true', '', out=True)
 
     def test_whitespace(self):
         grammar = textwrap.dedent("""\
@@ -797,7 +1012,7 @@ class PragmasMixin:
 
             foo     = 'foo'
             """)
-        self.check(grammar, text='foofoo', out=True)
+        self.check(grammar, 'foofoo', out=True)
 
     def test_whitespace_can_be_referenced(self):
         grammar = textwrap.dedent("""\
@@ -819,7 +1034,7 @@ class PragmasMixin:
         g = ?{foo} -> 'foo is true'
           | ?{bar} -> 'bar is true'
         """
-        self.check(g, text='', out='foo is true')
+        self.check(g, '', out='foo is true')
 
 
 class OperatorsMixin:
@@ -905,7 +1120,7 @@ class OperatorsMixin:
         """
         self.check(
             g,
-            text='1',
+            '1',
             grammar_err=('Errors were found:\n  Unknown rule "a"\n'),
         )
 
@@ -926,14 +1141,14 @@ class OperatorsMixin:
                  | expr '^' expr -> [$1, '^', $3]
                  | '0'..'9'
             """
-        self.check(g, text='1', out='1')
-        self.check(g, text='1+2', out=['1', '+', '2'])
-        self.check(g, text='1+2*3', out=['1', '+', ['2', '*', '3']])
-        self.check(g, text='1+2-3', out=[['1', '+', '2'], '-', '3'])
+        self.check(g, '1', out='1')
+        self.check(g, '1+2', out=['1', '+', '2'])
+        self.check(g, '1+2*3', out=['1', '+', ['2', '*', '3']])
+        self.check(g, '1+2-3', out=[['1', '+', '2'], '-', '3'])
 
         self.check(
             g,
-            text='1^2^3+4*5/6',
+            '1^2^3+4*5/6',
             out=[
                 ['1', '^', ['2', '^', '3']],
                 '+',
@@ -949,7 +1164,7 @@ class OperatorsMixin:
            expr = expr '++' expr -> [$1, '++', $3]
                 | '0'..'9'
         """
-        self.check(g, text='1++2', out=['1', '++', '2'])
+        self.check(g, '1++2', out=['1', '++', '2'])
 
     @skip('operators')
     def test_whitespace(self):
@@ -968,11 +1183,11 @@ class OperatorsMixin:
                  | expr '^' expr -> [$1, '^', $3]
                  | '0'..'9'
             """
-        self.check(g, text='1', out='1')
-        self.check(g, text='1 + 2', out=['1', '+', '2'])
+        self.check(g, '1', out='1')
+        self.check(g, '1 + 2', out=['1', '+', '2'])
         self.check(
             g,
-            text='1^2^3 + 4 * 5 / 6',
+            '1^2^3 + 4 * 5 / 6',
             out=[
                 ['1', '^', ['2', '^', '3']],
                 '+',
@@ -1130,7 +1345,7 @@ class ErrorsMixin:
     def test_unknown_function(self):
         self.check(
             'grammar = -> foo()',
-            text='',
+            '',
             grammar_err=(
                 'Errors were found:\n'
                 '  Unknown function "foo" called\n'
@@ -1141,7 +1356,7 @@ class ErrorsMixin:
     def test_unknown_var(self):
         self.check(
             'grammar = -> v',
-            text='',
+            '',
             grammar_err=(
                 'Errors were found:\n  Unknown identifier "v" referenced\n'
             ),
@@ -1150,7 +1365,7 @@ class ErrorsMixin:
     def test_unknown_rule(self):
         self.check(
             'grammar = foo',
-            text='',
+            '',
             grammar_err=('Errors were found:\n  Unknown rule "foo"\n'),
         )
 
@@ -1160,7 +1375,7 @@ class ErrorsMixin:
             textwrap.dedent("""\
             grammar = _whitespace
             """),
-            text='',
+            '',
             grammar_err=('Errors were found:\n  Unknown rule "_whitespace"\n'),
         )
 
@@ -1171,7 +1386,7 @@ class ErrorsMixin:
             %whitespace = ' '
             grammar = _whitespace
             """),
-            text='',
+            '',
             grammar_err=('Errors were found:\n  Unknown rule "_whitespace"\n'),
         )
 
@@ -1227,7 +1442,7 @@ class IntegrationMixin:
         self.assertIsNone(err)
         self._common_json_checks(p, {})
 
-        self.checkp(p, text='"foo"', out='"foo"', externs={})
+        self.checkp(p, '"foo"', out='"foo"', externs={})
 
         if hasattr(p, 'cleanup'):
             p.cleanup()
@@ -1247,34 +1462,34 @@ class IntegrationMixin:
         self.assertIsNone(err)
 
         # TODO: Figure out what to do with 'Infinity' and 'NaN'.
-        # self.checkp(p, text='Infinity', out=float('inf'))
-        self.checkp(p, text='Infinity', out='Infinity', externs=externs)
+        # self.checkp(p, 'Infinity', out=float('inf'))
+        self.checkp(p, 'Infinity', out='Infinity', externs=externs)
 
         # Can't use check() for this because NaN != NaN.
         # obj, err, _ = p.parse('NaN')
         # self.assertTrue(math.isnan(obj))
         # self.assertTrue(err is None)
-        self.checkp(p, text='NaN', out='NaN', externs=externs)
+        self.checkp(p, 'NaN', out='NaN', externs=externs)
 
         if hasattr(p, 'cleanup'):
             p.cleanup()
 
     def _common_json_checks(self, p, externs):
-        self.checkp(p, text='123', out=123, externs=externs)
-        self.checkp(p, text='1.5', out=1.5, externs=externs)
-        self.checkp(p, text='-1.5', out=-1.5, externs=externs)
-        self.checkp(p, text='1.5e2', out=150, externs=externs)
-        self.checkp(p, text='null', out=None, externs=externs)
-        self.checkp(p, text='true', out=True, externs=externs)
-        self.checkp(p, text='false', out=False, externs=externs)
+        self.checkp(p, '123', out=123, externs=externs)
+        self.checkp(p, '1.5', out=1.5, externs=externs)
+        self.checkp(p, '-1.5', out=-1.5, externs=externs)
+        self.checkp(p, '1.5e2', out=150, externs=externs)
+        self.checkp(p, 'null', out=None, externs=externs)
+        self.checkp(p, 'true', out=True, externs=externs)
+        self.checkp(p, 'false', out=False, externs=externs)
 
-        self.checkp(p, text='[]', out=[], externs=externs)
-        self.checkp(p, text='[2]', out=[2], externs=externs)
-        self.checkp(p, text='{}', out={}, externs=externs)
+        self.checkp(p, '[]', out=[], externs=externs)
+        self.checkp(p, '[2]', out=[2], externs=externs)
+        self.checkp(p, '{}', out={}, externs=externs)
 
         self.checkp(
             p,
-            text='[1',
+            '[1',
             err='<string>:1 Unexpected end of input at column 3',
             externs=externs,
         )
@@ -1283,12 +1498,12 @@ class IntegrationMixin:
         self.checkp(p, '  {}', {}, externs=externs)
 
     def _common_json5_checks(self, p, externs):
-        self.checkp(p, text='+1.5', out=1.5, externs=externs)
-        self.checkp(p, text='.5e-2', out=0.005, externs=externs)
-        self.checkp(p, text='"foo"', out='foo', externs=externs)
+        self.checkp(p, '+1.5', out=1.5, externs=externs)
+        self.checkp(p, '.5e-2', out=0.005, externs=externs)
+        self.checkp(p, '"foo"', out='foo', externs=externs)
         self.checkp(
             p,
-            text='{foo: "bar", a: "b"}',
+            '{foo: "bar", a: "b"}',
             out={'foo': 'bar', 'a': 'b'},
             externs=externs,
         )

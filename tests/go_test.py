@@ -35,6 +35,11 @@ class Rules(_Mixin, grammar_test.RulesMixin):
 
 
 @unittest.skip('unimplemented')
+class Values(_Mixin, grammar_test.ValuesMixin):
+    pass
+
+
+@unittest.skip('unimplemented')
 class Actions(_Mixin, grammar_test.ActionsMixin):
     pass
 
