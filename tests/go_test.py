@@ -52,17 +52,6 @@ class Functions(_Mixin, grammar_test.FunctionsMixin):
     pass
 
 
-@unittest.skip('unimplemented')
-class Comments(_Mixin, grammar_test.CommentsMixin):
-    pass
-
-
-@unittest.skip('unimplemented')
-class Pragmas(_Mixin, grammar_test.PragmasMixin):
-    pass
-
-
-@unittest.skip('unimplemented')
 class Errors(_Mixin, grammar_test.ErrorsMixin):
     pass
 

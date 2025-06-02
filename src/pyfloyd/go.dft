@@ -276,7 +276,8 @@ parser_constructor: @"""
 
 
 externs: [fn []
-             [vl [map_items [fn [k v]
+             [vl [hl 'p.externs = make(map[string]bool)']
+                 [map_items [fn [k v]
                                 [hl 'p.externs['
                                     [lit k]
                                     '] = '
