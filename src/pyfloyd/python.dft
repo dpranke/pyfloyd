@@ -68,10 +68,6 @@ t_meth_def: 'def _'
 t_meth_self: 'self'
 t_meth_params: [fn [params]
                    [if [equal params ''] 'self' [strcat 'self, ' params]]]
-t_newmap: '{}'
-t_null: 'None'
-t_not: 'not '  # the logical operator
-t_true: 'True'
 t_eq: [fn [x y] [hl x ' == ' y]]
 t_if: [fn [cond body] [block [hl 'if ' cond] body]]
 t_ifelse: [fn [cond if_body e_body]
@@ -86,11 +82,16 @@ t_isfalse: [fn [v] [hl v ' is False']]
 t_declare_local_vars: [fn [node] [vl]]
 t_declare_vars: [fn [v] [vl]]
 t_or: [fn [x y] [hl x ' or ' y]]
+t_newscope: '{}'  # value for a new scope (dict[str, any])
+t_not: 'not '  # the logical operator
+t_null: 'None'
 t_pop: [fn [lst] [hl lst '.pop()']]
 t_return:  'return'
 t_substr: [fn [s start end] [hl s '[' start ':' end ']']]
 t_throw: [fn [msg] [hl 'raise _ParsingRuntimeError(' msg ')' t_end]]
+t_to_str: [fn [x] x]
 t_toplevel_extra_sep: ''
+t_true: 'True'
 t_while: [fn [cond body] [block [hl 'while ' cond] body]]
 
 #

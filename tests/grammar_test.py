@@ -693,6 +693,8 @@ class ValuesMixin:
             '',
             out='b',
         )
+
+    def test_pred_bad_value(self):
         self.check(
             'grammar = ?{"foo"} end -> false',
             '',

@@ -90,7 +90,7 @@ t_list_of_one: [fn [x] [hl '[' x ']']]
 t_meth_def: ''
 t_meth_self: ''
 t_meth_params: [fn [params] params]
-t_newmap: 'new Map()'
+t_newscope: 'new Map()'  # value for a new scope (dict[str, any])
 t_not: '!'  # the logical operator
 t_null: 'null'
 t_or: [fn [x y] [hl x ' || ' y]]
@@ -98,6 +98,7 @@ t_pop: [fn [x] [hl x '.pop()']]
 t_return: 'return;'
 t_substr: [fn [s start end] [hl s '.substr(' start ', ' end ')']]
 t_throw: [fn [msg] [hl 'throw new ParsingRuntimeError(' msg ')' t_end]]
+t_to_str: [fn [x] x]
 t_toplevel_extra_sep: null
 t_true: 'true'
 t_while: [fn [cond body] [block [hl 'while (' cond ')'] body]]

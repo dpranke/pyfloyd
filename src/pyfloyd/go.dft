@@ -76,13 +76,7 @@ lit: [fn [s] [if [is_str s]
 
 t_assign: [fn [var val] [hl var ' = ' val t_end]]
 t_assign_outer: [fn [var val]
-                    [hl "p.scopes[p.scopes.length - 1]."
-                        "set('"
-                        var
-                        "', "
-                        val
-                        ")" 
-                        t_end]]
+                    [hl 'p.scopes[len(p.scopes) - 1]["' var '"] = ' val]]
 t_append: [fn [lst val] [hl lst ' = append(' lst ', ' val ')' t_end]]
 t_break:  'break'
 
@@ -126,11 +120,11 @@ t_list_of_one: [fn [x] [hl '[]any{' x '}']]
 t_meth_def: 'func (p *Parser) '
 t_meth_self: ''
 t_meth_params: [fn [params] params]
-t_newmap: 'new Map()'
+t_newscope: 'make(map[string]any)'  # value for a new scope (dict[str, any])
 t_not: '!'  # the logical operator
 t_null: 'nil'
 t_or: [fn [x y] [hl x ' || ' y]]
-t_pop: [fn [x] [hl 'x = x[:len(x) - 1]']]
+t_pop: [fn [x] [hl x ' = ' x '[:len(' x ') - 1]']]
 t_return: 'return'
 
 t_regexp: [fn [re]
@@ -159,6 +153,7 @@ t_substr: [fn [s start end]
 
 t_throw: [fn [msg] [hl 'panic(' msg ')']]
 t_toplevel_extra_sep: null
+t_to_str: [fn [v] [hl v '.(string)']]
 t_true: 'true'
 t_while: [fn [cond body] [block [hl 'for ' cond ] body]]
 
@@ -210,12 +205,6 @@ operator_state_class: d"""
     """
 
 result_class: d"""
-    type seed struct {
-        val any
-        failed bool
-        pos int
-    }
-
     type Result struct {
         val any
         err error
@@ -260,10 +249,10 @@ parser_class: @"""
         end  int
         errpos int
         externs map[string]bool
-        @if[generator_options.memoize 'cache map[int]any']
-        @if[grammar.seeds_needed 'seeds map[int]seed']
-        @if[grammar.leftrec_needed 'blocked map[string][int]']
-        @if[grammar.lookup_needed 'scopes []map[string][any]']
+        @if[generator_options.memoize 'cache map[int][string]Result']
+        @if[grammar.seeds_needed 'seeds map[int][string]Result']
+        @if[grammar.leftrec_needed 'blocked map[string]int']
+        @if[grammar.lookup_needed 'scopes []map[string]any']
         @if[grammar.operator_needed 'operators map[string]any']
     }
 
@@ -321,7 +310,7 @@ operator_choices: [fn [o] [vl 'o.choices = new Map()'
                                          o.choices]]]
 
 parse_with_exception: @"""
-    func (p Parser) Parse(args ...any) Result {
+    func (p Parser) Parse(args ...any) (r Result) {
       var externs map[string]bool
       var start int
 
@@ -334,11 +323,57 @@ parse_with_exception: @"""
       }
 
       errs := ""
-      for key := range externs {
+      for key, value := range externs {
           if _, ok := p.externs[key] ; !ok {
               errs += "Unexpected extern '" + key + "'\\n"
           } else {
-              p.externs[key] = externs[key]
+              p.externs[key] = value
+          }
+      }
+
+      if errs != "" {
+          return Result{nil, errors.New(errs), 0}
+      }
+
+      defer func() {
+        if msg := recover(); msg != nil {
+            lineno, _ := p.o_offsets(p.errpos)
+            err_msg := fmt.Sprintf("%s:%d %s", p.path, lineno, msg.(string))
+            r = Result{nil, errors.New(err_msg), 0}
+        }
+      }()
+
+      p.pos = start
+      p.r_@grammar.starting_rule()
+
+      if p.failed {
+          r = Result{nil, errors.New(p.o_error()), p.errpos}
+      } else {
+          r = Result{p.val, nil, p.pos}
+      }
+      return
+    }
+    """  # parse_with_exception
+
+parse_without_exception: @"""
+    func (p Parser) Parse(args ...any) (r Result) {
+      var externs map[string]bool
+      var start int
+
+      if len(args) == 2 {
+          externs = args[0].(map[string]bool)
+          start = args[1].(int)
+      } else if len(args) == 1 {
+          externs = args[0].(map[string]bool)
+          start = 0
+      }
+
+      errs := ""
+      for key, value := range externs {
+          if _, ok := p.externs[key] ; !ok {
+              errs += "Unexpected extern '" + key + "'\\n"
+          } else {
+              p.externs[key] = value
           }
       }
 
@@ -350,15 +385,12 @@ parse_with_exception: @"""
       p.r_@grammar.starting_rule()
 
       if p.failed {
-          return Result{nil, errors.New(p.o_error()), p.errpos}
+          r = Result{nil, errors.New(p.o_error()), p.errpos}
       } else {
-          return Result{p.val, nil, p.pos}
+          r = Result{p.val, nil, p.pos}
       }
+      return
     }
-    """  # parse_with_exception
-
-parse_without_exception: @"""
-    @parse_with_exception[]
     """  # parse_without_exception
 
 default_footer: null
@@ -479,8 +511,7 @@ o_fail: [meth q[] d"""
 
 o_leftrec: [meth q['rule any' 'rule_name string' 'left_assoc bool'] d"""
     pos := p.pos
-    key := [rule_name, pos]
-    seed := p.seeds[key]
+    seed := p.seeds[pos][rule_name]
     if seed {
       [p.val, p.failed, p.pos] = seed
       return
@@ -491,7 +522,7 @@ o_leftrec: [meth q['rule any' 'rule_name string' 'left_assoc bool'] d"""
       return
     }
     current := [nil, true, p.pos]
-    p.seeds[key] = current
+    p.seeds[pos][rule_name] = current
     if left_assoc {
       p.blocked.add(rule_name)
     }
@@ -499,10 +530,10 @@ o_leftrec: [meth q['rule any' 'rule_name string' 'left_assoc bool'] d"""
       rule.call(p)
       if p.pos > current[2] {
         current = [p.val, p.failed, p.pos]
-        p.seeds[key] = current
+        p.seeds[pos][rule_name] = current
         p.pos = pos
       } else {
-        delete p.seeds[key]
+        delete p.seeds[pos][rule_name]
         [p.val, p.failed, p.pos] = current
         if left_assoc {
           p.blocked.delete(rule_name)
@@ -512,24 +543,28 @@ o_leftrec: [meth q['rule any' 'rule_name string' 'left_assoc bool'] d"""
     }
     """]  # o_leftrec
     
-o_lookup: [meth q['v string'] d"""
-    l := p.scopes.length - 1
-    while (l >= 0) {
-      if val, ok := p.scopes[l][v] ; ok {
-        return val
-      }
-      l -= 1
+o_lookup: d"""
+    func (p *Parser) o_lookup(v string) any {
+        var val any
+        var ok bool
+        l := len(p.scopes) - 1
+        for l >= 0 {
+          if val, ok = p.scopes[l][v] ; ok {
+            return val
+          }
+          l -= 1
+        }
+        if val, ok = p.externs[v]; ok {
+          return val
+        }
+        panic("Unknown var '" + v + "'")
     }
-    if val, ok :p p.externs[v] {
-      return val
-    }
-    panic("Unknown var '" + v + "'")
-    """]
+    """
 
 o_memoize: [meth q['rule_name string' 'fn any'] d"""
     pos := p.pos
     if !p.cache.has(pos) {
-      p.cache.set(pos, new Map())
+      p.cache.set(pos, make(map[pos][string]))
     }
     let c = p.cache.get(pos)
     if c.has(rule_name) {
@@ -543,15 +578,14 @@ o_memoize: [meth q['rule_name string' 'fn any'] d"""
 o_operator: [meth q['rule_name string'] d"""
     o := p.operators[rule_name]
     pos := p.pos
-    key := [rule_name, pos]
-    seed := p.seeds[key]
+    seed := p.seeds[pos][rule_name]
     if seed {
       [p.val, p.failed, p.pos] = seed
       return
     }
     o.currentDepth += 1
     current := [nil, true, pos]
-    p.seeds[key] = current
+    p.seeds[pos][rule_name] = current
     minPrec := o.currentPrec
     i := 0
     while (i < o.precs.length) {
@@ -570,7 +604,7 @@ o_operator: [meth q['rule_name string'] d"""
         o.choices.get(op).call(p)
         if !p.failed && p.pos > pos {
           current = [p.val, p.failed, p.pos]
-          p.seeds[key] = current
+          p.seeds[pos][rule_name] = current
           repeat = true
           break
         }
@@ -580,7 +614,7 @@ o_operator: [meth q['rule_name string'] d"""
         i += 1
       }
     }
-    delete p.seeds[key]
+    delete p.seeds[pos][rule_name]
     o.currentDepth -= 1
     if o.currentDepth === 0 {
       o.currentPrec = 0
@@ -661,16 +695,16 @@ fn_dedent: [meth q['s string'] 'return s']
 
 fn_dict: [meth q['pairs [](string, any)'] d"""
     m := map[str]any
-    for [k, v] of pairs {
-      m[k] = v  // TODO: m.set(k, v) doesn't work?
+    for k, v: range pairs {
+         m[k] = v
     }
     return m
     """]
 
 fn_in: d"""
     func (p *Parser) fn_in(lis []any, v any) bool {
-        for i := range lis {
-            if lis[i] == any {
+        for _, el := range lis {
+            if el == v {
                 return true
             }
         }

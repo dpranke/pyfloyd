@@ -273,7 +273,8 @@ n_ends_in: [fn [node] [t_while t_true
                               [call_rule 'r_any' q[]]
                               [t_if failed t_break]]]]
 
-n_equals: [fn [node] [hl [call_op 'str' [list [expr node.child]] t_end]]]
+n_equals: [fn [node] [hl [call_op 'str' [list [t_to_str [expr node.child]]]
+                         t_end]]]
 
 n_label: [fn [node] [vl [stmts node.child]
                         [return_if_failed node.child]
@@ -344,7 +345,7 @@ n_run: [fn [node]
                [t_assign 'end' f_pos]
                [t_assign f_val [t_substr [fld 'text'] 'start' 'end']]]]
 
-n_scope: [fn [node] [vl [t_append [fld 'scopes'] t_newmap]
+n_scope: [fn [node] [vl [t_append [fld 'scopes'] t_newscope]
                         [stmts node.child]
                         [t_pop [fld 'scopes']]]]
 

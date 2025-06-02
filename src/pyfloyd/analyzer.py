@@ -798,7 +798,7 @@ def _compute_local_vars(grammar):
             node.vars = sorted(vs)
             return set()
 
-        if node.t == 'label':
+        if node.t == 'label' and not node.outer_scope:
             vs.add(node.name)
         for c in node.ch:
             vs.update(_walk(c))
