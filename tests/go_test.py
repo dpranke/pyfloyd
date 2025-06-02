@@ -37,9 +37,14 @@ class Values(_Mixin, grammar_test.ValuesMixin):
     pass
 
 
-@unittest.skip('unimplemented')
 class Actions(_Mixin, grammar_test.ActionsMixin):
-    pass
+    @unittest.skip('bignum')
+    def test_big_int(self):
+        pass
+
+    @unittest.skip('saw/getitem')
+    def test_quals(self):
+        pass
 
 
 @unittest.skip('unimplemented')

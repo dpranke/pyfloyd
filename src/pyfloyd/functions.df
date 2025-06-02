@@ -80,7 +80,8 @@ functions = {
         ret: str
         doc: d"""
               Returns the string produced by concatenating all of the
-              elements of `strs` together Equivalent to `join('', strs)`.
+              elements of `strs` together Equivalent to `join('', strs)` or
+              `cat(*strs)`.
               """
         body: "return ''.join(strs)"
     }
@@ -446,7 +447,7 @@ functions = {
     }
     pairs: {
         params: [[d 'dict[str, any]']]
-        ret: 'list[any]'
+        ret: 'list[any]'  # really `list[list[str, any]]`
         doc: d"""
               Returns a list of the [key, value] pairs in the dict `d`.
               """

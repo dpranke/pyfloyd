@@ -62,13 +62,10 @@ extern: [fn [name] [strcat "p.externs[" [lit name] "]"]]
 
 method_name: [fn [name] [fld name]]
 
-lit: [fn [s] [if [is_str s]
-                 [strcat '"' [escape s '"'] '"']
-                 [if [is_int s]
-                     [itoa s]
-                     [if [is_bool s]
-                         [btoa s]
-                         '<unknown?>']]]]
+lit: [fn [s]
+         [if [is_str s]
+             [strcat '"' [escape s '"'] '"']
+             [if [is_int s] [itoa s] [if [is_bool s] [btoa s] '<unknown?>']]]]
 
 #
 # Helper methods for generating text portably.
@@ -85,8 +82,7 @@ t_declare_local_vars: [fn [node] [t_declare_vars node.local_vars]]
 t_declare_vars: [fn [vars]
                     [vl [map [fn [v]
                                  [if [strin v ' ']
-                                     [hl 'var '
-                                         [replace v 'list[any]' '[]any']]
+                                     [hl 'var ' [replace v 'list[any]' '[]any']]
                                      [hl 'var ' v ' any']]]
                              vars]]]
 
@@ -106,13 +102,13 @@ t_ifelse: [fn [cond if_body e_body]
                   [hl '}']]]
 
 t_ifelifelse: [fn [cond if_body elif_cond elif_body e_body]
-              [vl [hl 'if ' cond ' {']
-                  [ind if_body]
-                  [hl '} else if ' elif_cond ' {']
-                  [ind elif_body ]
-                  [hl '} else {']
-                  [ind e_body]
-                  [hl '}']]]
+                  [vl [hl 'if ' cond ' {']
+                      [ind if_body]
+                      [hl '} else if ' elif_cond ' {']
+                      [ind elif_body ]
+                      [hl '} else {']
+                      [ind e_body]
+                      [hl '}']]]
 
 t_istrue: [fn [v] [hl v ' == true']]
 t_isfalse: [fn [v] [hl v ' == false']]
@@ -127,20 +123,17 @@ t_or: [fn [x y] [hl x ' || ' y]]
 t_pop: [fn [x] [hl x ' = ' x '[:len(' x ') - 1]']]
 t_return: 'return'
 
-t_regexp: [fn [re]
-              [vl [hl "r, _ := regexp.Compile(" [lit [strcat "(?m:" re ')']] ")"]
-                  [hl "sub := string(p.text[p.pos:p.end])"]
+t_regexp: [fn [re_str]
+              [vl [hl "r, _ := regexp.Compile("
+                      [lit [strcat "(?m:" re_str ')']]
+                      ")"]
+                  [hl "sub := string(p.text[p.pos : p.end])"]
                   [hl "loc := r.FindStringIndex(sub)"]
                   'if loc != nil {'
-                  [ind [hl 'p.o_succeed(' [comma [list [hl 'string('
-                                                           'p.text['
-                                                           'p.pos + loc[0]'
-                                                           ':'
-                                                           'p.pos + loc[1]'
-                                                           '])'],
-                                          'p.pos + loc[1]']]
-                                          ')']
-                        'return']
+                  [ind [vl 'start := p.pos + loc[0]'
+                           'end := p.pos + loc[1]'
+                           [succeed 'string(p.text[start:end])' 'end']
+                           'return']]
                   '}'
                   'p.o_fail()']]
 
@@ -153,7 +146,12 @@ t_substr: [fn [s start end]
 
 t_throw: [fn [msg] [hl 'panic(' msg ')']]
 t_toplevel_extra_sep: null
-t_to_str: [fn [v] [hl v '.(string)']]
+
+t_to_str: [fn [v]
+              [if [and [is_str v] [equal [substr v 0 1] '"']]
+                  v
+                  [hl v '.(string)']]]
+
 t_true: 'true'
 t_while: [fn [cond body] [block [hl 'for ' cond ] body]]
 
@@ -184,8 +182,13 @@ imports: @"""
         @if[generator_options.main [vl '"encoding/json"' '"io"' '"os"']]
         @if[[or grammar.re_needed [in grammar.needed_operators 'unicat']]
             '"regexp"']
+        @if[[or [in grammar.needed_builtin_functions 'atoi']
+                [in grammar.needed_builtin_functions 'atof']
+                [in grammar.needed_builtin_functions 'atou']]
+            '"strconv"']
         @if[[or [in grammar.needed_builtin_functions 'join']
-                [in grammar.needed_builtin_functions 'scat']]
+                [in grammar.needed_builtin_functions 'scat']
+                [in grammar.needed_builtin_functions 'scons']]
             '"strings"']
     )
     """
@@ -257,6 +260,8 @@ parser_class: @"""
     }
 
     @parser_methods[]
+
+    @fn_aplus
     """
 
 parser_constructor: @"""
@@ -270,12 +275,13 @@ parser_constructor: @"""
     """
 
 
-externs: [fn [] [vl [map_items [fn [k v]
-                                   [hl 'p.externs['
-                                       [lit k]
-                                       '] = '
-                                       [if v 'true' 'false']]]
-                               grammar.externs]]]
+externs: [fn []
+             [vl [map_items [fn [k v]
+                                [hl 'p.externs['
+                                    [lit k]
+                                    '] = '
+                                    [if v 'true' 'false']]]
+                            grammar.externs]]]
 
 operator_state: [fn [rule o]
                     [vl 'o := OperatorState{}'
@@ -301,13 +307,14 @@ operator_rassoc: [fn [o]
                          [comma [map [fn [op] [lit op]] o.rassoc]]
                          '])']]
 
-operator_choices: [fn [o] [vl 'o.choices = new Map()'
-                              [map_items [fn [op meth]
-                                             [hl "o.choices["
-                                                 [lit op]
-                                                 "] = p."
-                                                 meth]]
-                                         o.choices]]]
+operator_choices: [fn [o]
+                      [vl 'o.choices = new Map()'
+                          [map_items [fn [op meth]
+                                         [hl "o.choices["
+                                             [lit op]
+                                             "] = p."
+                                             meth]]
+                                     o.choices]]]
 
 parse_with_exception: @"""
     func (p Parser) Parse(args ...any) (r Result) {
@@ -439,6 +446,20 @@ main_footer: d"""
 # Language-specific rules for nodes in the AST.
 #
 
+n_e_arr: [fn [node]
+             [tri '[]any{' [comma [map [fn [c] [expr c]] node.ch]] '}']]
+
+n_e_getitem: [fn [node] [tri '[' [expr node.child] ']']]
+
+n_e_not: [fn [node]
+             [if [equal [expr node.child] 'true']
+                 'false'
+                 [if [equal [expr node.child] 'false']
+                     'true'
+                     [hl '!(' [expr node.child] '.(bool))']]]]
+
+n_e_plus: [fn [node]
+              [call 'fn_aplus' [list [expr node.left] [expr node.right]]]]
 
 n_regexp: [fn [node] [t_regexp node.v]]
 
@@ -448,205 +469,214 @@ n_set: [fn [node] [t_regexp [strcat '[' node.v ']']]]
 # Built-in operators and rules
 #
 
-r_any: [meth q[] d"""
-    if p.pos < p.end {
-        p.o_succeed(string(p.text[p.pos]), p.pos + 1)
-    } else {
-        p.o_fail()
-    }
-    """]
+r_any: [meth q[]
+             d"""
+             if p.pos < p.end {
+                 p.o_succeed(string(p.text[p.pos]), p.pos + 1)
+             } else {
+                 p.o_fail()
+             }
+             """]
 
-r_end: [meth q[] d"""
-    if p.pos == p.end {
-        p.o_succeed(nil, p.pos)
-    } else {
-        p.o_fail()
-    }
-    """]
+r_end: [meth q[]
+             d"""
+             if p.pos == p.end {
+                 p.o_succeed(nil, p.pos)
+             } else {
+                 p.o_fail()
+             }
+             """]
 
-o_ch: [meth q['c string'] d"""
-    pos := p.pos
-    if pos < p.end && p.text[pos] == ([]rune(c)[0]) {
-        p.o_succeed(c, p.pos + 1)
-    } else {
-        p.o_fail()
-    }
-    """]
+o_ch: [meth q['c string']
+            d"""
+            pos := p.pos
+            if pos < p.end && p.text[pos] == ([]rune(c)[0]) {
+                p.o_succeed(c, p.pos + 1)
+            } else {
+                p.o_fail()
+            }
+            """]
 
 o_offsets: d"""
-    func (p *Parser) o_offsets(pos int) (int, int) {
-        lineno := 1
-        colno := 1
-        for i := 0 ; i < pos ; i++ {
-            if p.text[i] == '\\n' {
-                lineno += 1
-                colno = 1
-            } else {
-                colno += 1
-            }
-        }
-        return lineno, colno
-    }
-    """
+           func (p *Parser) o_offsets(pos int) (int, int) {
+               lineno := 1
+               colno := 1
+               for i := 0 ; i < pos ; i++ {
+                   if p.text[i] == '\\n' {
+                       lineno += 1
+                       colno = 1
+                   } else {
+                       colno += 1
+                   }
+               }
+               return lineno, colno
+           }
+           """
 
 o_error: d"""
-    func (p *Parser) o_error() string {
-        lineno, colno := p.o_offsets(p.errpos)
-        var thing string
-        if p.errpos == p.end {
-            thing = "end of input"
-        } else {
-            thing = fmt.Sprintf("%q", string(p.text[p.errpos]))
-        }
-        return fmt.Sprintf("%s:%d Unexpected %s at column %d",
-                           p.path, lineno, thing, colno)
-    }
-    """
+         func (p *Parser) o_error() string {
+             lineno, colno := p.o_offsets(p.errpos)
+             var thing string
+             if p.errpos == p.end {
+                 thing = "end of input"
+             } else {
+                 thing = fmt.Sprintf("%q", string(p.text[p.errpos]))
+             }
+             return fmt.Sprintf("%s:%d Unexpected %s at column %d",
+                                p.path, lineno, thing, colno)
+         }
+         """
 
-o_fail: [meth q[] d"""
-    p.val = nil
-    p.failed = true
-    p.errpos = max(p.errpos, p.pos)
-    """]
+o_fail: [meth q[]
+              d"""
+              p.val = nil
+              p.failed = true
+              p.errpos = max(p.errpos, p.pos)
+              """]
 
-o_leftrec: [meth q['rule any' 'rule_name string' 'left_assoc bool'] d"""
-    pos := p.pos
-    seed := p.seeds[pos][rule_name]
-    if seed {
-      [p.val, p.failed, p.pos] = seed
-      return
-    }
-    if _, ok := p.blocked[rule_name]; ok {
-      p.val = nil
-      p.failed = true
-      return
-    }
-    current := [nil, true, p.pos]
-    p.seeds[pos][rule_name] = current
-    if left_assoc {
-      p.blocked.add(rule_name)
-    }
-    while (true) {
-      rule.call(p)
-      if p.pos > current[2] {
-        current = [p.val, p.failed, p.pos]
-        p.seeds[pos][rule_name] = current
-        p.pos = pos
-      } else {
-        delete p.seeds[pos][rule_name]
-        [p.val, p.failed, p.pos] = current
-        if left_assoc {
-          p.blocked.delete(rule_name)
-        }
-        return
-      }
-    }
-    """]  # o_leftrec
-    
+o_leftrec: [meth q['rule any' 'rule_name string' 'left_assoc bool']
+                 d"""
+                 pos := p.pos
+                 seed := p.seeds[pos][rule_name]
+                 if seed {
+                   [p.val, p.failed, p.pos] = seed
+                   return
+                 }
+                 if _, ok := p.blocked[rule_name]; ok {
+                   p.val = nil
+                   p.failed = true
+                   return
+                 }
+                 current := [nil, true, p.pos]
+                 p.seeds[pos][rule_name] = current
+                 if left_assoc {
+                   p.blocked.add(rule_name)
+                 }
+                 while (true) {
+                   rule.call(p)
+                   if p.pos > current[2] {
+                     current = [p.val, p.failed, p.pos]
+                     p.seeds[pos][rule_name] = current
+                     p.pos = pos
+                   } else {
+                     delete p.seeds[pos][rule_name]
+                     [p.val, p.failed, p.pos] = current
+                     if left_assoc {
+                       p.blocked.delete(rule_name)
+                     }
+                     return
+                   }
+                 }
+                 """]  # o_leftrec
+
 o_lookup: d"""
-    func (p *Parser) o_lookup(v string) any {
-        var val any
-        var ok bool
-        l := len(p.scopes) - 1
-        for l >= 0 {
-          if val, ok = p.scopes[l][v] ; ok {
-            return val
+          func (p *Parser) o_lookup(v string) any {
+              var val any
+              var ok bool
+              l := len(p.scopes) - 1
+              for l >= 0 {
+                if val, ok = p.scopes[l][v] ; ok {
+                  return val
+                }
+                l -= 1
+              }
+              if val, ok = p.externs[v]; ok {
+                return val
+              }
+              panic("Unknown var '" + v + "'")
           }
-          l -= 1
-        }
-        if val, ok = p.externs[v]; ok {
-          return val
-        }
-        panic("Unknown var '" + v + "'")
-    }
-    """
+          """
 
-o_memoize: [meth q['rule_name string' 'fn any'] d"""
-    pos := p.pos
-    if !p.cache.has(pos) {
-      p.cache.set(pos, make(map[pos][string]))
-    }
-    let c = p.cache.get(pos)
-    if c.has(rule_name) {
-      [p.val, p.failed, p.pos] = c.get(rule_name)
-      return
-    }
-    fn.call(p)
-    c.set(rule_name, [p.val, p.failed, p.pos])
-   """]
+o_memoize: [meth q['rule_name string' 'fn any']
+                 d"""
+                 pos := p.pos
+                 if !p.cache.has(pos) {
+                   p.cache.set(pos, make(map[pos][string]))
+                 }
+                 let c = p.cache.get(pos)
+                 if c.has(rule_name) {
+                   [p.val, p.failed, p.pos] = c.get(rule_name)
+                   return
+                 }
+                 fn.call(p)
+                 c.set(rule_name, [p.val, p.failed, p.pos])
+                 """]
 
-o_operator: [meth q['rule_name string'] d"""
-    o := p.operators[rule_name]
-    pos := p.pos
-    seed := p.seeds[pos][rule_name]
-    if seed {
-      [p.val, p.failed, p.pos] = seed
-      return
-    }
-    o.currentDepth += 1
-    current := [nil, true, pos]
-    p.seeds[pos][rule_name] = current
-    minPrec := o.currentPrec
-    i := 0
-    while (i < o.precs.length) {
-      repeat := false
-      prec := o.precs[i]
-      precOps := o.precOps.get(prec)
-      if prec < minPrec {
-        break
-      }
-      o.currentPrec = prec
-      if !o.rassoc.has(precOps[0]) {
-        o.currentPrec += 1
-      }
-      for (let j = 0 j < precOps.length j += 1) {
-        let op = precOps[j]
-        o.choices.get(op).call(p)
-        if !p.failed && p.pos > pos {
-          current = [p.val, p.failed, p.pos]
-          p.seeds[pos][rule_name] = current
-          repeat = true
-          break
-        }
-        p.o_rewind(pos)
-      }
-      if !repeat {
-        i += 1
-      }
-    }
-    delete p.seeds[pos][rule_name]
-    o.currentDepth -= 1
-    if o.currentDepth === 0 {
-      o.currentPrec = 0
-    }
-    [p.val, p.failed, p.pos] = current
-    """]  # o_operator
+o_operator: [meth q['rule_name string']
+                  d"""
+                  o := p.operators[rule_name]
+                  pos := p.pos
+                  seed := p.seeds[pos][rule_name]
+                  if seed {
+                    [p.val, p.failed, p.pos] = seed
+                    return
+                  }
+                  o.currentDepth += 1
+                  current := [nil, true, pos]
+                  p.seeds[pos][rule_name] = current
+                  minPrec := o.currentPrec
+                  i := 0
+                  while (i < o.precs.length) {
+                    repeat := false
+                    prec := o.precs[i]
+                    precOps := o.precOps.get(prec)
+                    if prec < minPrec {
+                      break
+                    }
+                    o.currentPrec = prec
+                    if !o.rassoc.has(precOps[0]) {
+                      o.currentPrec += 1
+                    }
+                    for (let j = 0 j < precOps.length j += 1) {
+                      let op = precOps[j]
+                      o.choices.get(op).call(p)
+                      if !p.failed && p.pos > pos {
+                        current = [p.val, p.failed, p.pos]
+                        p.seeds[pos][rule_name] = current
+                        repeat = true
+                        break
+                      }
+                      p.o_rewind(pos)
+                    }
+                    if !repeat {
+                      i += 1
+                    }
+                  }
+                  delete p.seeds[pos][rule_name]
+                  o.currentDepth -= 1
+                  if o.currentDepth === 0 {
+                    o.currentPrec = 0
+                  }
+                  [p.val, p.failed, p.pos] = current
+                  """]  # o_operator
 
-o_range: [meth q['i string' 'j string'] d"""
-    pos := p.pos
-    if pos == p.end {
-      p.o_fail()
-      return
-    }
-    c := p.text[pos]
-    if []rune(i)[0] <= c && c <= []rune(j)[0] {
-      p.o_succeed(string(c), p.pos + 1)
-    } else {
-      p.o_fail()
-    }
-    """]
+o_range: [meth q['i string' 'j string']
+               d"""
+               pos := p.pos
+               if pos == p.end {
+                 p.o_fail()
+                 return
+               }
+               c := p.text[pos]
+               if []rune(i)[0] <= c && c <= []rune(j)[0] {
+                 p.o_succeed(string(c), p.pos + 1)
+               } else {
+                 p.o_fail()
+               }
+               """]
 
 o_rewind: [meth q['newpos int'] 'p.o_succeed(nil, newpos)']
 
-o_str: [meth q['s string'] d"""
-   for _, r := range s {
-     p.o_ch(string(r))
-     if p.failed {
-       return
-     }
-   }
-   p.val = s
-   """]
+o_str: [meth q['s string']
+             d"""
+             for _, r := range s {
+               p.o_ch(string(r))
+               if p.failed {
+                 return
+               }
+             }
+             p.val = s
+             """]
 
 o_succeed: [meth q['v any' 'newpos int'] d"""
    p.val = v
@@ -654,95 +684,174 @@ o_succeed: [meth q['v any' 'newpos int'] d"""
    p.pos = newpos
    """]
 
-o_unicat: [meth q['cat string'] d"""
-                         r, _ := regexp.Compile("(?m:\\\\p{" + cat + "})")
-                         sub := string(p.text[p.pos:p.end])
-                         loc := r.FindStringIndex(sub)
-                         if loc != nil {
-                             start := p.pos + loc[0]
-                             end := p.pos + loc[1]
-                             p.o_succeed(string(p.text[start:end]), end)
-                             return
-                         }
-                         p.o_fail()
-                         """]
+o_unicat: [meth q['cat string']
+                d"""
+                 r, _ := regexp.Compile("(?m:\\\\p{" + cat + "})")
+                 sub := string(p.text[p.pos:p.end])
+                 loc := r.FindStringIndex(sub)
+                 if loc != nil {
+                     start := p.pos + loc[0]
+                     end := p.pos + loc[1]
+                     p.o_succeed(string(p.text[start:end]), end)
+                     return
+                 }
+                 p.o_fail()
+                 """]
 
-fn_atof: [meth q['a string'] 'return parseFloat(a)']
-fn_atoi: [meth q['a string' 'base int'] 'return parseInt(a, base)']
+fn_aplus: [def_method _t_name
+                      q['l any' 'r any']
+                      ' any'
+                      d"""
+                      l_type := fmt.Sprintf("%T", l)
+                      r_type := fmt.Sprintf("%T", r)
+                      if l_type != r_type {
+                          panic(fmt.Sprintf("Different types for `+`: %s, %s",
+                                            l_type, r_type))
+                      }
+                      if l_type == "string" {
+                          return l.(string) + r.(string)
+                      } else if l_type == "int" {
+                          return l.(int) + r.(int)
+                      } else if l_type == "float64" {
+                          return l.(float64) + r.(float64)
+                      } else {
+                          panic(fmt.Sprintf("Unsupported type for `+`: %s",
+                                            l_type))
+                     }
+                     """]
 
-fn_atou: [meth q['a string' 'base int']
-               'return String.fromCharCode(Number.parseInt(a, base))']
+fn_atof: [def_method _t_name
+                     q['a any']
+                     ' float64'
+                     d"""
+                     r, _ := strconv.ParseFloat(a.(string), 64)
+                     return r
+                     """]
 
-fn_cat: [meth q['ss []string'] "return ss.join('')"]
+fn_atoi: [def_method _t_name
+                     q['a any' 'base int']
+                     ' int'
+                     d"""
+                     r, _ := strconv.ParseInt(a.(string), base, 64)
+                     return
+                     """]
 
-fn_colno: [
-    meth q[] d"""
-          colno := 0
-          if p.pos == p.end {
-            colno += 1
-          }
-          while (p.pos >= colno && p.text[p.pos - colno] != "\\n") {
-            colno += 1
-          }
-          return colno
-          """]
+fn_atou: [def_method _t_name
+                     q['a any' 'base int']
+                     ' string'
+                     d"""
+                     r, _ := strconv.ParseInt(a.(string), base, 64)
+                     return string(rune(r))
+                     """]
 
-fn_concat: [meth q['xs []string' 'ys []string'] 'return xs.concat(ys)']
+fn_cat: [def_method _t_name
+                    q['ss []string']
+                    ' string',
+                    "return strings.Join(ss, "")"]
 
-fn_cons: [meth q['hd any' 'tl []any'] 'return [hd].concat(tl)']
+fn_colno: [def_method _t_name
+                      q[]
+                      " int"
+                      d"""
+                      colno := 0
+                      if p.pos == p.end {
+                        colno += 1
+                      }
+                      while (p.pos >= colno && p.text[p.pos - colno] != "\\n") {
+                        colno += 1
+                      }
+                      return colno
+                      """]
 
-fn_dedent: [meth q['s string'] 'return s']
+fn_concat: [def_method _t_name
+                       q['xs any' 'ys any']
+                       ' []any'
+                       'return append(xs.([]any), ys.([]any)...)']
 
-fn_dict: [meth q['pairs [](string, any)'] d"""
-    m := map[str]any
-    for k, v: range pairs {
-         m[k] = v
-    }
-    return m
-    """]
+fn_cons: [def_method _t_name
+                     q['hd any' 'tl any']
+                     ' []any'
+                     'return append([]any{hd}, tl.([]any)...)']
 
-fn_in: d"""
-    func (p *Parser) fn_in(lis []any, v any) bool {
-        for _, el := range lis {
-            if el == v {
-                return true
-            }
-        }
-        return false
-    }
-    """
+fn_dedent: [def_method _t_name
+                       q['s string']
+                       'string'
+                       'return s']
 
-fn_itou: [meth q['n int'] 'return String.fromCharCode(n)']
+fn_dict: [def_method _t_name
+                      q['pairs map[string]any']
+                      ' map[string]any'
+                      d"""
+                      m := map[string]any
+                      for k, v: range pairs {
+                           m[k] = v
+                      }
+                      return m
+                      """]
+
+fn_in: [def_method _t_name
+                    q['lis []any' 'v any']
+                    ' bool'
+                    d"""
+                    for _, el := range lis {
+                        if el == v {
+                            return true
+                        }
+                    }
+                    return false
+                    """]
+
+fn_itou: [def_method _t_name
+                     q['n int']
+                     ' string'
+                     'return string(rune(n))']
 
 fn_join: [def_method _t_name
-                     q['sep string' 'vs any']
+                     q['sep any' 'vs any']
                      'string'
                      d"""
                      strs := make([]string, len(vs.([]any)))
                      for i, v := range(vs.([]any)) {
                          strs[i] = v.(string)
                      }
-                     return strings.Join(strs, sep)
+                     return strings.Join(strs, sep.(string))
                      """]
 
-fn_scat: [meth q['ss []string'] 'return strings.Join("", ss)']
+fn_scat: [def_method _t_name
+                     q['hd string' 'tl []string']
+                     ' string'
+                     'return hd + strings.Join("", ss)']
 
-fn_scons: [meth q['hd string' 'tl []string'] 'return [hd].concat(tl)']
+fn_scons: [def_method _t_name
+                      q['hd any' 'tl any']
+                      ' string'
+                      'return hd.(string) + strings.Join(tl.([]string), "")']
 
 fn_strcat: [def_method _t_name
-                       q['a string' 'b string']
-                       'string'
+                       q['a string' 'b string']  # TODO: handle > 2 strings.
+                       ' string'
                        'return a + b']
 
-fn_ulookup: [meth q['s string'] d"""
-    panic('Unsupported function "ulookup"')
-    """]
+# TODO: Could theoretically use `runenames.Lookup()` from
+# `go pkg golang.org/x/text/unicode/runenames` to implement this.
+fn_ulookup: [def_method _t_name
+                        q['s string']
+                        ' string'
+                        'panic("Unsupported function `ulookup()`")']
 
-fn_utoi: [meth q['s string'] 'return s.charCodeAt(0)']
+fn_utoi: [def_method _t_name
+                     q['s string']
+                     ' int64'
+                     'return int64(([]rune(s))[0])']
 
-fn_xtoi: [meth q['s string'] 'return Number.parseInt(s, 16)']
+fn_xtoi: [def_method _t_name
+                     q['s string']
+                     ' int64'
+                     'return strconv(s, 16, 64)']
 
-fn_xtou: [meth q['s string']
-               'return String.fromCharCode(Number.parseInt(s, 16))']
+fn_xtou: [def_method _t_name
+                     q['s string']
+                     ' string'
+                     'return string(rune(strconv(s, 16, 64)))']
 
 }

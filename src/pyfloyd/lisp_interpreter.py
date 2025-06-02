@@ -326,10 +326,11 @@ class Interpreter:
         raise InterpreterError(f"Don't know how to evaluate `{expr}`")
 
     def fexpr_and(self, args, env):
-        first = self.eval(args[0], env)
-        if not first:
-            return False
-        return self.eval(args[1], env)
+        for arg in args[:-1]:
+            r = self.eval(arg, env)
+            if not r:
+                return False
+        return self.eval(args[-1], env)
 
     def fexpr_define(self, args, env):
         head, body = args
@@ -363,10 +364,11 @@ class Interpreter:
         return self.eval(f_expr, env)
 
     def fexpr_or(self, args, env):
-        first = self.eval(args[0], env)
-        if first:
-            return first
-        return self.eval(args[1], env)
+        for arg in args[:-1]:
+            r = self.eval(arg, env)
+            if r:
+                return r
+        return self.eval(args[-1], env)
 
     def fexpr_quote(self, args, env):
         del env

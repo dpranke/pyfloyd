@@ -837,6 +837,9 @@ class ActionsMixin:
             grammar_err='<string>:1 Unexpected "t" at column 16',
         )
 
+    def test_ll_arr(self):
+        self.check("grammar = -> ['a', 'b']", '', out=['a', 'b'])
+
     def test_ll_getitem(self):
         self.check("grammar = end -> ['a', 'b'][1]", '', out='b')
 
