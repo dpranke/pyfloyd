@@ -41,6 +41,7 @@ class AtExprHandler:
         interp.define_native_fn('hang', self.f_hang)
         interp.define_native_fn('hl', self.f_hl)
         interp.define_native_fn('ind', self.f_ind)
+        interp.define_native_fn('escape', self.f_escape)
         interp.define_native_fn('lit', self.f_lit)
         interp.define_native_fn('saw', self.f_saw)
         interp.define_native_fn('tree', self.f_tree)
@@ -83,6 +84,12 @@ class AtExprHandler:
     def f_ind(self, args, env) -> Any:
         del env
         return formatter.Indent(args, indent=self.indent)
+
+    def f_escape(self, args, env) -> Any:
+        del env
+        s = args[0]
+        ch = args[1]
+        return string_literal.escape(s, ch)
 
     def f_lit(self, args, env) -> Any:
         del env

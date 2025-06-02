@@ -63,6 +63,7 @@ t_break:   'break'
 t_empty_list: '[]'
 t_end: ''  # statement terminator (not used in Python)
 t_false: 'False'
+t_list_of_one: [fn [x] [hl '[' x ']']]
 t_meth_def: 'def _'
 t_meth_self: 'self'
 t_meth_params: [fn [params]

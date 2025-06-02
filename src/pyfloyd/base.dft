@@ -57,9 +57,6 @@ templates = {
 # Helper methods
 #
 
-ch_lit: [fn [c] [lit c]]
-str_lit: [fn [s] [lit s]]
-
 # Formats the command line used to generate the output.
 wrap_argv: [fn [first prefix]
                [wrap [hang [cons 'pyfloyd' generator_options.argv] ' ']
@@ -221,7 +218,7 @@ n_choice: [fn [node] [vl [t_assign 'pos' f_pos]
                               [slice node.ch 0 -1]]
                          [stmts [item node.ch -1]]]]
 
-n_count: [fn [node] [vl [t_assign 'vs' '[]']
+n_count: [fn [node] [vl [t_assign 'vs' t_empty_list]
                         [t_assign 'i' '0']
                         [t_assign 'cmin' [itoa [item node.v 0]]]
                         [t_assign 'cmax' [itoa [item node.v 1]]]
@@ -291,8 +288,8 @@ n_leftrec: [fn [node] [hl [call_op 'leftrec'
                            t_end]]
 
 n_lit: [fn [node] [hl [if [equal [strlen node.v] 1]
-                          [call_op 'ch' [list [ch_lit node.v]]]
-                          [call_op 'str' [list [str_lit node.v]]]]
+                          [call_op 'ch' [list [lit node.v]]]
+                          [call_op 'str' [list [lit node.v]]]]
                       t_end]]
 
 n_not: [fn [node] [vl [t_assign 'pos' f_pos]
@@ -312,7 +309,7 @@ n_operator: [fn [node] [hl [call_op 'operator' [list [lit node.v]] t_end]]]
 n_opt: [fn [node] [vl [stmts node.child]
                       [t_ifelse failed
                                 [vl [succeed t_empty_list f_pos]]
-                                [vl [succeed [hl '[' f_val ']'] f_pos]]]]]
+                                [vl [succeed [t_list_of_one f_val] f_pos]]]]]
 
 n_paren: [fn [node] [stmts node.child]]
 

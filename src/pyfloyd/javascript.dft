@@ -86,6 +86,7 @@ t_ifelifelse: [fn [cond if_body elif_cond elif_body e_body]
                   [block 'else' e_body]]]
 t_istrue: [fn [v] [hl v ' === true']]
 t_isfalse: [fn [v] [hl v ' === false']]
+t_list_of_one: [fn [x] [hl '[' x ']']]
 t_meth_def: ''
 t_meth_self: ''
 t_meth_params: [fn [params] params]

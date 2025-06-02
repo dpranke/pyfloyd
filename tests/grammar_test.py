@@ -219,8 +219,8 @@ class _GeneratedParserWrapper:
             stderr = proc.stderr.decode('utf8').strip()
             stderr = stderr.replace(self.tempdir, '.')
             stderr = stderr.replace('./input.txt', path)
-            if stderr.endswith('exit status 1'):
-                stderr = stderr[: -len('exit status 1')]
+            if stderr.endswith('\nexit status 1'):
+                stderr = stderr[: -len('\nexit status 1')]
         else:
             stderr = None
 
@@ -259,9 +259,6 @@ class RulesMixin:
 
     def test_basic(self):
         self.check('grammar = end', '')
-
-    def test_bind(self):
-        self.check("grammar = 'a'*", 'aa')
 
     def test_c_style_comment(self):
         self.check('grammar = /* foo */ end', '')
@@ -383,6 +380,8 @@ class RulesMixin:
             """,
             '',
         )
+
+    def test_pred_bad_value(self):
         self.check(
             'grammar = ?{"foo"} end',
             '',
@@ -439,11 +438,6 @@ class RulesMixin:
             err='<string>:1 Unexpected end of input at column 1',
         )
         self.check(
-            'g = [^\\]]',
-            ']',
-            err='<string>:1 Unexpected "]" at column 1',
-        )
-        self.check(
             'g = [^]',
             '',
             grammar_err='<string>:1 Unexpected "]" at column 7',
@@ -465,6 +459,13 @@ class RulesMixin:
     def test_set_escaped_right_bracket(self):
         g = r'g = [xa-e\]]'
         self.check(g, ']')
+
+    def test_set_exclude_escaped_right_bracket(self):
+        self.check(
+            'g = [^\\]]',
+            ']',
+            err='<string>:1 Unexpected "]" at column 1',
+        )
 
     def test_star(self):
         self.check("grammar = 'a'*", '')

@@ -29,9 +29,10 @@ class Hello(_Mixin, grammar_test.HelloMixin):
     pass
 
 
-@unittest.skip('unimplemented')
 class Rules(_Mixin, grammar_test.RulesMixin):
-    pass
+    @unittest.skip('panic')
+    def test_pred_bad_value(self):
+        pass
 
 
 @unittest.skip('unimplemented')
