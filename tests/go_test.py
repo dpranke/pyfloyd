@@ -69,7 +69,6 @@ class Pragmas(_Mixin, grammar_test.PragmasMixin):
     pass
 
 
-@unittest.skip('unimplemented')
 class Operators(_Mixin, grammar_test.OperatorsMixin):
     pass
 

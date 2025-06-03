@@ -499,14 +499,17 @@ o_memoize: [meth q['rule_name' 'fn'] d'''
 o_operator: [meth q['rule_name'] d'''
         o = self._operators[rule_name]
         pos = self._pos
-        key = (rule_name, self._pos)
-        seed = self._seeds.get(key)
-        if seed:
-            self._val, self._failed, self._pos = seed
+        cache = self._seeds.get(pos)
+        if not cache:
+            self._seeds[pos] = {}
+        cache = self._seeds[pos]
+        entry = cache.get(rule_name)
+        if entry:
+            self._val, self._failed, self._pos = entry
             return
         o.current_depth += 1
-        current = (None, True, self._pos)
-        self._seeds[key] = current
+        entry = (None, True, self._pos)
+        cache[rule_name] = entry
         min_prec = o.current_prec
         i = 0
         while i < len(o.precs):
@@ -522,19 +525,19 @@ o_operator: [meth q['rule_name'] d'''
                 op = prec_ops[j]
                 o.choices[op]()
                 if not self._failed and self._pos > pos:
-                    current = (self._val, self._failed, self._pos)
-                    self._seeds[key] = current
+                    entry = (self._val, self._failed, self._pos)
+                    cache[rule_name] = entry
                     repeat = True
                     break
                 self._o_rewind(pos)
             if not repeat:
                 i += 1
 
-        del self._seeds[key]
+        del cache[rule_name]
         o.current_depth -= 1
         if o.current_depth == 0:
             o.current_prec = 0
-        self._val, self._failed, self._pos = current
+        self._val, self._failed, self._pos = entry
         ''']
 
 o_range: [meth q['i' 'j'] d'''

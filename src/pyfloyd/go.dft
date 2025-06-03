@@ -181,6 +181,7 @@ imports: @"""
         @if[generator_options.main [vl '"encoding/json"' '"io"' '"os"']]
         @if[[or grammar.re_needed [in grammar.needed_operators 'unicat']]
             '"regexp"']
+        @if[grammar.operator_needed '"slices"']
         @if[[or [in grammar.needed_builtin_functions 'atoi']
                 [in grammar.needed_builtin_functions 'atof']
                 [in grammar.needed_builtin_functions 'atou']
@@ -205,13 +206,13 @@ parsing_runtime_exception_class: d"""
     """
 
 operator_state_class: d"""
-    type OperatorState struct {
+    type operatorState struct {
         currentDepth int
         currentPrec int
-        precOps map[int][string]
+        precOps map[int][]string
         precs []int
-        rassoc []str
-        choices map[str][any] // any == grammar.Rule
+        rassoc map[string]bool
+        choices map[string](func ()())
     }
     """
 
@@ -266,7 +267,7 @@ parser_class: @"""
         @if[grammar.seeds_needed 'seeds map[int]map[string]cacheEntry']
         @if[grammar.leftrec_needed 'blocked map[string]bool']
         @if[grammar.lookup_needed 'scopes []map[string]any']
-        @if[grammar.operator_needed 'operators map[string]any']
+        @if[grammar.operator_needed 'operators map[string]*operatorState']
     }
 
     @parser_methods[]
@@ -280,6 +281,7 @@ parser_constructor: @"""
     func NewParser(text string, path string) *Parser {
         p := Parser{text: []rune(text), path: path}
         p.end = len(p.text)
+        @externs[]
         @if[generator_options.memoize
             'p.cache = make(map[int]map[string]cacheEntry)']
         @if[grammar.seeds_needed
@@ -287,8 +289,8 @@ parser_constructor: @"""
         @if[grammar.leftrec_needed
             'p.blocked = make(map[string]bool)']
         @if[grammar.operator_needed
-            'p.operators = make(map[string]any)']
-        @externs[]
+            [vl 'p.operators = make(map[string]*operatorState)'
+                [map_items operator_state grammar.operators]]]
         return &p
     }
 
@@ -305,31 +307,38 @@ externs: [fn []
                             grammar.externs]]]
 
 operator_state: [fn [rule o]
-                    [vl 'o := OperatorState{}'
+                    [vl 'o := operatorState{}'
                         [operator_prec_ops o]
-                        [hl 'o.precs = [...o.precOps.keys()].sort('
-                            '(a, b) => b - a)']
+                        'precs := make([]int, 0, len(o.precOps))'
+                        'for k, _ := range o.precOps {'
+                        '    precs = append(precs, k)'
+                        '}'
+                        'slices.Sort(precs)'
+                        'slices.Reverse(precs)'
+                        'o.precs = precs'
                         [operator_rassoc o]
                         [operator_choices o]
-                        [hl 'p.operators[' [lit rule] '] = o']]]
+                        [hl 'p.operators[' [lit rule] '] = &o']]]
 
 operator_prec_ops: [fn [o]
-                       [vl 'o.precOps = new Map()'
+                       [vl 'o.precOps = make(map[int][]string)'
                            [map [fn [prec]
-                                    [hl 'o.precOps[' [itoa prec] '] = ['
+                                    [hl 'o.precOps['
+                                        [itoa prec]
+                                        '] = []string{'
                                         [map [fn [op] [lit op]]
                                              [get o.prec_ops prec]
                                              ', ']
-                                        ']']]
+                                        '}']]
                                 [sort [keys o.prec_ops]]]]]
 
 operator_rassoc: [fn [o]
-                     [hl 'o.rassoc = new Set(['
-                         [comma [map [fn [op] [lit op]] o.rassoc]]
-                         '])']]
+                     [vl 'o.rassoc = make(map[string]bool)'
+                         [map [fn [op] [hl 'o.rassoc[' [lit op] '] = true']]
+                             o.rassoc]]]
 
 operator_choices: [fn [o]
-                      [vl 'o.choices = new Map()'
+                      [vl 'o.choices = make(map[string](func ()()))'
                           [map_items [fn [op meth]
                                          [hl "o.choices["
                                              [lit op]
@@ -338,7 +347,7 @@ operator_choices: [fn [o]
                                      o.choices]]]
 
 parse_with_exception: @"""
-    func (p Parser) Parse(args ...any) (r Result) {
+    func (p *Parser) Parse(args ...any) (r Result) {
       var externs map[string]bool
       var start int
 
@@ -384,7 +393,7 @@ parse_with_exception: @"""
     """  # parse_with_exception
 
 parse_without_exception: @"""
-    func (p Parser) Parse(args ...any) (r Result) {
+    func (p *Parser) Parse(args ...any) (r Result) {
       var externs map[string]bool
       var start int
 
@@ -663,50 +672,60 @@ o_memoize: [meth q['rule_name string' 'fn any']
 
 o_operator: [meth q['rule_name string']
                   d"""
+                  var entry cacheEntry
+                  var cache map[string]cacheEntry
+                  var ok bool
+
                   o := p.operators[rule_name]
                   pos := p.pos
-                  seed := p.seeds[pos][rule_name]
-                  if seed {
-                    [p.val, p.failed, p.pos] = seed
-                    return
+                  if _, ok = p.seeds[pos]; !ok {
+                      p.seeds[pos] = make(map[string]cacheEntry)
+                  }
+                  cache = p.seeds[pos]
+                  if entry, ok = cache[rule_name]; ok {
+                      p.val = entry.val
+                      p.failed = entry.failed
+                      p.pos = entry.pos
+                      return
                   }
                   o.currentDepth += 1
-                  current := [nil, true, pos]
-                  p.seeds[pos][rule_name] = current
+                  entry = cacheEntry{nil, true, p.pos}
+                  cache[rule_name] = entry
                   minPrec := o.currentPrec
-                  i := 0
-                  while (i < o.precs.length) {
-                    repeat := false
-                    prec := o.precs[i]
-                    precOps := o.precOps.get(prec)
-                    if prec < minPrec {
-                      break
-                    }
-                    o.currentPrec = prec
-                    if !o.rassoc.has(precOps[0]) {
-                      o.currentPrec += 1
-                    }
-                    for (let j = 0 j < precOps.length j += 1) {
-                      let op = precOps[j]
-                      o.choices.get(op).call(p)
-                      if !p.failed && p.pos > pos {
-                        current = [p.val, p.failed, p.pos]
-                        p.seeds[pos][rule_name] = current
-                        repeat = true
-                        break
+                  for i := 0; i < len(o.precs) ; {
+                      repeat := false
+                      prec := o.precs[i]
+                      precOps := o.precOps[prec]
+                      if prec < minPrec {
+                          break
                       }
-                      p.o_rewind(pos)
-                    }
-                    if !repeat {
-                      i += 1
-                    }
+                      o.currentPrec = prec
+                      if _, ok = o.rassoc[precOps[0]]; !ok {
+                          o.currentPrec += 1
+                      }
+                      for j := 0; j < len(precOps) ; j += 1 {
+                          op := precOps[j]
+                          o.choices[op]()
+                          if !p.failed && p.pos > pos {
+                              entry = cacheEntry{p.val, p.failed, p.pos}
+                              cache[rule_name] = entry
+                              repeat = true
+                              break
+                          }
+                          p.o_rewind(pos)
+                      }
+                      if !repeat {
+                          i += 1
+                      }
                   }
-                  delete p.seeds[pos][rule_name]
+                  delete(cache, rule_name)
                   o.currentDepth -= 1
-                  if o.currentDepth === 0 {
+                  if o.currentDepth == 0 {
                     o.currentPrec = 0
                   }
-                  [p.val, p.failed, p.pos] = current
+                  p.val = entry.val
+                  p.failed = entry.failed
+                  p.pos = entry.pos
                   """]  # o_operator
 
 o_range: [meth q['i string' 'j string']
