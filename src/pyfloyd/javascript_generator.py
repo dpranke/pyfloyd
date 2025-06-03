@@ -895,12 +895,20 @@ _BUILTINS = {
         """,
     'fn_atoi': """
         fn_atoi(a, base) {
+          if ((base == 8 && a.startsWith('0o')) ||
+              (base == 2 && a.startsWith('0b'))) {
+              a = a.substr(2);
+          }
           return parseInt(a, base);
         }
         """,
     'fn_atou': """
         fn_atou(a, base) {
-          return String.fromCharCode(Number.parseInt(a, base));
+          if ((base == 8 && a.startsWith('0o')) ||
+              (base == 2 && a.startsWith('0b'))) {
+            a = a.substr(2);
+          }
+          return String.fromCharCode(parseInt(a, base));
         }
         """,
     'fn_cat': """

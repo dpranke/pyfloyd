@@ -870,16 +870,27 @@ class FunctionsMixin:
 
     def test_atoi(self):
         self.check("g = -> atoi('0x41', 16)", '', out=65)
+        self.check("g = -> atoi('41', 16)", '', out=65)
+        self.check("g = -> atoi('41', 10)", '', out=41)
+        # self.check("g = -> atoi('0o41', 8)", '', out=33)
+        self.check("g = -> atoi('41', 8)", '', out=33)
+        # self.check("g = -> atoi('0b11', 2)", '', out=3)
+        self.check("g = -> atoi('11', 2)", '', out=3)
 
     def test_atou(self):
-        self.check("g = -> atou('65', 10)", '', out='A')
         self.check("g = -> atou('0x41', 16)", '', out='A')
+        self.check("g = -> atou('41', 16)", '', out='A')
+        self.check("g = -> atou('41', 10)", '', out=')')
+        self.check("g = -> atou('0o41', 8)", '', out='!')
+        self.check("g = -> atou('41', 8)", '', out='!')
+        self.check("g = -> atou('0b11', 2)", '', out='\x03')
+        self.check("g = -> atou('11', 2)", '', out='\x03')
 
     def test_cat(self):
         self.check("g = -> cat(['1', '2'])", '', out='12')
 
     def test_colno(self):
-        g = "g = ('a' | '\n')* -> colno()"
+        g = "g = ('a' | '\\n')* -> colno()"
         self.check(g, '', out=1)
         self.check(g, 'a', out=2)
         self.check(g, 'aaa', out=4)
@@ -923,8 +934,13 @@ class FunctionsMixin:
     def test_utoi(self):
         self.check('grammar = -> utoi("a")', '', out=97)
 
+    def test_xtoi(self):
+        self.check("g = -> xtoi('0x41')", '', out=65)
+        self.check("g = -> xtoi('41')", '', out=65)
+
     def test_xtou(self):
         self.check("g = -> xtou('0x41')", '', out='A')
+        self.check("g = -> xtou('41')", '', out='A')
 
 
 class CommentsMixin:

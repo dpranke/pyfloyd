@@ -42,14 +42,23 @@ class Actions(_Mixin, grammar_test.ActionsMixin):
     def test_big_int(self):
         pass
 
-    @unittest.skip('saw/getitem')
-    def test_quals(self):
+    def test_ll_getitem(self):
+        # TODO: make getitem work w/ literals.
+        # self.check("grammar = end -> ['a', 'b'][1]", '', out='b')
         pass
 
+    def test_quals(self):
+        self.check("g = -> utoi(' ')", '', out=32)
+        self.check("g = 'x'*:l -> l[0]", 'xx', out='x')
+        # TODO: make getitem work w/ literals.
+        # self.check("g = -> ['a', 'b'][1]", '', out='b')
+        # self.check("g = -> [['a']][0][0]", '', out='a')
 
-@unittest.skip('unimplemented')
+
 class Functions(_Mixin, grammar_test.FunctionsMixin):
-    pass
+    @unittest.skip('not implemented yet')
+    def test_dedent(self):
+        pass
 
 
 class Errors(_Mixin, grammar_test.ErrorsMixin):

@@ -32,7 +32,8 @@ given types (using Python's type annotation syntax):
 
 * `cat(strs: list[str]) -> str`<br>
     Returns the string produced by concatenating all of the
-    elements of `strs` together Equivalent to `join('', strs)`.
+    elements of `strs` together Equivalent to `join('', strs)` or
+    `cat(*strs)`.
 
 * `cdr(lis: list[any]) -> list[any]`<br>
     Returns the sublist with everything but the first element.

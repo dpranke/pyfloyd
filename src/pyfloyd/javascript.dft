@@ -630,10 +630,23 @@ o_unicat: [meth q['cat'] d"""
 
 fn_atof: [meth q['a'] 'return parseFloat(a);']
 
-fn_atoi: [meth q['a' 'base'] 'return parseInt(a, base);']
+fn_atoi: [meth q['a' 'base']
+               d"""
+               if ((base == 8 && a.startsWith('0o')) ||
+                   (base == 2 && a.startsWith('0b'))) {
+                   a = a.substr(2);
+               }
+               return parseInt(a, base);
+               """]
 
 fn_atou: [meth q['a' 'base']
-               'return String.fromCharCode(Number.parseInt(a, base));']
+               d"""
+               if ((base == 8 && a.startsWith('0o')) ||
+                   (base == 2 && a.startsWith('0b'))) {
+                   a = a.substr(2);
+               }
+               return String.fromCharCode(parseInt(a, base));
+               """]
 
 fn_cat: [meth q['ss'] "return ss.join('');"]
 

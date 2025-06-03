@@ -184,11 +184,19 @@ imports: @"""
             '"regexp"']
         @if[[or [in grammar.needed_builtin_functions 'atoi']
                 [in grammar.needed_builtin_functions 'atof']
-                [in grammar.needed_builtin_functions 'atou']]
+                [in grammar.needed_builtin_functions 'atou']
+                [in grammar.needed_builtin_functions 'xtoi']
+                [in grammar.needed_builtin_functions 'xtou']
+                ]
             '"strconv"']
-        @if[[or [in grammar.needed_builtin_functions 'join']
+        @if[[or [in grammar.needed_builtin_functions 'atoi']
+                [in grammar.needed_builtin_functions 'atou']
+                [in grammar.needed_builtin_functions 'cat']
+                [in grammar.needed_builtin_functions 'join']
                 [in grammar.needed_builtin_functions 'scat']
-                [in grammar.needed_builtin_functions 'scons']]
+                [in grammar.needed_builtin_functions 'xtoi']
+                [in grammar.needed_builtin_functions 'xtou']
+                ]
             '"strings"']
     )
     """
@@ -450,7 +458,7 @@ main_footer: d"""
 n_e_arr: [fn [node]
              [tri '[]any{' [comma [map [fn [c] [expr c]] node.ch]] '}']]
 
-n_e_getitem: [fn [node] [tri '[' [expr node.child] ']']]
+n_e_getitem: [fn [node] [tri '.([]any)[' [expr node.child] ']']]
 
 n_e_not: [fn [node]
              [if [equal [expr node.child] 'true']
@@ -461,6 +469,12 @@ n_e_not: [fn [node]
 
 n_e_plus: [fn [node]
               [call 'fn_aplus' [list [expr node.left] [expr node.right]]]]
+
+#n_e_qual: [fn [node]
+#              [vl [hl 'v := ' [expr [item node.ch 0]]]
+#                  [if [equal [get [item node.ch 1] 't'] 'e_call']
+#                      [saw [[expr [item node.ch 0]] [expr [item node.ch 1]]]
+
 
 n_regexp: [fn [node] [t_regexp node.v]]
 
@@ -733,22 +747,40 @@ fn_atoi: [def_method _t_name
                      q['a any' 'base int']
                      ' int'
                      d"""
-                     r, _ := strconv.ParseInt(a.(string), base, 64)
-                     return
+                     s := a.(string)
+                     if ((base == 16 && strings.HasPrefix(s, "0x")) ||
+                         (base == 8 && strings.HasPrefix(s, "0o")) ||
+                         (base == 2 && strings.HasPrefix(s, "0b"))) {
+                        s = s[2:]
+                    }
+                     r, _ := strconv.ParseInt(s, base, 64)
+                     return int(r)
                      """]
 
 fn_atou: [def_method _t_name
                      q['a any' 'base int']
                      ' string'
                      d"""
-                     r, _ := strconv.ParseInt(a.(string), base, 64)
+                     s := a.(string)
+                     if ((base == 16 && strings.HasPrefix(s, "0x")) ||
+                         (base == 8 && strings.HasPrefix(s, "0o")) ||
+                         (base == 2 && strings.HasPrefix(s, "0b"))) {
+                        s = s[2:]
+                    }
+                     r, _ := strconv.ParseInt(s, base, 64)
                      return string(rune(r))
                      """]
 
 fn_cat: [def_method _t_name
-                    q['ss []string']
+                    q['ss any']
                     ' string',
-                    "return strings.Join(ss, "")"]
+                    d"""
+                    lis := make([]string, 0)
+                    for _, s := range ss.([]any) {
+                        lis = append(lis, s.(string))
+                    }
+                    return strings.Join(lis, "")
+                    """]
 
 fn_colno: [def_method _t_name
                       q[]
@@ -756,10 +788,10 @@ fn_colno: [def_method _t_name
                       d"""
                       colno := 0
                       if p.pos == p.end {
-                        colno += 1
+                          colno += 1
                       }
-                      while (p.pos >= colno && p.text[p.pos - colno] != "\\n") {
-                        colno += 1
+                      for (p.pos >= colno) && (p.text[p.pos - colno] != '\\n') {
+                          colno += 1
                       }
                       return colno
                       """]
@@ -780,12 +812,13 @@ fn_dedent: [def_method _t_name
                        'return s']
 
 fn_dict: [def_method _t_name
-                      q['pairs map[string]any']
+                      q['pairs []any']
                       ' map[string]any'
                       d"""
-                      m := map[string]any
-                      for k, v: range pairs {
-                           m[k] = v
+                      m := make(map[string]any)
+                      for _, v := range pairs {
+                           l := v.([]any)
+                           m[l[0].(string)] = l[1]
                       }
                       return m
                       """]
@@ -825,8 +858,15 @@ fn_scat: [def_method _t_name
 
 fn_scons: [def_method _t_name
                       q['hd any' 'tl any']
-                      ' string'
-                      'return hd.(string) + strings.Join(tl.([]string), "")']
+                      ' []string'
+                      d"""
+                      lis := make([]string, 0)
+                      lis = append(lis, hd.(string))
+                      for _, t := range tl.([]any) {
+                          lis = append(lis, t.(string))
+                      }
+                      return lis
+                      """]
 
 fn_strcat: [def_method _t_name
                        q['a string' 'b string']  # TODO: handle > 2 strings.
@@ -841,18 +881,32 @@ fn_ulookup: [def_method _t_name
                         'panic("Unsupported function `ulookup()`")']
 
 fn_utoi: [def_method _t_name
-                     q['s string']
+                     q['u any']
                      ' int64'
-                     'return int64(([]rune(s))[0])']
+                     'return int64(([]rune(u.(string)))[0])']
 
 fn_xtoi: [def_method _t_name
-                     q['s string']
+                     q['x any']
                      ' int64'
-                     'return strconv(s, 16, 64)']
+                     d"""
+                     s := x.(string)
+                     if (strings.HasPrefix(s, "0x")) {
+                         s = s[2:]
+                     }
+                     r, _ := strconv.ParseInt(s, 16, 64)
+                     return r
+                     """]
 
 fn_xtou: [def_method _t_name
-                     q['s string']
+                     q['x any']
                      ' string'
-                     'return string(rune(strconv(s, 16, 64)))']
+                     d"""
+                     s := x.(string)
+                     if (strings.HasPrefix(s, "0x")) {
+                         s = s[2:]
+                     }
+                     r, _ := strconv.ParseInt(s, 16, 64)
+                     return string(rune(r))
+                     """]
 
 }
