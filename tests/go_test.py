@@ -74,7 +74,6 @@ class Operators(_Mixin, grammar_test.OperatorsMixin):
     pass
 
 
-@unittest.skip('unimplemented')
 class Recursion(_Mixin, grammar_test.RecursionMixin):
     pass
 

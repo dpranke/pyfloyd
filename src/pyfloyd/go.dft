@@ -264,7 +264,7 @@ parser_class: @"""
         externs map[string]bool
         @if[generator_options.memoize 'cache map[int]map[string]cacheEntry']
         @if[grammar.seeds_needed 'seeds map[int]map[string]cacheEntry']
-        @if[grammar.leftrec_needed 'blocked map[string]int']
+        @if[grammar.leftrec_needed 'blocked map[string]bool']
         @if[grammar.lookup_needed 'scopes []map[string]any']
         @if[grammar.operator_needed 'operators map[string]any']
     }
@@ -285,7 +285,7 @@ parser_constructor: @"""
         @if[grammar.seeds_needed
             'p.seeds = make(map[int]map[string]cacheEntry)']
         @if[grammar.leftrec_needed
-            'p.blocked = make(map[string]int)']
+            'p.blocked = make(map[string]bool)']
         @if[grammar.operator_needed
             'p.operators = make(map[string]any)']
         @externs[]
@@ -581,35 +581,46 @@ o_fail: [meth q[]
 o_leftrec: [meth q['rule any' 'rule_name string' 'left_assoc bool']
                  d"""
                  pos := p.pos
-                 seed := p.seeds[pos][rule_name]
-                 if seed {
-                   [p.val, p.failed, p.pos] = seed
-                   return
+                 var entry cacheEntry
+                 var ok bool
+
+                 if _, ok = p.seeds[pos]; !ok {
+                    p.seeds[pos] = make(map[string]cacheEntry)
                  }
-                 if _, ok := p.blocked[rule_name]; ok {
-                   p.val = nil
-                   p.failed = true
-                   return
-                 }
-                 current := [nil, true, p.pos]
-                 p.seeds[pos][rule_name] = current
-                 if left_assoc {
-                   p.blocked.add(rule_name)
-                 }
-                 while (true) {
-                   rule.call(p)
-                   if p.pos > current[2] {
-                     current = [p.val, p.failed, p.pos]
-                     p.seeds[pos][rule_name] = current
-                     p.pos = pos
-                   } else {
-                     delete p.seeds[pos][rule_name]
-                     [p.val, p.failed, p.pos] = current
-                     if left_assoc {
-                       p.blocked.delete(rule_name)
-                     }
+                 c := p.seeds[pos]
+                 if entry, ok = c[rule_name]; ok {
+                     p.val = entry.val
+                     p.failed = entry.failed
+                     p.pos = entry.pos
                      return
-                   }
+                 }
+                 if _, ok = p.blocked[rule_name]; ok {
+                     p.val = nil
+                     p.failed = true
+                     return
+                 }
+                 entry = cacheEntry{nil, true, p.pos}
+                 p.seeds[pos][rule_name] = entry
+                 if left_assoc {
+                     p.blocked[rule_name] = true
+                 }
+                 for true {
+                     f := rule.(func ()())
+                     f()
+                     if p.pos > entry.pos {
+                         entry = cacheEntry{p.val, p.failed, p.pos}
+                         c[rule_name] = entry
+                         p.pos = pos
+                     } else {
+                         delete(c, rule_name)
+                         p.val = entry.val
+                         p.failed = entry.failed
+                         p.pos = entry.pos
+                         if left_assoc {
+                             delete(p.blocked, rule_name)
+                         }
+                         return
+                     }
                  }
                  """]  # o_leftrec
 
