@@ -65,6 +65,10 @@ class Errors(_Mixin, grammar_test.ErrorsMixin):
     pass
 
 
+class Pragmas(_Mixin, grammar_test.PragmasMixin):
+    pass
+
+
 @unittest.skip('unimplemented')
 class Operators(_Mixin, grammar_test.OperatorsMixin):
     pass
@@ -75,6 +79,5 @@ class Recursion(_Mixin, grammar_test.RecursionMixin):
     pass
 
 
-@unittest.skip('unimplemented')
 class Integration(_Mixin, grammar_test.IntegrationMixin):
     pass

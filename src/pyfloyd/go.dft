@@ -129,10 +129,9 @@ t_regexp: [fn [re_str]
                       ")"]
                   [hl "sub := string(p.text[p.pos : p.end])"]
                   [hl "loc := r.FindStringIndex(sub)"]
-                  'if loc != nil {'
-                  [ind [vl 'start := p.pos + loc[0]'
-                           'end := p.pos + loc[1]'
-                           [succeed 'string(p.text[start:end])' 'end']
+                  'if (loc != nil) && (loc[0] == 0) {'
+                  [ind [vl 'end := p.pos + loc[1]'
+                           [succeed 'string(p.text[p.pos:end])' 'end']
                            'return']]
                   '}'
                   'p.o_fail()']]
@@ -189,7 +188,8 @@ imports: @"""
                 [in grammar.needed_builtin_functions 'xtou']
                 ]
             '"strconv"']
-        @if[[or [in grammar.needed_builtin_functions 'atoi']
+        @if[[or generator_options.main
+                [in grammar.needed_builtin_functions 'atoi']
                 [in grammar.needed_builtin_functions 'atou']
                 [in grammar.needed_builtin_functions 'cat']
                 [in grammar.needed_builtin_functions 'join']
@@ -216,6 +216,12 @@ operator_state_class: d"""
     """
 
 result_class: d"""
+    type cacheEntry struct {
+        val any
+        failed bool
+        pos int
+    }
+
     type Result struct {
         val any
         err error
@@ -225,22 +231,18 @@ result_class: d"""
 
 parse_function: d"""
     func Parse(text string, args ...any) (any, error) {
-      var path string
-      var start int
-      var externs map[string]bool
+      var path string = "<string>"
+      var start int = 0
+      externs := make(map[string]bool)
 
-      if len(args) == 3 {
+      if len(args) > 0 {
           path = args[0].(string)
-          start = args[1].(int)
-          externs = args[2].(map[string]bool)
-      } else if len(args) == 1 {
-          path = args[0].(string)
-          start = 0
-          externs = make(map[string]bool)
-      } else {
-          path = "<string>"
-          start = 0
-          externs = make(map[string]bool)
+      }
+      if len(args) > 1 {
+          externs = args[1].(map[string]bool)
+      }
+      if len(args) > 2 {
+         start = args[2].(int)
       }
 
       p := NewParser(text, path);
@@ -260,8 +262,8 @@ parser_class: @"""
         end  int
         errpos int
         externs map[string]bool
-        @if[generator_options.memoize 'cache map[int][string]Result']
-        @if[grammar.seeds_needed 'seeds map[int][string]Result']
+        @if[generator_options.memoize 'cache map[int]map[string]cacheEntry']
+        @if[grammar.seeds_needed 'seeds map[int]map[string]cacheEntry']
         @if[grammar.leftrec_needed 'blocked map[string]int']
         @if[grammar.lookup_needed 'scopes []map[string]any']
         @if[grammar.operator_needed 'operators map[string]any']
@@ -269,13 +271,23 @@ parser_class: @"""
 
     @parser_methods[]
 
+    @fn_aminus
     @fn_aplus
+    @fn_to_bool
     """
 
 parser_constructor: @"""
     func NewParser(text string, path string) *Parser {
         p := Parser{text: []rune(text), path: path}
         p.end = len(p.text)
+        @if[generator_options.memoize
+            'p.cache = make(map[int]map[string]cacheEntry)']
+        @if[grammar.seeds_needed
+            'p.seeds = make(map[int]map[string]cacheEntry)']
+        @if[grammar.leftrec_needed
+            'p.blocked = make(map[string]int)']
+        @if[grammar.operator_needed
+            'p.operators = make(map[string]any)']
         @externs[]
         return &p
     }
@@ -414,28 +426,51 @@ default_footer: null
 main_footer: d"""
 
     func main() {
-        if len(os.Args) != 2 || os.Args[1] == "-h" || os.Args[1] == "--help" {
-            fmt.Println("usage: [-h|--help] data")
-            os.Exit(2)
-        }
-        data_file := os.Args[1]
-
-        var d []byte
+        externs := make(map[string]bool)
+        var s string
+        var filename string
+        var i int = 1
         var err error
 
-        if data_file == "-" {
-            d, err = io.ReadAll(os.Stdin)
-        } else {
-            d, err = os.ReadFile(data_file)
-        }
-        if err != nil {
-            panic(err)
+        for i < len(os.Args) {
+            if os.Args[i] == "-h" || os.Args[i] == "--help" {
+                fmt.Println("usage [-h] [-D var=val] [-c str] [file]")
+                os.Exit(2)
+            } else if os.Args[i] == "-D" || os.Args[i] == "--define" {
+                l := strings.SplitN(os.Args[i+1], "=", 2)
+                var v any
+                err = json.Unmarshal([]byte(l[1]), &v)
+                if err != nil {
+                    panic(err)
+                }
+                externs[l[0]] = v.(bool)
+                i += 2
+            } else if os.Args[i] == "-c" || os.Args[i] == "--code" {
+                s = os.Args[i+1]
+                filename = "<code>"
+                break
+            } else {
+                break
+            }
         }
 
-        if err != nil {
-            panic(err)
+        var d []byte
+
+        if s == "" {
+            if len(os.Args) == i || os.Args[i] == "-" {
+                d, err = io.ReadAll(os.Stdin)
+                filename = "<stdin>"
+            } else {
+                filename = os.Args[i]
+                d, err = os.ReadFile(os.Args[i])
+            }
+            if err != nil {
+                panic(err)
+            }
+            s = string(d)
         }
-        val, err := Parse(string(d), data_file)
+
+        val, err := Parse(string(d), filename, externs)
         if err == nil {
             b, _ := json.Marshal(val)
             if err != nil {
@@ -460,20 +495,14 @@ n_e_arr: [fn [node]
 
 n_e_getitem: [fn [node] [tri '.([]any)[' [expr node.child] ']']]
 
-n_e_not: [fn [node]
-             [if [equal [expr node.child] 'true']
-                 'false'
-                 [if [equal [expr node.child] 'false']
-                     'true'
-                     [hl '!(' [expr node.child] '.(bool))']]]]
+n_e_minus: [fn [node]
+              [call 'fn_aminus' [list [expr node.left] [expr node.right]]]]
+
+n_e_not: [fn [node] [hl '!' [call 'fn_to_bool' [list [expr node.child]]]]]
 
 n_e_plus: [fn [node]
               [call 'fn_aplus' [list [expr node.left] [expr node.right]]]]
 
-#n_e_qual: [fn [node]
-#              [vl [hl 'v := ' [expr [item node.ch 0]]]
-#                  [if [equal [get [item node.ch 1] 't'] 'e_call']
-#                      [saw [[expr [item node.ch 0]] [expr [item node.ch 1]]]
 
 
 n_regexp: [fn [node] [t_regexp node.v]]
@@ -605,16 +634,20 @@ o_lookup: d"""
 o_memoize: [meth q['rule_name string' 'fn any']
                  d"""
                  pos := p.pos
-                 if !p.cache.has(pos) {
-                   p.cache.set(pos, make(map[pos][string]))
+                 if _, ok := p.cache[pos]; !ok {
+                    p.cache[pos] = make(map[string]cacheEntry)
                  }
-                 let c = p.cache.get(pos)
-                 if c.has(rule_name) {
-                   [p.val, p.failed, p.pos] = c.get(rule_name)
+                 c := p.cache[pos]
+                 if _, ok := c[rule_name]; ok {
+                   r := c[rule_name]
+                   p.val = r.val
+                   p.failed = r.failed
+                   p.pos = r.pos
                    return
                  }
-                 fn.call(p)
-                 c.set(rule_name, [p.val, p.failed, p.pos])
+                 f := fn.(func ()())
+                 f()
+                 c[rule_name] = cacheEntry{p.val, p.failed, p.pos}
                  """]
 
 o_operator: [meth q['rule_name string']
@@ -701,17 +734,33 @@ o_succeed: [meth q['v any' 'newpos int'] d"""
 
 o_unicat: [meth q['cat string']
                 d"""
-                 r, _ := regexp.Compile("(?m:\\\\p{" + cat + "})")
-                 sub := string(p.text[p.pos:p.end])
-                 loc := r.FindStringIndex(sub)
-                 if loc != nil {
-                     start := p.pos + loc[0]
-                     end := p.pos + loc[1]
-                     p.o_succeed(string(p.text[start:end]), end)
-                     return
-                 }
-                 p.o_fail()
-                 """]
+                r, _ := regexp.Compile("(?m:\\\\p{" + cat + "})")
+                sub := string(p.text[p.pos:])
+                loc := r.FindStringIndex(sub)
+                if (loc != nil) && (loc[0] == 0) {
+                    end := p.pos + loc[1]
+                    p.o_succeed(p.text[p.pos:end], end)
+                    return
+                }
+                p.o_fail()
+                """]
+
+fn_aminus: [def_method _t_name
+                      q['l any' 'r any']
+                      ' any'
+                      d"""
+                      l_type := fmt.Sprintf("%T", l)
+                      r_type := fmt.Sprintf("%T", r)
+                      if l_type == "int" && r_type == "int" {
+                          return l.(int) - r.(int)
+                      } else if l_type == "int" && r_type == "float64" {
+                          return float64(l.(int)) - r.(float64)
+                      } else if l_type == "float64" && r_type == "int" {
+                          return l.(float64) - float64(r.(int))
+                      } else {
+                          return l.(float64) - r.(float64)
+                      }
+                      """]
 
 fn_aplus: [def_method _t_name
                       q['l any' 'r any']
@@ -775,6 +824,11 @@ fn_cat: [def_method _t_name
                     q['ss any']
                     ' string',
                     d"""
+                    slis, ok := ss.([]string)
+                    if ok {
+                        return strings.Join(slis, "")
+                    }
+
                     lis := make([]string, 0)
                     for _, s := range ss.([]any) {
                         lis = append(lis, s.(string))
@@ -812,11 +866,11 @@ fn_dedent: [def_method _t_name
                        'return s']
 
 fn_dict: [def_method _t_name
-                      q['pairs []any']
+                      q['pairs any']
                       ' map[string]any'
                       d"""
                       m := make(map[string]any)
-                      for _, v := range pairs {
+                      for _, v := range pairs.([]any) {
                            l := v.([]any)
                            m[l[0].(string)] = l[1]
                       }
@@ -852,9 +906,16 @@ fn_join: [def_method _t_name
                      """]
 
 fn_scat: [def_method _t_name
-                     q['hd string' 'tl []string']
+                     q['hd any' 'tl any']
                      ' string'
-                     'return hd + strings.Join("", ss)']
+                     d"""
+                      lis := make([]string, 0)
+                      lis = append(lis, hd.(string))
+                      for _, t := range tl.([]any) {
+                          lis = append(lis, t.(string))
+                      }
+                     return strings.Join("", lis)
+                     """]
 
 fn_scons: [def_method _t_name
                       q['hd any' 'tl any']
@@ -869,14 +930,20 @@ fn_scons: [def_method _t_name
                       """]
 
 fn_strcat: [def_method _t_name
-                       q['a string' 'b string']  # TODO: handle > 2 strings.
+                       q['a any' 'b any']  # TODO: handle > 2 strings.
                        ' string'
-                       'return a + b']
+                       'return a.(string) + b.(string)']
+
+fn_to_bool: [def_method _t_name
+                        q['b any']
+                        ' bool'
+                        'return b.(bool)']
+
 
 # TODO: Could theoretically use `runenames.Lookup()` from
 # `go pkg golang.org/x/text/unicode/runenames` to implement this.
 fn_ulookup: [def_method _t_name
-                        q['s string']
+                        q['s any']
                         ' string'
                         'panic("Unsupported function `ulookup()`")']
 

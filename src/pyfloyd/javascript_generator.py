@@ -237,7 +237,7 @@ class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
                     if (!this.externs.has(key)) {{
                       errors += `Unexpected extern "${{key}}"\\n`;
                     }} else {{
-                      this.externs[key] = externs[key];
+                      this.externs.set(key, externs.get(key));
                     }}
                   }}
                   if (errors != '') {{
@@ -270,7 +270,7 @@ class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
                 if (!this.externs.has(key)) {{
                     errors += `Unexpected extern "${{key}}"\\n`;
                 }} else {{
-                    this.externs[key] = externs[key];
+                    this.externs.set(key, externs.get(key));
                 }}
               }}
 
@@ -589,7 +589,7 @@ class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
 
                 if (process.argv[i] == '-D' || process.argv[i] == '--define') {
                   let [k, v] = process.argv[i+1].split('=', 2);
-                  externs.set(k, JSON.parse(v))
+                  externs.set(k.trim(), JSON.parse(v))
                   i += 2;
                 } else if (process.argv[i] == '-c' || process.argv[i] == '--code') {
                   s = process.argv[i+1];

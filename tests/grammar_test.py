@@ -71,11 +71,12 @@ class Mixin(unittest.TestCase):
         out=None,
         err=None,
         grammar_err=None,
+        externs=None,
     ):
         p, p_err, _ = self.compile(grammar)
         self.assertMultiLineEqual(grammar_err or '', p_err or '')
         if p:
-            self.checkp(p, text, out, err)
+            self.checkp(p, text, out, err, externs)
         if hasattr(p, 'cleanup'):
             p.cleanup()
 
@@ -314,6 +315,14 @@ class RulesMixin:
     def test_escape_unicat(self):
         self.check('grammar = \\p{Nd}', '1')
 
+        # Check to make sure we're only matching at the beginning of the
+        # string.
+        self.check(
+            'grammar = \\p{Nd}',
+            'a1',
+            err='<string>:1 Unexpected "a" at column 1',
+        )
+
     def test_escapes_in_string(self):
         self.check('grammar = "\\n\\"foo"', '\n"foo')
         self.check("grammar = '\\'foo'", "'foo")
@@ -395,6 +404,11 @@ class RulesMixin:
 
     def test_regexp(self):
         self.check('g = /.+/', 'abc')
+
+    def test_regexp_must_match_at_start(self):
+        self.check(
+            'g = /ab/', 'ba', err='<string>:1 Unexpected "b" at column 1'
+        )
 
     def test_rule_with_lit_str(self):
         self.check(
@@ -930,6 +944,9 @@ class FunctionsMixin:
 
     def test_strcat(self):
         self.check("g = -> strcat('foo', 'bar')", '', out='foobar')
+        self.check(
+            "g = 'foo':f 'bar':b -> strcat(f, b)", 'foobar', out='foobar'
+        )
 
     def test_utoi(self):
         self.check('grammar = -> utoi("a")', '', out=97)
@@ -1049,14 +1066,22 @@ class PragmasMixin:
         self.check(grammar, '" "', out=True)
 
     def test_externs(self):
-        g = """
+        g = textwrap.dedent("""\
         %externs = foo -> true
                  | bar -> false
 
         g = ?{foo} -> 'foo is true'
           | ?{bar} -> 'bar is true'
-        """
+        """)
         self.check(g, '', out='foo is true')
+
+    def test_extern_not(self):
+        g = textwrap.dedent("""\
+        %externs = foo -> true
+        g = ?{foo} -> true
+          | -> false
+        """)
+        self.check(g, '', out=False, externs={'foo': False})
 
 
 class OperatorsMixin:
