@@ -59,7 +59,7 @@ templates = {
 
 # Formats the command line used to generate the output.
 wrap_argv: [fn [first prefix]
-               [wrap [hang [cons 'pyfloyd' generator_options.argv] ' ']
+               [wrap [hang [cons 'flc' generator_options.argv] ' ']
                      prefix
                      ' \\'
                      first

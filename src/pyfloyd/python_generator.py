@@ -443,7 +443,7 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
     # Handlers for each non-host node in the glop AST follow.
     #
 
-    def _ty_choice(self, node: gram.Node) -> formatter.ListObj:
+    def _ty_choice(self, node: gram.Node) -> formatter.FormatObj:
         vl = formatter.VList('p = self._pos')
         for subnode in node.ch[:-1]:
             vl += self._gen_stmts(subnode)
@@ -453,7 +453,7 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
         vl += self._gen_stmts(node.ch[-1])
         return vl
 
-    def _ty_count(self, node: gram.Node) -> formatter.ListObj:
+    def _ty_count(self, node: gram.Node) -> formatter.FormatObj:
         vl = formatter.VList(
             'vs = []',
             'i = 0',
@@ -473,7 +473,7 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
         vl += 'self._o_succeed(vs)'
         return vl
 
-    def _ty_ends_in(self, node: gram.Node) -> formatter.ListObj:
+    def _ty_ends_in(self, node: gram.Node) -> formatter.FormatObj:
         vl = formatter.VList('while True:')
         vl += formatter.Indent(self._gen_stmts(node.child))
         if node.can_fail:
@@ -485,7 +485,7 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
         ]
         return vl
 
-    def _ty_label(self, node: gram.Node) -> formatter.ListObj:
+    def _ty_label(self, node: gram.Node) -> formatter.FormatObj:
         assert isinstance(node, gram.Label)
         vl = formatter.VList(self._gen_stmts(node.child))
         if node.child.can_fail:
@@ -496,7 +496,7 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
             vl += f'{self._gen_varname(node.name)} = self._val'
         return vl
 
-    def _ty_not(self, node: gram.Node) -> formatter.ListObj:
+    def _ty_not(self, node: gram.Node) -> formatter.FormatObj:
         vl = formatter.VList(
             'p = self._pos',
             'errpos = self._errpos',
@@ -512,14 +512,14 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
         ]
         return vl
 
-    def _ty_not_one(self, node: gram.Node) -> formatter.ListObj:
+    def _ty_not_one(self, node: gram.Node) -> formatter.FormatObj:
         sublines = self._gen_stmts(self.grammar.node(gram.Not, node.child))
         vl = formatter.VList()
         vl += sublines
         vl += ['if not self._failed:', '    self._r_any()']
         return vl
 
-    def _ty_opt(self, node: gram.Node) -> formatter.ListObj:
+    def _ty_opt(self, node: gram.Node) -> formatter.FormatObj:
         vl = formatter.VList('p = self._pos')
         vl += self._gen_stmts(node.child)
         vl += [
@@ -530,10 +530,10 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
         ]
         return vl
 
-    def _ty_paren(self, node: gram.Node) -> formatter.ListObj:
+    def _ty_paren(self, node: gram.Node) -> formatter.FormatObj:
         return self._gen_stmts(node.child)
 
-    def _ty_plus(self, node: gram.Node) -> formatter.ListObj:
+    def _ty_plus(self, node: gram.Node) -> formatter.FormatObj:
         sublines = self._gen_stmts(node.child)
         vl = formatter.VList('vs = []')
         vl += sublines
@@ -552,7 +552,7 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
         ]
         return vl
 
-    def _ty_pred(self, node: gram.Node) -> formatter.ListObj:
+    def _ty_pred(self, node: gram.Node) -> formatter.FormatObj:
         arg = self._gen_expr(node.child)
         return formatter.VList(
             formatter.HList('v = ', arg),
@@ -564,7 +564,7 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
             "    raise _ParsingRuntimeError('Bad predicate value')",
         )
 
-    def _ty_regexp(self, node: gram.Node) -> formatter.ListObj:
+    def _ty_regexp(self, node: gram.Node) -> formatter.FormatObj:
         return formatter.VList(
             f'p = {self._gen_lit(node.v)}',
             'if p not in self._regexps:',

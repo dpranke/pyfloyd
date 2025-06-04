@@ -13,19 +13,192 @@
 # limitations under the License.
 
 import copy
-import inspect
-from typing import Any, Callable, Optional, Sequence, Union
+from typing import Any, Callable, Optional, Union
 
 from pyfloyd import datafile
 
 
-FormatMethod = Callable[[int, str], list[str]]
-
-
 El = Union[str, 'FormatObj', None]
-ElSeq = Sequence[El]
-ElList = list[El]
-_FmtFn = Callable[[El, Union[None, int], str], list[str]]
+_Len = Union[int, None]
+_FmtFn = Callable[[El, '_FmtParams'], list[str]]
+
+
+class _FmtParams:
+    cur_len: _Len
+    max_len: _Len
+    indent: str
+    fn: _FmtFn
+
+    def __init__(self, cur_len: _Len, max_len: _Len, indent: str, fn: _FmtFn):
+        self.cur_len = cur_len
+        self.max_len = max_len
+        self.indent = indent
+        self.fn = fn
+
+    def shrink(self, ln: int, max_ln: int = 0) -> '_FmtParams':
+        return self.adjust(
+            _new_l(self.cur_len, ln),
+            _new_l(self.max_len, max_ln),
+        )
+
+    def adjust(self, new_cur: _Len, new_max: _Len) -> '_FmtParams':
+        return _FmtParams(new_cur, new_max, self.indent, self.fn)
+
+    def fmt(self, obj):
+        return self.fn(obj, self)
+
+
+def flatten(
+    obj: El,
+    length: _Len = 79,
+    indent: str = '    ',
+) -> list[str]:
+    """Returns an object formatted into a list of 1 or more strings.
+
+    Each string must be shorter than `length` characters, if possible. If
+    length is None, lines can be arbitrarily long.
+    """
+    p = _FmtParams(length, length, indent, _fmt)
+    return p.fn(obj, p)
+
+
+def flatten_as_lisplist(
+    obj: El, length: _Len = 79, indent: str = '    '
+) -> list[str]:
+    """Returns an object formatted as a datafile-formatted representation of
+    itself."""
+    r_obj = to_lisplist(obj)
+    p = _FmtParams(length, length, indent, _fmt_quote)
+    return p.fmt(r_obj)
+
+
+def _fmt(obj: El, p: _FmtParams) -> list[str]:
+    if obj is None:
+        return []
+    if isinstance(obj, str):
+        return splitlines(obj)
+    return obj.fmt(p)
+
+
+def _fmt_quote(obj: El, p: _FmtParams) -> list[str]:
+    if obj is None:
+        return []
+    if isinstance(obj, str):
+        lines = [
+            datafile.encode_quoted_string(line, escape_newlines=True)
+            for line in splitlines(obj)
+        ]
+        if len(lines) > 1:
+            return ['('] + [p.indent + line for line in lines] + [')']
+        return lines
+    return obj.fmt(p)
+
+
+def to_list(obj):
+    """Returns a nested list of objects corresponding to the FormatObj."""
+    if isinstance(obj, FormatObj):
+        return obj.to_list()
+    return obj
+
+
+def to_lisplist(obj):
+    """Returns a nested list of objects formatted with tags as bare words."""
+    if isinstance(obj, FormatObj):
+        return obj.to_lisplist()
+    return obj
+
+
+def from_list(obj: Any) -> Any:
+    """Turns a list of objects into a recursively nested FormatObj."""
+    if not isinstance(obj, list):
+        return obj
+    assert len(obj) >= 2, 'lists need at least two elements: {obj!r}'
+    tag = obj[0]
+    cls_map = _class_map()
+    assert tag in cls_map, f'unknown list tag {tag}'
+    args = []
+    for ob in obj[1:]:
+        arg = from_list(ob)
+        args.append(arg)
+    cls = cls_map[tag]
+    return cls(*args)
+
+
+def split_to_objs(s: str, indent: str) -> 'VList':
+    objs = []
+    lines = splitlines(s)
+    for line in lines:
+        level = indent_level(line, indent)
+        obj: Union[Indent, str] = line[len(indent) * level :]
+        while level > 0:
+            obj = Indent(obj)
+            level -= 1
+        objs.append(obj)
+    return VList(objs)
+
+
+def splitlines(s: str) -> list[str]:
+    if s == '':
+        return ['']
+    if s == '\n':
+        return ['']
+    lines = []
+    spl_lines = s.splitlines()
+    for spl_line in spl_lines[:-1]:
+        lines.append(spl_line)
+    lines.append(spl_lines[-1])
+    return lines
+
+
+def _new_l(l1: _Len, l2: int) -> _Len:
+    return l1 if l1 is None else l1 - l2
+
+
+def _fits(p: _FmtParams, s: str) -> bool:
+    return p.cur_len is None or len(s) <= p.cur_len
+
+
+def _fits_on_one(p, lines) -> bool:
+    return not lines or (len(lines) == 1 and _fits(p, lines[0]))
+
+
+def indent_level(s: str, indent: str) -> int:
+    if indent == '':
+        return 0
+    i = 0
+    j = 0
+    ln = len(indent)
+    while s[j : j + ln] == indent:
+        i += 1
+        j += ln
+    return i
+
+
+def _lines(objs):
+    i = 0
+    for obj in objs:
+        if isinstance(obj, list):
+            i += _lines(obj)
+        elif isinstance(obj, FormatObj):
+            i += _lines(obj.objs)
+        else:
+            i += 1
+    return i
+
+
+def _class_map():
+    return {
+        'comma': Comma,
+        'hang': Hang,
+        'hl': HList,
+        'ind': Indent,
+        'll': LispList,
+        'saw': Saw,
+        'tree': Tree,
+        'tri': Triangle,
+        'vl': VList,
+        'wrap': Wrap,
+    }
 
 
 class FormatObj:
@@ -114,162 +287,48 @@ class FormatObj:
         return [self.tag] + [to_list(obj) for obj in self.objs]
 
     def to_lisplist(self):
-        assert self.tag is not None
         return LispList(self.tag, *[to_lisplist(obj) for obj in self.objs])
 
     def is_empty(self):
         return len(self.objs) == 0
 
-    def fmt(
-        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> list[str]:
+    def fmt(self, p: _FmtParams) -> list[str]:
         """Returns a list of strings, each representing a line."""
         raise NotImplementedError
 
 
-# For backward compatibility. TODO: remove this.
-ListObj = FormatObj
+class Comma(FormatObj):
+    """Format a comma-separated list of arguments.
 
+    If we need to format a list of arguments across multiple lines, we
+    want each to appear on its own line with a trailing comma, even on
+    the last line where the trailing comma is unnecessary.
 
-class HList(FormatObj):
-    """Takes a list of objects and lays them out horizontally.
+    [comma]           = ''
+    [comma a]         = 'a'
+    [comma a b c ...] = 'a, b, c'
+                      | '<i>a,'
+                        '<i>b,'
+                        '<i>c,'
+    """
 
-    The objects are considered to be atomic concatenated and will not be
-    split by subsequent formatting, but any object that can be formatted
-    multiple ways itself will be handled. If any object produces multiple
-    lines, subsequent objects will be laid out on the same last line."""
+    tag = 'comma'
 
-    tag = 'hl'
-
-    def __init__(self, *objs):
-        super().__init__()
-        new_objs = self._collapse(objs, cls=self.__class__)
-        self.objs = self._simplify_hlists(new_objs)
-
-    def fmt(
-        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> list[str]:
-        lines: list[str] = []
+    def fmt(self, p: _FmtParams) -> list[str]:
+        # single line
         if len(self.objs) == 0:
-            return ['']
+            return []
+        if len(self.objs) == 1:
+            # Don't want a comma after a single arg.
+            return p.fmt(self.objs[0])
 
-        lines.extend(fmt_fn(self.objs[0], length, indent))
-        for obj in self.objs[1:]:
-            if obj is None:
-                continue
-            if isinstance(obj, str):
-                lines[-1] += obj
-            else:
-                new_l = None if length is None else length - len(lines[-1])
-                sublines = obj.fmt(new_l, indent, fmt_fn)
-                if sublines:
-                    lines[-1] += sublines[0]
-                    if len(sublines) > 1:
-                        lines.extend(sublines[1:])
-        return lines
-
-
-class VList(FormatObj):
-    """Takes a list of objects and lays them out vertically."""
-
-    tag = 'vl'
-
-    def __init__(self, *objs):
-        super().__init__()
-        self.objs = self._optimize(objs, self.__class__)
-
-    def __iadd__(self, obj):
-        self.objs.extend(self._optimize([obj], self.__class__))
-        return self
-
-    def fmt(
-        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> list[str]:
+        lines = pack(p, self.objs, ', ')
+        if _fits_on_one(p, lines):
+            return lines
         lines = []
         for obj in self.objs:
-            if obj is not None:
-                lines.extend(fmt_fn(obj, length, indent))
+            lines.extend(wrap(p, obj, '', '', '', ', '))
         return lines
-
-
-class Wrap(FormatObj):
-    """Wraps an object with text on both sides.
-
-    It takes an object and four parameters: the text to use as a prefix on
-    most lines, the text to use as a suffix on most lines, the text to use
-    as a prefix on just the first line, and the text to use as the suffix
-    on the last line. The two prefix strings must be the same length.
-    The two suffix strings may be different lengths. Any trailing whitespace
-    will be stripped."""
-
-    tag = 'wrap'
-
-    def __init__(self, *objs):
-        super().__init__(*objs)
-        assert len(objs) == 5
-
-    def fmt(self, length: Union[int, None], indent: str, fmt_fn: _FmtFn):
-        obj, prefix, suffix, first, last = self.objs
-        new_l = _new_length(length, len(prefix) + max(len(suffix), len(last)))
-        sub_lines = fmt_fn(obj, new_l, indent)
-        if not sub_lines:
-            return sub_lines
-
-        if len(sub_lines) == 1:
-            lines = [(first + sub_lines[0] + last).rstrip()]
-        else:
-            lines = [(first + sub_lines[0] + suffix).rstrip()]
-            for line in sub_lines[1:-1]:
-                lines.append((prefix + line + suffix).rstrip())
-            lines.append((prefix + sub_lines[-1] + last).rstrip())
-
-        return lines
-
-
-class Indent(VList):
-    tag = 'ind'
-
-    def __init__(self, *objs):
-        super().__init__([])
-        new_objs = self._optimize(objs, VList)
-        self.objs = new_objs
-
-    def fmt(
-        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> list[str]:
-        assert indent is not None
-        new_l = _new_length(length, len(indent))
-        lines = super().fmt(new_l, indent, fmt_fn)
-        new_lines = ['' if line == '' else indent + line for line in lines]
-        return new_lines
-
-
-class _MultipleObj(FormatObj):
-    "An object that can be formatted in multiple non-trivially different ways."
-
-    def fmt(
-        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> list[str]:
-        """Returns a list of strings, each representing a line."""
-        s = self.fmt_single_line(None, indent, fmt_fn)
-        if s is not None and (length is None or len(s) <= length):
-            return [s]
-        lines = self.fmt_multiple_lines(None, indent, fmt_fn)
-        if length is None:
-            return lines
-        if all((line is not None and len(line) <= length) for line in lines):
-            return lines
-        return self.fmt_multiple_lines(length, indent, fmt_fn)
-
-    def fmt_single_line(
-        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> Optional[str]:
-        raise NotImplementedError
-
-    def fmt_multiple_lines(
-        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> list[str]:
-        raise NotImplementedError
 
 
 class Hang(FormatObj):
@@ -279,100 +338,83 @@ class Hang(FormatObj):
     The second and subsequent lines will be indented to align with the
     *second* argument, e.g. .[foo bar baz] will format as
 
-        [foo bar
-             baz]
-
+    [hang ' ']           = ''
+    [hang ' ' a]         = 'a'
+    [hang ' ' a b c ...] = 'a b c d'
+                           '  d e f'
     """
 
     tag = 'hang'
 
-    def fmt(
-        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> list[str]:
+    def fmt(self, p: _FmtParams) -> list[str]:
         objs = self.objs[0]
         sep = self.objs[1]
         if len(objs) == 0:
             return []
-
-        lines: list[str] = []
-        lines.extend(fmt_fn(objs[0], length, indent))
-        hang = len(lines[-1]) + 1
-        if len(objs) > 1:
-            second = fmt_fn(objs[1], length, indent)
-            assert len(second) == 1
-            lines[-1] += sep + second[0]
-            for obj in objs[2:]:
-                if obj is None:
-                    continue
-
-                # NOTE: Don't know how to handle anything where a single obj
-                # requires multiple lines.
-                new_l = _new_length(length, len(lines[-1]) - len(sep))
-                sublines = fmt_fn(obj, None, indent)
-                assert len(sublines) == 1
-                if not new_l or len(sublines[0]) < new_l:
-                    lines[-1] += sep + sublines[0]
-                    continue
-                lines[-1] += sep
-                lines.append(' ' * hang + sublines[0])
-        return [line.rstrip() for line in lines]
+        first = p.fmt(objs[0])[0]
+        if len(objs) == 1:
+            return [first]
+        first += sep
+        prefix = ' ' * len(first)
+        new_p = p.adjust(
+            _new_l(p.cur_len, len(first)), _new_l(p.max_len, len(first))
+        )
+        rest = pack(new_p, objs[1:])
+        return wrap(p, rest, prefix, '', first, '')
 
 
-class Comma(_MultipleObj):
-    """Format a comma-separated list of arguments.
+class HList(FormatObj):
+    """Takes a list of objects and lays them out horizontally.
 
-    If we need to format a list of arguments across multiple lines, we
-    want each to appear on its own line with a trailing comma, even on
-    the last line where the trailing comma is unnecessary.
+    The objects are considered to be atomic concatenated and will not be
+    split by subsequent formatting, but any object that can be formatted
+    multiple ways itself will be handled. If any object produces multiple
+    lines, subsequent objects will be laid out on the same last line, e.g.:
+
+    [hl a b [vl c d] e f]    = 'abc'
+                               '  def'
     """
 
-    tag = 'comma'
+    tag = 'hl'
 
-    def fmt_single_line(
-        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> Optional[str]:
-        if not self.objs:
-            return ''
+    def __init__(self, *objs):
+        super().__init__()
+        new_objs = self._collapse(objs, cls=self.__class__)
+        self.objs = self._simplify_hlists(new_objs)
 
-        new_l = None if length is None else length
-        s = _fmt_single_line(self.objs[0], new_l, indent, fmt_fn)
-        if s is None:
-            return s
-
-        for obj in self.objs[1:]:
-            if new_l is not None:
-                new_l -= len(s) + 2
-            r = _fmt_single_line(obj, new_l, indent, fmt_fn)
-            if r is None:
-                return r
-            s += ', ' + r
-        return s
-
-    def fmt_multiple_lines(
-        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> list[str]:
-        if not self.objs:
-            return ['']
-
-        new_l = None if length is None else length
-        lines = []
-        for obj in self.objs:
-            lines += fmt_fn(obj, new_l, indent)
-            if len(self.objs) > 1:
-                lines[-1] += ','
-        return lines
+    def fmt(self, p: _FmtParams) -> list[str]:
+        return horiz(p, self.objs)
 
 
-class LispList(_MultipleObj):
+class Indent(FormatObj):
+    """Returns a list of objects laid out vertically, each line indented.
+
+    [ind a b c] = '<i>a'
+                  '<i>b'
+                  '<i>c'
+    """
+
+    tag = 'ind'
+
+    def __init__(self, *objs):
+        super().__init__([])
+        self.objs = self._optimize(objs, VList)
+
+    def fmt(self, p: _FmtParams) -> list[str]:
+        return wrap(p, self.objs, p.indent)
+
+
+class LispList(FormatObj):
     """Format as a list, lisp-style.
 
     Across multiple lines, the second and subsequent lines will be
     indented to match the second argument to the list, and closing
     brackets will be on the last line:
 
-        [foo [bar [baz]
-                  [a b c]]
-             [quux]]
+    [ll a [ll b c d [ll e f] = '[a [b c d] [e f]]'
+                             | '[a [b c'
+                               '      d]'
+                               '   [e f]]'
     """
 
     # TODO: Should this just be a flag on an existing class or classes,
@@ -380,60 +422,44 @@ class LispList(_MultipleObj):
 
     tag = 'll'
 
-    def fmt_single_line(
-        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> Optional[str]:
-        s = '['
-        if self.objs:
-            # r = _fmt_single_line(self.objs[0], length, indent, fmt_fn)
-            s += self.objs[0]
-            if len(self.objs) > 1:
-                for obj in self.objs[1:]:
-                    if obj is None:
-                        continue
-                    s += ' '
-                    r = _fmt_single_line(obj, length, indent, fmt_fn)
-                    if r is None:
-                        return r
-                    s += r
-        s += ']'
-        return s
+    def __init__(self, *objs):
+        super().__init__(*objs)
+        if len(self.objs) > 0:
+            assert isinstance(self.objs[0], str)
 
-    def fmt_multiple_lines(
-        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> list[str]:
-        lines = ['']
+    def fmt(self, p: _FmtParams) -> list[str]:
         if len(self.objs) == 0:
             return ['[]']
+
         if len(self.objs) == 1:
-            if isinstance(self.objs[0], str):
-                return ['[' + self.objs[0] + ']']
-            if self.objs[0] is None:
-                return ['[]']
-            sl = fmt_fn(self.objs[0], length, indent)
-            sl[0] = '[' + sl[0] + ']'
-            sl[-1] = sl[-1] + ']'
-            return sl
+            return ['[' + self.objs[0] + ']']
 
-        assert isinstance(self.objs[0], str)
-        prefix = '[' + self.objs[0] + ' '
-        lines[0] += prefix
-        new_l = None if length is None else length - len(prefix)
-        for i, obj in enumerate(self.objs[1:]):
-            if obj is None:
-                continue
-            sl = fmt_fn(obj, new_l, indent)
-            if i == 0:
-                lines[0] += sl[0]
-            else:
-                lines.append(' ' * len(prefix) + sl[0])
-            for sline in sl[1:]:
-                lines.append(' ' * len(prefix) + sline)
-        lines[-1] += ']'
-        return lines
+        first = '[' + self.objs[0] + ' '
+        hang = ' ' * len(first)
+        new_p = p.shrink(len(first) + 1)
+        sub_lines = pack(new_p, self.objs[1:])
+        if _fits_on_one(new_p, sub_lines):
+            return [first + sub_lines[0] + ']']
+        return wrap(new_p, vert(new_p, self.objs[1:]), hang, '', first, ']')
 
 
-class Saw(_MultipleObj):
+class Pack(FormatObj):
+    """Formats a list of objects into one or more left-aligned rows.
+
+    [pack a b c ..]      = 'a b c d e f'
+                         | 'a b c'
+                           'd e f'
+    [pack a [vl b c] d]  = 'a b'
+                           'c d'
+    """
+
+    tag = 'pack'
+
+    def fmt(self, p: _FmtParams) -> list[str]:
+        return pack(p, self.objs)
+
+
+class Saw(FormatObj):
     """Formats values in a saw-shaped pattern.
 
     Expressions of the form `foo(x)`, `[4]`, and `foo(x)[4]` can be called
@@ -446,334 +472,253 @@ class Saw(_MultipleObj):
     )[
         4
     ]
+    ```
 
     where the unindented parts are all on a single line and the indented
     parts may be on one or more lines. We express this as one Saw object
     with an initial prefix + multiple Triangle objects.
+
+    Note: this ends up formatting the same as `pack()`.
     """
 
     tag = 'saw'
 
-    def __init__(self, s, *args):
-        super().__init__()
-        assert isinstance(s, (str, Triangle))
-        for arg in args:
+    def __init__(self, *args):
+        super().__init__(*args)
+        assert len(args) > 1
+        assert isinstance(args[0], (str, HList, Triangle))
+        for arg in args[1:]:
             assert isinstance(arg, Triangle)
 
-        if isinstance(s, str):
-            objs = [s]
-        else:
-            objs = list(s.objs)
-        for arg in args:
-            objs[-1] += arg.objs[0]
-            objs.append(arg.objs[1])
-            objs.append(arg.objs[2])
-        self.objs = objs
-
-    def fmt_single_line(
-        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> Optional[str]:
-        s = ''
-        for obj in self.objs:
-            r = _fmt_single_line(obj, length, indent, fmt_fn)
-            if r is None:
-                return r
-            s += r
-        return s
-
-    def fmt_multiple_lines(
-        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> list[str]:
-        lines = fmt_fn(self.objs[0], length, indent)
-        i = 1
-        while i < len(self.objs) - 1:
-            offset = len(lines[-1]) + len(self.objs[i + 1])
-            new_l = _new_length(length, offset)
-            sub_lines = fmt_fn(self.objs[i], new_l, indent)
-            if (
-                length
-                and len(sub_lines) == 1
-                and len(lines[-1]) + offset <= length
-            ):
-                lines[-1] += sub_lines[0] + self.objs[i + 1]
-                i += 2
-                continue
-            assert indent is not None
-            new_l = _new_length(length, len(indent))
-            lines.extend(
-                indent + line for line in fmt_fn(self.objs[i], new_l, indent)
-            )
-            lines.append(self.objs[i + 1])
-            i += 2
-        return lines
+    def fmt(self, p: _FmtParams) -> list[str]:
+        return pack(p, self.objs, '')
 
 
-class Triangle(_MultipleObj):
+class Triangle(FormatObj):
+    """Format a series of three objects.
+
+    [tri a b c] = 'abc'
+                | 'a'
+                  '<ind>b'
+                  'c'
+    """
+
     tag = 'tri'
 
     def __init__(self, left, mid, right):
         super().__init__(left, mid, right)
-        self.left, self.mid, self.right = left, mid, right
         assert isinstance(self.objs[0], str)
         assert isinstance(self.objs[2], str)
 
-    def fmt_single_line(
-        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> Optional[str]:
-        s = ''
-        for obj in self.objs:
-            r = _fmt_single_line(obj, length, indent, fmt_fn)
-            if r is None:
-                return r
-            s += r
-        return s
+    def fmt(self, p: _FmtParams) -> list[str]:
+        lines = pack(p, self.objs, '')
+        if _fits_on_one(p, lines):
+            return lines
 
-    def fmt_multiple_lines(
-        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> list[str]:
-        lines = fmt_fn(self.objs[0], length, indent)
-        new_l = _new_length(length, len(indent))
-        lines.extend(
-            indent + line for line in fmt_fn(self.objs[1], new_l, indent)
+        new_p = p.adjust(p.max_len, p.max_len)
+        return vert(
+            p,
+            [self.objs[0]]
+            + wrap(new_p, self.objs[1], new_p.indent)
+            + [self.objs[2]],
         )
-        lines.extend(fmt_fn(self.objs[2], length, indent))
-        return lines
 
 
-class Tree(_MultipleObj):
+class Tree(FormatObj):
     """Formats a call or dereference.
 
     Given an expression like '(foo)' or '[bar]', where there's a starting
     and ending string and a possibly more complex object in the middle,
     formats these thing over possibly multiple lines.
+
+    tree [a b [tree c d e]]  = 'a b c d e'
+                             | 'a'
+                               'b c'
+                               'd e'
+
+    This gets its own format rule because the trees may be recursive
+    and yet need to be formatted as one thing.
     """
 
     tag = 'tree'
 
     def __init__(self, left, op, right):
         super().__init__(left, op, right)
-        self.left, self.op, self.right = left, op, right
-
-    def fmt_single_line(
-        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> Optional[str]:
-        # pylint: disable=unbalanced-tuple-unpacking
-        left, op, right = self.left, self.op, self.right
-        assert isinstance(op, str)
-        if left is None:
-            s = op
-            assert right is not None
-            r = _fmt_single_line(right, length, indent, fmt_fn)
-            if r is None:
-                return r
-            s += r
-        else:
-            r = _fmt_single_line(left, length, indent, fmt_fn)
-            if r is None:
-                return r
-            s = r
-            if right is None:
-                s += op
-            else:
-                s += ' ' + op + ' '
-                new_l = None if length is None else length - len(s)
-                r = _fmt_single_line(right, new_l, indent, fmt_fn)
-                if r is None:
-                    return r
-                s += r
-        return s
-
-    def fmt_multiple_lines(
-        self, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-    ) -> list[str]:
-        left, op, right = self.left, self.op, self.right
-        lines: list[str]
-        right_lines: list[str]
+        assert left is not None or right is not None
         assert isinstance(op, str)
 
-        if left is None:
-            assert right is not None
-            assert isinstance(op, str)
-            new_l = None if length is None else length - len(op)
-            sublines: list[str] = fmt_fn(right, new_l, indent)
-            if sublines:
-                lines = [op + sublines[0]] + sublines[1:]
+    def fmt(self, p: _FmtParams) -> list[str]:
+        lines = pack(p, self.objs, ' ')
+        if _fits_on_one(p, lines):
             return lines
-
-        lines = fmt_fn(left, length, indent)
-        if right is None:
-            lines[-1] += op
-            return lines
-
-        while isinstance(right, Tree):
-            new_l = None if length is None else length - len(op) - 1
-            if right.objs[0] is not None:
-                right_lines = fmt_fn(right.objs[0], new_l, indent)
-                lines.append(op + ' ' + right_lines[0])
-                lines += right_lines[1:]
-            op = right.objs[1]
-            right = right.objs[2]
-        if right is not None:
-            new_l = None if length is None else length - len(op) - 1
-            if isinstance(right, FormatObj):
-                right_lines = fmt_fn(right, new_l, indent)
-                lines.append(op + ' ' + right_lines[0])
-                lines += right_lines[1:]
-            else:
-                lines.append(op + ' ' + right)
-        return lines
+        return vtree(p, self)
 
 
-def _fmt(obj: El, length: Union[int, None], indent: str) -> list[str]:
-    if obj is None:
-        return []
-    if isinstance(obj, str):
-        return splitlines(obj)
-    return obj.fmt(length, indent, _fmt)
+class VList(FormatObj):
+    """Takes a list of objects and lays them out vertically.
 
-
-def flatten(
-    obj: El,
-    length: Union[None, int] = 79,
-    indent: str = '    ',
-    fmt_fn: _FmtFn = _fmt,
-) -> list[str]:
-    """Flatten an object into a list of 1 or more strings.
-
-    Each string must be shorter than `length` characters, if possible. If
-    length is None, lines can be arbitrarily long.
+    [vl a b c ...]  = 'a'
+                      'b'
+                      'c'
     """
-    return fmt_fn(obj, length, indent)
+
+    tag = 'vl'
+
+    def __init__(self, *objs):
+        super().__init__()
+        self.objs = self._optimize(objs, self.__class__)
+
+    def __iadd__(self, obj):
+        self.objs.extend(self._optimize([obj], self.__class__))
+        return self
+
+    def fmt(self, p: _FmtParams) -> list[str]:
+        return vert(p, self.objs)
 
 
-def flatten_as_lisplist(
-    obj: El, length: Optional[int] = 79, indent: str = '    '
-) -> list[str]:
-    """Print a datafile-formatted representation of the tree itself."""
-    r_obj = to_lisplist(obj)
-    return flatten(r_obj, length, indent, _fmt_quote)
+class Wrap(FormatObj):
+    """Wraps an object with text on both sides.
+
+    It takes an object and four parameters: the text to use as a prefix on
+    most lines, the text to use as a suffix on most lines, the text to use
+    as a prefix on just the first line, and the text to use as the suffix
+    on the last line. The two prefix strings must be the same length.
+    The two suffix strings may be different lengths. Any trailing whitespace
+    will be stripped.
+
+    [wrap a b c d [vl e f g]  = 'ceb'
+                                'afb'
+                                'agd'
+    """
+
+    tag = 'wrap'
+
+    def __init__(self, *objs):
+        super().__init__(*objs)
+        assert len(objs) == 5
+
+    def fmt(self, p: _FmtParams) -> list[str]:
+        obj, prefix, suffix, first, last = self.objs
+        return wrap(p, obj, prefix, suffix, first, last)
 
 
-def _fmt_quote(obj: El, length: Union[int, None], indent: str) -> list[str]:
-    if obj is None:
-        return []
-    if isinstance(obj, str):
-        lines = [
-            datafile.encode_quoted_string(line, escape_newlines=True)
-            for line in splitlines(obj)
-        ]
-        if len(lines) > 1:
-            return ['('] + [indent + line for line in lines] + [')']
-        return lines
-    return obj.fmt(length, indent, _fmt_quote)
+def flatten_objs(obj: Any, lis: Optional[list[Any]] = None):
+    """Returns a single list of objects from a list of objects and lists."""
+    lis = [] if lis is None else lis
+    if isinstance(obj, list):
+        for el in obj:
+            flatten_objs(el, lis)
+    else:
+        lis.append(obj)
+    return lis
 
 
-def _fmt_single_line(
-    obj: El, length: Union[int, None], indent: str, fmt_fn: _FmtFn
-) -> Optional[str]:
-    lines = fmt_fn(obj, length, indent)
-    assert isinstance(lines, list)
-    if len(lines) > 2 or (len(lines) == 2 and lines[1] != '\n'):
-        return None
-
-    assert (len(lines) == 1) or (len(lines) == 2 and lines[1] == "'\n'"), (
-        f'format unexpectedly returned more than one line: {repr(lines)}'
-    )
-
-    return lines[0]
-
-
-def to_list(obj):
-    if isinstance(obj, FormatObj):
-        return obj.to_list()
-    return obj
-
-
-def to_lisplist(obj):
-    if isinstance(obj, FormatObj):
-        return obj.to_lisplist()
-    return obj
-
-
-CLASS_MAP = {}
-
-
-def _set_class_map():
-    for k in list(globals()):
-        obj = globals()[k]
-        if (
-            inspect.isclass(obj)
-            and issubclass(obj, FormatObj)
-            and obj not in (FormatObj, _MultipleObj)
-        ):
-            CLASS_MAP[obj.tag] = obj
-
-
-_set_class_map()
-
-
-def from_list(obj: Any) -> El:
-    if not isinstance(obj, list):
-        return obj
-    assert len(obj) >= 2, 'lists need at least two elements: {obj!r}'
-    tag = obj[0]
-    assert tag in CLASS_MAP, f'unknown list tag {tag}'
-    cls = CLASS_MAP[tag]
-    args = []
-    for ob in obj[1:]:
-        arg = from_list(ob)
-        args.append(arg)
-    return cls(*args)
-
-
-def split_to_objs(s, indent):
-    objs = []
-    lines = splitlines(s)
-    for line in lines:
-        level = indent_level(line, indent)
-        obj = line[len(indent) * level :]
-        while level > 0:
-            obj = Indent(obj)
-            level -= 1
-        objs.append(obj)
-    return VList(objs)
-
-
-def splitlines(s, skip_empty=False):
-    if s == '':
-        if skip_empty:
-            return []
+def horiz(p: _FmtParams, objs: list[El]) -> list[str]:
+    """Lay out objects horizontally."""
+    lines: list[str] = []
+    if len(objs) == 0:
         return ['']
-    if s == '\n':
-        return ['']
-    lines = []
-    spl_lines = s.splitlines()
-    for spl_line in spl_lines[:-1]:
-        lines.append(spl_line)
-    lines.append(spl_lines[-1])
+
+    lines = ['']
+    new_p = p.shrink(0)
+    for obj in objs:
+        if obj is None:
+            continue
+        if isinstance(obj, str):
+            lines[-1] += obj
+        else:
+            ind = len(lines[-1])
+            new_p = p.adjust(
+                _new_l(p.cur_len, len(lines[-1])),
+                _new_l(p.max_len, len(lines[-1])),
+            )
+            sublines = new_p.fmt(obj)
+            if sublines:
+                lines[-1] += sublines[0]
+                if len(sublines) > 1:
+                    lines.extend((' ' * ind) + line for line in sublines[1:])
     return lines
 
 
-def _new_length(l1: Union[int, None], l2: int) -> Union[int, None]:
-    return l1 if l1 is None else l1 - l2
+def vert(p: _FmtParams, objs: list[El]) -> list[str]:
+    """Lay out objects vertically"""
+    lines = []
+    for obj in flatten_objs(objs):
+        lines.extend(p.fmt(obj))
+    return lines
 
 
-def indent_level(obj, indent: str) -> int:
-    if isinstance(obj, str):
-        while obj.startswith(indent):
-            return 1 + indent_level(obj[len(indent) :], indent)
-    elif isinstance(obj, HList):
-        return indent_level(obj.objs[0], indent)
-    return 0
-
-
-def _lines(objs):
-    i = 0
-    for obj in objs:
-        if isinstance(obj, list):
-            i += _lines(obj)
-        elif isinstance(obj, FormatObj):
-            i += _lines(obj.objs)
+def pack(p: _FmtParams, objs: list[FormatObj], sep: str = ' ') -> list[str]:
+    """Lay out objects packed across multiple lines"""
+    if len(objs) == 0:
+        return []
+    lines = p.fmt(objs[0])
+    new_p = p
+    for sub_obj in objs[1:]:
+        if lines:
+            lines[-1] += sep
+            new_p = p.shrink(len(lines[-1]))
+        sl = new_p.fmt(sub_obj)
+        if not sl:
+            continue
+        if _fits(new_p, sl[0]):
+            if lines:
+                lines[-1] += sl[0]
+                lines.extend(sl[1:])
+            else:
+                lines = sl
         else:
-            i += 1
-    return i
+            lines.extend(sl)
+    return lines
+
+
+def vtree(p: _FmtParams, t: El):
+    """Lay out objects as per Tree()."""
+    if t is None:
+        return []
+    if isinstance(t, str):
+        return [t]
+    assert isinstance(t, Tree)
+    left, op, right = t.objs[0], t.objs[1], t.objs[2]
+    if left is None:
+        lines = []
+    else:
+        lines = vtree(p, left)
+    if right is None:
+        lines[-1].append(' ' + op)
+        return lines
+    sub_lines = vtree(p, right)
+    lines.append(op + ' ' + sub_lines[0])
+    lines.extend(sub_lines[1:])
+    return lines
+
+
+def wrap(
+    p: _FmtParams,
+    objs: list[El],
+    prefix: str = '',
+    suffix: str = '',
+    first: Optional[str] = None,
+    last: Optional[str] = None,
+) -> list[str]:
+    """Wraps a list of objects in text."""
+    first = first or prefix
+    last = last or suffix
+    assert len(first) == len(prefix)
+    dist = len(prefix) + max(len(suffix), len(last))
+    new_p = p.shrink(dist, dist)
+
+    new_objs = flatten_objs(objs)
+    sub_lines = []
+    for obj in new_objs:
+        sub_lines.extend(new_p.fmt(obj))
+
+    lines = []
+    if len(sub_lines) == 1:
+        lines = [first + sub_lines[0] + last]
+    elif len(sub_lines) > 1:
+        lines.append(first + sub_lines[0] + suffix)
+        for sl in sub_lines[1:-1]:
+            lines.append(prefix + sl + suffix)
+        lines.append(prefix + sub_lines[-1] + last)
+    return [line.rstrip() for line in lines]

@@ -138,7 +138,7 @@ class HardCodedGenerator(generator.Generator):
     # Handlers for each non-host node in the glop AST follow.
     #
 
-    def _ty_action(self, node: m_grammar.Node) -> formatter.ListObj:
+    def _ty_action(self, node: m_grammar.Node) -> formatter.FormatObj:
         return formatter.HList(
             self._gen_invoke(
                 self._gen_opname('succeed'), self._gen_expr(node.child)
@@ -146,7 +146,7 @@ class HardCodedGenerator(generator.Generator):
             self._map['end'],
         )
 
-    def _ty_apply(self, node: m_grammar.Node) -> formatter.ListObj:
+    def _ty_apply(self, node: m_grammar.Node) -> formatter.FormatObj:
         assert isinstance(node, m_grammar.Apply)
         if node.memoize:
             return formatter.HList(
@@ -224,20 +224,20 @@ class HardCodedGenerator(generator.Generator):
         assert node.kind == 'local', f'Unexpected identifer kind {node!r}'
         return self._gen_varname(node.v)
 
-    def _ty_empty(self, node) -> formatter.ListObj:
+    def _ty_empty(self, node) -> formatter.FormatObj:
         del node
         return formatter.HList(
             self._gen_invoke(self._gen_opname('succeed'), self._map['null']),
             self._map['end'],
         )
 
-    def _ty_equals(self, node) -> formatter.ListObj:
+    def _ty_equals(self, node) -> formatter.FormatObj:
         arg = self._gen_expr(node.child)
         return formatter.HList(
             self._gen_invoke(self._gen_opname('str'), arg), self._map['end']
         )
 
-    def _ty_leftrec(self, node) -> formatter.ListObj:
+    def _ty_leftrec(self, node) -> formatter.FormatObj:
         if node.left_assoc:
             left_assoc = self._map['true']
         else:
@@ -253,7 +253,7 @@ class HardCodedGenerator(generator.Generator):
             self._map['end'],
         )
 
-    def _ty_lit(self, node) -> formatter.ListObj:
+    def _ty_lit(self, node) -> formatter.FormatObj:
         expr = self._gen_lit(node.v)
         if len(node.v) == 1:
             method = 'o_ch'
@@ -263,7 +263,7 @@ class HardCodedGenerator(generator.Generator):
             self._gen_invoke(method, expr), self._map['end']
         )
 
-    def _ty_operator(self, node) -> formatter.ListObj:
+    def _ty_operator(self, node) -> formatter.FormatObj:
         # Operator nodes have no children, but subrules for each arm
         # of the expression cluster have been defined and are referenced
         # from self.grammar.operators[node.v].choices.
@@ -273,7 +273,7 @@ class HardCodedGenerator(generator.Generator):
             self._map['end'],
         )
 
-    def _ty_range(self, node) -> formatter.ListObj:
+    def _ty_range(self, node) -> formatter.FormatObj:
         return formatter.HList(
             self._gen_invoke(
                 self._gen_opname('range'),
@@ -283,14 +283,14 @@ class HardCodedGenerator(generator.Generator):
             self._map['end'],
         )
 
-    def _ty_regexp(self, node) -> formatter.ListObj:
+    def _ty_regexp(self, node) -> formatter.FormatObj:
         raise NotImplementedError
 
-    def _ty_set(self, node) -> formatter.ListObj:
+    def _ty_set(self, node) -> formatter.FormatObj:
         new_node = m_grammar.Regexp('[' + node.v + ']')
         return self._ty_regexp(new_node)
 
-    def _ty_unicat(self, node) -> formatter.ListObj:
+    def _ty_unicat(self, node) -> formatter.FormatObj:
         return formatter.HList(
             self._gen_invoke(
                 self._gen_opname('unicat'), self._gen_lit(node.v)

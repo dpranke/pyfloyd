@@ -392,6 +392,14 @@ class Tests(unittest.TestCase):
             repr(Tree('1', '+', Tree('2', '+', '3'))),
         )
 
+    def test_tri(self):
+        self.assertEqual(['(1)'], flatten(Triangle('(', '1', ')')))
+        t = Triangle('(', Comma('foo', 'bar', 'baz', 'qux'), ')')
+        self.assertEqual(
+            ['(', '    foo,', '    bar,', '    baz,', '    qux,', ')'],
+            flatten(t, 10),
+        )
+
     def test_vlist(self):
         self.assertEqual([], flatten(VList()))
         self.assertEqual([''], flatten(VList('')))
@@ -489,15 +497,20 @@ class AsListTests(unittest.TestCase):
     def test_saw(self):
         self.check(
             Saw('foo', Triangle('(', '4', ')')),
-            ['saw', 'foo(', '4', ')'],
-            LL('saw', 'foo(', '4', ')'),
-            ["[saw 'foo(' '4' ')']"],
+            ['saw', 'foo', ['tri', '(', '4', ')']],
+            LL('saw', 'foo', LL('tri', '(', '4', ')')),
+            ["[saw 'foo' [tri '(' '4' ')']]"],
         )
         self.check(
             Saw('foo', Triangle('(', '4', ')'), Triangle('[', 'a', ']')),
-            ['saw', 'foo(', '4', ')[', 'a', ']'],
-            LL('saw', 'foo(', '4', ')[', 'a', ']'),
-            ["[saw 'foo(' '4' ')[' 'a' ']']"],
+            ['saw', 'foo', ['tri', '(', '4', ')'], ['tri', '[', 'a', ']']],
+            LL(
+                'saw',
+                'foo',
+                LL('tri', '(', '4', ')'),
+                LL('tri', '[', 'a', ']'),
+            ),
+            ["[saw 'foo' [tri '(' '4' ')'] [tri '[' 'a' ']']]"],
         )
 
     def test_str(self):
