@@ -75,7 +75,7 @@ class AtExprHandler:
 
     def f_hang(self, args, env) -> Any:
         del env
-        return formatter.Hang(*args, indent=self.indent)
+        return formatter.Hang(*args)
 
     def f_hl(self, args, env) -> Any:
         del env
@@ -83,7 +83,7 @@ class AtExprHandler:
 
     def f_ind(self, args, env) -> Any:
         del env
-        return formatter.Indent(args, indent=self.indent)
+        return formatter.Indent(args)
 
     def f_escape(self, args, env) -> Any:
         del env
@@ -110,11 +110,11 @@ class AtExprHandler:
 
     def f_vl(self, args, env) -> Any:
         del env
-        return formatter.VList(args, indent=self.indent)
+        return formatter.VList(args)
 
     def f_wrap(self, args, env) -> Any:
         del env
-        return formatter.Wrap(*args, indent=self.indent)
+        return formatter.Wrap(*args)
 
 
 def process_values(values, indent):

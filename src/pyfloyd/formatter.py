@@ -31,30 +31,14 @@ _FmtFn = Callable[[El, Union[None, int], str], list[str]]
 class FormatObj:
     tag: str = ''
 
-    def __init__(self, *objs, indent=None):
+    def __init__(self, *objs):
         self.objs = list(objs)
-        self.indent = indent
 
-    def _optimize(self, objs, cls, indent):
-        objs = self._collapse(objs, cls)
-        objs = self._split_objs(objs, indent)
+    def _optimize(self, objs, cls):
         objs = self._collapse(objs, cls)
         objs = self._simplify_hlists(objs)
         objs = self._merge_indents(objs)
         return objs
-
-    def _split_objs(self, objs, indent):
-        split_objs = []
-        for obj in objs:
-            if (
-                isinstance(obj, str)
-                and (obj.startswith(' ') or '\n' in obj)
-                and indent is not None
-            ):
-                split_objs.append(split_to_objs(obj, indent))
-            else:
-                split_objs.append(obj)
-        return split_objs
 
     def _collapse(self, objs, cls):
         if objs is None:
@@ -157,8 +141,8 @@ class HList(FormatObj):
 
     tag = 'hl'
 
-    def __init__(self, *objs, indent=None):
-        super().__init__(indent=indent)
+    def __init__(self, *objs):
+        super().__init__()
         new_objs = self._collapse(objs, cls=self.__class__)
         self.objs = self._simplify_hlists(new_objs)
 
@@ -190,13 +174,12 @@ class VList(FormatObj):
 
     tag = 'vl'
 
-    def __init__(self, *objs, indent=None):
+    def __init__(self, *objs):
         super().__init__()
-        self.indent = indent
-        self.objs = self._optimize(objs, self.__class__, indent)
+        self.objs = self._optimize(objs, self.__class__)
 
     def __iadd__(self, obj):
-        self.objs.extend(self._optimize([obj], self.__class__, self.indent))
+        self.objs.extend(self._optimize([obj], self.__class__))
         return self
 
     def fmt(
@@ -221,8 +204,8 @@ class Wrap(FormatObj):
 
     tag = 'wrap'
 
-    def __init__(self, *objs, indent=None):
-        super().__init__(*objs, indent=indent)
+    def __init__(self, *objs):
+        super().__init__(*objs)
         assert len(objs) == 5
 
     def fmt(self, length: Union[int, None], indent: str, fmt_fn: _FmtFn):
@@ -246,9 +229,9 @@ class Wrap(FormatObj):
 class Indent(VList):
     tag = 'ind'
 
-    def __init__(self, *objs, indent=None):
-        super().__init__([], indent=indent)
-        new_objs = self._optimize(objs, VList, indent)
+    def __init__(self, *objs):
+        super().__init__([])
+        new_objs = self._optimize(objs, VList)
         self.objs = new_objs
 
     def fmt(
@@ -471,8 +454,8 @@ class Saw(_MultipleObj):
 
     tag = 'saw'
 
-    def __init__(self, s, *args, indent=None):
-        super().__init__(indent=indent)
+    def __init__(self, s, *args):
+        super().__init__()
         assert isinstance(s, (str, Triangle))
         for arg in args:
             assert isinstance(arg, Triangle)
@@ -528,8 +511,8 @@ class Saw(_MultipleObj):
 class Triangle(_MultipleObj):
     tag = 'tri'
 
-    def __init__(self, left, mid, right, indent=None):
-        super().__init__(left, mid, right, indent=indent)
+    def __init__(self, left, mid, right):
+        super().__init__(left, mid, right)
         self.left, self.mid, self.right = left, mid, right
         assert isinstance(self.objs[0], str)
         assert isinstance(self.objs[2], str)
@@ -567,8 +550,8 @@ class Tree(_MultipleObj):
 
     tag = 'tree'
 
-    def __init__(self, left, op, right, indent=None):
-        super().__init__(left, op, right, indent=indent)
+    def __init__(self, left, op, right):
+        super().__init__(left, op, right)
         self.left, self.op, self.right = left, op, right
 
     def fmt_single_line(
