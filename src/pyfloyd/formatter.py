@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import copy
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional, Sequence, Union
 
 from pyfloyd import datafile
 
@@ -193,7 +193,6 @@ def _class_map():
         'hl': HList,
         'ind': Indent,
         'll': LispList,
-        'saw': Saw,
         'tree': Tree,
         'tri': Triangle,
         'vl': VList,
@@ -359,8 +358,7 @@ class Hang(FormatObj):
         new_p = p.adjust(
             _new_l(p.cur_len, len(first)), _new_l(p.max_len, len(first))
         )
-        rest = pack(new_p, objs[1:])
-        return wrap(p, rest, prefix, '', first, '')
+        return wrap(p, pack(new_p, objs[1:]), prefix, '', first, '')
 
 
 class HList(FormatObj):
@@ -446,52 +444,17 @@ class LispList(FormatObj):
 class Pack(FormatObj):
     """Formats a list of objects into one or more left-aligned rows.
 
-    [pack a b c ..]      = 'a b c d e f'
-                         | 'a b c'
-                           'd e f'
-    [pack a [vl b c] d]  = 'a b'
-                           'c d'
+    [pack a b c ..]      = 'abcdef'
+                         | 'abc'
+                           'def'
+    [pack a [vl b c] d]  = 'ab'
+                           'cd'
     """
 
     tag = 'pack'
 
     def fmt(self, p: _FmtParams) -> list[str]:
-        return pack(p, self.objs)
-
-
-class Saw(FormatObj):
-    """Formats values in a saw-shaped pattern.
-
-    Expressions of the form `foo(x)`, `[4]`, and `foo(x)[4]` can be called
-    saw-shaped, as when the arguments are long, the rest can be a series
-    of alternating lines and indented regions, e.g.
-
-    ```
-    foo(
-        x
-    )[
-        4
-    ]
-    ```
-
-    where the unindented parts are all on a single line and the indented
-    parts may be on one or more lines. We express this as one Saw object
-    with an initial prefix + multiple Triangle objects.
-
-    Note: this ends up formatting the same as `pack()`.
-    """
-
-    tag = 'saw'
-
-    def __init__(self, *args):
-        super().__init__(*args)
-        assert len(args) > 1
-        assert isinstance(args[0], (str, HList, Triangle))
-        for arg in args[1:]:
-            assert isinstance(arg, Triangle)
-
-    def fmt(self, p: _FmtParams) -> list[str]:
-        return pack(p, self.objs, '')
+        return pack(p, self.objs, sep='')
 
 
 class Triangle(FormatObj):
@@ -548,7 +511,10 @@ class Tree(FormatObj):
         assert isinstance(op, str)
 
     def fmt(self, p: _FmtParams) -> list[str]:
-        lines = pack(p, self.objs, ' ')
+        if self.objs[0] is None:
+            lines = pack(p, self.objs, '')
+        else:
+            lines = pack(p, self.objs, ' ')
         if _fits_on_one(p, lines):
             return lines
         return vtree(p, self)
@@ -688,14 +654,17 @@ def vtree(p: _FmtParams, t: El):
         lines[-1].append(' ' + op)
         return lines
     sub_lines = vtree(p, right)
-    lines.append(op + ' ' + sub_lines[0])
+    if left is None:
+        lines.append(op + sub_lines[0])
+    else:
+        lines.append(op + ' ' + sub_lines[0])
     lines.extend(sub_lines[1:])
     return lines
 
 
 def wrap(
     p: _FmtParams,
-    objs: list[El],
+    objs: Sequence[El],
     prefix: str = '',
     suffix: str = '',
     first: Optional[str] = None,

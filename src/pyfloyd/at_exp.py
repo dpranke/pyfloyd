@@ -43,7 +43,7 @@ class AtExprHandler:
         interp.define_native_fn('ind', self.f_ind)
         interp.define_native_fn('escape', self.f_escape)
         interp.define_native_fn('lit', self.f_lit)
-        interp.define_native_fn('saw', self.f_saw)
+        interp.define_native_fn('pack', self.f_pack)
         interp.define_native_fn('tree', self.f_tree)
         interp.define_native_fn('tri', self.f_tri)
         interp.define_native_fn('vl', self.f_vl)
@@ -96,9 +96,9 @@ class AtExprHandler:
         s = args[0]
         return string_literal.encode(s)
 
-    def f_saw(self, args, env) -> Any:
+    def f_pack(self, args, env) -> Any:
         del env
-        return formatter.Saw(*args[0])
+        return formatter.Pack(*args[0])
 
     def f_tree(self, args, env) -> Any:
         del env

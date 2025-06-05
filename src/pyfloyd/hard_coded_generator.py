@@ -207,9 +207,9 @@ class HardCodedGenerator(generator.Generator):
             self._gen_expr(node.left), '+', self._gen_expr(node.right)
         )
 
-    def _ty_e_qual(self, node: m_grammar.Node) -> formatter.Saw:
+    def _ty_e_qual(self, node: m_grammar.Node) -> formatter.Pack:
         objs = [self._gen_expr(c) for c in node.ch]
-        return formatter.Saw(*objs)
+        return formatter.Pack(*objs)
 
     def _ty_e_ident(self, node: m_grammar.Node) -> formatter.El:
         assert isinstance(node, m_grammar.EIdent)

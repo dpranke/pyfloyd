@@ -263,7 +263,7 @@ n_e_paren: [fn [node] [expr node.child]]
 
 n_e_plus: [fn [node] [tree [expr node.left] '+' [expr node.right]]]
 
-n_e_qual: [fn [node] [saw [map [fn [c] [expr c]] node.ch]]]
+n_e_qual: [fn [node] [pack [map [fn [c] [expr c]] node.ch]]]
 
 n_empty: [fn [node] [succeed t_null f_pos]]
 

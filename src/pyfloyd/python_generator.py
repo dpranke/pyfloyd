@@ -434,8 +434,8 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
     def _gen_opname(self, name: str) -> str:
         return 'o_' + name
 
-    def _gen_invoke(self, fn, *args) -> formatter.Saw:
-        return formatter.Saw(
+    def _gen_invoke(self, fn, *args) -> formatter.Pack:
+        return formatter.Pack(
             'self._' + fn, formatter.Triangle('(', formatter.Comma(*args), ')')
         )
 

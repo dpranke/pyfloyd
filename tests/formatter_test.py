@@ -25,7 +25,7 @@ from pyfloyd.formatter import (
     HList,
     Indent,
     LispList as LL,
-    Saw,
+    Pack,
     Triangle,
     Tree,
     VList,
@@ -68,20 +68,20 @@ class Tests(unittest.TestCase):
         )
 
     def test_complex(self):
-        obj = Saw(
+        obj = Pack(
             'self._o_succeed',
             Triangle(
                 '(',
                 Triangle(
                     '[',
                     Comma(
-                        Saw(
+                        Pack(
                             'self._fn_strcat',
                             Triangle(
                                 '(',
                                 Comma(
                                     "'L'",
-                                    Saw(
+                                    Pack(
                                         'self._o_lookup',
                                         Triangle('(', Comma("'lq'"), ')'),
                                     ),
@@ -109,11 +109,11 @@ class Tests(unittest.TestCase):
 
     def test_complex_2(self):
         lines = flatten(
-            Saw(
+            Pack(
                 'self._succeed',
                 Triangle(
                     '(',
-                    Saw(
+                    Pack(
                         'self.xtou',
                         Triangle(
                             '(',
@@ -258,20 +258,20 @@ class Tests(unittest.TestCase):
             flatten(lis, length=14),
         )
 
-    def test_saw(self):
+    def test_pack(self):
         # test short triangle cases.
-        t = Saw('foo', Triangle('(', '0', ')'))
+        t = Pack('foo', Triangle('(', '0', ')'))
         self.assertEqual(['foo(0)'], flatten(t))
 
-        t = Saw('foo', Triangle('(', '0', ')'), Triangle('(', '0', ')'))
+        t = Pack('foo', Triangle('(', '0', ')'), Triangle('(', '0', ')'))
         self.assertEqual(['foo(0)(0)'], flatten(t))
 
         # Test case where the first arg isn't a string.
-        t = Saw(Triangle('[', Comma('1'), ']'), Triangle('[', '0', ']'))
+        t = Pack(Triangle('[', Comma('1'), ']'), Triangle('[', '0', ']'))
         self.assertEqual(['[1][0]'], flatten(t))
 
-        # Test the three different cases for a saw with one long triangle.
-        t = Saw(
+        # Test the three different cases for a pack with one long triangle.
+        t = Pack(
             'foobar',
             Triangle(
                 '(',
@@ -317,7 +317,7 @@ class Tests(unittest.TestCase):
             flatten(t, length=66),
         )
 
-        t = Saw(
+        t = Pack(
             'foo',
             Triangle(
                 '(',
@@ -494,23 +494,23 @@ class AsListTests(unittest.TestCase):
             ["[ind 'foo' 'bar']"],
         )
 
-    def test_saw(self):
+    def test_pack(self):
         self.check(
-            Saw('foo', Triangle('(', '4', ')')),
-            ['saw', 'foo', ['tri', '(', '4', ')']],
-            LL('saw', 'foo', LL('tri', '(', '4', ')')),
-            ["[saw 'foo' [tri '(' '4' ')']]"],
+            Pack('foo', Triangle('(', '4', ')')),
+            ['pack', 'foo', ['tri', '(', '4', ')']],
+            LL('pack', 'foo', LL('tri', '(', '4', ')')),
+            ["[pack 'foo' [tri '(' '4' ')']]"],
         )
         self.check(
-            Saw('foo', Triangle('(', '4', ')'), Triangle('[', 'a', ']')),
-            ['saw', 'foo', ['tri', '(', '4', ')'], ['tri', '[', 'a', ']']],
+            Pack('foo', Triangle('(', '4', ')'), Triangle('[', 'a', ']')),
+            ['pack', 'foo', ['tri', '(', '4', ')'], ['tri', '[', 'a', ']']],
             LL(
-                'saw',
+                'pack',
                 'foo',
                 LL('tri', '(', '4', ')'),
                 LL('tri', '[', 'a', ']'),
             ),
-            ["[saw 'foo' [tri '(' '4' ')'] [tri '[' 'a' ']']]"],
+            ["[pack 'foo' [tri '(' '4' ')'] [tri '[' 'a' ']']]"],
         )
 
     def test_str(self):

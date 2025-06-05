@@ -139,8 +139,8 @@ t_regexp: [fn [re_str]
 
 t_substr: [fn [s start end]
               [tri 'string('
-                   [saw [list [tri '[]rune(' s ')']
-                              [tri '[' [hl start ':' end] ']']]]
+                   [pack [list [tri '[]rune(' s ')']
+                               [tri '[' [hl start ':' end] ']']]]
                    ')']]
 
 t_throw: [fn [msg] [hl 'panic(' msg ')']]

@@ -341,8 +341,8 @@ class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
     def _gen_extern(self, name: str) -> str:
         return "this.externs.get('" + name + "');"
 
-    def _gen_invoke(self, fn: str, *args) -> formatter.Saw:
-        return formatter.Saw(
+    def _gen_invoke(self, fn: str, *args) -> formatter.Pack:
+        return formatter.Pack(
             self._gen_rulename(fn),
             formatter.Triangle('(', formatter.Comma(*args), ')'),
         )
