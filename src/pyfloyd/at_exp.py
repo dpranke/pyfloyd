@@ -98,7 +98,7 @@ class AtExprHandler:
 
     def f_pack(self, args, env) -> Any:
         del env
-        return formatter.Pack(*args[0])
+        return formatter.Pack(*args)
 
     def f_tree(self, args, env) -> Any:
         del env

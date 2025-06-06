@@ -139,8 +139,7 @@ t_regexp: [fn [re_str]
 
 t_substr: [fn [s start end]
               [tri 'string('
-                   [pack [list [tri '[]rune(' s ')']
-                               [tri '[' [hl start ':' end] ']']]]
+                   [pack [tri '[]rune(' s ')'] [tri '[' [hl start ':' end] ']']]
                    ')']]
 
 t_throw: [fn [msg] [hl 'panic(' msg ')']]
@@ -274,6 +273,7 @@ parser_class: @"""
 
     @fn_aminus
     @fn_aplus
+    @fn_getany
     @fn_to_bool
     """
 
@@ -503,6 +503,11 @@ n_e_arr: [fn [node]
              [tri '[]any{' [comma [map [fn [c] [expr c]] node.ch]] '}']]
 
 n_e_getitem: [fn [node] [tri '.([]any)[' [expr node.child] ']']]
+
+n_e_getitem_infix: [fn [node] [hl [call 'fn_getany'
+                                        [list [expr [item node.ch 0]]
+                                              [expr [item node.ch 1]]]
+                                  ']']]]
 
 n_e_minus: [fn [node]
               [call 'fn_aminus' [list [expr node.left] [expr node.right]]]]
@@ -791,6 +796,11 @@ fn_aminus: [def_method _t_name
                           return l.(float64) - r.(float64)
                       }
                       """]
+
+fn_getany: [def_method _t_name
+                      q['v any' 'i int']
+                      ' any'
+                      'return v.([]any)[i]']
 
 fn_aplus: [def_method _t_name
                       q['l any' 'r any']

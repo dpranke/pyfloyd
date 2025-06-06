@@ -224,12 +224,19 @@ class Interpreter:
         self._succeed(vals)
 
     def _ty_e_call(self, node):
+        # e_{call,getitem,qual} have been rewritten to e_{call,getitem}_infix.
+        del node
+        assert False, '`e_call` should never be invoked'
+
+    def _ty_e_call_infix(self, node):
         vals = []
-        for subnode in node.ch:
+        self._interpret(node.ch[0])
+        left = self._val
+        vals = []
+        for subnode in node.ch[1:]:
             self._interpret(subnode)
             vals.append(self._val)
-        # Return 'e_call' as a tag here so we can check it in e_qual.
-        self._succeed(['e_call', vals])
+        self._val = left(*vals)
 
     def _ty_e_const(self, node):
         if node.v == 'true':
@@ -245,10 +252,16 @@ class Interpreter:
             self._succeed(float('NaN'))
 
     def _ty_e_getitem(self, node):
-        self._interpret(node.child)
-        assert not self._failed
-        # Return 'e_getitem' as a tag here so we can check it in e_qual.
-        self._succeed(['e_getitem', self._val])
+        # e_{call,getitem,qual} have been rewritten to e_{call,getitem}_infix.
+        del node
+        assert False, '`e_getitem` should never be invoked'
+
+    def _ty_e_getitem_infix(self, node):
+        self._interpret(node.ch[0])
+        left = self._val
+        self._interpret(node.ch[1])
+        right = self._val
+        self._val = left[right]
 
     def _ty_e_lit(self, node):
         self._succeed(node.v)
@@ -288,22 +301,9 @@ class Interpreter:
         self._succeed(v1 + v2)
 
     def _ty_e_qual(self, node):
-        # TODO: is it possible for this to fail?
-        self._interpret(node.ch[0])
-        assert not self._failed
-        for n in node.ch[1:]:
-            lhs = self._val
-            # TODO: is it possible for this to fail?
-            self._interpret(n)
-            assert not self._failed
-            op, rhs = self._val
-            if op == 'e_getitem':
-                self._val = lhs[rhs]
-            else:
-                assert op == 'e_call'
-                # Note that unknown functions were caught during analysis
-                # so it's safe to dereference this without checking.
-                self._val = lhs(*rhs)
+        # e_{call,getitem,qual} have been rewritten to e_{call,getitem}_infix.
+        del node
+        assert False, '`e_qual` should never be invoked'
 
     def _ty_e_ident(self, node):
         # Unknown variables should have been caught in analysis.

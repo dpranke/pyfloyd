@@ -49,6 +49,9 @@ def analyze(ast, rewrite_subrules: bool) -> m_grammar.Grammar:
     if a.errors:
         raise AnalysisError(a.errors)
 
+    # Rewrite quals from a list to a tree of getitems and calls.
+    _rewrite_quals(g)
+
     # Rewrite the AST to insert scopes as needed.
     _rewrite_scopes(g)
 
@@ -322,6 +325,31 @@ class _Analyzer:
 
         for c in node.ch:
             self._check_named_vars(c, labels, local_labels, references)
+
+
+def _rewrite_quals(grammar):
+    def rewrite_node(node):
+        if node.t == 'e_qual':
+            # A qual is a term plus a list of postfix expressions. We
+            # need to turn it into a tree of binary expressions as some
+            # languages may need to manipulate both the left and right
+            # hand sides of the expression. To do this we need to basically
+            # do a right fold over the list.
+            r = node.ch[0]
+            for i, c in enumerate(node.ch[1:]):
+                if c.t == 'e_call':
+                    r = m_grammar.ECallInfix(
+                        [r] + [rewrite_node(gc) for gc in c.ch]
+                    )
+                elif c.t == 'e_getitem':
+                    r = m_grammar.EGetitemInfix([r, rewrite_node(c.child)])
+            return r
+        for i, c in enumerate(node.ch):
+            node.ch[i] = rewrite_node(c)
+        return node
+
+    for rule in grammar.ast.rules:
+        rule.child = rewrite_node(rule.child)
 
 
 def _rewrite_scopes(grammar):

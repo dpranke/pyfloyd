@@ -237,11 +237,17 @@ n_e_arr: [fn [node] [if [is_empty node.ch]
                              [comma [map [fn [c] [expr c]] node.ch]]
                              ']']]]
 
-n_e_call: [fn [node] [tri '(' [comma [map [fn [c] [expr c]] node.ch]] ')']]
+n_e_call_infix: [fn [node]
+                    [pack [expr [item node.ch 0]]
+                          [tri '('
+                                [comma [map [fn [c] [expr c]]
+                                            [slice node.ch 1 0]]]
+                                ')']]]
 
 n_e_const: [fn [node] [invoke [strcat 't_' node.v]]]
 
-n_e_getitem: [fn [node] [tri '[' [expr node.child] ']']]
+n_e_getitem_infix: [fn [node] [pack [expr [item node.ch 0]]
+                                    [tri '[' [expr [item node.ch 1]] ']']]]
 
 n_e_ident: [fn [node] [if [equal node.kind 'outer']
                           [call_op 'lookup' [list [lit node.v]]]
@@ -262,8 +268,6 @@ n_e_num: [fn [node] node.v]
 n_e_paren: [fn [node] [expr node.child]]
 
 n_e_plus: [fn [node] [tree [expr node.left] '+' [expr node.right]]]
-
-n_e_qual: [fn [node] [pack [map [fn [c] [expr c]] node.ch]]]
 
 n_empty: [fn [node] [succeed t_null f_pos]]
 

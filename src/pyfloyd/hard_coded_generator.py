@@ -170,15 +170,31 @@ class HardCodedGenerator(generator.Generator):
         return formatter.Triangle('[', formatter.Comma(*args), ']')
 
     def _ty_e_call(self, node: m_grammar.Node) -> formatter.Triangle:
-        args = [self._gen_expr(c) for c in node.ch]
-        return formatter.Triangle('(', formatter.Comma(*args), ')')
+        # e_{call,getitem,qual} have been rewritten to e_{call,getitem}_infix.
+        del node
+        assert False, '`e_call` should never be invoked'
+
+    def _ty_e_call_infix(self, node: m_grammar.Node) -> formatter.Pack:
+        pfx = self._gen_expr(node.ch[0])
+        args = [self._gen_expr(c) for c in node.ch[1:]]
+        return formatter.Pack(
+            pfx, formatter.Triangle('(', formatter.Comma(*args), ')')
+        )
 
     def _ty_e_const(self, node: m_grammar.Node) -> str:
         assert isinstance(node.v, str)
         return self._map[node.v]
 
     def _ty_e_getitem(self, node: m_grammar.Node) -> formatter.Triangle:
-        return formatter.Triangle('[', self._gen_expr(node.child), ']')
+        # e_{call,getitem,qual} have been rewritten to e_{call,getitem}_infix.
+        del node
+        assert False, '`e_getitem` should never be invoked'
+
+    def _ty_e_getitem_infix(self, node: m_grammar.Node) -> formatter.HList:
+        return formatter.HList(
+            self._gen_expr(node.ch[0]),
+            formatter.Triangle('[', self._gen_expr(node.ch[1]), ']'),
+        )
 
     def _ty_e_lit(self, node: m_grammar.Node) -> str:
         return self._gen_lit(node.v)
@@ -208,8 +224,9 @@ class HardCodedGenerator(generator.Generator):
         )
 
     def _ty_e_qual(self, node: m_grammar.Node) -> formatter.Pack:
-        objs = [self._gen_expr(c) for c in node.ch]
-        return formatter.Pack(*objs)
+        # e_{call,getitem,qual} have been rewritten to e_{call,getitem}_infix.
+        del node
+        assert False, '`e_qual` should never be invoked'
 
     def _ty_e_ident(self, node: m_grammar.Node) -> formatter.El:
         assert isinstance(node, m_grammar.EIdent)

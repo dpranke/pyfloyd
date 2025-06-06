@@ -292,6 +292,11 @@ class ECall(Node):
         super().__init__('e_call', None, ch)
 
 
+class ECallInfix(Node):
+    def __init__(self, ch):
+        super().__init__('e_call_infix', None, ch)
+
+
 class EConst(Node):
     def __init__(self, v):
         super().__init__('e_const', v, [])
@@ -300,6 +305,11 @@ class EConst(Node):
 class EGetitem(Node):
     def __init__(self, child):
         super().__init__('e_getitem', None, [child])
+
+
+class EGetitemInfix(Node):
+    def __init__(self, ch):
+        super().__init__('e_getitem_infix', None, ch)
 
 
 class EIdent(Node):
