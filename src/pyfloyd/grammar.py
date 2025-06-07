@@ -324,6 +324,14 @@ class Choice(Node):
 def _merge_types(types: list[str]) -> str:
     if len(types) == 1:
         return types[0]
+    has_list = any(ty.startswith('list') for ty in types)
+    if has_list:
+        types2 = [
+           ty.replace('tuple[]', 'list[any]').replace('tuple', 'list')
+           for ty in types
+        ]
+        if len(list(set(types2))) == 1:
+            return list(types2)[0]
     return 'any'
 
 

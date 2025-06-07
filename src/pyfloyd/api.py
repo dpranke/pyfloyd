@@ -169,7 +169,7 @@ def generate(
         return result
     grammar_obj = analyzer.analyze(result.val, rewrite_subrules=True)
     if grammar_obj.errors:
-        return CompiledResult(None, _err_str(grammar_obj.errors))
+        return Result(None, _err_str(grammar_obj.errors))
 
     if not isinstance(options, generator.GeneratorOptions):
         if options is None:

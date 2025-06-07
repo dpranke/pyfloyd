@@ -578,7 +578,7 @@ class Runner:
 
     def _gen_output(self, output, cmd):
         new_file = f'{output}.new'
-        self.call(['fld', '-o', new_file] + cmd)
+        self.call(['flt', '-o', new_file] + cmd)
         # TODO: Add a command line arg to set the name of the parser file.
         if not self.args.no_execute:
             with open(new_file, encoding='utf8') as fp:

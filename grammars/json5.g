@@ -28,10 +28,10 @@ value          = 'null'                          -> null
                | string
 
 object         = '{' member_list '}'             -> dict($2)
-               | '{' '}'                         -> dict(list())
+               | '{' '}'                         -> dict([])
 
 array          = '[' element_list ']'            -> $2
-               | '[' ']'                         -> list()
+               | '[' ']'                         -> []
 
 string         = squote sqchar* squote           -> cat($2)
                | dquote dqchar* dquote           -> cat($2)
