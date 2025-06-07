@@ -320,6 +320,7 @@ class Choice(Node):
             types.add('<?' + self.t + '?>' if c.type is None else c.type)
         self.type = _merge_types(list(types))
 
+
 def _merge_types(types: list[str]) -> str:
     if len(types) == 1:
         return types[0]
@@ -377,7 +378,7 @@ class ECallInfix(Node):
                     f'args, got {len(self.ch[1:])}.'
                 )
 
-        for i, c in enumerate(self.ch[1:last+1]):
+        for i, c in enumerate(self.ch[1 : last + 1]):
             p_type = params[i][1]
             if not _check_type(p_type, c.type):
                 g.errors.append(
@@ -386,7 +387,7 @@ class ECallInfix(Node):
                 )
         if last != len(params):
             p_type = params[last][1]
-            for i, c in enumerate(self.ch[last+1:]):
+            for i, c in enumerate(self.ch[last + 1 :]):
                 if not _check_type(p_type, c.type):
                     g.errors.append(
                         f'Expected arg #{last + 1 + i} to {func_name}() to be '
@@ -450,13 +451,11 @@ class EIdent(Node):
         super().infer_types(g, var_types)
         if self.kind == 'function':
             self.type = 'func'
-        elif self.kind == 'local':
+        elif self.kind in ('local', 'outer'):
             self.type = var_types[self.name]
-        elif self.kind == 'extern':
-            self.type = 'bool'
         else:
-            assert self.kind == 'outer'
-            self.type = '<outer>'
+            assert self.kind == 'extern'
+            self.type = 'bool'
 
 
 class ELit(Node):

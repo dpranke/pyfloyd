@@ -502,7 +502,7 @@ class _Parser:
         self._o_ch(']')
         if self._failed:
             return
-        self._o_succeed([], self._pos)
+        self._o_succeed(self._fn_list(), self._pos)
 
     def _s_list_7(self):
         self._r_ws()
@@ -619,3 +619,6 @@ class _Parser:
 
     def _fn_join(self, sep, strs):
         return sep.join(strs)
+
+    def _fn_list(self, *args):
+        return list(args)

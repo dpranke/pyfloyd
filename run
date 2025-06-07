@@ -156,11 +156,12 @@ class Runner:
         return subp
 
     def call(self, cmd, comment='', echo_cmd=None, **kwargs):
+        if not self.args.echo_real_command and echo_cmd:
+            cmdstr = f'{shlex.join(echo_cmd)}{comment}'
+        else:
+            cmdstr = f'{shlex.join(cmd)}{comment}'
         if self.args.no_execute or self.args.verbose:
-            if not self.args.echo_real_command and echo_cmd:
-                print(f'{shlex.join(echo_cmd)}{comment}')
-            else:
-                print(f'{shlex.join(cmd)}{comment}')
+            print(cmdstr)
         if self.args.no_execute:
             return None
         capture_output = kwargs.get('capture_output', self.args.quiet)
@@ -171,6 +172,8 @@ class Runner:
             cmd, capture_output=capture_output, check=False, **kwargs
         )
         if proc.returncode != 0:
+            if not self.args.no_execute and not self.args.verbose:
+                print(f'Command failed: `{cmdstr}`')
             if self.args.quiet:
                 print(proc.stdout)
                 print(proc.stderr, file=sys.stderr)
@@ -563,16 +566,7 @@ class Runner:
 
     def _gen_parser(self, grammar, parser_file):
         new_file = f'{parser_file}.new'
-        self.call(
-            self.run_cmd
-            + [
-                '-m',
-                'pyfloyd',
-                '-o',
-                new_file,
-                grammar,
-            ]
-        )
+        self.call(['flc', '-o', new_file, grammar])
         # TODO: Add a command line arg to set the name of the parser file.
         if not self.args.no_execute:
             with open(new_file, encoding='utf8') as fp:
@@ -584,16 +578,7 @@ class Runner:
 
     def _gen_output(self, output, cmd):
         new_file = f'{output}.new'
-        self.call(
-            self.run_cmd
-            + [
-                '-m',
-                'pyfloyd.template',
-                '-o',
-                new_file,
-            ]
-            + cmd
-        )
+        self.call(['fld', '-o', new_file] + cmd)
         # TODO: Add a command line arg to set the name of the parser file.
         if not self.args.no_execute:
             with open(new_file, encoding='utf8') as fp:

@@ -649,7 +649,7 @@ class _Parser:
         if self._failed:
             return
         self._o_succeed(
-            ['string_list', v__1, self._fn_scons(v__3, v__4)], self._pos
+            ['string_list', v__1, self._fn_cons(v__3, v__4)], self._pos
         )
 
     def _s_string_list_1(self):
@@ -2610,11 +2610,11 @@ class _Parser:
     def _fn_concat(self, xs, ys):
         return xs + ys
 
+    def _fn_cons(self, hd, tl):
+        return [hd] + tl
+
     def _fn_join(self, sep, strs):
         return sep.join(strs)
-
-    def _fn_scons(self, hd, tl):
-        return [hd] + tl
 
     def _fn_strcat(self, *args):
         return ''.join(args)

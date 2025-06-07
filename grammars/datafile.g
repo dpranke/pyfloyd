@@ -95,7 +95,7 @@ string       = raw_str_tag raw_str                    -> ['string', $1, $2]
 
 string_list  = string_tag
                '(' string (','? string)* ')'          -> ['string_list', $1,
-                                                          scons($3, $4)]
+                                                          cons($3, $4)]
 raw_str_tag  = ('r' | 'rd' | 'dr')
                  ~(%whitespace | %comment)            -> $1
 

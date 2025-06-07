@@ -123,12 +123,11 @@ def compile_to_parser(  # pylint: disable=redefined-builtin
     result = grammar_parser.parse(grammar, path, externs)
     if result.err:
         return CompiledResult(err=result.err, pos=result.pos)
-    try:
-        g = analyzer.analyze(result.val, rewrite_subrules=False)
-        interpreter = m_interpreter.Interpreter(g, memoize=memoize)
-        return CompiledResult(interpreter, None)
-    except analyzer.AnalysisError as e:
-        return CompiledResult(None, str(e))
+    g = analyzer.analyze(result.val, rewrite_subrules=False)
+    if g.errors:
+        return CompiledResult(None, _err_str(g.errors))
+    interpreter = m_interpreter.Interpreter(g, memoize=memoize)
+    return CompiledResult(interpreter, None)
 
 
 def generate(
@@ -168,10 +167,9 @@ def generate(
     result = grammar_parser.parse(grammar, path, externs)
     if result.err:
         return result
-    try:
-        grammar_obj = analyzer.analyze(result.val, rewrite_subrules=True)
-    except analyzer.AnalysisError as e:
-        return Result(err=str(e))
+    grammar_obj = analyzer.analyze(result.val, rewrite_subrules=True)
+    if grammar_obj.errors:
+        return CompiledResult(None, _err_str(grammar_obj.errors))
 
     if not isinstance(options, generator.GeneratorOptions):
         if options is None:
@@ -258,11 +256,15 @@ def dump_ast(
     if result.err:
         return None, result.err
 
-    try:
-        g = analyzer.analyze(
-            result.val,
-            rewrite_subrules=rewrite_subrules,
-        )
-        return g.ast, None
-    except analyzer.AnalysisError as e:
-        return None, str(e)
+    g = analyzer.analyze(
+        result.val,
+        rewrite_subrules=rewrite_subrules,
+    )
+    return g.ast, None
+
+
+def _err_str(errors: list[str]):
+    s = 'Errors were found:\n  '
+    s += '\n  '.join(error for error in errors)
+    s += '\n'
+    return s
