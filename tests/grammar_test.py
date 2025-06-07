@@ -1386,6 +1386,35 @@ class ErrorsMixin:
             err='<string>:1 Unexpected end of input at column 12',
         )
 
+    def test_bad_pred(self):
+        self.check(
+            'grammar = ?{1}',
+            text='',
+            grammar_err=(
+                'Errors were found:\n  Non-bool object passed to `?{}`.\n'
+            ),
+        )
+
+    def test_func_wrong_number_of_args(self):
+        self.check(
+            'grammar = -> join()',
+            text='',
+            grammar_err=(
+                'Errors were found:\n  join() takes 2 args, got 0.\n'
+            ),
+        )
+
+    def test_func_wrong_args_types(self):
+        self.check(
+            'grammar = -> join(1, "")',
+            text='',
+            grammar_err=(
+                'Errors were found:\n'
+                '  Expected arg #1 to join() to be str, got int.\n'
+                '  Expected arg #2 to join() to be list[str], got str.\n'
+            ),
+        )
+
     def test_second_line_of_grammar(self):
         self.check_grammar_error(
             """\

@@ -360,7 +360,20 @@ class ECallInfix(Node):
     def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
         super().infer_types(g, var_types)
         assert self.ch[0].t == 'e_ident' and self.ch[0].v in functions.ALL
-        self.type = functions.ALL[self.ch[0].v]['ret']
+        func_name = self.ch[0].v
+        func = functions.ALL[func_name]
+        if len(self.ch[1:]) != len(func['params']):
+            g.errors.append(
+                f'{func_name}() takes {len(func["params"])} '
+                f'args, got {len(self.ch[1:])}.'
+            )
+        for i, c in enumerate(self.ch[1:]):
+            if c.type != func['params'][i][1]:
+                g.errors.append(
+                    f'Expected arg #{i + 1} to {func_name}() to be '
+                    f'{func["params"][i][1]}, got {c.type}.'
+                )
+        self.type = func['ret']
         assert self.type is not None
 
 
@@ -449,7 +462,8 @@ class ENum(Node):
         super().__init__('e_num', v, [])
 
     def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
-        self.type = 'bool'
+        super().infer_types(g, var_types)
+        self.type = 'int'
 
 
 class EPlus(Node):
@@ -582,6 +596,8 @@ class Pred(Node):
 
     def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
         super().infer_types(g, var_types)
+        if self.child.type != 'bool':
+            g.errors.append('Non-bool object passed to `?{}`.')
         self.type = 'bool'
 
 
@@ -610,7 +626,7 @@ class Rule(Node):
         self.local_vars = []
 
     def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
-        if self.type is not None:
+        if self.type != '?':
             return
         self.type = '<?' + self.name + '?>'
         for c in self.ch:
@@ -684,6 +700,7 @@ class Unicat(Node):
 class Grammar:
     def __init__(self, ast: Any):
         self.ast: Node = Node.to(ast)
+        self.errors: list[str] = []
         self.comment: Optional[Rule] = None
         self.rules: dict[str, Rule] = collections.OrderedDict()
         self.pragmas: list[Rule] = []

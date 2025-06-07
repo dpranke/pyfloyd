@@ -87,6 +87,8 @@ def analyze(ast, rewrite_subrules: bool) -> m_grammar.Grammar:
     # Do typechecking, figure out which nodes can fail, figure out which
     # nodes' values are used, etc.
     g.update_node(g.ast)
+    if g.errors:
+        raise AnalysisError(g.errors)
 
     g.needed_builtin_rules = sorted(set(g.needed_builtin_rules))
     g.needed_builtin_functions = sorted(set(g.needed_builtin_functions))
