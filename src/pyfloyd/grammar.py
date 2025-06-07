@@ -17,6 +17,7 @@ import re
 from typing import Any, Optional, Union
 
 from pyfloyd import functions
+from pyfloyd import type_desc
 
 
 class OperatorState:
@@ -41,10 +42,6 @@ BUILTIN_RULES = (
 #
 # AST node classes
 #
-
-
-BASIC_TYPES = ('any', 'bool', 'int', 'null', 'str')
-COMPOUND_TYPES = ('dict', 'list', 'sum', 'tuple')
 
 
 class Node:
@@ -268,7 +265,7 @@ class Node:
     def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
         if self.type != '?':
             return
-        self.type = '<?' + self.t + '?>'
+        self.type = 'any'  # '<?' + self.t + '?>'
         for c in self.ch:
             c.infer_types(g, var_types)
         # By default most nodes will have the type of the last of their
@@ -317,22 +314,9 @@ class Choice(Node):
         super().infer_types(g, var_types)
         types = set()
         for c in self.ch:
-            types.add('<?' + self.t + '?>' if c.type is None else c.type)
-        self.type = _merge_types(list(types))
-
-
-def _merge_types(types: list[str]) -> str:
-    if len(types) == 1:
-        return types[0]
-    has_list = any(ty.startswith('list') for ty in types)
-    if has_list:
-        types2 = [
-           ty.replace('tuple[]', 'list[any]').replace('tuple', 'list')
-           for ty in types
-        ]
-        if len(list(set(types2))) == 1:
-            return list(types2)[0]
-    return 'any'
+            # types.add('<?' + self.t + '?>' if c.type is None else c.type)
+            types.add(c.type)
+        self.type = type_desc.merge(list(types))
 
 
 class Count(Node):
@@ -388,7 +372,7 @@ class ECallInfix(Node):
 
         for i, c in enumerate(self.ch[1 : last + 1]):
             p_type = params[i][1]
-            if not _check_type(p_type, c.type):
+            if not type_desc.check(p_type, c.type):
                 g.errors.append(
                     f'Expected arg #{i + 1} to {func_name}() to be '
                     f'{p_type}, got {c.type}.'
@@ -396,27 +380,13 @@ class ECallInfix(Node):
         if last != len(params):
             p_type = params[last][1]
             for i, c in enumerate(self.ch[last + 1 :]):
-                if not _check_type(p_type, c.type):
+                if not type_desc.check(p_type, c.type):
                     g.errors.append(
                         f'Expected arg #{last + 1 + i} to {func_name}() to be '
                         f'{p_type}, got {c.type}.'
                     )
         self.type = func['ret']
         assert self.type is not None
-
-
-def _check_type(exp, got):
-    if got == exp:
-        return True
-    if exp == 'any':
-        return True
-    if exp == 'list[any]' and got.startswith('list['):
-        return True
-    if 'tuple' in got and 'list' in exp:
-        t_args = got[6:-1]
-        e_arg = exp[5:-1]
-        return all(_check_type(e_arg, t_arg) for t_arg in t_args.split(', '))
-    return False
 
 
 class EConst(Node):
@@ -440,7 +410,7 @@ class EGetitemInfix(Node):
     def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
         super().infer_types(g, var_types)
         # TODO: Figure out what the type is.
-        self.type = '<getitem>'
+        self.type = 'any'  # '<getitem>'
 
 
 class EIdent(Node):
@@ -668,7 +638,7 @@ class Rule(Node):
     def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
         if self.type != '?':
             return
-        self.type = '<?' + self.name + '?>'
+        self.type = 'any'  # '<?' + self.name + '?>'
         for c in self.ch:
             c.infer_types(g, var_types)
         self.type = self.ch[-1].type
