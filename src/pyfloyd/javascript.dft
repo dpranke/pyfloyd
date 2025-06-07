@@ -680,6 +680,8 @@ fn_itou: [meth q['n'] 'return String.fromCharCode(n);']
 
 fn_join: [meth q['s' 'vs'] 'return vs.join(s);']
 
+fn_list: [meth q['...args'] 'return args;']
+
 fn_scat: [meth q['ss'] "return ss.join('');"]
 
 fn_scons: [meth q['hd' 'tl'] 'return [hd].concat(tl);']

@@ -861,6 +861,10 @@ _BUILTINS = {
         def _fn_join(self, s, vs):
             return s.join(vs)
         """,
+    'fn_list': """
+        def _fn_list(self, *args):
+            return list(args)
+        """,
     'fn_otou': """
         def _fn_otou(self, s):
             return chr(int(s, base=8))

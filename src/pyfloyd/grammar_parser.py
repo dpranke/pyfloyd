@@ -1831,21 +1831,29 @@ class _Parser:
         self._o_fail()
 
     def _r__whitespace(self):
-        vs = []
+        start = self._pos
         self._s__whitespace_1()
+        if self._failed:
+            return
+        end = self._pos
+        self._val = self._text[start:end]
+
+    def _s__whitespace_1(self):
+        vs = []
+        self._s__whitespace_2()
         if self._failed:
             return
         vs.append(self._val)
         while True:
             pos = self._pos
-            self._s__whitespace_1()
+            self._s__whitespace_2()
             if self._failed or self._pos == pos:
                 self._o_rewind(pos)
                 break
             vs.append(self._val)
         self._o_succeed(vs, self._pos)
 
-    def _s__whitespace_1(self):
+    def _s__whitespace_2(self):
         pos = self._pos
         self._o_ch(' ')
         if not self._failed:
@@ -1875,15 +1883,23 @@ class _Parser:
         if not self._failed:
             return
         self._o_rewind(pos)
-        self._s__comment_5()
+        self._s__comment_6()
 
     def _s__comment_1(self):
+        start = self._pos
         self._s__comment_2()
         if self._failed:
             return
-        self._s__comment_3()
+        end = self._pos
+        self._val = self._text[start:end]
 
     def _s__comment_2(self):
+        self._s__comment_3()
+        if self._failed:
+            return
+        self._s__comment_4()
+
+    def _s__comment_3(self):
         pos = self._pos
         self._o_str('//')
         if not self._failed:
@@ -1891,18 +1907,18 @@ class _Parser:
         self._o_rewind(pos)
         self._o_ch('#')
 
-    def _s__comment_3(self):
+    def _s__comment_4(self):
         vs = []
         while True:
             pos = self._pos
-            self._s__comment_4()
+            self._s__comment_5()
             if self._failed or self._pos == pos:
                 self._o_rewind(pos)
                 break
             vs.append(self._val)
         self._o_succeed(vs, self._pos)
 
-    def _s__comment_4(self):
+    def _s__comment_5(self):
         rexp = '[^\r\n]'
         if rexp not in self._regexps:
             self._regexps[rexp] = re.compile(rexp)
@@ -1912,7 +1928,15 @@ class _Parser:
             return
         self._o_fail()
 
-    def _s__comment_5(self):
+    def _s__comment_6(self):
+        start = self._pos
+        self._s__comment_7()
+        if self._failed:
+            return
+        end = self._pos
+        self._val = self._text[start:end]
+
+    def _s__comment_7(self):
         self._o_str('/*')
         if self._failed:
             return
@@ -1925,17 +1949,23 @@ class _Parser:
                 break
 
     def _r__filler(self):
+        start = self._pos
+        self._s__filler_1()
+        end = self._pos
+        self._val = self._text[start:end]
+
+    def _s__filler_1(self):
         vs = []
         while True:
             pos = self._pos
-            self._s__filler_1()
+            self._s__filler_2()
             if self._failed or self._pos == pos:
                 self._o_rewind(pos)
                 break
             vs.append(self._val)
         self._o_succeed(vs, self._pos)
 
-    def _s__filler_1(self):
+    def _s__filler_2(self):
         pos = self._pos
         self._o_memoize('r__whitespace', self._r__whitespace)
         if not self._failed:

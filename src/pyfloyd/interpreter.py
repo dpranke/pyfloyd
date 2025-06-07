@@ -317,8 +317,12 @@ class Interpreter:
             self._succeed(self._externs[v])
             return
         if node.kind == 'function':
-            if node.v in self._functions and self._functions[node.v]:
-                self._succeed(self._functions[node.v])
+            if (
+                node.v in self._functions
+                and self._functions[node.v]
+                and self._functions[node.v]['func']
+            ):
+                self._succeed(self._functions[node.v]['func'])
                 return
             v = getattr(self, '_fn_' + node.v, None)
             if v:

@@ -945,6 +945,17 @@ fn_join: [def_method _t_name
                      return strings.Join(strs, sep.(string))
                      """]
 
+fn_list: [def_method _t_name
+                    q['args ...any']
+                    ' []any'
+                    """
+                    if len(args) == 0 {
+                        return []any{}
+                    } else {
+                        return args
+                    }
+                    """]
+
 fn_scat: [def_method _t_name
                      q['hd any' 'tl any']
                      ' string'

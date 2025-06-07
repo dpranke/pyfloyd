@@ -962,6 +962,11 @@ _BUILTINS = {
           return vs.join(s);
         }
         """,
+    'fn_list': """
+        fn_list(...args) {
+            return args;
+        }
+        """,
     'fn_scat': """
         fn_scat(ss) {
           return ss.join('');

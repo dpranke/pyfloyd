@@ -81,14 +81,28 @@ params: [fn [params]
                                  [replace [item param 1] 'any' 'Any']]]]
                 params ', ']]]
 
-all = [fn [] [vl 'ALL = {'
-                 [ind [map_items [fn [k v] [strcat "'"
-                                                   k
-                                                   "': "
-                                                   [if [has v 'body']
-                                                       [strcat "f_" k ","]
-                                                       'None,']]]
-                                 functions]]
-                 '}']]
+all = [fn []
+          [vl 'ALL: dict[str, dict[str, Any]] = {'
+              [ind [map_items [fn [k v] [vl [hl "'" k "': {"]
+                                            [fn_def k v],
+                                            '},']]
+                              functions]]
+              '}']]
+
+fn_def = [fn [k v]
+             [ind [hl "'func': "
+                      [if [has v 'body'] [strcat 'f_' k] 'None'] ',']
+                  [hl "'params': " [param_types v.params] ',']
+                  [hl "'ret': '" v.ret "',"]]]
+
+param_types: [fn [params]
+                 [hl '[' [map [fn [param]
+                                  [hl "['"
+                                      [item param 0]
+                                      "', '"
+                                      [item param 1]
+                                      "']"]]
+                              params
+                              ', '] ']']]
 
 }

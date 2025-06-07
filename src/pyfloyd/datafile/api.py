@@ -805,11 +805,14 @@ class Encoder:
                     d_indent_str = indent_str + self.indent
                 lines = val_str.splitlines()
                 leading_quote = _get_leading_quote(lines[0])
-                val_str = 'd' + leading_quote
-                val_str += d_indent_str + lines[0][len(leading_quote) :]
-                for line in lines[1:-1]:
-                    val_str += d_indent_str + line
-                val_str += d_indent_str + lines[-1]
+                if len(lines) > 1:
+                    val_str = 'd' + leading_quote
+                    val_str += d_indent_str + lines[0][len(leading_quote) :]
+                    for line in lines[1:-1]:
+                        val_str += d_indent_str + line
+                    val_str += d_indent_str + lines[-1]
+                else:
+                    val_str = lines[0]
             s += key_str + kv_sep + val_str
 
         s += end_str + '}'
@@ -874,7 +877,7 @@ def encode_quoted_string(
 
     i = 0
     while i < len(s):
-        if s[i] == '\\' and s[i + 1] in '\'"`':
+        if s[i] == '\\' and (i + 1 < len(s)) and s[i + 1] in '\'"`':
             i += 2
         for k in quote_map:
             if s[i:].startswith(k):
@@ -921,7 +924,13 @@ def encode_quoted_string(
         else:
             ret.append(escape_char(ch))
         i += 1
-    ret = ['\n' if (r == '\\n' and not escape_newlines) else r for r in ret]
+
+    if len(ret) > 10:
+        # Only allow "long" strings to span multiple lines. The number 10
+        # is pulled out of the air here as a heuristic for "long".
+        ret = [
+            '\n' if (r == '\\n' and not escape_newlines) else r for r in ret
+        ]
 
     return quote + ''.join(ret) + quote
 

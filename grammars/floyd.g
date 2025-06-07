@@ -5,10 +5,10 @@
             | unicode_categories           -> true
             | unicode_names                -> true
 
-%whitespace = (' ' | '\f' | '\n' | '\r' | '\t' | '\v')+
+%whitespace = <(' ' | '\f' | '\n' | '\r' | '\t' | '\v')+>
 
-%comment    = ('//' | '#') [^\r\n]*
-            | '/*' ^.'*/'
+%comment    = <('//' | '#') [^\r\n]*>
+            | <'/*' ^.'*/'>
 
 %tokens     = escape hex ident int lit regexp set zpos
 

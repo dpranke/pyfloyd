@@ -266,8 +266,8 @@ class Interpreter:
 
         for name, obj in functions.ALL.items():
             if name not in functions.UNDEFINED:
-                if hasattr(obj, 'func'):
-                    self.define_simple_fn(name, obj.func)
+                if 'func' in obj:
+                    self.define_simple_fn(name, obj['func'])
                 else:
                     self.define_simple_fn(name, obj)
 
@@ -392,15 +392,11 @@ class Interpreter:
             f"Second arg to map isn't a list: `{exprs}`",
         )
         results = []
-        for expr in exprs:
+        ln = len(exprs)
+        for i, expr in enumerate(exprs):
             results.append(fn.call([expr], env))
-        if sep is not None:
-            for i, result in enumerate(results, start=1):
-                check(
-                    functions.f_is_str(result),
-                    f'Result #{i} from map is not a string: {repr(result)}',
-                )
-            return sep.join(results)
+            if sep is not None and i < ln - 1:
+                results.append(sep)
         return results
 
     def f_map_items(self, args, env):
@@ -422,13 +418,9 @@ class Interpreter:
         )
 
         results = []
-        for k, v in d.items():
+        ln = len(d)
+        for i, (k, v) in enumerate(d.items()):
             results.append(fn.call([k, v], env))
-        if sep is not None:
-            for i, result in enumerate(results):
-                check(
-                    functions.f_is_str(result),
-                    f'Arg #{i} to map_items is not a string: {repr(result)}',
-                )
-            return sep.join(results)
+            if sep is not None and i < ln:
+                results.append(sep)
         return results

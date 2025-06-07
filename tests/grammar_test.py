@@ -939,6 +939,12 @@ class FunctionsMixin:
     def test_join(self):
         self.check("g = -> join('x', ['1', '2', '3'])", '', out='1x2x3')
 
+    def test_list(self):
+        self.check('g = -> list()', '', [])
+        self.check('g = -> list(1)', '', [1])
+        self.check('g = -> list(1, 2)', '', [1, 2])
+        self.check('g = -> list(1, 2, "foo")', '', [1, 2, 'foo'])
+
     def test_scons(self):
         self.check("g = -> scons('a', ['b', 'c'])", '', out=['a', 'b', 'c'])
 

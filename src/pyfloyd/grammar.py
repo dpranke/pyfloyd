@@ -13,7 +13,10 @@
 # limitations under the License.
 
 import collections
+import re
 from typing import Any, Optional, Union
+
+from pyfloyd import functions
 
 
 class OperatorState:
@@ -38,6 +41,10 @@ BUILTIN_RULES = (
 #
 # AST node classes
 #
+
+
+BASIC_TYPES = ('any', 'bool', 'int', 'null', 'str')
+COMPOUND_TYPES = ('dict', 'list', 'sum', 'tuple')
 
 
 class Node:
@@ -141,6 +148,8 @@ class Node:
         self.t: str = t
         self.v: Any = v
         self.ch: list['Node'] = ch
+        self.type: str = '?'
+        self.value_used: Optional[bool] = None
         self._can_fail: Optional[bool] = None
 
     def __getattr__(self, attr: str) -> Any:
@@ -218,9 +227,9 @@ class Node:
         return self._can_fail is not None
 
     @property
-    def attrs(self) -> tuple[str, ...]:
+    def attrs(self) -> list[str]:
         fn = self.__class__.__init__.__code__
-        return fn.co_varnames[1 : fn.co_argcount]
+        return list(fn.co_varnames[1 : fn.co_argcount]) + ['type']
 
     def to_json(self, include_derived=False) -> Any:
         d: dict[str, Any] = {}
@@ -246,6 +255,8 @@ class Node:
             d['can_fail'] = self.can_fail
             for a in self.derived_attrs:
                 d[a] = getattr(self, a)
+            d['type'] = self.type
+            d['value_used'] = self.value_used
         if child:
             d['child'] = self.child.to_json(include_derived)
         if self.ch_alias:
@@ -253,6 +264,17 @@ class Node:
         if ch:
             d['ch'] = [c.to_json(include_derived) for c in self.ch]
         return d
+
+    def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
+        if self.type != '?':
+            return
+        self.type = '<?' + self.t + '?>'
+        for c in self.ch:
+            c.infer_types(g, var_types)
+        # By default most nodes will have the type of the last of their
+        # children, since that is also their default value.
+        if self.ch:
+            self.type = self.ch[-1].type
 
 
 class Action(Node):
@@ -269,10 +291,40 @@ class Apply(Node):
         # This will only be set by the generator.
         self.memoize = None
 
+    def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
+        if self.v in ('any', 'r_any'):
+            self.type = 'str'
+        elif self.v in ('end', 'r_end'):
+            self.type = 'null'
+        # elif self.v in ('e_expr', 'prim_expr', 'choice'):
+        #    # 'any<' + self.v + '>'
+        #    self.type = 'any'
+        else:
+            for n in g.ast.rules:
+                if n.v == self.v:
+                    if n.type is None:
+                        n.infer_types(g, var_types)
+                    self.type = n.type
+                    return
+            assert False
+
 
 class Choice(Node):
     def __init__(self, ch):
         super().__init__('choice', None, ch)
+
+    def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
+        super().infer_types(g, var_types)
+        types = set()
+        for c in self.ch:
+            types.add('<?' + self.t + '?>' if c.type is None else c.type)
+        if len(types) > 1:
+            # self.type = 'union[' + ', '.join(sorted(types)) + ']'
+            self.type = 'any'
+        elif types:
+            self.type = list(types)[0]
+        else:
+            self.type = '<?>'
 
 
 class Count(Node):
@@ -281,10 +333,19 @@ class Count(Node):
     def __init__(self, child, start, stop):
         super().__init__('count', [start, stop], [child])
 
+    def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
+        super().infer_types(g, var_types)
+        self.type = 'list[' + self.child.type + ']'
+
 
 class EArr(Node):
     def __init__(self, ch):
         super().__init__('e_arr', None, ch)
+
+    def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
+        super().infer_types(g, var_types)
+        types = [c.type for c in self.ch]
+        self.type = 'tuple[' + ', '.join(types) + ']'
 
 
 class ECall(Node):
@@ -296,10 +357,20 @@ class ECallInfix(Node):
     def __init__(self, ch):
         super().__init__('e_call_infix', None, ch)
 
+    def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
+        super().infer_types(g, var_types)
+        assert self.ch[0].t == 'e_ident' and self.ch[0].v in functions.ALL
+        self.type = functions.ALL[self.ch[0].v]['ret']
+        assert self.type is not None
+
 
 class EConst(Node):
     def __init__(self, v):
         super().__init__('e_const', v, [])
+        if v == 'null':
+            self.type = 'null'
+        else:
+            self.type = 'bool'
 
 
 class EGetitem(Node):
@@ -310,6 +381,11 @@ class EGetitem(Node):
 class EGetitemInfix(Node):
     def __init__(self, ch):
         super().__init__('e_getitem_infix', None, ch)
+
+    def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
+        super().infer_types(g, var_types)
+        # TODO: Figure out what the type is.
+        self.type = '<getitem>'
 
 
 class EIdent(Node):
@@ -324,10 +400,23 @@ class EIdent(Node):
     def name(self):
         return self.v
 
+    def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
+        super().infer_types(g, var_types)
+        if self.kind == 'function':
+            self.type = 'func'
+        elif self.kind == 'local':
+            self.type = var_types[self.name]
+        elif self.kind == 'extern':
+            self.type = 'bool'
+        else:
+            assert self.kind == 'outer'
+            self.type = '<outer>'
+
 
 class ELit(Node):
     def __init__(self, v):
         super().__init__('e_lit', v, [])
+        self.type = 'str'
 
 
 class EParen(Node):
@@ -341,15 +430,26 @@ class EMinus(Node):
     def __init__(self, left, right):
         super().__init__('e_minus', None, [left, right])
 
+    def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
+        super().infer_types(g, var_types)
+        self.type = 'int'
+
 
 class ENot(Node):
     def __init__(self, ch):
         super().__init__('e_not', None, [ch])
 
+    def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
+        super().infer_types(g, var_types)
+        self.type = 'bool'
+
 
 class ENum(Node):
     def __init__(self, v):
         super().__init__('e_num', v, [])
+
+    def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
+        self.type = 'bool'
 
 
 class EPlus(Node):
@@ -357,6 +457,10 @@ class EPlus(Node):
 
     def __init__(self, left, right):
         super().__init__('e_plus', None, [left, right])
+
+    def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
+        super().infer_types(g, var_types)
+        self.type = 'int'
 
 
 class EQual(Node):
@@ -368,6 +472,10 @@ class Empty(Node):
     def __init__(self):
         super().__init__('empty', None, [])
 
+    def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
+        super().infer_types(g, var_types)
+        self.type = 'null'
+
 
 class EndsIn(Node):
     def __init__(self, child):
@@ -377,6 +485,10 @@ class EndsIn(Node):
 class Equals(Node):
     def __init__(self, child):
         super().__init__('equals', None, [child])
+
+    def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
+        super().infer_types(g, var_types)
+        self.type = 'str'
 
 
 class Label(Node):
@@ -396,15 +508,26 @@ class Leftrec(Node):
         super().__init__('leftrec', name, [child])
         self.left_assoc = None
 
+    def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
+        super().infer_types(g, var_types)
+        self.type = '<leftrec>'
+
 
 class Lit(Node):
     def __init__(self, v):
         super().__init__('lit', v, [])
 
+    def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
+        self.type = 'str'
+
 
 class Not(Node):
     def __init__(self, child):
         super().__init__('not', None, [child])
+
+    def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
+        super().infer_types(g, var_types)
+        self.type = 'bool'
 
 
 class NotOne(Node):
@@ -425,10 +548,18 @@ class Operator(Node):
     def __init__(self, name, ch):
         super().__init__('operator', name, ch)
 
+    def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
+        super().infer_types(g, var_types)
+        self.type = '<operator>'
+
 
 class Opt(Node):
     def __init__(self, child):
         super().__init__('opt', None, [child])
+
+    def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
+        super().infer_types(g, var_types)
+        self.type = 'list[' + self.child.type + ']'
 
 
 class Paren(Node):
@@ -440,10 +571,18 @@ class Plus(Node):
     def __init__(self, child):
         super().__init__('plus', None, [child])
 
+    def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
+        super().infer_types(g, var_types)
+        self.type = 'list[' + self.child.type + ']'
+
 
 class Pred(Node):
     def __init__(self, child):
         super().__init__('pred', None, [child])
+
+    def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
+        super().infer_types(g, var_types)
+        self.type = 'bool'
 
 
 class Range(Node):
@@ -451,11 +590,13 @@ class Range(Node):
 
     def __init__(self, start, stop):
         super().__init__('range', [start, stop], [])
+        self.type = 'str'
 
 
 class Regexp(Node):
     def __init__(self, v):
         super().__init__('regexp', v, [])
+        self.type = 'str'
 
 
 class Rule(Node):
@@ -468,6 +609,14 @@ class Rule(Node):
         # does so.
         self.local_vars = []
 
+    def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
+        if self.type is not None:
+            return
+        self.type = '<?' + self.name + '?>'
+        for c in self.ch:
+            c.infer_types(g, var_types)
+        self.type = self.ch[-1].type
+
 
 class Rules(Node):
     ch_alias = 'rules'
@@ -475,10 +624,19 @@ class Rules(Node):
     def __init__(self, rules):
         super().__init__('rules', None, rules)
 
+    def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
+        for c in self.ch:
+            c.infer_types(g, var_types)
+        self.type = 'null'
+
 
 class Run(Node):
     def __init__(self, child):
         super().__init__('run', None, [child])
+
+    def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
+        super().infer_types(g, var_types)
+        self.type = 'str'
 
 
 class Scope(Node):
@@ -493,20 +651,34 @@ class Seq(Node):
         super().__init__('seq', None, ch)
         self.vars = []
 
+    def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
+        local_var_types = var_types.copy()
+        for c in self.ch:
+            c.infer_types(g, local_var_types)
+            if c.t == 'label':
+                local_var_types[c.name] = c.type
+        self.type = self.ch[-1].type
+
 
 class Set(Node):
     def __init__(self, v):
         super().__init__('set', v, [])
+        self.type = 'str'
 
 
 class Star(Node):
     def __init__(self, child):
         super().__init__('star', None, [child])
 
+    def infer_types(self, g: 'Grammar', var_types: dict[str, str]):
+        super().infer_types(g, var_types)
+        self.type = 'list[' + self.child.type + ']'
+
 
 class Unicat(Node):
     def __init__(self, v):
         super().__init__('unicat', v, [])
+        self.type = 'str'
 
 
 class Grammar:
@@ -561,6 +733,19 @@ class Grammar:
 
     def update_node(self, node: Node) -> Node:
         self._set_can_fail(node)
+        node.infer_types(self, var_types={})
+
+        def _patch_types(node):
+            m = re.match(r'(.*)<\?(.+)\?>(.*)', node.type)
+            if m:
+                node.type = (
+                    m.group(1) + self.rules[m.group(2)].type + m.group(3)
+                )
+            for c in node.ch:
+                _patch_types(c)
+
+        _patch_types(node)
+
         return node
 
     def _set_can_fail(self, node):

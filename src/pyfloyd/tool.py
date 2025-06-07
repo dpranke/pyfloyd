@@ -17,11 +17,9 @@
 
 import argparse
 import importlib.util
-import io
 import json
 import pathlib
 import pdb
-import pprint
 import sys
 import traceback
 
@@ -70,14 +68,7 @@ def main(argv=None, host=None):
                 rewrite_subrules=args.rewrite_subrules,
             )
             if ast:
-                if args.as_json:
-                    contents = json.dumps(ast.to_json(args.full_ast), indent=2)
-                else:
-                    s = io.StringIO()
-                    pprint.pprint(ast, stream=s)
-                    contents = s.getvalue()
-            else:
-                contents = None
+                contents = json.dumps(ast.to_json(args.full_ast), indent=2)
         elif args.pretty_print:
             contents, err = pyfloyd.pretty_print(grammar, args.grammar)
         elif args.interpret:

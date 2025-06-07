@@ -72,7 +72,7 @@ def analyze(ast, rewrite_subrules: bool) -> m_grammar.Grammar:
         # Not needed when just interpreting the grammar.
         _rewrite_subrules(g)
 
-    _compute_local_vars(g)
+    _compute_vars(g)
 
     # TODO: Figure out how to statically analyze predicates to
     # catch ones that don't return booleans, so that we don't need
@@ -84,7 +84,8 @@ def analyze(ast, rewrite_subrules: bool) -> m_grammar.Grammar:
 
     g.exception_needed = _exception_needed(g.ast)
 
-    # Figure out which nodes can fail, etc.
+    # Do typechecking, figure out which nodes can fail, figure out which
+    # nodes' values are used, etc.
     g.update_node(g.ast)
 
     g.needed_builtin_rules = sorted(set(g.needed_builtin_rules))
@@ -554,7 +555,7 @@ def _add_filler_rules(grammar):
         else:
             filler = m_grammar.Star(m_grammar.Apply('%whitespace'))
     if filler:
-        grammar.rules['%filler'] = m_grammar.Choice([filler])
+        grammar.rules['%filler'] = m_grammar.Run(m_grammar.Choice([filler]))
 
 
 def _add_filler_nodes(grammar, node):
@@ -817,7 +818,7 @@ def _rewrite_pragma_rules(grammar):
     grammar.ast.rules = new_rules
 
 
-def _compute_local_vars(grammar):
+def _compute_vars(grammar):
     def _walk(node) -> set[str]:
         vs: set[str] = set()
         if node.t == 'seq':

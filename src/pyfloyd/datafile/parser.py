@@ -2495,17 +2495,23 @@ class _Parser:
                 break
 
     def _r__filler(self):
+        start = self._pos
+        self._s__filler_1()
+        end = self._pos
+        self._val = self._text[start:end]
+
+    def _s__filler_1(self):
         vs = []
         while True:
             pos = self._pos
-            self._s__filler_1()
+            self._s__filler_2()
             if self._failed or self._pos == pos:
                 self._o_rewind(pos)
                 break
             vs.append(self._val)
         self._o_succeed(vs, self._pos)
 
-    def _s__filler_1(self):
+    def _s__filler_2(self):
         pos = self._pos
         self._o_memoize('r__whitespace', self._r__whitespace)
         if not self._failed:
