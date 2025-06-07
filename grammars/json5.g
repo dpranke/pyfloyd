@@ -28,10 +28,10 @@ value          = 'null'                          -> null
                | string
 
 object         = '{' member_list '}'             -> dict($2)
-               | '{' '}'                         -> dict([])
+               | '{' '}'                         -> dict(list())
 
 array          = '[' element_list ']'            -> $2
-               | '[' ']'                         -> []
+               | '[' ']'                         -> list()
 
 string         = squote sqchar* squote           -> cat($2)
                | dquote dqchar* dquote           -> cat($2)
@@ -83,7 +83,7 @@ member_list    = member (',' member)* ','?       -> cons($1, $2)
 member         = string ':' value                -> [$1, $3]
                | ident ':' value                 -> [$1, $3]
 
-ident          = id_start id_continue*           -> cat(cons($1, $2))
+ident          = id_start id_continue*           -> cat(scons($1, $2))
 
 id_start       = ascii_id_start
                | other_id_start

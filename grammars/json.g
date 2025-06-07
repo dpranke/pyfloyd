@@ -13,14 +13,14 @@ value          = object                               -> dict($1)
                | 'null'                               -> null
 
 object         = '{' members '}'                      -> $2
-               | '{' '}'                              -> []
+               | '{' '}'                              -> list()
 
 members        = pair (',' pair)*                     -> cons($1, $2)
 
 pair           = string ':' value                     -> [$1, $3]
 
 array          = '[' elements ']'                     -> $2
-               | '[' ']'                              -> []
+               | '[' ']'                              -> list()
 
 elements       = value (',' value)*                   -> cons($1, $2)
 

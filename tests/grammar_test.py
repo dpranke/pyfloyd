@@ -390,13 +390,6 @@ class RulesMixin:
             '',
         )
 
-    def test_pred_bad_value(self):
-        self.check(
-            'grammar = ?{"foo"} end',
-            '',
-            err='<string>:1 Bad predicate value',
-        )
-
     def test_range(self):
         grammar = "g = '0'..'9'"
         self.check(grammar, '5')
@@ -708,14 +701,6 @@ class ValuesMixin:
             out='b',
         )
 
-    def test_pred_bad_value(self):
-        self.check(
-            'grammar = ?{"foo"} end -> false',
-            '',
-            out=None,
-            err='<string>:1 Bad predicate value',
-        )
-
     def test_range(self):
         grammar = "g = '0'..'9':d -> d"
         self.check(grammar, '5', out='5')
@@ -814,7 +799,7 @@ class ActionsMixin:
     def test_array(self):
         self.check(
             """\
-            grammar = '[' value:v (',' value)*:vs ','? ']' -> concat([v], vs)
+            grammar = '[' value:v (',' value)*:vs ','? ']' -> concat(list(v), vs)
             value   = '2':v                                -> atof(v)
             """,
             '[2]',

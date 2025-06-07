@@ -302,7 +302,7 @@ class Apply(Node):
         else:
             for n in g.ast.rules:
                 if n.v == self.v:
-                    if n.type is None:
+                    if n.type == '?':
                         n.infer_types(g, var_types)
                     self.type = n.type
                     return
@@ -318,13 +318,12 @@ class Choice(Node):
         types = set()
         for c in self.ch:
             types.add('<?' + self.t + '?>' if c.type is None else c.type)
-        if len(types) > 1:
-            # self.type = 'union[' + ', '.join(sorted(types)) + ']'
-            self.type = 'any'
-        elif types:
-            self.type = list(types)[0]
-        else:
-            self.type = '<?>'
+        self.type = _merge_types(list(types))
+
+def _merge_types(types: list[str]) -> str:
+    if len(types) == 1:
+        return types[0]
+    return 'any'
 
 
 class Count(Node):
@@ -362,19 +361,53 @@ class ECallInfix(Node):
         assert self.ch[0].t == 'e_ident' and self.ch[0].v in functions.ALL
         func_name = self.ch[0].v
         func = functions.ALL[func_name]
-        if len(self.ch[1:]) != len(func['params']):
-            g.errors.append(
-                f'{func_name}() takes {len(func["params"])} '
-                f'args, got {len(self.ch[1:])}.'
-            )
-        for i, c in enumerate(self.ch[1:]):
-            if c.type != func['params'][i][1]:
+        params = func['params']
+        if len(params) and params[-1][0].startswith('*'):
+            last = len(params) - 1
+            if len(self.ch[1:]) < last:
+                g.errors.append(
+                    f'{func_name}() takes at least {len(params)} '
+                    f'args, got {len(self.ch[1:])}.'
+                )
+        else:
+            last = len(params)
+            if len(self.ch[1:]) != last:
+                g.errors.append(
+                    f'{func_name}() takes {len(params)} '
+                    f'args, got {len(self.ch[1:])}.'
+                )
+
+        for i, c in enumerate(self.ch[1:last+1]):
+            p_type = params[i][1]
+            if not _check_type(p_type, c.type):
                 g.errors.append(
                     f'Expected arg #{i + 1} to {func_name}() to be '
-                    f'{func["params"][i][1]}, got {c.type}.'
+                    f'{p_type}, got {c.type}.'
                 )
+        if last != len(params):
+            p_type = params[last][1]
+            for i, c in enumerate(self.ch[last+1:]):
+                if not _check_type(p_type, c.type):
+                    g.errors.append(
+                        f'Expected arg #{last + 1 + i} to {func_name}() to be '
+                        f'{p_type}, got {c.type}.'
+                    )
         self.type = func['ret']
         assert self.type is not None
+
+
+def _check_type(exp, got):
+    if got == exp:
+        return True
+    if exp == 'any':
+        return True
+    if exp == 'list[any]' and got.startswith('list['):
+        return True
+    if 'tuple' in got and 'list' in exp:
+        t_args = got[6:-1]
+        e_arg = exp[5:-1]
+        return all(_check_type(e_arg, t_arg) for t_arg in t_args.split(', '))
+    return False
 
 
 class EConst(Node):

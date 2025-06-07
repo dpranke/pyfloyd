@@ -972,12 +972,16 @@ fn_scons: [def_method _t_name
                       q['hd any' 'tl any']
                       ' []string'
                       d"""
-                      lis := make([]string, 0)
-                      lis = append(lis, hd.(string))
-                      for _, t := range tl.([]any) {
-                          lis = append(lis, t.(string))
+                      strs := make([]string, 0)
+                      strs = append(strs, hd.(string))
+                      if vals, ok := tl.([]string); ok {
+                          strs = append(strs, vals...)
+                      } else {
+                          for _, v := range tl.([]any) {
+                              strs = append(strs, v.(string))
+                          }
                       }
-                      return lis
+                      return strs
                       """]
 
 fn_strcat: [def_method _t_name

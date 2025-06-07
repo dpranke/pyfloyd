@@ -83,7 +83,7 @@ member_list    = member:m (sp ',' sp member)*:ms sp ','?
 member         = string:k sp ':' sp value:v          -> [k, v]
                | ident:k sp ':' sp value:v           -> [k, v]
 
-ident          = id_start:hd id_continue*:tl         -> cat(cons(hd, tl))
+ident          = id_start:hd id_continue*:tl         -> cat(scons(hd, tl))
 
 id_start       = ascii_id_start
                | other_id_start
@@ -124,18 +124,18 @@ dec_literal    = dec_int_lit:d frac:f exp:e          -> strcat(d, strcat(f, e))
                | frac:f                              -> f
 
 dec_int_lit    = '0' ~digit                          -> '0'
-               | nonzerodigit:d digit*:ds            -> cat(cons(d, ds))
+               | nonzerodigit:d digit*:ds            -> cat(scons(d, ds))
 
 digit          = '0'..'9'
 
 nonzerodigit   = '1'..'9'
 
-hex_literal    = ('0x' | '0X') hex+:hs               -> cat(cons('0x', hs))
+hex_literal    = ('0x' | '0X') hex+:hs               -> cat(scons('0x', hs))
 
 hex            = 'a'..'f' | 'A'..'F' | digit
 
-frac           = '.' digit*:ds                       -> cat(cons('.', ds))
+frac           = '.' digit*:ds                       -> cat(scons('.', ds))
 
 exp            = ('e' | 'E') ('+' | '-'):s digit*:ds 
-                   -> cat(cons('e', cons(s, ds)))
-               | ('e' | 'E') digit*:ds               -> cat(cons('e', ds))
+                   -> cat(scons('e', scons(s, ds)))
+               | ('e' | 'E') digit*:ds               -> cat(scons('e', ds))
