@@ -80,31 +80,39 @@ t_break:  'break'
 t_declare_local_vars: [fn [node] [t_declare_vars node.local_vars]]
 
 t_declare_vars: [fn [vars]
-                    [vl [map [fn [v]
-                                 [if [strin v ' ']
-                                     [hl 'var ' [replace v 'list[any]' '[]any']]
-                                     [hl 'var ' v ' any']]]
-#                    [vl [map [fn [v tdstr]
-#                                [hl 'var ' v [t_to_type tdstr]]]
-                             vars]]]
+                    [vl [map_items [fn [name td]
+                                       [hl 'var ' name ' ' [t_type_str td]]]
+                                   vars]]]
 
-t_empty_list: 'make([]any, 0)'
+# Note that we can't use proper types here because Go considers
+# `list[T]` and `list[any]` as two different things and you can't cast
+# from one to the other. Once you can't use `list[T]` for local vars,
+# you might as well not use `T` either, and just always deal in `any`,
+# because otherwise you're casting between T and any a lot.
+t_declare_node_vars: [
+    fn [node] [t_declare_vars [dict [map_items [fn [v ty]
+                                                   [list [local_var v]
+                                                         [str2td 'any']]]
+                                               node.vars]]]]
+
+t_empty_any_list: '[]any{}'
+t_empty_str_list: '[]str{}'
 
 t_end: ''  # statement terminator
 t_eq: [fn [x y] [hl x ' == ' y]]
 t_false: 'false'
 
-t_if: [fn [cond body] [block [hl 'if ' cond] body]]
+t_if: [fn [expr body] [block [hl 'if ' expr] body]]
 
-t_ifelse: [fn [cond if_body e_body]
-              [vl [hl 'if ' cond ' {']
+t_ifelse: [fn [expr if_body e_body]
+              [vl [hl 'if ' expr ' {']
                   [ind if_body]
                   [hl '} else {']
                   [ind e_body]
                   [hl '}']]]
 
-t_ifelifelse: [fn [cond if_body elif_cond elif_body e_body]
-                  [vl [hl 'if ' cond ' {']
+t_ifelifelse: [fn [expr if_body elif_cond elif_body e_body]
+                  [vl [hl 'if ' expr ' {']
                       [ind if_body]
                       [hl '} else if ' elif_cond ' {']
                       [ind elif_body ]
@@ -114,7 +122,8 @@ t_ifelifelse: [fn [cond if_body elif_cond elif_body e_body]
 
 t_istrue: [fn [v] [hl v ' == true']]
 t_isfalse: [fn [v] [hl v ' == false']]
-t_list_of_one: [fn [x] [hl '[]any{' x '}']]
+t_list_one_any: [fn [x] [hl '[]any{' x '}']]
+t_list_zero_any: '[]any{}'
 t_meth_def: 'func (p *Parser) '
 t_meth_self: ''
 t_meth_params: [fn [params] params]
@@ -151,11 +160,29 @@ t_to_str: [fn [v]
                   v
                   [hl v '.(string)']]]
 
-#t_to_type: [fn [tdstr]
-#               [if [empty [get [str2td tdstr] 'elements']]
 
 t_true: 'true'
-t_while: [fn [cond body] [block [hl 'for ' cond ] body]]
+
+t_type_str: [fn [td]
+              [let [[b  [get td 'base']]
+                    [els [get td 'elements']]
+                    [b2s [cond [[equal b 'null'] 'null']
+                               [[equal b 'any'] 'any']
+                               [[equal b 'float'] 'float64']
+                               [[equal b 'str'] 'string']
+                               [else b]]]]
+                [if [is_empty els]
+                    b2s
+                    [cond [[equal b 'list']
+                           [strcat '[]' [t_type_str [item els 0]]]]
+                          [[equal b 'dict']
+                           [strcat 'map['
+                                    [t_type_str [item els 0]]
+                                    ']'
+                                    [t_type_str [item els 1]]]]
+                          [else '??']]]]]
+
+t_while: [fn [expr body] [block [hl 'for ' expr ] body]]
 
 #
 # The basic block structure of the file is given in the `generate` template
@@ -276,8 +303,11 @@ parser_class: @"""
     @parser_methods[]
 
     @fn_aminus
+
     @fn_aplus
+
     @fn_getany
+
     @fn_to_bool
     """
 
@@ -952,7 +982,7 @@ fn_join: [def_method _t_name
 fn_list: [def_method _t_name
                     q['args ...any']
                     ' []any'
-                    """
+                    d"""
                     if len(args) == 0 {
                         return []any{}
                     } else {

@@ -26,6 +26,14 @@ def str2d(s: str) -> dict[str, Any]:
     return TypeDesc.str2d(s)
 
 
+def from_str(s: str) -> 'TypeDesc':
+    return TypeDesc.from_str(s)
+
+
+def from_dict(d: dict[str, Any]) -> 'TypeDesc':
+    return TypeDesc.from_dict(d)
+
+
 class TypeDesc:
     def __init__(self, base: str, elements: Optional[list['TypeDesc']] = None):
         elements = elements or []

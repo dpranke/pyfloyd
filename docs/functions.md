@@ -83,7 +83,7 @@ given types (using Python's type annotation syntax):
     Values are truncated towards zero (i.e., `int(3.5)` returns
     `3` and `int(-3.5)` returns `-3`).
 
-* `get(d: any, attr: any) -> any`<br>
+* `get(d: dict[str, any], attr: any) -> any`<br>
     Returns the given member of the dictionary.
 
 * `has(d: dict[str, any], key: str) -> bool`<br>

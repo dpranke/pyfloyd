@@ -60,10 +60,10 @@ t_assign_outer: [fn [var val]
                     [hl "self._scopes[-1]['" var "'] = " val]]
 t_append: [fn [lst val] [hl lst '.append(' val ')' t_end]]
 t_break:   'break'
-t_empty_list: '[]'
 t_end: ''  # statement terminator (not used in Python)
 t_false: 'False'
-t_list_of_one: [fn [x] [hl '[' x ']']]
+t_list_one_any: [fn [x] [hl '[' x ']']]
+t_list_zero_any: '[]'
 t_meth_def: 'def _'
 t_meth_self: 'self'
 t_meth_params: [fn [params]
@@ -80,7 +80,7 @@ t_ifelifelse: [fn [cond if_body elif_cond elif_body e_body]
 t_istrue: [fn [v] [hl v ' is True']]
 t_isfalse: [fn [v] [hl v ' is False']]
 t_declare_local_vars: [fn [node] [vl]]
-t_declare_vars: [fn [v] [vl]]
+t_declare_node_vars: [fn [node] [vl]]
 t_or: [fn [x y] [hl x ' or ' y]]
 t_newscope: '{}'  # value for a new scope (dict[str, any])
 t_not: 'not '  # the logical operator

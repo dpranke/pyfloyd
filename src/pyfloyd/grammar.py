@@ -638,7 +638,7 @@ class Rule(Node):
         super().__init__('rule', name, [child])
         # Note: This will not actually be derived until the generator
         # does so.
-        self.local_vars = []
+        self.local_vars = {}
 
     def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
         if self.type is not None:
@@ -683,7 +683,7 @@ class Seq(Node):
 
     def __init__(self, ch):
         super().__init__('seq', None, ch)
-        self.vars = []
+        self.vars = {}
 
     def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
         local_var_types = var_types.copy()

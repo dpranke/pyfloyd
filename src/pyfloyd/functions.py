@@ -141,7 +141,7 @@ def f_ftoi(f: float) -> int:
     return int(f)
 
 
-def f_get(d: Any, attr: Any) -> Any:
+def f_get(d: dict[str, Any], attr: Any) -> Any:
     return d[attr]
 
 
@@ -409,7 +409,7 @@ ALL: dict[str, dict[str, Any]] = {
     },
     'get': {
         'func': f_get,
-        'params': [['d', 'any'], ['attr', 'any']],
+        'params': [['d', 'dict[str, any]'], ['attr', 'any']],
         'ret': 'any',
     },
     'has': {

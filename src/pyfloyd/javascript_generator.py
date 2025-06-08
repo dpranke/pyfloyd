@@ -55,17 +55,17 @@ class JavaScriptGenerator(hard_coded_generator.HardCodedGenerator):
 
         # Keep this updated and in sync with the text of each node type.
         local_var_map: dict[str, list[str]] = {
-            'choice': ['pos'],
-            'count': ['cmin', 'cmax', 'i', 'vs'],
-            'not': ['errpos', 'pos'],
-            'not_one': ['errpos', 'pos'],
-            'opt': ['pos'],
-            'plus': ['pos', 'vs'],
-            'pred': ['v'],
-            'regexp': ['found', 'r'],
-            'run': ['end', 'start'],
-            'set': ['found', 'r'],
-            'star': ['pos', 'vs'],
+            'choice': ['pos int'],
+            'count': ['cmin int', 'cmax int', 'i int', 'vs list[any]'],
+            'not': ['errpos int', 'pos int'],
+            'not_one': ['errpos int', 'pos int'],
+            'opt': ['pos int'],
+            'plus': ['pos int', 'vs list[any]'],
+            'pred': ['v any'],
+            'regexp': ['found bool', 'r any'],
+            'run': ['end int', 'start int'],
+            'set': ['found bool', 'r any'],
+            'star': ['pos int', 'vs list[any]'],
         }
         self._process_grammar(local_var_map)
 

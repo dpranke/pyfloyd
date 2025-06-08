@@ -22,6 +22,7 @@ from pyfloyd import (
     attr_dict,
     datafile,
     support,
+    type_desc,
 )
 
 
@@ -151,9 +152,11 @@ class Generator:
         _walk(grammar.ast)
 
     def _derive_local_vars(self, grammar, local_var_map):
-        def _walk(node) -> set[str]:
-            local_vars: set[str] = set()
-            local_vars.update(set(local_var_map.get(node.t, [])))
+        def _walk(node) -> dict[str, Any]:
+            local_vars: dict[str, Any] = {}
+            for decl in local_var_map.get(node.t, []):
+                name, ty = decl.split(' ', maxsplit=1)
+                local_vars[name] = type_desc.from_str(ty).to_dict()
             for c in node.ch:
                 local_vars.update(_walk(c))
             return local_vars

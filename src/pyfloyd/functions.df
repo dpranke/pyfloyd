@@ -230,7 +230,7 @@ functions = {
     }
     get: {
         # TODO: Figure out how to get to `d: dict[str, any], attr: str`.
-        params: [[d any] [attr any]]
+        params: [[d 'dict[str, any]'] [attr any]]
         ret: any
         doc: d"""
               Returns the given member of the dictionary.

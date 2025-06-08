@@ -218,7 +218,7 @@ n_choice: [fn [node] [vl [t_assign 'pos' f_pos]
                               [slice node.ch 0 -1]]
                          [stmts [item node.ch -1]]]]
 
-n_count: [fn [node] [vl [t_assign 'vs' t_empty_list]
+n_count: [fn [node] [vl [t_assign 'vs' t_list_zero_any]
                         [t_assign 'i' '0']
                         [t_assign 'cmin' [itoa [item node.v 0]]]
                         [t_assign 'cmax' [itoa [item node.v 1]]]
@@ -313,13 +313,13 @@ n_operator: [fn [node] [hl [call_op 'operator' [list [lit node.v]] t_end]]]
 
 n_opt: [fn [node] [vl [stmts node.child]
                       [t_ifelse failed
-                                [vl [succeed t_empty_list f_pos]]
-                                [vl [succeed [t_list_of_one f_val] f_pos]]]]]
+                                [vl [succeed t_list_zero_any f_pos]]
+                                [vl [succeed [t_list_one_any f_val] f_pos]]]]]
 
 n_paren: [fn [node] [stmts node.child]]
 
 n_plus: [fn [node]
-            [vl [t_assign 'vs' t_empty_list]
+            [vl [t_assign 'vs' t_list_zero_any]
                 [stmts node.child]
                 [return_if_failed node.child]
                 [t_append 'vs' f_val]
@@ -354,7 +354,7 @@ n_scope: [fn [node] [vl [t_append [fld 'scopes'] t_newscope]
                         [t_pop [fld 'scopes']]]]
 
 n_seq: [fn [node]
-           [vl [t_declare_vars [map [fn [v] [local_var v]] node.vars]]
+           [vl [t_declare_node_vars node]
                [stmts [item node.ch 0]]
                [return_if_failed [item node.ch 0]]
                [map [fn [c] [vl [stmts c]
@@ -363,7 +363,7 @@ n_seq: [fn [node]
                [stmts [item node.ch -1]]]]
 
 n_star: [fn [node]
-            [vl [t_assign 'vs' t_empty_list]
+            [vl [t_assign 'vs' t_list_zero_any]
                 [t_while t_true
                       [vl [t_assign 'pos' f_pos]
                           [stmts node.child]

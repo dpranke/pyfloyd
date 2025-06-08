@@ -65,14 +65,16 @@ t_append: [fn [lst val] [hl lst '.push(' val ')' t_end]]
 t_break:  'break;'
 
 t_declare_local_vars: [fn [node] [t_declare_vars node.local_vars]]
+t_declare_node_vars: [
+    fn [node] [t_declare_vars [dict [map_items [fn [v ty]
+                                                   [list [local_var v] ty]]
+                                               node.vars]]]]
+
 t_declare_vars: [fn [vars]
-                    [vl [map [fn [v]
-                                 [if [strin v ' ']
-                                     [hl 'let ' [item [split v ' '] 0] t_end]
-                                     [hl 'let ' v t_end]]]
+                    [vl [map_items [fn [k v]
+                                   [hl 'let ' k t_end]]
                              vars]]]
 
-t_empty_list: '[]'
 t_end: ';'  # statement terminator
 t_eq: [fn [x y] [hl x ' === ' y]]
 t_false: 'false'
@@ -86,7 +88,8 @@ t_ifelifelse: [fn [cond if_body elif_cond elif_body e_body]
                   [block 'else' e_body]]]
 t_istrue: [fn [v] [hl v ' === true']]
 t_isfalse: [fn [v] [hl v ' === false']]
-t_list_of_one: [fn [x] [hl '[' x ']']]
+t_list_one_any: [fn [x] [hl '[' x ']']]
+t_list_zero_any: '[]'
 t_meth_def: ''
 t_meth_self: ''
 t_meth_params: [fn [params] params]

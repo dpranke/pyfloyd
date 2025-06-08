@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any
+
 from pyfloyd import functions
 from pyfloyd import grammar as m_grammar
 
@@ -59,8 +61,6 @@ def analyze(ast, rewrite_subrules: bool) -> m_grammar.Grammar:
         # Not needed when just interpreting the grammar.
         _rewrite_subrules(g)
 
-    _compute_vars(g)
-
     # TODO: Figure out how to statically analyze predicates to
     # catch ones that don't return booleans, so that we don't need
     # to worry about runtime exceptions where possible.
@@ -76,6 +76,8 @@ def analyze(ast, rewrite_subrules: bool) -> m_grammar.Grammar:
     g.update_node(g.ast)
     if g.errors:
         return g
+
+    _compute_vars(g)
 
     g.needed_builtin_rules = sorted(set(g.needed_builtin_rules))
     g.needed_builtin_functions = sorted(set(g.needed_builtin_functions))
@@ -810,20 +812,19 @@ def _rewrite_pragma_rules(grammar):
 
 
 def _compute_vars(grammar):
-    def _walk(node) -> set[str]:
-        vs: set[str] = set()
+    def _walk(node) -> dict[str, Any]:
+        vs: dict[str, Any] = {}
         if node.t == 'seq':
             for c in node.ch:
                 vs.update(_walk(c))
-            node.vars = sorted(vs)
-            return set()
+            node.vars = vs
+            return vs
 
         if node.t == 'label' and not node.outer_scope:
-            vs.add(node.name)
+            vs[node.name] = node.type.to_dict()
         for c in node.ch:
             vs.update(_walk(c))
         return vs
 
     for rule in grammar.ast.rules:
-        vs = _walk(rule.child)
-        assert vs == set()
+        _walk(rule.child)
