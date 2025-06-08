@@ -267,7 +267,7 @@ class Node:
     def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
         if self.type is not None:
             return
-        self.type = TD('any') # TODO TD('wip')?
+        self.type = TD('any')  # TODO TD('wip')?
         for c in self.ch:
             c.infer_types(g, var_types)
         # By default most nodes will have the type of the last of their
@@ -643,7 +643,7 @@ class Rule(Node):
     def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
         if self.type is not None:
             return
-        self.type = TD('any') # TODO TD('wip')?  '<?' + self.name + '?>'
+        self.type = TD('any')  # TODO TD('wip')?  '<?' + self.name + '?>'
         for c in self.ch:
             c.infer_types(g, var_types)
         self.type = self.ch[-1].type
