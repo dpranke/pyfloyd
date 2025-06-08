@@ -22,6 +22,8 @@
 from typing import Any
 import unicodedata
 
+from pyfloyd import type_desc
+
 
 class UserError(Exception):
     """An exception raised from inside the host language (in user code)."""
@@ -139,7 +141,7 @@ def f_ftoi(f: float) -> int:
     return int(f)
 
 
-def f_get(d: dict[Any, Any], attr: Any) -> Any:
+def f_get(d: Any, attr: Any) -> Any:
     return d[attr]
 
 
@@ -263,6 +265,10 @@ def f_split(s: str, sep: str = '') -> list[str]:
     return s.split(sep)
 
 
+def f_str2td(s: str) -> dict[str, Any]:
+    return type_desc.str2d(s)
+
+
 def f_strcat(*args: str) -> str:
     return ''.join(args)
 
@@ -277,6 +283,10 @@ def f_strlen(s: str) -> int:
 
 def f_substr(s: str, start: int, end: int) -> str:
     return s[start:] if end == 0 else s[start:end]
+
+
+def f_td2str(d: dict[str, Any]) -> str:
+    return type_desc.d2str(d)
 
 
 def f_throw(msg: str) -> str:
@@ -399,7 +409,7 @@ ALL: dict[str, dict[str, Any]] = {
     },
     'get': {
         'func': f_get,
-        'params': [['d', 'dict[any, any]'], ['attr', 'any']],
+        'params': [['d', 'any'], ['attr', 'any']],
         'ret': 'any',
     },
     'has': {
@@ -552,6 +562,11 @@ ALL: dict[str, dict[str, Any]] = {
         'params': [['s', 'str'], ['sep', 'str']],
         'ret': 'list[str]',
     },
+    'str2td': {
+        'func': f_str2td,
+        'params': [['s', 'str']],
+        'ret': 'dict[str, any]',
+    },
     'strcat': {
         'func': f_strcat,
         'params': [['*args', 'str']],
@@ -570,6 +585,11 @@ ALL: dict[str, dict[str, Any]] = {
     'substr': {
         'func': f_substr,
         'params': [['s', 'str'], ['start', 'int'], ['end', 'int']],
+        'ret': 'str',
+    },
+    'td2str': {
+        'func': f_td2str,
+        'params': [['d', 'dict[str, any]']],
         'ret': 'str',
     },
     'throw': {

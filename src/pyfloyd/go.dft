@@ -84,6 +84,8 @@ t_declare_vars: [fn [vars]
                                  [if [strin v ' ']
                                      [hl 'var ' [replace v 'list[any]' '[]any']]
                                      [hl 'var ' v ' any']]]
+#                    [vl [map [fn [v tdstr]
+#                                [hl 'var ' v [t_to_type tdstr]]]
                              vars]]]
 
 t_empty_list: 'make([]any, 0)'
@@ -136,7 +138,6 @@ t_regexp: [fn [re_str]
                   '}'
                   'p.o_fail()']]
 
-
 t_substr: [fn [s start end]
               [tri 'string('
                    [pack [tri '[]rune(' s ')'] [tri '[' [hl start ':' end] ']']]
@@ -149,6 +150,9 @@ t_to_str: [fn [v]
               [if [and [is_str v] [equal [substr v 0 1] '"']]
                   v
                   [hl v '.(string)']]]
+
+#t_to_type: [fn [tdstr]
+#               [if [empty [get [str2td tdstr] 'elements']]
 
 t_true: 'true'
 t_while: [fn [cond body] [block [hl 'for ' cond ] body]]

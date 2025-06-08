@@ -28,6 +28,8 @@ generate: @'''
 from typing import Any
 import unicodedata
 
+from pyfloyd import type_desc
+
 
 class UserError(Exception):
     """An exception raised from inside the host language (in user code)."""
@@ -51,13 +53,28 @@ UNDEFINED = (
 wrap_argv: [fn [] [wrap [hang [cons 'pyfloyd' generator_options.argv] ' ']
                         '#     ' ' \\' '#    `' '`']]
 
+t_type_str: [fn [ts] [t_td_str [str2td ts]]]
+
+t_td_str: [fn [td]
+              [let [[b  [item td 'base']]
+                    [els [item td 'elements']]
+                    [b2s [cond [[equal b 'null'] 'None']
+                                [[equal b 'any'] 'Any']
+                                 [else b]]]]
+                [if [is_empty els]
+                    b2s
+                    [strcat b2s
+                            '['
+                            [join ', ' [map t_td_str els]]
+                            ']']]]]
+
 func: [fn [k v] [if [has v 'body']
                     [vl [hl 'def f_'
                             k
                             '('
                             [params v.params]
                             ') -> '
-                            [replace v.ret 'any' 'Any']
+                            [t_type_str v.ret]
                             ':']
                         [ind # [hl '"""' [substr v.doc 0 -1] '"""']
                              # ''
@@ -68,18 +85,18 @@ func: [fn [k v] [if [has v 'body']
 
 params: [fn [params]
             [hl [map [fn [param]
-                     [if [equal [len param] 3]
-                         [strcat [item param 0]
-                                 ': '
-                                 [replace [item param 1] 'any' 'Any']
-                                 ' = '
-                                 [if [is_str [item param 2]]
-                                     [strcat "'" [item param 2] "'"]
-                                     [itoa [item param 2]]]]
-                         [strcat [item param 0]
-                                 ': '
-                                 [replace [item param 1] 'any' 'Any']]]]
-                params ', ']]]
+                         [if [equal [len param] 3]
+                             [strcat [item param 0]
+                                     ': '
+                                     [t_type_str [item param 1]]
+                                     ' = '
+                                     [if [is_str [item param 2]]
+                                         [strcat "'" [item param 2] "'"]
+                                         [itoa [item param 2]]]]
+                             [strcat [item param 0]
+                                     ': '
+                                     [t_type_str [item param 1]]]]]
+                     params ', ']]]
 
 all = [fn []
           [vl 'ALL: dict[str, dict[str, Any]] = {'

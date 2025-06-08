@@ -83,7 +83,7 @@ given types (using Python's type annotation syntax):
     Values are truncated towards zero (i.e., `int(3.5)` returns
     `3` and `int(-3.5)` returns `-3`).
 
-* `get(d: dict[any, any], attr: any) -> any`<br>
+* `get(d: any, attr: any) -> any`<br>
     Returns the given member of the dictionary.
 
 * `has(d: dict[str, any], key: str) -> bool`<br>
@@ -201,6 +201,14 @@ given types (using Python's type annotation syntax):
     `sep` occurs. If sep is the empty string, the string is split
     into a list of individual characters.
 
+* `str2td(s: str) -> dict[str, any]`<br>
+    Returns a descriptor containing a language-neutral parsed
+    version of a given language-neutral type string. Each descriptor
+    contains two fields, a `base` field with the base type (as a
+    string), and an `elements` field, for any type parameters.
+    For example, `list[str]` would be
+    `{base: list, elements[{base: str}]}`.
+
 * `strcat(*args: str) -> str`<br>
     Returns the string concatenation of the args. Equivalent to
     `cat(args)` or `join('', args)`.
@@ -217,6 +225,13 @@ given types (using Python's type annotation syntax):
     they are zero-based and negative numbers count backwards from
     the end. Unlike Python, however, a value of `0` for `end` can
     be used for the end of the string.
+
+* `td2str(d: dict[str, any]) -> str`<br>
+    Returns a language-neutral string representative of a given
+    language-neutral type description. See `str2td` for the
+    dictionary structure. For example,
+    `td2str({base: list, elements: [{base: str, elements: []}]`
+    would return `list[str]`.
 
 * `throw(msg: str) -> str`<br>
     Throws (or raises) an exception with the given `msg` as a
