@@ -14,7 +14,7 @@
 
 from typing import Optional
 
-BASIC_TYPES = ('any', 'bool', 'float', 'int', 'null', 'str')
+BASIC_TYPES = ('any', 'bool', 'float', 'func', 'int', 'null', 'str', 'wip')
 COMPOUND_TYPES = ('dict', 'list', 'tuple')
 
 
@@ -55,7 +55,8 @@ class TypeDesc:
 
     def __eq__(self, other):
         return (
-            self.base == other.base
+            isinstance(other, TypeDesc)
+            and self.base == other.base
             and len(self.elements) == len(other.elements)
             and all(
                 self.elements[i] == other.elements[i]
