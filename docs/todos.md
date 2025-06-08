@@ -31,16 +31,6 @@
 * Add more primitives/built-in functions, logic so that we don't need
   separate api.py files to implement the rest of encoding and decoding.
 
-* Figure out how to do proper typechecking and decide how to handle
-  union/json types in a static language like Go or C++. Do we need
-  to add functions like an `add()` that takes two JSON values and
-  does the right thing, rather than relying on `a + b` just working
-  for free in the host environment (which works in Python, but doesn't
-  really work in JavaScript as the type promotion rules are weird and
-  wouldn't work at all in C). Once we do this we should be able to
-  statically catch type errors that would cause predicates to not work
-  right.
-
 * Support separating out semantic actions from grammar syntax; look at
   existing work in Rats and Ohm for approaches.
 
@@ -48,7 +38,7 @@
   and clean up the namespace in the regular generated script version
   using an IIFE to declare `parse()`.
 
-* Add Go, Java, PHP, Swift, C#, Dart, Kotlin, TypeScript code gen.
+* Add Java code gen.
 
 * Add C, C++ code gen. This may require a revamp of the API and CLI in order
   to be able to generate both an interface/header file and a source file
@@ -56,10 +46,12 @@
 
 * Add Rust code gen.
 
+* Add PHP, Swift, C#, Dart, Kotlin, TypeScript code gen.
+
 * Flesh out Floyd into a full language so that we can declare functions
   in grammars and write complete programs in Floyd.
 
-* Port Floyd to other languages.
+* Port Floyd to other (host) languages.
 
 * Support streaming input (don't require all of the input up front).
 
@@ -114,17 +106,11 @@
 * printer_test.py: Improve printer algorithm so that it can pretty-print
   floyd.g and stay under 80 characters wide (see test_floyd).
 
-* Use `\1` for "text matching $1".
-
 * Support regexp escapes like \d, \s, and so on.
 
 * Ensure that only reserved rules start with underscores.
   - Ensure that only reserved identifiers in values start with underscores,
     too?
-
-* Define `\.` as a synonym for `_any`, `\$` as a synonym for `_end`?
-
-* Add bounded qualifiers like `foo^3`, `foo^3+`, `foo^3,4` or something.
 
 * Handle more types of operator expressions. See test_not_quite_operators
   for some examples.
