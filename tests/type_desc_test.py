@@ -14,7 +14,9 @@
 
 import unittest
 
-from pyfloyd.type_desc import TypeDesc as TD
+from pyfloyd import type_desc
+
+TD = type_desc.TypeDesc
 
 
 class Tests(unittest.TestCase):
@@ -50,3 +52,24 @@ class Tests(unittest.TestCase):
         self.assertRaises(ValueError, TD.from_str, 'list[str, any]')
         self.assertRaises(ValueError, TD.from_str, 'dict[]')
         self.assertRaises(ValueError, TD.from_str, 'dict[str]')
+
+    def test_str2d(self):
+        self.assertEqual(
+            {'base': 'str', 'elements': []}, type_desc.str2d('str')
+        )
+        self.assertEqual(
+            {'base': 'list', 'elements': [{'base': 'str', 'elements': []}]},
+            type_desc.str2d('list[str]'),
+        )
+
+    def test_d2str(self):
+        self.assertEqual(
+            'str', type_desc.d2str({'base': 'str', 'elements': []})
+        )
+
+        self.assertEqual(
+            'list[str]',
+            type_desc.d2str(
+                {'base': 'list', 'elements': [{'base': 'str', 'elements': []}]}
+            ),
+        )

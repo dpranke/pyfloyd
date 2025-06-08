@@ -12,10 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional
+from typing import Any, Optional
 
 BASIC_TYPES = ('any', 'bool', 'float', 'func', 'int', 'null', 'str', 'wip')
 COMPOUND_TYPES = ('dict', 'list', 'tuple')
+
+
+def d2str(d: dict[str, Any]) -> str:
+    return TypeDesc.d2str(d)
+
+
+def str2d(s: str) -> dict[str, Any]:
+    return TypeDesc.str2d(s)
 
 
 class TypeDesc:
@@ -69,6 +77,26 @@ class TypeDesc:
             return self.base
         el_str = ', '.join(el.to_str() for el in self.elements)
         return self.base + '[' + el_str + ']'
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            'base': self.base,
+            'elements': [el.to_dict() for el in self.elements],
+        }
+
+    @staticmethod
+    def d2str(d: dict[str, Any]) -> str:
+        return TypeDesc.from_dict(d).to_str()
+
+    @staticmethod
+    def str2d(s: str) -> dict[str, Any]:
+        return TypeDesc.from_str(s).to_dict()
+
+    @staticmethod
+    def from_dict(d: dict[str, Any]) -> 'TypeDesc':
+        return TypeDesc(
+            d['base'], [TypeDesc.from_dict(el) for el in d['elements']]
+        )
 
     @staticmethod
     def from_str(s: str, allow_trailing: bool = False) -> 'TypeDesc':
