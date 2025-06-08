@@ -258,8 +258,10 @@ class Interpreter:
         self.env.set('false', False)
         self.env.set('null', None)
         self.define_native_fn('fn', self.fexpr_fn, is_fexpr=True)
+        self.define_native_fn('cond', self.fexpr_cond, is_fexpr=True)
         self.define_native_fn('define', self.fexpr_define, is_fexpr=True)
         self.define_native_fn('if', self.fexpr_if, is_fexpr=True)
+        self.define_native_fn('let', self.fexpr_let, is_fexpr=True)
         self.define_native_fn('quote', self.fexpr_quote, is_fexpr=True)
         self.define_native_fn('and', self.fexpr_and, is_fexpr=True)
         self.define_native_fn('or', self.fexpr_or, is_fexpr=True)
@@ -332,6 +334,19 @@ class Interpreter:
                 return False
         return self.eval(args[-1], env)
 
+    def fexpr_cond(self, args, env):
+        for arg in args[:-1]:
+            r = self.eval(arg[0], env)
+            if r:
+                return self.eval(arg[1], env)
+        if args[-1][0] == ['symbol', 'else']:
+            return self.eval(args[-1][1], env)
+
+        r = self.eval(args[-1], env)
+        if r:
+            return self.eval(args[-1][1], env)
+        return self.eval(['symbol', 'null'], env)
+
     def fexpr_define(self, args, env):
         head, body = args
         name = self.eval(head, env)
@@ -362,6 +377,16 @@ class Interpreter:
         if res:
             return self.eval(t_expr, env)
         return self.eval(f_expr, env)
+
+    def fexpr_let(self, args, env):
+        l_vars = args[0]
+        l_expr = args[1]
+        l_env = Env(parent=env)
+        for lv in l_vars:
+            check(is_symbol(lv[0]))
+            v = self.eval(lv[1], l_env)
+            l_env.set(symbol(lv[0]), v)
+        return self.eval(l_expr, l_env)
 
     def fexpr_or(self, args, env):
         for arg in args[:-1]:
