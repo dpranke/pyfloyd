@@ -230,7 +230,7 @@ functions = {
     }
     get: {
         # TODO: Figure out how to get to `d: dict[str, any], attr: str`.
-        params: [[d 'dict[any, any]'] [attr any]]
+        params: [[d any] [attr any]]
         ret: any
         doc: d"""
               Returns the given member of the dictionary.
@@ -512,6 +512,19 @@ functions = {
               """
         body: 'return s.split(sep)'
     }
+    str2td: {
+        params: [[s str]]
+        ret: 'dict[str, any]'
+        doc: d"""
+              Returns a descriptor containing a language-neutral parsed
+              version of a given language-neutral type string. Each descriptor
+              contains two fields, a `base` field with the base type (as a
+              string), and an `elements` field, for any type parameters.
+              For example, `list[str]` would be
+              `{base: list, elements[{base: str}]}`.
+              """
+        body: d'return type_desc.str2d(s)'
+    }
     strcat: {
         params: [['*args' str]]
         ret: str
@@ -548,6 +561,18 @@ functions = {
               be used for the end of the string.
               """
         body: 'return s[start:] if end == 0 else s[start:end]'
+    }
+    td2str: {
+        params: [[d 'dict[str, any]']]
+        ret: 'str'
+        doc: d"""
+              Returns a language-neutral string representative of a given
+              language-neutral type description. See `str2td` for the
+              dictionary structure. For example,
+              `td2str({base: list, elements: [{base: str, elements: []}]`
+              would return `list[str]`.
+              """
+        body: d'return type_desc.d2str(d)'
     }
     throw: {
         params: [[msg str]]
