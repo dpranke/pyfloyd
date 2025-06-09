@@ -207,7 +207,8 @@ given types (using Python's type annotation syntax):
     contains two fields, a `base` field with the base type (as a
     string), and an `elements` field, for any type parameters.
     For example, `list[str]` would be
-    `{base: list, elements[{base: str}]}`.
+    `{base: list, elements[{base: str}]}`. Note: in some languages
+    this may return a dict-like object rather than an actual dict.
 
 * `strcat(*args: str) -> str`<br>
     Returns the string concatenation of the args. Equivalent to

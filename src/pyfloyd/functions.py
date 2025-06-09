@@ -266,7 +266,7 @@ def f_split(s: str, sep: str = '') -> list[str]:
 
 
 def f_str2td(s: str) -> dict[str, Any]:
-    return type_desc.str2d(s)
+    return type_desc.TypeDesc(s)
 
 
 def f_strcat(*args: str) -> str:

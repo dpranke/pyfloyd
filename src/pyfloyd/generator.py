@@ -19,7 +19,7 @@ from typing import Any, Optional, Sequence, Union
 
 import pyfloyd
 from pyfloyd import (
-    attr_dict,
+    custom_dicts,
     datafile,
     support,
     type_desc,
@@ -29,7 +29,7 @@ from pyfloyd import (
 DEFAULT_GENERATOR = 'datafile'
 
 
-class GeneratorOptions(attr_dict.AttrDict):
+class GeneratorOptions(custom_dicts.AttrDict):
     def __init__(self, *args, **kwargs):
         self.argv = []
         self.command_line = ''
@@ -63,7 +63,7 @@ class Generator:
     ):
         self.host = host
         data = data or {}
-        self.data = attr_dict.AttrDict(
+        self.data = custom_dicts.AttrDict(
             name=self.name,
             starting_template=None,
             grammar=None,
@@ -156,7 +156,7 @@ class Generator:
             local_vars: dict[str, Any] = {}
             for decl in local_var_map.get(node.t, []):
                 name, ty = decl.split(' ', maxsplit=1)
-                local_vars[name] = type_desc.str2d(ty)
+                local_vars[name] = type_desc.TypeDesc(ty)
             for c in node.ch:
                 local_vars.update(_walk(c))
             return local_vars

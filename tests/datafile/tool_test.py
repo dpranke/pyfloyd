@@ -46,7 +46,8 @@ class _Tests:
         self.check(
             ['-c', '[x'],
             returncode=1,
-            out='-:1 Unexpected end of input at column 3\n')
+            out='-:1 Unexpected end of input at column 3\n',
+        )
 
     def test_read_command(self):
         self.check(['-c', '"foo"'], out='foo\n')

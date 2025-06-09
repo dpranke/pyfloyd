@@ -53,13 +53,11 @@ class Tests(unittest.TestCase):
         self.assertRaises(ValueError, TD.from_str, 'dict[]')
         self.assertRaises(ValueError, TD.from_str, 'dict[str]')
 
-    def test_str2d(self):
-        self.assertEqual(
-            {'base': 'str', 'elements': []}, type_desc.str2d('str')
-        )
+    def test_to_dict(self):
+        self.assertEqual({'base': 'str', 'elements': []}, TD('str').to_dict())
         self.assertEqual(
             {'base': 'list', 'elements': [{'base': 'str', 'elements': []}]},
-            type_desc.str2d('list[str]'),
+            TD('list[str]').to_dict(),
         )
 
     def test_d2str(self):

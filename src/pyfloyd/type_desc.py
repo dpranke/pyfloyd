@@ -14,6 +14,8 @@
 
 from typing import Any, Optional
 
+from pyfloyd import custom_dicts
+
 BASIC_TYPES = ('any', 'bool', 'float', 'func', 'int', 'null', 'str', 'wip')
 COMPOUND_TYPES = ('dict', 'list', 'tuple')
 
@@ -23,18 +25,20 @@ def d2str(d: dict[str, Any]) -> str:
 
 
 def str2d(s: str) -> dict[str, Any]:
-    return TypeDesc.str2d(s)
+    return TypeDesc(s).to_dict()
 
 
 def from_str(s: str) -> 'TypeDesc':
-    return TypeDesc.from_str(s)
+    return TypeDesc(s)
 
 
 def from_dict(d: dict[str, Any]) -> 'TypeDesc':
     return TypeDesc.from_dict(d)
 
 
-class TypeDesc:
+class TypeDesc(custom_dicts.FixedDict):
+    _keys = ('base', 'elements')
+
     def __init__(self, base: str, elements: Optional[list['TypeDesc']] = None):
         elements = elements or []
         self.base = base
@@ -69,36 +73,15 @@ class TypeDesc:
     def __str__(self):
         return self.to_str()
 
-    def __eq__(self, other):
-        return (
-            isinstance(other, TypeDesc)
-            and self.base == other.base
-            and len(self.elements) == len(other.elements)
-            and all(
-                self.elements[i] == other.elements[i]
-                for i in range(len(self.elements))
-            )
-        )
-
     def to_str(self) -> str:
         if self.base in BASIC_TYPES:
             return self.base
         el_str = ', '.join(el.to_str() for el in self.elements)
         return self.base + '[' + el_str + ']'
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            'base': self.base,
-            'elements': [el.to_dict() for el in self.elements],
-        }
-
     @staticmethod
     def d2str(d: dict[str, Any]) -> str:
         return TypeDesc.from_dict(d).to_str()
-
-    @staticmethod
-    def str2d(s: str) -> dict[str, Any]:
-        return TypeDesc.from_str(s).to_dict()
 
     @staticmethod
     def from_dict(d: dict[str, Any]) -> 'TypeDesc':
