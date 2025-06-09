@@ -199,6 +199,12 @@ class Runner:
             help='Report branch coverage.',
         )
         subp.add_argument(
+            '-m',
+            '--show-missing',
+            action='store_true',
+            help='Show uncovered lines.',
+        )
+        subp.add_argument(
             '--omit',
             help='Omit files whose paths match one of these patterns.',
         )
@@ -337,6 +343,8 @@ class Runner:
             self.args.omit = '*_test.py'
         if self.args.typ:
             cmd = self.run_cmd + ['-m', 'typ', '-TW', '-c']
+            if self.args.show_missing:
+                cmd.append('--coverage-show-missing')
         else:
             cmd = self.run_cmd + ['-m', 'coverage', 'run']
             if self.args.branch:

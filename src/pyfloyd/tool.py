@@ -95,16 +95,18 @@ def main(argv=None, host=None):
             host.make_executable(path)
         return 0
 
-    except KeyboardInterrupt:
+    except KeyboardInterrupt:  # pragma: no cover
         host.print('Interrupted, exiting.', file=host.stderr)
         return 130  # SIGINT
-    except datafile.DatafileError as exc:
+    except datafile.DatafileError as exc:  # pragma: no cover
         if args and args.post_mortem:
             traceback.print_exception(exc)
             pdb.post_mortem()
         print(str(exc), file=host.stderr)
         return 1
-    except Exception as exc:  # pylint: disable=broad-exception-caught
+    # pylint: disable=broad-exception-caught
+    except Exception as exc:  # pragma: no cover
+        # pragma: no cover
         if args and args.post_mortem:
             traceback.print_exception(exc)
             pdb.post_mortem()

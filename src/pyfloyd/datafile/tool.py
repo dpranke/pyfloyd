@@ -73,7 +73,7 @@ def main(argv=None, host=None):
         host.print(s)
         return 0
     except datafile.DatafileError as exc:
-        print(exc)
+        host.print(exc)
         return 1
 
 

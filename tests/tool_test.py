@@ -88,7 +88,34 @@ class ToolTest(unittest.TestCase):
             'grammar.g:1 Unexpected end of input at column 4\n',
         )
 
+    def test_extern(self):
+        host = support.FakeHost()
+        grammar = """\
+            %externs  = foo -> false
+            grammar   = ?{foo} -> true
+                      |        -> false
+            """
+        host.write_text_file('grammar.g', grammar)
+        host.stdin.write('')
+        ret = tool.main(['-I', 'grammar.g'], host=host)
+        self.assertEqual(ret, 0)
+        self.assertEqual(host.stdout.getvalue(), 'false\n')
+        self.assertEqual(host.stderr.getvalue(), '')
+
+        host = support.FakeHost()
+        host.write_text_file('grammar.g', grammar)
+        host.stdin.write('')
+        ret = tool.main(['-I', '-E', 'foo = true', 'grammar.g'], host=host)
+        self.assertEqual(ret, 0)
+        self.assertEqual(host.stdout.getvalue(), 'true\n')
+        self.assertEqual(host.stderr.getvalue(), '')
+
     def test_version(self):
+        host = support.FakeHost()
+        tool.main(['--version'], host=host)
+        self.assertNotEqual(host.stdout.getvalue(), '')
+        self.assertEqual(host.stderr.getvalue(), '')
+
         proc = subprocess.run(
             [sys.executable, '-m', 'pyfloyd', '--version'],
             capture_output=True,
