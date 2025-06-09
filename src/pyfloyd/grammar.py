@@ -352,7 +352,12 @@ class ECallInfix(Node):
 
     def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
         super().infer_types(g, var_types)
-        assert self.ch[0].t == 'e_ident' and self.ch[0].v in functions.ALL
+        assert self.ch[0].t == 'e_ident'
+        if self.ch[0].v in g.externs and self.ch[0].v not in functions.ALL:
+            self.type = TD('any')
+            return
+
+        assert self.ch[0].v in functions.ALL
         func_name = self.ch[0].v
         func = functions.ALL[func_name]
         params = func['params']
@@ -399,6 +404,8 @@ class EConst(Node):
         super().__init__('e_const', v, [])
         if v == 'null':
             self.type = TD('null')
+        elif v == 'func':
+            self.type = TD('func')
         else:
             self.type = TD('bool')
 
@@ -438,7 +445,10 @@ class EIdent(Node):
             self.type = var_types[self.name]
         else:
             assert self.kind == 'extern'
-            self.type = TD('bool')
+            if g.externs[self.name] == 'func':
+                self.type = TD('func')
+            else:
+                self.type = TD('bool')
 
 
 class ELit(Node):

@@ -120,6 +120,8 @@ def compile_to_parser(  # pylint: disable=redefined-builtin
     This routine parses the provided grammar and returns an object
     that can parse strings according to the grammar.
     """
+    
+    externs = _default_externs(externs)
     result = grammar_parser.parse(grammar, path, externs)
     if result.err:
         return CompiledResult(err=result.err, pos=result.pos)
@@ -164,6 +166,7 @@ def generate(
     the errors.
     """
 
+    externs = _default_externs(externs)
     result = grammar_parser.parse(grammar, path, externs)
     if result.err:
         return result
@@ -237,7 +240,8 @@ def pretty_print(
     any errors, if it wasn't. If one of the values in the tuple is non-None,
     the other will be None.
     """
-    result = grammar_parser.parse(grammar, path)
+    externs = _default_externs()
+    result = grammar_parser.parse(grammar, path, externs)
     if result.err:
         return None, result.err
     return printer.Printer(result.val).dumps(), None
@@ -252,7 +256,8 @@ def dump_ast(
 
     `rewrite_subrules` works as in the other methods.
     """
-    result = grammar_parser.parse(grammar, path)
+    externs = _default_externs()
+    result = grammar_parser.parse(grammar, path, externs)
     if result.err:
         return None, result.err
 
@@ -268,3 +273,15 @@ def _err_str(errors: list[str]):
     s += '\n  '.join(error for error in errors)
     s += '\n'
     return s
+
+
+def _default_externs(externs: Optional[Externs] = None) -> Externs:
+    externs = externs or {}
+    if 'node' not in externs:
+        externs['node'] = _node
+    return externs
+
+
+def _node(parser: grammar_parser._Parser, *args) -> Any:
+    del parser
+    return m_grammar.Node.to(args)

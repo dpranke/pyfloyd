@@ -159,9 +159,12 @@ class _Analyzer:
             key = choice.ch[0].rule_name
             assert choice.ch[1].t == 'action'
             assert choice.ch[1].child.t == 'e_const'
-            assert choice.ch[1].child.v in ('true', 'false')
+            assert choice.ch[1].child.v in ('true', 'false', 'func')
             value = choice.ch[1].child.v == 'true'
-            self.grammar.externs[key] = value
+            if choice.ch[1].child.v == 'func':
+                self.grammar.externs[key] = 'func'
+            else:
+                self.grammar.externs[key] = value
 
     def _collect_idents(self, s, node):
         if node.t == 'apply':
@@ -251,7 +254,8 @@ class _Analyzer:
     def check_for_unknown_functions(self, node):
         if node.t == 'e_qual' and node.ch[1].t == 'e_call':
             function_name = node.ch[0].v
-            if function_name not in functions.ALL:
+            if (function_name not in functions.ALL and
+                function_name not in self.grammar.externs):
                 self.grammar.errors.append(
                     f'Unknown function "{function_name}" called'
                 )
@@ -307,11 +311,11 @@ class _Analyzer:
             elif var_name in local_labels or var_name[0] == '$':
                 node.kind = 'local'
                 references.add(var_name)
-            elif var_name in self.grammar.externs:
-                node.kind = 'extern'
             elif var_name in functions.ALL:
                 node.kind = 'function'
                 self.grammar.needed_builtin_functions.append(var_name)
+            elif var_name in self.grammar.externs:
+                node.kind = 'extern'
             else:
                 self.grammar.errors.append(
                     f'Unknown identifier "{var_name}" referenced'
