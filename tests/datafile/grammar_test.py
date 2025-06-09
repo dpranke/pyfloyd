@@ -21,12 +21,6 @@ class Grammar(unittest.TestCase):
     def check(self, s, obj, **kwargs):
         self.assertEqual(datafile.loads(s, **kwargs), obj)
 
-    def check_fail(self, s, ex, msg=None, **kwargs):
-        with self.assertRaises(ex) as cm:
-            return datafile.loads(s, **kwargs)
-        if msg is not None:
-            self.assertEqual(str(cm.exception), msg)
-
     def test_true(self):
         self.check('true', True)
 

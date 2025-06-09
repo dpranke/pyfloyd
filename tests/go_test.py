@@ -38,15 +38,17 @@ class Values(_Mixin, grammar_test.ValuesMixin):
 
 
 class Actions(_Mixin, grammar_test.ActionsMixin):
-    @unittest.skip('bignum')
-    def test_big_int(self):
-        pass
+    pass
 
 
 class Functions(_Mixin, grammar_test.FunctionsMixin):
-    @unittest.skip('not implemented yet')
     def test_dedent(self):
-        pass
+        # TODO: `dedent` isn't implemented properly in Go yet.
+        self.check(
+            'g = -> dedent("\n  foo\n     bar\n", -1)',
+            text='',
+            out='\n  foo\n     bar\n',
+        )
 
 
 class Errors(_Mixin, grammar_test.ErrorsMixin):

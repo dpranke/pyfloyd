@@ -669,7 +669,7 @@ fn_concat: [meth q['xs' 'ys'] 'return xs.concat(ys);']
 
 fn_cons: [meth q['hd' 'tl'] 'return [hd].concat(tl);']
 
-fn_dedent: [meth q['s'] 'return s;']
+fn_dedent: [meth q['s' 'colno'] 'return s;']
 
 fn_dict: [meth q['pairs'] d"""
     let m = new Map();

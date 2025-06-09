@@ -24,8 +24,7 @@ class Tests(unittest.TestCase):
         interp = lisp_interpreter.Interpreter()
 
         def _parse_bareword(bw: str, as_key: bool) -> Any:
-            if as_key:
-                return bw
+            assert as_key is False
             return ['symbol', bw]
 
         expr = datafile.loads(s, parse_bareword=_parse_bareword)

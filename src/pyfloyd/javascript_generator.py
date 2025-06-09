@@ -939,7 +939,7 @@ _BUILTINS = {
         }
         """,
     'fn_dedent': """
-        fn_dedent(s) {
+        fn_dedent(s, colno) {
           return s;
         }
         """,
