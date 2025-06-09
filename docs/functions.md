@@ -164,6 +164,11 @@ given types (using Python's type annotation syntax):
     Returns a list containing the values returned from calling `fn`
     with each `key`, `value` pair in `d`.
 
+* `node(parser: any, *args: any) -> any`<br>
+    Hook function that can be used to synthesize custom AST nodes
+    in the parser. By default this just returns a list of the args
+    passed to it.
+
 * `otou(s: str) -> str`<br>
     Returns a string containing a single character with the code
     point corresponding to the given string of octal digits.
@@ -171,6 +176,11 @@ given types (using Python's type annotation syntax):
 
 * `pairs(d: dict[str, any]) -> list[any]`<br>
     Returns a list of the [key, value] pairs in the dict `d`.
+
+* `pos() -> int`<br>
+
+                 Returns the current position in the parser.
+
 
 * `replace(s: str, old: str, new: str) -> str`<br>
     Returns a copy of `s` with all the occurrences of `old` replaced

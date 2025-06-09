@@ -522,6 +522,11 @@ ALL: dict[str, dict[str, Any]] = {
         'params': [['fn', 'func[[str, any], any]'], ['lis', 'list[any]']],
         'ret': 'list[any]',
     },
+    'node': {
+        'func': None,
+        'params': [['parser', 'any'], ['*args', 'any']],
+        'ret': 'any',
+    },
     'otou': {
         'func': f_otou,
         'params': [['s', 'str']],
@@ -531,6 +536,11 @@ ALL: dict[str, dict[str, Any]] = {
         'func': f_pairs,
         'params': [['d', 'dict[str, any]']],
         'ret': 'list[any]',
+    },
+    'pos': {
+        'func': None,
+        'params': [],
+        'ret': 'int',
     },
     'replace': {
         'func': f_replace,
@@ -639,4 +649,6 @@ UNDEFINED = (
     'colno',
     'map',
     'map_items',
+    'node',
+    'pos',
 )

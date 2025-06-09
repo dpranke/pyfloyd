@@ -240,8 +240,13 @@ n_e_arr: [fn [node] [if [is_empty node.ch]
 n_e_call_infix: [fn [node]
                     [pack [expr [item node.ch 0]]
                           [tri '('
-                                [comma [map [fn [c] [expr c]]
-                                            [slice node.ch 1 0]]]
+                                [if [in grammar.externs
+                                        [get [item node.ch 0] 1]]
+                                    [comma [cons 'self'
+                                                 [map [fn [c] [expr c]]
+                                                      [slice node.ch 1 0]]]]
+                                    [comma [map [fn [c] [expr c]]
+                                                [slice node.ch 1 0]]]]
                                 ')']]]
 
 n_e_const: [fn [node] [invoke [strcat 't_' node.v]]]

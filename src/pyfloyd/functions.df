@@ -435,6 +435,15 @@ functions = {
               with each `key`, `value` pair in `d`.
               """
     }
+    node: {
+        params: [[parser any] ['*args' any]]
+        ret: 'any'
+        doc: d"""
+             Hook function that can be used to synthesize custom AST nodes
+             in the parser. By default this just returns a list of the args
+             passed to it.
+             """
+    }
     otou: {
         params: [[s str]]
         ret: str
@@ -452,6 +461,13 @@ functions = {
               Returns a list of the [key, value] pairs in the dict `d`.
               """
         body: 'return list(d.items())'
+    }
+    pos: {
+        params: []
+        ret: 'int'
+        doc: """
+             Returns the current position in the parser.
+             """
     }
     replace: {
         params: [[s str] [old str] [new str]]

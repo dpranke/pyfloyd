@@ -62,6 +62,7 @@ t_append: [fn [lst val] [hl lst '.append(' val ')' t_end]]
 t_break:   'break'
 t_end: ''  # statement terminator (not used in Python)
 t_false: 'False'
+t_func: 'func'
 t_list_one_any: [fn [x] [hl '[' x ']']]
 t_list_zero_any: '[]'
 t_meth_def: 'def _'
@@ -126,6 +127,7 @@ imports: [vl [if generator_options.main
              [if grammar.re_needed 'import re']
              'from typing import Any, Dict, NamedTuple, Optional'
              [if grammar.unicodedata_needed 'import unicodedata']]
+
 
 parsing_runtime_exception_class: d"""
     class _ParsingRuntimeError(Exception):
@@ -213,7 +215,9 @@ externs: [fn [] [if [dict_is_empty grammar.externs]
                         [ind [map_items [fn [k v]
                                             [hl [lit k]
                                                 ": "
-                                                [if v 'True' 'False']
+                                                [if [equal v t_func]
+                                                    [fld [fn_name k]]
+                                                    [if v t_true t_false]]
                                                 ","]]
                                         grammar.externs]]
                         '}']]]
@@ -256,6 +260,7 @@ operator_choices: [fn [o] [vl 'o.choices = {'
 parse_with_exception: @"""
     def parse(self, externs: Externs = None, start: int = 0):
         self._pos = start
+
         errors = ''
         if externs:
             for k, v in externs.items():
@@ -263,8 +268,12 @@ parse_with_exception: @"""
                     self._externs[k] = v
                 else:
                     errors += f'Unexpected extern "{k}"\n'
+        for k, v in self._externs.items():
+            if v is None:
+                errors += f'Missing required extern "{k}"'
         if errors:
             return Result(None, errors, 0)
+
         try:
             self._r_@grammar.starting_rule()
 
@@ -283,9 +292,16 @@ parse_with_exception: @"""
 parse_without_exception: @"""
     def parse(self, externs: Externs = None, start: int = 0):
         self._pos = start
+
+        errors = ''
         if externs:
             for k, v in externs.items():
                 self._externs[k] = v
+        for k, v in self._externs.items():
+            if v is None:
+                errors += f'Missing required extern "{k}"'
+        if errors:
+            return Result(None, errors, 0)
 
         self._r_@grammar.starting_rule()
 
@@ -582,5 +598,13 @@ fn_colno: [
                 colno += 1
             return colno
             """]
+
+fn_pos: [meth q[] 'return self.pos']
+
+fn_node: [meth q['*args'] d"""
+        if self._externs['node']:
+            return self._externs['node'](*args)
+        return list(*args)
+        """]
 
 }

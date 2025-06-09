@@ -278,7 +278,7 @@ def _err_str(errors: list[str]):
 def _default_externs(externs: Optional[Externs] = None) -> Externs:
     externs = externs or {}
     if 'node' not in externs:
-        externs['node'] = _node
+        pass # externs['node'] = _node
     return externs
 
 

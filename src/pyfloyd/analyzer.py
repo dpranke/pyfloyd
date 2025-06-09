@@ -158,13 +158,16 @@ class _Analyzer:
             assert choice.ch[0].t == 'apply'
             key = choice.ch[0].rule_name
             assert choice.ch[1].t == 'action'
-            assert choice.ch[1].child.t == 'e_const'
-            assert choice.ch[1].child.v in ('true', 'false', 'func')
-            value = choice.ch[1].child.v == 'true'
-            if choice.ch[1].child.v == 'func':
+            if choice.ch[1].child.t == 'e_ident' and choice.ch[1].child.name == 'func':
                 self.grammar.externs[key] = 'func'
             else:
-                self.grammar.externs[key] = value
+                assert choice.ch[1].child.t == 'e_const'
+                assert choice.ch[1].child.v in ('true', 'false', 'func')
+                value = choice.ch[1].child.v == 'true'
+                if choice.ch[1].child.v == 'func':
+                    self.grammar.externs[key] = 'func'
+                else:
+                    self.grammar.externs[key] = value
 
     def _collect_idents(self, s, node):
         if node.t == 'apply':

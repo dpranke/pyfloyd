@@ -67,6 +67,7 @@ class _Parser:
 
     def parse(self, externs: Externs = None, start: int = 0):
         self._pos = start
+
         errors = ''
         if externs:
             for k, v in externs.items():
@@ -74,8 +75,12 @@ class _Parser:
                     self._externs[k] = v
                 else:
                     errors += f'Unexpected extern "{k}"\n'
+        for k, v in self._externs.items():
+            if v is None:
+                errors += f'Missing required extern "{k}"'
         if errors:
             return Result(None, errors, 0)
+
         try:
             self._r_grammar()
 
