@@ -238,7 +238,9 @@ n_e_arr: [fn [node] [if [is_empty node.ch]
                              ']']]]
 
 n_e_call_infix: [fn [node]
-                    [pack [expr [item node.ch 0]]
+                    [pack [if [in grammar.externs [get [item node.ch 0] 1]]
+                              [extern [get [item node.ch 0] 1]]
+                              [expr [item node.ch 0]]]
                           [tri '('
                                 [if [in grammar.externs
                                         [get [item node.ch 0] 1]]

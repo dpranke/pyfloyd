@@ -66,6 +66,7 @@ class _Parser:
             'unicode': True,
             'unicode_categories': True,
             'unicode_names': True,
+            'node': self._fn_node,
         }
         self._cache = {}
         self._regexps = {}
@@ -107,7 +108,9 @@ class _Parser:
         self._o_memoize('r_end', self._r_end)
         if self._failed:
             return
-        self._o_succeed(['rules', None, v__1], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'rules', None, v__1), self._pos
+        )
 
     def _s_grammar_1(self):
         vs = []
@@ -1594,23 +1597,27 @@ class _Parser:
         if not self._failed:
             return
         self._o_rewind(pos)
-        self._s_e_prim_6()
+        self._s_e_prim_5()
         if not self._failed:
             return
         self._o_rewind(pos)
-        self._s_e_prim_8()
+        self._s_e_prim_7()
         if not self._failed:
             return
         self._o_rewind(pos)
-        self._s_e_prim_10()
+        self._s_e_prim_9()
         if not self._failed:
             return
         self._o_rewind(pos)
-        self._s_e_prim_12()
+        self._s_e_prim_11()
         if not self._failed:
             return
         self._o_rewind(pos)
         self._s_e_prim_13()
+        if not self._failed:
+            return
+        self._o_rewind(pos)
+        self._s_e_prim_14()
 
     def _s_e_prim_1(self):
         self._o_memoize('r__filler', self._r__filler)
@@ -1634,7 +1641,14 @@ class _Parser:
         self._o_succeed(['e_const', 'true', []], self._pos)
 
     def _s_e_prim_4(self):
-        self._s_e_prim_5()
+        self._o_memoize('r__filler', self._r__filler)
+        self._o_str('func')
+        if self._failed:
+            return
+        self._o_succeed(['e_const', 'func', []], self._pos)
+
+    def _s_e_prim_5(self):
+        self._s_e_prim_6()
         if self._failed:
             return
         v__1 = self._val
@@ -1642,12 +1656,12 @@ class _Parser:
             return
         self._o_succeed(['e_ident', v__1, []], self._pos)
 
-    def _s_e_prim_5(self):
+    def _s_e_prim_6(self):
         self._o_memoize('r__filler', self._r__filler)
         self._o_memoize('r_ident', self._r_ident)
 
-    def _s_e_prim_6(self):
-        self._s_e_prim_7()
+    def _s_e_prim_7(self):
+        self._s_e_prim_8()
         if self._failed:
             return
         v__1 = self._val
@@ -1655,12 +1669,12 @@ class _Parser:
             return
         self._o_succeed(['e_num', v__1, []], self._pos)
 
-    def _s_e_prim_7(self):
+    def _s_e_prim_8(self):
         self._o_memoize('r__filler', self._r__filler)
         self._o_memoize('r_hex', self._r_hex)
 
-    def _s_e_prim_8(self):
-        self._s_e_prim_9()
+    def _s_e_prim_9(self):
+        self._s_e_prim_10()
         if self._failed:
             return
         v__1 = self._val
@@ -1668,12 +1682,12 @@ class _Parser:
             return
         self._o_succeed(['e_num', v__1, []], self._pos)
 
-    def _s_e_prim_9(self):
+    def _s_e_prim_10(self):
         self._o_memoize('r__filler', self._r__filler)
         self._o_memoize('r_int', self._r_int)
 
-    def _s_e_prim_10(self):
-        self._s_e_prim_11()
+    def _s_e_prim_11(self):
+        self._s_e_prim_12()
         if self._failed:
             return
         v__1 = self._val
@@ -1681,11 +1695,11 @@ class _Parser:
             return
         self._o_succeed(['e_lit', v__1, []], self._pos)
 
-    def _s_e_prim_11(self):
+    def _s_e_prim_12(self):
         self._o_memoize('r__filler', self._r__filler)
         self._o_memoize('r_lit', self._r_lit)
 
-    def _s_e_prim_12(self):
+    def _s_e_prim_13(self):
         self._o_memoize('r__filler', self._r__filler)
         self._o_ch('(')
         if self._failed:
@@ -1702,7 +1716,7 @@ class _Parser:
             return
         self._o_succeed(['e_paren', None, [v__2]], self._pos)
 
-    def _s_e_prim_13(self):
+    def _s_e_prim_14(self):
         self._o_memoize('r__filler', self._r__filler)
         self._o_ch('[')
         if self._failed:
@@ -2059,6 +2073,10 @@ class _Parser:
 
     def _fn_cons(self, hd, tl):
         return [hd] + tl
+
+    def _fn_node(self, parser, *args):
+        del parser
+        return list(args)
 
     def _fn_scons(self, hd, tl):
         return [hd] + tl

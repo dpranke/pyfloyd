@@ -601,10 +601,9 @@ fn_colno: [
 
 fn_pos: [meth q[] 'return self.pos']
 
-fn_node: [meth q['*args'] d"""
-        if self._externs['node']:
-            return self._externs['node'](*args)
-        return list(*args)
+fn_node: [meth q['parser' '*args'] d"""
+        del parser
+        return list(args)
         """]
 
 }

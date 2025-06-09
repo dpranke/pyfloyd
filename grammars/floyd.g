@@ -4,6 +4,7 @@
             | unicode                      -> true
             | unicode_categories           -> true
             | unicode_names                -> true
+            | node                         -> func
 
 %whitespace = <(' ' | '\f' | '\n' | '\r' | '\t' | '\v')+>
 
@@ -12,7 +13,7 @@
 
 %tokens     = escape hex ident int lit regexp set zpos
 
-grammar     = rule* end                    -> ['rules', null, $1]
+grammar     = rule* end                    -> node('rules', null, $1)
 
 rule        = ident '=' choice             -> ['rule', $1, [$3]]
 
@@ -125,6 +126,7 @@ e_post_op  = '[' e_expr ']'               -> ['e_getitem', null, [$2]]
 e_prim     = 'false'                      -> ['e_const', 'false', []]
             | 'null'                      -> ['e_const', 'null', []]
             | 'true'                      -> ['e_const', 'true', []]
+            | 'func'                      -> ['e_const', 'func', []]
             | ident                       -> ['e_ident', $1, []]
             | hex                         -> ['e_num', $1, []]
             | int                         -> ['e_num', $1, []]
