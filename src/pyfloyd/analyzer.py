@@ -821,7 +821,7 @@ def _compute_vars(grammar):
             return vs
 
         if node.t == 'label' and not node.outer_scope:
-            vs[node.name] = node.type.to_dict()
+            vs[node.name] = node.type
         for c in node.ch:
             vs.update(_walk(c))
         return vs

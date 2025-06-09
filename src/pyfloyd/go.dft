@@ -935,7 +935,7 @@ fn_cons: [def_method _t_name
                      'return append([]any{hd}, tl.([]any)...)']
 
 fn_dedent: [def_method _t_name
-                       q['s string']
+                       q['s string', 'colno int']
                        'string'
                        'return s']
 

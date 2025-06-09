@@ -32,7 +32,7 @@ THIS_DIR = os.path.dirname(__file__)
 SKIP = os.environ.get('SKIP', '')
 
 
-class _JSONDecodeError(Exception):
+class _JSONDecodeError(Exception):  # pragma: no cover
     def __init__(self, stdout, *args):
         super().__init__(*args)
         self.stdout = stdout
@@ -86,10 +86,10 @@ class Mixin(unittest.TestCase):
             actual_out, actual_err, _ = parser.parse(
                 text, path='<string>', externs=externs
             )
-        except _JSONDecodeError as e:
+        except _JSONDecodeError as e:  # pragma: no cover
             ex = e
 
-        if ex:
+        if ex:  # pragma: no cover
             if ex.stdout == b'':
                 self.fail('Failed to decode JSON object from empty stdout')
             else:
@@ -102,7 +102,7 @@ class Mixin(unittest.TestCase):
 
         # Test err before out because it's probably more helpful to display
         # an unexpected error than it is to display an unexpected output.
-        if err is None and actual_err:
+        if err is None and actual_err:  # pragma: no cover
             print(
                 'Got Unexpected stderr:\n  '
                 + '\n  '.join(actual_err.splitlines())
@@ -130,9 +130,7 @@ class GeneratorMixin(Mixin):
 
     def compile(self, grammar, path='<string>', memoize=False, externs=None):
         if self.cmd is None:
-            if os.path.sep in self.exe:
-                cmd = [self.exe]
-            elif self.exe == 'python':
+            if self.exe == 'python':
                 cmd = [sys.executable]
             else:
                 cmd = [shutil.which(self.exe)]
@@ -228,7 +226,7 @@ class _GeneratedParserWrapper:
         if proc.returncode == 0:
             try:
                 return json.loads(proc.stdout), None, 0
-            except json.decoder.JSONDecodeError as e:
+            except json.decoder.JSONDecodeError as e:  # pragma: no cover
                 raise _JSONDecodeError(proc.stdout, *e.args) from e
 
         return None, stderr, 0
@@ -914,9 +912,6 @@ class FunctionsMixin:
         self.check(
             "g = -> dict([['a', 1], ['b', 2]])", '', out={'a': 1, 'b': 2}
         )
-
-    def disabled_test_int(self):
-        self.check('g = int(4.0)', '', out=4)
 
     def test_itou(self):
         self.check('grammar = -> itou(97)', '', out='a')

@@ -14,6 +14,7 @@
 
 import subprocess
 import sys
+import textwrap
 import unittest
 
 from pyfloyd import support, tool
@@ -23,6 +24,42 @@ class ToolTest(unittest.TestCase):
     maxDiff = None
 
     # pylint: disable=exec-used
+
+    def test_ast(self):
+        host = support.FakeHost()
+        host.write_text_file('grammar.g', 'grammar = end')
+        ret = tool.main(['--ast', 'grammar.g', '-o', '-'], host=host)
+        self.assertEqual(ret, 0)
+        self.assertEqual(
+            host.stdout.getvalue(),
+            textwrap.dedent("""\
+            {
+              "t": "rules",
+              "type": {
+                "base": "null",
+                "elements": []
+              },
+              "rules": [
+                {
+                  "t": "rule",
+                  "name": "grammar",
+                  "type": {
+                    "base": "null",
+                    "elements": []
+                  },
+                  "child": {
+                    "t": "apply",
+                    "rule_name": "end",
+                    "type": {
+                      "base": "null",
+                      "elements": []
+                    }
+                  }
+                }
+              ]
+            }"""),
+        )
+        self.assertEqual(host.stderr.getvalue(), '')
 
     def test_compile(self):
         host = support.FakeHost()

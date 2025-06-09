@@ -12,14 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import shutil
-import unittest
-
 from . import grammar_test
 
 
 class _Mixin(grammar_test.GeneratorMixin):
-    cmd = [shutil.which('go'), 'run']
+    cmd = ['go', 'run']
     generator = 'datafile'
     template = 'go'
     ext = '.go'

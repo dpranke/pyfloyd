@@ -156,7 +156,7 @@ class Generator:
             local_vars: dict[str, Any] = {}
             for decl in local_var_map.get(node.t, []):
                 name, ty = decl.split(' ', maxsplit=1)
-                local_vars[name] = type_desc.from_str(ty).to_dict()
+                local_vars[name] = type_desc.str2d(ty)
             for c in node.ch:
                 local_vars.update(_walk(c))
             return local_vars
