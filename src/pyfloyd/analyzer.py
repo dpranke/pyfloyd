@@ -186,9 +186,7 @@ class _Analyzer:
             if node.v not in self.grammar.rules:
                 self.grammar.errors.append(f'Unknown rule "{node.v}"')
                 return
-            self._collect_operators(
-                operators, self.grammar.rules[node.v]
-            )
+            self._collect_operators(operators, self.grammar.rules[node.v])
             return
         if node.t in ('rule', 'choice', 'seq'):
             for c in node.ch:
@@ -454,9 +452,7 @@ def _check_lr(rule_name, node, grammar, seen):
             # We've hit left recursion on a different rule, so, no.
             return False
         seen.add(node.v)
-        return _check_lr(
-            rule_name, grammar.rules[node.v], grammar, seen
-        )
+        return _check_lr(rule_name, grammar.rules[node.v], grammar, seen)
     if node.t in ('lit', 'ends_in', 'not_one', 'plus', 'unicat'):
         return False
     if node.t == 'seq':
@@ -591,9 +587,7 @@ def _add_filler_nodes(grammar, node):
             '%whitespace',
         ):
             return False
-        if node.t == 'apply' and (
-            node.v == 'end' or node.v in grammar.tokens
-        ):
+        if node.t == 'apply' and (node.v == 'end' or node.v in grammar.tokens):
             return True
         if node.t == 'empty':
             return True
@@ -744,9 +738,7 @@ class _SubRuleRewriter:
     def _ty_apply(self, node):
         if node.v in ('any', 'end'):
             self._grammar.needed_builtin_rules.append(node.v)
-        return m_grammar.Node(
-            'apply', self._rule_fmt.format(rule_name=node.v)
-        )
+        return m_grammar.Node('apply', self._rule_fmt.format(rule_name=node.v))
 
     def _ty_ends_in(self, node):
         self._grammar.needed_builtin_rules.append('any')

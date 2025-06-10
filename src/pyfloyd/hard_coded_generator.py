@@ -156,9 +156,7 @@ class HardCodedGenerator(generator.Generator):
                 ),
                 self._map['end'],
             )
-        return formatter.HList(
-            self._gen_invoke(node.v), self._map['end']
-        )
+        return formatter.HList(self._gen_invoke(node.v), self._map['end'])
 
     def _ty_e_arr(
         self, node: m_grammar.Node
@@ -239,7 +237,9 @@ class HardCodedGenerator(generator.Generator):
             return self._gen_extern(node.v)
         if node.attrs.kind == 'function':
             return self._gen_funcname(node.v)
-        assert node.attrs.kind == 'local', f'Unexpected identifer kind {node!r}'
+        assert node.attrs.kind == 'local', (
+            f'Unexpected identifer kind {node!r}'
+        )
         return self._gen_varname(node.v)
 
     def _ty_empty(self, node) -> formatter.FormatObj:
