@@ -151,13 +151,13 @@ class HardCodedGenerator(generator.Generator):
             return formatter.HList(
                 self._gen_invoke(
                     self._gen_opname('memoize'),
-                    f"'{node.rule_name}'",
-                    self._gen_rulename(node.rule_name),
+                    f"'{node.v}'",
+                    self._gen_rulename(node.v),
                 ),
                 self._map['end'],
             )
         return formatter.HList(
-            self._gen_invoke(node.rule_name), self._map['end']
+            self._gen_invoke(node.v), self._map['end']
         )
 
     def _ty_e_arr(
@@ -176,7 +176,7 @@ class HardCodedGenerator(generator.Generator):
     def _ty_e_call_infix(self, node: m_grammar.Node) -> formatter.Pack:
         pfx = self._gen_expr(node.ch[0])
         args = [self._gen_expr(c) for c in node.ch[1:]]
-        if node.ch[0][1] in self.grammar.externs:
+        if node.ch[0].v in self.grammar.externs:
             return formatter.Pack(
                 pfx,
                 formatter.Triangle('(', formatter.Comma('self', *args), ')'),
@@ -205,7 +205,7 @@ class HardCodedGenerator(generator.Generator):
 
     def _ty_e_minus(self, node: m_grammar.Node) -> formatter.Tree:
         return formatter.Tree(
-            self._gen_expr(node.left), '-', self._gen_expr(node.right)
+            self._gen_expr(node.ch[0]), '-', self._gen_expr(node.ch[1])
         )
 
     def _ty_e_not(self, node: m_grammar.Node) -> formatter.Tree:
@@ -222,7 +222,7 @@ class HardCodedGenerator(generator.Generator):
 
     def _ty_e_plus(self, node: m_grammar.Node) -> formatter.Tree:
         return formatter.Tree(
-            self._gen_expr(node.left), '+', self._gen_expr(node.right)
+            self._gen_expr(node.ch[0]), '+', self._gen_expr(node.ch[1])
         )
 
     def _ty_e_qual(self, node: m_grammar.Node) -> formatter.Pack:
@@ -231,15 +231,15 @@ class HardCodedGenerator(generator.Generator):
         assert False, '`e_qual` should never be invoked'
 
     def _ty_e_ident(self, node: m_grammar.Node) -> formatter.El:
-        if node.kind == 'outer':
+        if node.attrs.kind == 'outer':
             return self._gen_invoke(
                 self._gen_opname('lookup'), "'" + node.v + "'"
             )
-        if node.kind == 'extern':
+        if node.attrs.kind == 'extern':
             return self._gen_extern(node.v)
-        if node.kind == 'function':
+        if node.attrs.kind == 'function':
             return self._gen_funcname(node.v)
-        assert node.kind == 'local', f'Unexpected identifer kind {node!r}'
+        assert node.attrs.kind == 'local', f'Unexpected identifer kind {node!r}'
         return self._gen_varname(node.v)
 
     def _ty_empty(self, node) -> formatter.FormatObj:
@@ -256,7 +256,7 @@ class HardCodedGenerator(generator.Generator):
         )
 
     def _ty_leftrec(self, node) -> formatter.FormatObj:
-        if node.left_assoc:
+        if node.attrs.left_assoc:
             left_assoc = self._map['true']
         else:
             left_assoc = self._map['false']
@@ -295,8 +295,8 @@ class HardCodedGenerator(generator.Generator):
         return formatter.HList(
             self._gen_invoke(
                 self._gen_opname('range'),
-                self._gen_lit(node.start),
-                self._gen_lit(node.stop),
+                self._gen_lit(node.v[0]),
+                self._gen_lit(node.v[1]),
             ),
             self._map['end'],
         )

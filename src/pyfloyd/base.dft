@@ -206,10 +206,10 @@ n_action: [fn [node] [succeed [expr node.child] f_pos]]
 
 n_apply: [fn [node]
              [if node.memoize
-                 [hl [call_op 'memoize' [list [lit node.rule_name]
-                                              [method_name node.rule_name]]]
+                 [hl [call_op 'memoize' [list [lit node.v]
+                                              [method_name node.v]]]
                      t_end]
-                 [hl [call_rule node.rule_name q[]] t_end]]]
+                 [hl [call_rule node.v q[]] t_end]]]
 
 n_choice: [fn [node] [vl [t_assign 'pos' f_pos]
                          [map [fn [c] [vl [stmts c]
@@ -238,12 +238,12 @@ n_e_arr: [fn [node] [if [is_empty node.ch]
                              ']']]]
 
 n_e_call_infix: [fn [node]
-                    [pack [if [in grammar.externs [get [item node.ch 0] 1]]
-                              [extern [get [item node.ch 0] 1]]
+                    [pack [if [in grammar.externs [get [item node.ch 0] 'v']]
+                              [extern [get [item node.ch 0] 'v']]
                               [expr [item node.ch 0]]]
                           [tri '('
                                 [if [in grammar.externs
-                                        [get [item node.ch 0] 1]]
+                                        [get [item node.ch 0] 'v']]
                                     [comma [cons t_self
                                                  [map [fn [c] [expr c]]
                                                       [slice node.ch 1 0]]]]
@@ -256,17 +256,19 @@ n_e_const: [fn [node] [invoke [strcat 't_' node.v]]]
 n_e_getitem_infix: [fn [node] [pack [expr [item node.ch 0]]
                                     [tri '[' [expr [item node.ch 1]] ']']]]
 
-n_e_ident: [fn [node] [if [equal node.kind 'outer']
+n_e_ident: [fn [node] [if [equal node.attrs.kind 'outer']
                           [call_op 'lookup' [list [lit node.v]]]
-                          [if [equal node.kind 'extern']
+                          [if [equal node.attrs.kind 'extern']
                               [extern node.v]
-                              [if [equal node.kind 'function']
+                              [if [equal node.attrs.kind 'function']
                                   [method_name [fn_name node.v]]
                                   [local_var node.v]]]]]
 
 n_e_lit: [fn [node] [lit node.v]]
 
-n_e_minus: [fn [node] [tree [expr node.left] '-' [expr node.right]]]
+n_e_minus: [fn [node] [tree [expr [item node.ch 0]]
+                            '-'
+                            [expr [item node.ch 1]]]]
 
 n_e_not: [fn [node] [tree null t_not [expr node.child]]]
 
@@ -274,7 +276,9 @@ n_e_num: [fn [node] node.v]
 
 n_e_paren: [fn [node] [expr node.child]]
 
-n_e_plus: [fn [node] [tree [expr node.left] '+' [expr node.right]]]
+n_e_plus: [fn [node] [tree [expr [item node.ch 0]]
+                           '+'
+                           [expr [item node.ch 1]]]]
 
 n_empty: [fn [node] [succeed t_null f_pos]]
 
@@ -289,14 +293,16 @@ n_equals: [fn [node] [hl [call_op 'str' [list [t_to_str [expr node.child]]]
 
 n_label: [fn [node] [vl [stmts node.child]
                         [return_if_failed node.child]
-                        [if node.outer_scope
-                            [vl [t_assign_outer node.name f_val]]
-                            [vl [t_assign [local_var node.name] f_val]]]]]
+                        [if node.attrs.outer_scope
+                            [vl [t_assign_outer node.v f_val]]
+                            [vl [t_assign [local_var node.v] f_val]]]]]
 
 n_leftrec: [fn [node] [hl [call_op 'leftrec'
                                    [list [method_name node.child.v]
                                          [lit node.v]
-                                         [if node.left_assoc t_true t_false]]]
+                                         [if node.attrs.left_assoc
+                                             t_true
+                                             t_false]]]
                            t_end]]
 
 n_lit: [fn [node] [hl [if [equal [strlen node.v] 1]
@@ -346,7 +352,8 @@ n_pred: [fn [node]
                               [t_throw [lit 'Bad predicate value']]]]]
 
 n_range: [fn [node] [hl [call_op 'range'
-                                 [list [lit node.start] [lit node.stop]]]
+                                 [list [lit [item node.v 0]]
+                                       [lit [item node.v 1]]]]
                         t_end]]
 
 n_run: [fn [node]

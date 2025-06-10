@@ -64,11 +64,11 @@ t_assign_outer: [fn [var val]
 t_append: [fn [lst val] [hl lst '.push(' val ')' t_end]]
 t_break:  'break;'
 
-t_declare_local_vars: [fn [node] [t_declare_vars node.local_vars]]
+t_declare_local_vars: [fn [node] [t_declare_vars node.attrs.local_vars]]
 t_declare_node_vars: [
     fn [node] [t_declare_vars [dict [map_items [fn [v ty]
                                                    [list [local_var v] ty]]
-                                               node.vars]]]]
+                                               node.attrs.vars]]]]
 
 t_declare_vars: [fn [vars]
                     [vl [map_items [fn [k v]

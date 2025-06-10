@@ -161,7 +161,7 @@ class Interpreter:
         self._interpret(node.child)
 
     def _ty_apply(self, node):
-        rule_name = node.rule_name
+        rule_name = node.v
         if rule_name == 'any':
             self._r_any()
             return
@@ -204,7 +204,7 @@ class Interpreter:
     def _ty_count(self, node):
         vs = []
         i = 0
-        cmin, cmax = node.start, node.stop
+        cmin, cmax = node.v
         while i < cmax:
             self._interpret(node.child)
             if self._failed:
@@ -236,7 +236,7 @@ class Interpreter:
         for subnode in node.ch[1:]:
             self._interpret(subnode)
             vals.append(self._val)
-        if node.ch[0].t == 'e_ident' and node.ch[0].name in self._externs:
+        if node.ch[0].t == 'e_ident' and node.ch[0].v in self._externs:
             self._val = left(self, *vals)
         else:
             self._val = left(*vals)
@@ -270,9 +270,9 @@ class Interpreter:
         self._succeed(node.v)
 
     def _ty_e_minus(self, node):
-        self._interpret(node.left)
+        self._interpret(node.ch[0])
         v1 = self._val
-        self._interpret(node.right)
+        self._interpret(node.ch[1])
         v2 = self._val
         self._succeed(v1 - v2)
 
@@ -295,9 +295,9 @@ class Interpreter:
         self._interpret(node.child)
 
     def _ty_e_plus(self, node):
-        self._interpret(node.left)
+        self._interpret(node.ch[0])
         v1 = self._val
-        self._interpret(node.right)
+        self._interpret(node.ch[1])
         v2 = self._val
         self._succeed(v1 + v2)
 
@@ -314,10 +314,10 @@ class Interpreter:
             self._succeed(self._scopes[-1][v])
             return
 
-        if node.kind == 'extern':
+        if node.attrs.kind == 'extern':
             self._succeed(self._externs[v])
             return
-        if node.kind == 'function':
+        if node.attrs.kind == 'function':
             if (
                 node.v in self._functions
                 and self._functions[node.v]
@@ -330,12 +330,12 @@ class Interpreter:
                 self._succeed(v)
                 return
             assert False, f"Function '{node.v}()' isn't implemented"
-        if node.kind == 'local':
+        if node.attrs.kind == 'local':
             self._succeed(self._scopes[-1][v])
             return
 
         # Look up named labels in any scope.
-        assert node.kind == 'outer'
+        assert node.attrs.kind == 'outer'
         i = len(self._scopes) - 1
         while i >= 0:
             if v in self._scopes[i]:
@@ -375,7 +375,7 @@ class Interpreter:
         # described in "Parsing Expression Grammars Made Practical" by
         # Laurent and Mens, 2016.
         pos = self._pos
-        rule_name = node.name
+        rule_name = node.v
         assoc = self._grammar.assoc.get(rule_name, 'left')
         key = (rule_name, pos)
         seed = self._seeds.get(key)
@@ -423,23 +423,24 @@ class Interpreter:
 
     def _ty_operator(self, node):
         pos = self._pos
-        rule_name = node.name
+        rule_name = node.v
         key = (rule_name, self._pos)
         seed = self._seeds.get(key)
         if seed:
             self._val, self._failed, self._pos = seed
             return
 
-        o = self._operators.get(node.name)
+        o = self._operators.get(node.v)
         if o is None:
             o = _OperatorState()
             for op_node in node.ch:
-                o.prec_ops.setdefault(op_node.prec, []).append(op_node.op)
-                if self._grammar.assoc.get(op_node.op) == 'right':
-                    o.rassoc.add(op_node.op)
-                o.choices[op_node.op] = op_node.ch
+                op = op_node.v[0]
+                o.prec_ops.setdefault(op_node.v[1], []).append(op)
+                if self._grammar.assoc.get(op) == 'right':
+                    o.rassoc.add(op)
+                o.choices[op] = op_node.ch
             o.precs = sorted(o.prec_ops, reverse=True)
-            self._operators[node.name] = o
+            self._operators[node.v] = o
 
         o.current_depth += 1
         current = (None, True, self._pos)
@@ -508,7 +509,7 @@ class Interpreter:
     def _ty_range(self, node):
         if (
             self._pos != self._end
-            and node.start <= self._text[self._pos] <= node.stop
+            and node.v[0] <= self._text[self._pos] <= node.v[1]
         ):
             self._succeed(self._text[self._pos], self._pos + 1)
             return

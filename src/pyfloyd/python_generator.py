@@ -497,10 +497,10 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
         vl = formatter.VList(self._gen_stmts(node.child))
         if node.child.can_fail:
             vl += ['if self._failed:', '    return']
-        if node.outer_scope:
-            vl += f"self._scopes[-1]['{node.name}'] = self._val"
+        if node.attrs.outer_scope:
+            vl += f"self._scopes[-1]['{node.v}'] = self._val"
         else:
-            vl += f'{self._gen_varname(node.name)} = self._val'
+            vl += f'{self._gen_varname(node.v)} = self._val'
         return vl
 
     def _ty_not(self, node: gram.Node) -> formatter.FormatObj:

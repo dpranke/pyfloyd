@@ -15,6 +15,7 @@
 import collections
 from typing import Any, Optional
 
+from pyfloyd import custom_dicts
 from pyfloyd import functions
 from pyfloyd import type_desc
 
@@ -60,14 +61,18 @@ class Node:
         self.value_used: Optional[bool] = None
         self._can_fail: Optional[bool] = None
         self.memoize: Optional[bool] = None  # this will be set by a generator
-        self.outer_scope: bool = False
-        self.kind: str = ''  # one of 'extern', 'function', 'local', 'outer'
-        self.left_assoc: Optional[bool] = None
-        self.local_vars: dict[str, Any] = {}
-        self.vars: dict[str, Any] = {}
-
-    def __getitem__(self, i):
-        return [self.t, self.v, self.ch][i]
+        self.attrs = custom_dicts.AttrDict()
+        if self.t == 'e_ident':
+            self.attrs.outer_scope = False
+            self.attrs.kind = ''  # 'extern', 'function', 'local', or 'outer'
+        elif self.t == 'label':
+            self.attrs.outer_scope = False
+        elif self.t == 'leftrec':
+            self.attrs.left_assoc = None
+        elif self.t == 'seq':
+            self.attrs.local_vars = {}
+        elif self.t == 'rule':
+            self.attrs.vars = {}
 
     def __eq__(self, other) -> bool:
         assert isinstance(other, Node)
@@ -81,10 +86,6 @@ class Node:
     def __repr__(self):
         return f'Node(t={self.t}, v={self.v}, ch={self.ch}, type={self.type})'
 
-    # TODO: Get rid of all these properties.
-    def __len__(self):
-        return 3
-
     @property
     def child(self):
         return self.ch[0]
@@ -92,38 +93,6 @@ class Node:
     @child.setter
     def child(self, v):
         self.ch[0] = v
-
-    @property
-    def left(self):
-        return self.ch[0]
-
-    @property
-    def right(self):
-        return self.ch[1]
-
-    @property
-    def name(self):
-        return self.v
-
-    @name.setter
-    def name(self, v):
-        self.v = v
-
-    @property
-    def rule_name(self):
-        return self.v
-
-    @rule_name.setter
-    def rule_name(self, v):
-        self.v = v
-
-    @property
-    def start(self):
-        return self.v[0]
-
-    @property
-    def stop(self):
-        return self.v[1]
 
     @property
     def can_fail(self):
@@ -136,18 +105,6 @@ class Node:
 
     def can_fail_set(self) -> bool:
         return self._can_fail is not None
-
-    @property
-    def op(self):
-        return self.v[0]
-
-    @property
-    def prec(self):
-        return self.v[1]
-
-    @property
-    def rules(self):
-        return self.ch
 
     def to_json(self, include_derived=False) -> Any:
         d: dict[str, Any] = {
@@ -162,16 +119,7 @@ class Node:
             d['type'] = self.type
         if include_derived:
             d['can_fail'] = self.can_fail
-            if self.t in ('label', 'e_ident'):
-                d['outer_scope'] = self.outer_scope
-            if self.t == 'e_ident':
-                d['kind'] = self.kind
-            if self.t == 'leftrec':
-                d['left_assoc'] = self.left_assoc
-            if self.t == 'seq':
-                d['local_vars'] = self.local_vars
-            if self.t == 'rule':
-                d['vars'] = self.vars
+            d['attrs'] = self.attrs
         return d
 
     def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
@@ -221,7 +169,7 @@ class Node:
         elif self.v in ('end', 'r_end'):
             self.type = TD('null')
         else:
-            for n in g.ast.rules:
+            for n in g.ast.ch:
                 if n.v == self.v:
                     n.infer_types(g, var_types)
                     self.type = n.type
@@ -305,13 +253,13 @@ class Node:
             self.type = TD('bool')
 
     def _infer_types_e_ident(self, g, var_types):
-        if self.kind == 'function':
+        if self.attrs.kind == 'function':
             self.type = TD('func')
-        elif self.kind in ('local', 'outer'):
-            self.type = var_types[self.name]
+        elif self.attrs.kind in ('local', 'outer'):
+            self.type = var_types[self.v]
         else:
-            assert self.kind == 'extern'
-            if g.externs[self.name] == 'func':
+            assert self.attrs.kind == 'extern'
+            if g.externs[self.v] == 'func':
                 self.type = TD('func')
             else:
                 self.type = TD('bool')
@@ -336,7 +284,7 @@ class Node:
             c.infer_types(g, local_var_types)
             if c.t == 'label':
                 assert c.type is not None
-                local_var_types[c.name] = c.type
+                local_var_types[c.v] = c.type
         self.type = self.ch[-1].type
 
 
@@ -379,13 +327,13 @@ class Grammar:
         self.externs: dict[str, bool] = {}
 
         has_starting_rule = False
-        for rule in self.ast.rules:
-            if rule.name.startswith('%'):
+        for rule in self.ast.ch:
+            if rule.v.startswith('%'):
                 self.pragmas.append(rule)
             elif not has_starting_rule:
-                self.starting_rule = rule.name
+                self.starting_rule = rule.v
                 has_starting_rule = True
-            self.rules[rule.name] = rule.child
+            self.rules[rule.v] = rule.child
 
     def node(self, cls, *args, **kwargs) -> Node:
         n = cls(*args, **kwargs)
@@ -418,12 +366,12 @@ class Grammar:
         # Update grammar.rules to match grammar.ast for rules in
         # grammar.ast and then append any new rules to grammar.ast.
         rules = set()
-        for rule in self.ast.rules:
-            self.rules[rule.name] = rule.child
-            rules.add(rule.name)
+        for rule in self.ast.ch:
+            self.rules[rule.v] = rule.child
+            rules.add(rule.v)
         for rule_name in self.rules:
             if rule_name not in rules:
-                self.ast.rules.append(
+                self.ast.ch.append(
                     Node('rule', rule_name, [self.rules[rule_name]])
                 )
 
@@ -436,10 +384,10 @@ class Grammar:
         if node.t in ('action', 'empty', 'opt', 'star'):
             return False
         if node.t == 'apply':
-            if node.rule_name in ('any', 'r_any', 'end', 'r_end'):
+            if node.v in ('any', 'r_any', 'end', 'r_end'):
                 return True
-            # return self._can_fail(self.rules[node.rule_name], inline=False)
-            return self._can_fail(self.rules[node.rule_name], inline)
+            # return self._can_fail(self.rules[node.v], inline=False)
+            return self._can_fail(self.rules[node.v], inline)
         if node.t == 'label':
             # When the code for a label is being inlined, if the child
             # node can fail, its return will exit the outer method as well,
@@ -453,7 +401,7 @@ class Grammar:
         if node.t in ('label', 'paren', 'rule', 'run'):
             return self._can_fail(node.child, inline)
         if node.t == 'count':
-            return node.start != 0
+            return node.v[0] != 0
         if node.t in ('leftrec', 'operator', 'op'):
             # TODO: Figure out if there's a way to tell if these can not fail.
             return True

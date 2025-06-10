@@ -77,7 +77,7 @@ t_assign_outer: [fn [var val]
 t_append: [fn [lst val] [hl lst ' = append(' lst ', ' val ')' t_end]]
 t_break:  'break'
 
-t_declare_local_vars: [fn [node] [t_declare_vars node.local_vars]]
+t_declare_local_vars: [fn [node] [t_declare_vars node.attrs.local_vars]]
 
 t_declare_vars: [fn [vars]
                     [vl [map_items [fn [name td]
@@ -93,7 +93,7 @@ t_declare_node_vars: [
     fn [node] [t_declare_vars [dict [map_items [fn [v ty]
                                                    [list [local_var v]
                                                          [str2td 'any']]]
-                                               node.vars]]]]
+                                               node.attrs.vars]]]]
 
 t_empty_any_list: '[]any{}'
 t_empty_str_list: '[]str{}'
@@ -541,14 +541,14 @@ n_e_arr: [fn [node]
              [tri '[]any{' [comma [map [fn [c] [expr c]] node.ch]] '}']]
 
 n_e_call_infix: [fn [node]
-                    [pack [if [in grammar.externs [get [item node.ch 0] 1]]
+                    [pack [if [in grammar.externs [get [item node.ch 0] 'v']]
                               [hl '('
-                                  [extern [get [item node.ch 0] 1]]
+                                  [extern [get [item node.ch 0] 'v']]
                                   '.(func(*Parser, ...any)(any)))']
                               [expr [item node.ch 0]]]
                           [hl '('
                                 [if [in grammar.externs
-                                        [get [item node.ch 0] 1]]
+                                        [get [item node.ch 0] 'v']]
                                     [comma [cons t_self
                                                  [map [fn [c] [expr c]]
                                                       [slice node.ch 1 0]]]]
@@ -564,12 +564,14 @@ n_e_getitem_infix: [fn [node] [hl [call 'fn_getany'
                                   ']']]]
 
 n_e_minus: [fn [node]
-              [call 'fn_aminus' [list [expr node.left] [expr node.right]]]]
+              [call 'fn_aminus' [list [expr [item node.ch 0]]
+                                      [expr [item node.ch 1]]]]]
 
 n_e_not: [fn [node] [hl '!' [call 'fn_to_bool' [list [expr node.child]]]]]
 
 n_e_plus: [fn [node]
-              [call 'fn_aplus' [list [expr node.left] [expr node.right]]]]
+              [call 'fn_aplus' [list [expr [item node.ch 0]]
+                                     [expr [item node.ch 1]]]]]
 
 
 

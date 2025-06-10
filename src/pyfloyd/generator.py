@@ -134,8 +134,8 @@ class Generator:
 
         def _walk(node):
             if node.t == 'apply':
-                if node.rule_name.startswith('r_'):
-                    name = node.rule_name[2:]
+                if node.v.startswith('r_'):
+                    name = node.v[2:]
                     node.memoize = (
                         name not in self.grammar.operators
                         and name not in grammar.leftrec_rules
@@ -162,7 +162,7 @@ class Generator:
             return local_vars
 
         for _, node in grammar.rules.items():
-            node.local_vars = _walk(node)
+            node.attrs.local_vars = _walk(node)
 
     def generate(self) -> str:
         raise NotImplementedError

@@ -142,11 +142,17 @@ def f_ftoi(f: float) -> int:
 
 
 def f_get(d: dict[str, Any], attr: Any) -> Any:
-    return d[attr]
+    try:
+        return d[attr]
+    except TypeError:
+        return getattr(d, attr)
 
 
 def f_has(d: dict[str, Any], key: str) -> bool:
-    return key in d
+    try:
+        return key in d
+    except TypeError:
+        return hasattr(d, key)
 
 
 def f_in(lis: list[Any], v: Any) -> bool:
