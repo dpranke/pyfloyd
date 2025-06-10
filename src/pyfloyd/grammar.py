@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import collections
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 from pyfloyd import functions
 from pyfloyd import type_desc
@@ -47,153 +47,27 @@ BUILTIN_RULES = (
 
 
 class Node:
-    v_alias: Optional[str] = None
-    v_aliases: list[str] = []
-    ch_alias: Optional[str] = None
-    ch_aliases: list[str] = []
-    derived_attrs: list[str] = []
+    @staticmethod
+    def to(val: list[Any]) -> 'Node':
+        return Node(val[0], val[1], [Node.to(c) for c in val[2]])
 
-    @classmethod
-    def to(cls, val: list[Any]) -> 'Node':
-        assert len(val) == 3
-        assert isinstance(val[0], str)
-        assert isinstance(val[2], list)
-        ty = val[0]
-        if ty == 'action':
-            return Action(Node.to(val[2][0]))
-        if ty == 'apply':
-            return Apply(val[1])
-        if ty == 'choice':
-            return Choice([Node.to(sn) for sn in val[2]])
-        if ty == 'count':
-            return Count(Node.to(val[2][0]), val[1][0], val[1][1])
-        if ty == 'empty':
-            return Empty()
-        if ty == 'ends_in':
-            return EndsIn(Node.to(val[2][0]))
-        if ty == 'equals':
-            return Equals(Node.to(val[2][0]))
-        if ty == 'e_arr':
-            return EArr([Node.to(sn) for sn in val[2]])
-        if ty == 'e_call':
-            return ECall([Node.to(sn) for sn in val[2]])
-        if ty == 'e_const':
-            return EConst(val[1])
-        if ty == 'e_getitem':
-            return EGetitem(Node.to(val[2][0]))
-        if ty == 'e_lit':
-            return ELit(val[1])
-        if ty == 'e_num':
-            return ENum(val[1])
-        if ty in ('e_var', 'e_ident'):
-            return EIdent(val[1])
-        if ty == 'e_not':
-            return ENot(Node.to(val[2][0]))
-        if ty == 'e_minus':
-            return EMinus(Node.to(val[2][0]), Node.to(val[2][1]))
-        if ty == 'e_paren':
-            return EParen(Node.to(val[2][0]))
-        if ty == 'e_plus':
-            return EPlus(Node.to(val[2][0]), Node.to(val[2][1]))
-        if ty == 'e_qual':
-            return EQual([Node.to(sn) for sn in val[2]])
-        if ty == 'label':
-            return Label(val[1], Node.to(val[2][0]))
-        if ty == 'leftrec':
-            return Leftrec(val[1], Node.to(val[2][0]))
-        if ty == 'lit':
-            return Lit(val[1])
-        if ty == 'not':
-            return Not(Node.to(val[2][0]))
-        if ty == 'not_one':
-            return NotOne(Node.to(val[2][0]))
-        if ty == 'op':
-            return Op(val[1][0], val[1][1], Node.to(val[2][0]))
-        if ty == 'operator':
-            return Operator(val[1], [Node.to(sn) for sn in val[2]])
-        if ty == 'opt':
-            return Opt(Node.to(val[2][0]))
-        if ty == 'paren':
-            return Paren(Node.to(val[2][0]))
-        if ty == 'plus':
-            return Plus(Node.to(val[2][0]))
-        if ty == 'pred':
-            return Pred(Node.to(val[2][0]))
-        if ty == 'range':
-            return Range(val[1][0], val[1][1])
-        if ty == 'regexp':
-            return Regexp(val[1])
-        if ty == 'rule':
-            return Rule(val[1], Node.to(val[2][0]))
-        if ty == 'rules':
-            return Rules([Node.to(sn) for sn in val[2]])
-        if ty == 'run':
-            return Run(Node.to(val[2][0]))
-        if ty == 'scope':
-            return Scope([Node.to(sn) for sn in val[2]])
-        if ty == 'set':
-            return Set(val[1])
-        if ty == 'seq':
-            return Seq([Node.to(sn) for sn in val[2]])
-        if ty == 'plus':
-            return Plus(Node.to(val[2][0]))
-        if ty == 'star':
-            return Star(Node.to(val[2][0]))
-        if ty == 'unicat':
-            return Unicat(val[1])
-        raise ValueError(f'Unexpected AST node type "{val[0]}"')
-
-    def __init__(self, t: str, v: Any, ch: list['Node']):
-        self.t: str = t
-        self.v: Any = v
-        self.ch: list['Node'] = ch
+    def __init__(self, t: str, v: Any, ch: Optional[list['Node']] = None):
+        self.t = t
+        self.v = v
+        self.ch: list['Node'] = ch or []
+        assert isinstance(self.ch, list)
         self.type: Optional[TD] = None
         self.value_used: Optional[bool] = None
         self._can_fail: Optional[bool] = None
+        self.memoize: Optional[bool] = None  # this will be set by a generator
+        self.outer_scope: bool = False
+        self.kind: str = ''  # one of 'extern', 'function', 'local', 'outer'
+        self.left_assoc: Optional[bool] = None
+        self.local_vars: dict[str, Any] = {}
+        self.vars: dict[str, Any] = {}
 
-    def __getattr__(self, attr: str) -> Any:
-        if attr == 'child':
-            assert len(self.ch) == 1
-            return self.ch[0]
-
-        if attr == self.v_alias:
-            attr = 'v'
-        if attr == self.ch_alias:
-            attr = 'ch'
-            return self.ch
-        if attr in self.v_aliases:
-            return self.v[self.v_aliases.index(attr)]
-        if attr in self.ch_aliases:
-            return self.ch[self.ch_aliases.index(attr)]
-        return super().__getattribute__(attr)
-
-    def __setattr__(self, attr: str, v: Any) -> None:
-        if attr == 'child':
-            assert len(self.ch) == 1
-            self.ch[0] = v
-            return
-        if attr == self.v_alias:
-            attr = 'v'
-        elif attr == self.ch_alias:
-            attr = 'ch'
-        super().__setattr__(attr, v)
-
-    def __getitem__(self, i: int) -> Union[str, Any, list['Node']]:
-        assert 0 <= i <= 2
-        if i == 0:
-            return self.t
-        if i == 1:
-            return self.v
-        return self.ch
-
-    def __setitem__(self, i: int, v: Any) -> None:
-        assert 0 <= i <= 2
-        if i == 0:
-            self.t = v
-        elif i == 1:
-            self.v = v
-        else:
-            self.ch = v
+    def __getitem__(self, i):
+        return [self.t, self.v, self.ch][i]
 
     def __eq__(self, other) -> bool:
         assert isinstance(other, Node)
@@ -205,13 +79,51 @@ class Node:
         )
 
     def __repr__(self):
-        s = self.__class__.__name__ + '('
-        s += ', '.join(f'{a}={repr(getattr(self, a))}' for a in self.attrs)
-        s += ')'
-        return s
+        return f'Node(t={self.t}, v={self.v}, ch={self.ch}, type={self.type})'
 
+    # TODO: Get rid of all these properties.
     def __len__(self):
         return 3
+
+    @property
+    def child(self):
+        return self.ch[0]
+
+    @child.setter
+    def child(self, v):
+        self.ch[0] = v
+
+    @property
+    def left(self):
+        return self.ch[0]
+
+    @property
+    def right(self):
+        return self.ch[1]
+
+    @property
+    def name(self):
+        return self.v
+
+    @name.setter
+    def name(self, v):
+        self.v = v
+
+    @property
+    def rule_name(self):
+        return self.v
+
+    @rule_name.setter
+    def rule_name(self, v):
+        self.v = v
+
+    @property
+    def start(self):
+        return self.v[0]
+
+    @property
+    def stop(self):
+        return self.v[1]
 
     @property
     def can_fail(self):
@@ -226,71 +138,84 @@ class Node:
         return self._can_fail is not None
 
     @property
-    def attrs(self) -> list[str]:
-        fn = self.__class__.__init__.__code__
-        return list(fn.co_varnames[1 : fn.co_argcount]) + ['type']
+    def op(self):
+        return self.v[0]
+
+    @property
+    def prec(self):
+        return self.v[1]
+
+    @property
+    def rules(self):
+        return self.ch
 
     def to_json(self, include_derived=False) -> Any:
-        d: dict[str, Any] = {}
-        d['t'] = self.t
-        attrs = list(self.attrs)
-        child = 'child' in attrs
-        if child:
-            attrs.remove('child')
-        ch = 'ch' in self.attrs
-        if ch:
-            attrs.remove('ch')
-        if self.ch_alias:
-            attrs.remove(self.ch_alias)
-        for a in attrs:
-            v = getattr(self, a)
-            if isinstance(v, list):
-                d[a] = [c.to_json(include_derived) for c in v]
-            elif isinstance(v, Node):
-                d[a] = v.to_json(include_derived)
-            else:
-                d[a] = v
+        d: dict[str, Any] = {
+            't': self.t,
+        }
+        if self.v is not None:
+            d['v'] = self.v
+        if self.ch:
+            ch = [c.to_json(include_derived) for c in self.ch]
+            d['ch'] = ch
+        if self.type is not None:
+            d['type'] = self.type
         if include_derived:
             d['can_fail'] = self.can_fail
-            for a in self.derived_attrs:
-                d[a] = getattr(self, a)
-            d['type'] = self.type
-            d['value_used'] = self.value_used
-        if child:
-            d['child'] = self.child.to_json(include_derived)
-        if self.ch_alias:
-            d[self.ch_alias] = [c.to_json(include_derived) for c in self.ch]
-        if ch:
-            d['ch'] = [c.to_json(include_derived) for c in self.ch]
+            if self.t in ('label', 'e_ident'):
+                d['outer_scope'] = self.outer_scope
+            if self.t == 'e_ident':
+                d['kind'] = self.kind
+            if self.t == 'leftrec':
+                d['left_assoc'] = self.left_assoc
+            if self.t == 'seq':
+                d['local_vars'] = self.local_vars
+            if self.t == 'rule':
+                d['vars'] = self.vars
         return d
 
     def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
         if self.type is not None:
             return
         self.type = TD('any')  # TODO TD('wip')?
-        for c in self.ch:
-            c.infer_types(g, var_types)
-        # By default most nodes will have the type of the last of their
-        # children, since that is also their default value.
-        if self.ch:
-            self.type = self.ch[-1].type
 
+        if self.t != 'seq':
+            for c in self.ch:
+                c.infer_types(g, var_types)
 
-class Action(Node):
-    def __init__(self, child):
-        super().__init__('action', None, [child])
+        _fixed_types = {
+            'e_getitem_infix': 'any',  # TODO: Figure out what this should be.
+            'e_lit': 'str',
+            'e_minus': 'int',
+            'e_not': 'bool',
+            'e_num': 'int',
+            'e_plus': 'int',
+            'empty': 'null',
+            'equals': 'str',
+            'leftrec': 'any',  # TODO: Figure out what this should be.
+            'lit': 'str',
+            'not': 'bool',
+            'operator': 'any',  # TODO: Figure out what this should be.
+            'range': 'str',
+            'regexp': 'str',
+            'rules': 'null',
+            'run': 'str',
+            'set': 'str',
+            'unicat': 'str',
+        }
+        if self.t in _fixed_types:
+            self.type = TD(_fixed_types[self.t])
+        elif hasattr(self, '_infer_types_' + self.t):
+            getattr(self, '_infer_types_' + self.t)(g, var_types)
+        elif self.t in ('count', 'opt', 'plus', 'star'):
+            self.type = TD('list', [self.child.type])
+        else:
+            # By default most nodes will have the type of the last of their
+            # children, since that is also their default value.
+            if self.ch:
+                self.type = self.ch[-1].type
 
-
-class Apply(Node):
-    v_alias = 'rule_name'
-    derived_attrs = ['memoize']
-
-    def __init__(self, rule_name):
-        super().__init__('apply', rule_name, [])
-        # This will only be set by the generator.
-        self.memoize = None
-
-    def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
+    def _infer_types_apply(self, g, var_types):
         if self.v in ('any', 'r_any'):
             self.type = TD('str')
         elif self.v in ('end', 'r_end'):
@@ -303,55 +228,8 @@ class Apply(Node):
                     return
             assert False
 
-
-class Choice(Node):
-    def __init__(self, ch):
-        super().__init__('choice', None, ch)
-
-    def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
-        super().infer_types(g, var_types)
-        types = set()
-        for c in self.ch:
-            assert c.type is not None
-            types.add(type_desc.d2str(c.type))
-        self.type = TD(type_desc.merge(list(types)))
-
-
-class Count(Node):
-    v_aliases = ['start', 'stop']
-
-    def __init__(self, child, start, stop):
-        super().__init__('count', [start, stop], [child])
-
-    def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
-        super().infer_types(g, var_types)
-        self.type = TD('list', [self.child.type])
-
-
-class EArr(Node):
-    def __init__(self, ch):
-        super().__init__('e_arr', None, ch)
-
-    def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
-        super().infer_types(g, var_types)
-        types = []
-        for c in self.ch:
-            assert c.type is not None
-            types.append(c.type)
-        self.type = TD('tuple', types)
-
-
-class ECall(Node):
-    def __init__(self, ch):
-        super().__init__('e_call', None, ch)
-
-
-class ECallInfix(Node):
-    def __init__(self, ch):
-        super().__init__('e_call_infix', None, ch)
-
-    def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
-        super().infer_types(g, var_types)
+    def _infer_types_e_call_infix(self, g, var_types):
+        del var_types
         assert self.ch[0].t == 'e_ident'
         if self.ch[0].v in g.externs and self.ch[0].v not in functions.ALL:
             self.type = TD('any')
@@ -398,47 +276,35 @@ class ECallInfix(Node):
         self.type = TD(func['ret'])
         assert self.type is not None
 
+    def _infer_types_choice(self, g, var_types):
+        del g
+        del var_types
+        types = set()
+        for c in self.ch:
+            assert c.type is not None
+            types.add(type_desc.d2str(c.type))
+        self.type = TD(type_desc.merge(list(types)))
 
-class EConst(Node):
-    def __init__(self, v):
-        super().__init__('e_const', v, [])
-        if v == 'null':
+    def _infer_types_e_arr(self, g, var_types):
+        del g
+        del var_types
+        types = []
+        for c in self.ch:
+            assert c.type is not None
+            types.append(c.type)
+        self.type = TD('tuple', types)
+
+    def _infer_types_e_const(self, g, var_types):
+        del g
+        del var_types
+        if self.v == 'null':
             self.type = TD('null')
-        elif v == 'func':
+        elif self.v == 'func':
             self.type = TD('func')
         else:
             self.type = TD('bool')
 
-
-class EGetitem(Node):
-    def __init__(self, child):
-        super().__init__('e_getitem', None, [child])
-
-
-class EGetitemInfix(Node):
-    def __init__(self, ch):
-        super().__init__('e_getitem_infix', None, ch)
-
-    def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
-        super().infer_types(g, var_types)
-        # TODO: Figure out what the type is.
-        self.type = TD('any')  # '<getitem>'
-
-
-class EIdent(Node):
-    derived_attrs = ['outer_scope', 'kind']
-
-    def __init__(self, name):
-        super().__init__('e_ident', name, [])
-        self.outer_scope = False
-        self.kind = ''  # one of 'extern', 'function', local', 'outer'
-
-    @property
-    def name(self):
-        return self.v
-
-    def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
-        super().infer_types(g, var_types)
+    def _infer_types_e_ident(self, g, var_types):
         if self.kind == 'function':
             self.type = TD('func')
         elif self.kind in ('local', 'outer'):
@@ -450,252 +316,21 @@ class EIdent(Node):
             else:
                 self.type = TD('bool')
 
-
-class ELit(Node):
-    def __init__(self, v):
-        super().__init__('e_lit', v, [])
-        self.type = TD('str')
-
-
-class EParen(Node):
-    def __init__(self, child):
-        super().__init__('e_paren', None, [child])
-
-
-class EMinus(Node):
-    ch_aliases = ['left', 'right']
-
-    def __init__(self, left, right):
-        super().__init__('e_minus', None, [left, right])
-
-    def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
-        super().infer_types(g, var_types)
-        self.type = TD('int')
-
-
-class ENot(Node):
-    def __init__(self, ch):
-        super().__init__('e_not', None, [ch])
-
-    def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
-        super().infer_types(g, var_types)
-        self.type = TD('bool')
-
-
-class ENum(Node):
-    def __init__(self, v):
-        super().__init__('e_num', v, [])
-
-    def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
-        super().infer_types(g, var_types)
-        self.type = TD('int')
-
-
-class EPlus(Node):
-    ch_aliases = ['left', 'right']
-
-    def __init__(self, left, right):
-        super().__init__('e_plus', None, [left, right])
-
-    def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
-        super().infer_types(g, var_types)
-        self.type = TD('int')
-
-
-class EQual(Node):
-    def __init__(self, ch):
-        super().__init__('e_qual', None, ch)
-
-
-class Empty(Node):
-    def __init__(self):
-        super().__init__('empty', None, [])
-
-    def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
-        super().infer_types(g, var_types)
-        self.type = TD('null')
-
-
-class EndsIn(Node):
-    def __init__(self, child):
-        super().__init__('ends_in', None, [child])
-
-
-class Equals(Node):
-    def __init__(self, child):
-        super().__init__('equals', None, [child])
-
-    def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
-        super().infer_types(g, var_types)
-        self.type = TD('str')
-
-
-class Label(Node):
-    v_alias = 'name'
-    derived_attrs = ['outer_scope']
-
-    def __init__(self, name, child):
-        super().__init__('label', name, [child])
-        self.outer_scope = False
-
-
-class Leftrec(Node):
-    v_alias = 'name'
-    derived_attrs = ['leftrec']
-
-    def __init__(self, name, child):
-        super().__init__('leftrec', name, [child])
-        self.left_assoc = None
-
-    def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
-        super().infer_types(g, var_types)
-        self.type = TD('any')  # TODO: What should this be?
-
-
-class Lit(Node):
-    def __init__(self, v):
-        super().__init__('lit', v, [])
-
-    def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
-        self.type = TD('str')
-
-
-class Not(Node):
-    def __init__(self, child):
-        super().__init__('not', None, [child])
-
-    def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
-        super().infer_types(g, var_types)
-        self.type = TD('bool')
-
-
-class NotOne(Node):
-    def __init__(self, child):
-        super().__init__('not_one', None, [child])
-
-
-class Op(Node):
-    v_aliases = ['op', 'prec']
-
-    def __init__(self, op, prec, child):
-        super().__init__('op', [op, prec], [child])
-
-
-class Operator(Node):
-    v_alias = 'name'
-
-    def __init__(self, name, ch):
-        super().__init__('operator', name, ch)
-
-    def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
-        super().infer_types(g, var_types)
-        self.type = TD('any')  # TODO: What should this be?
-
-
-class Opt(Node):
-    def __init__(self, child):
-        super().__init__('opt', None, [child])
-
-    def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
-        super().infer_types(g, var_types)
-        self.type = TD('list', [self.child.type])
-
-
-class Paren(Node):
-    def __init__(self, child):
-        super().__init__('choice', None, [child])
-
-
-class Plus(Node):
-    def __init__(self, child):
-        super().__init__('plus', None, [child])
-
-    def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
-        super().infer_types(g, var_types)
-        self.type = TD('list', [self.child.type])
-
-
-class Pred(Node):
-    def __init__(self, child):
-        super().__init__('pred', None, [child])
-
-    def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
-        super().infer_types(g, var_types)
+    def _infer_types_pred(self, g, var_types):
+        del var_types
         if self.child.type['base'] != 'bool':
             g.errors.append('Non-bool object passed to `?{}`.')
         self.type = TD('bool')
 
-
-class Range(Node):
-    v_aliases = ['start', 'stop']
-
-    def __init__(self, start, stop):
-        super().__init__('range', [start, stop], [])
-        self.type = TD('str')
-
-
-class Regexp(Node):
-    def __init__(self, v):
-        super().__init__('regexp', v, [])
-        self.type = TD('str')
-
-
-class Rule(Node):
-    v_alias = 'name'
-    derived_attrs = ['local_vars']
-
-    def __init__(self, name, child):
-        super().__init__('rule', name, [child])
-        # Note: This will not actually be derived until the generator
-        # does so.
-        self.local_vars = {}
-
-    def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
-        if self.type is not None:
-            return
-        self.type = TD('any')  # TODO TD('wip')?  '<?' + self.name + '?>'
-        for c in self.ch:
-            c.infer_types(g, var_types)
+    def _infer_types_rule(self, g, var_types):
+        del g
+        del var_types
         self.type = self.ch[-1].type
         assert self.type is not None
         if self.type['base'] == 'wip':
             self.type = TD('all')
 
-
-class Rules(Node):
-    ch_alias = 'rules'
-
-    def __init__(self, rules):
-        super().__init__('rules', None, rules)
-
-    def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
-        for c in self.ch:
-            c.infer_types(g, var_types)
-        self.type = TD('null')
-
-
-class Run(Node):
-    def __init__(self, child):
-        super().__init__('run', None, [child])
-
-    def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
-        super().infer_types(g, var_types)
-        self.type = TD('str')
-
-
-class Scope(Node):
-    def __init__(self, ch):
-        super().__init__('scope', None, ch)
-
-
-class Seq(Node):
-    derived_attrs = ['vars']
-
-    def __init__(self, ch):
-        super().__init__('seq', None, ch)
-        self.vars = {}
-
-    def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
+    def _infer_types_seq(self, g: 'Grammar', var_types: dict[str, TD]):
         local_var_types = var_types.copy()
         for c in self.ch:
             c.infer_types(g, local_var_types)
@@ -705,37 +340,16 @@ class Seq(Node):
         self.type = self.ch[-1].type
 
 
-class Set(Node):
-    def __init__(self, v):
-        super().__init__('set', v, [])
-        self.type = TD('str')
-
-
-class Star(Node):
-    def __init__(self, child):
-        super().__init__('star', None, [child])
-
-    def infer_types(self, g: 'Grammar', var_types: dict[str, TD]):
-        super().infer_types(g, var_types)
-        self.type = TD('list', [self.child.type])
-
-
-class Unicat(Node):
-    def __init__(self, v):
-        super().__init__('unicat', v, [])
-        self.type = TD('str')
-
-
 class Grammar:
     def __init__(self, ast: Any):
         self.ast: Node = Node.to(ast)
         self.errors: list[str] = []
-        self.comment: Optional[Rule] = None
-        self.rules: dict[str, Rule] = collections.OrderedDict()
-        self.pragmas: list[Rule] = []
+        self.comment: Optional[Node] = None
+        self.rules: dict[str, Node] = collections.OrderedDict()
+        self.pragmas: list[Node] = []
         self.starting_rule: str = ''
         self.tokens: set[str] = set()
-        self.whitespace: Optional[Rule] = None
+        self.whitespace: Optional[Node] = None
         self.assoc: dict[str, str] = {}
         self.prec: dict[str, int] = {}
         self.exception_needed: bool = False
@@ -809,7 +423,9 @@ class Grammar:
             rules.add(rule.name)
         for rule_name in self.rules:
             if rule_name not in rules:
-                self.ast.rules.append(Rule(rule_name, self.rules[rule_name]))
+                self.ast.rules.append(
+                    Node('rule', rule_name, [self.rules[rule_name]])
+                )
 
     # TODO: Figure out what to do with `inline`; it seems like there are
     # might be places where it's safe to ignore if something can fail if
@@ -820,7 +436,6 @@ class Grammar:
         if node.t in ('action', 'empty', 'opt', 'star'):
             return False
         if node.t == 'apply':
-            assert isinstance(node, Apply)
             if node.rule_name in ('any', 'r_any', 'end', 'r_end'):
                 return True
             # return self._can_fail(self.rules[node.rule_name], inline=False)
@@ -838,7 +453,6 @@ class Grammar:
         if node.t in ('label', 'paren', 'rule', 'run'):
             return self._can_fail(node.child, inline)
         if node.t == 'count':
-            assert isinstance(node, Count)
             return node.start != 0
         if node.t in ('leftrec', 'operator', 'op'):
             # TODO: Figure out if there's a way to tell if these can not fail.

@@ -494,7 +494,6 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
         return vl
 
     def _ty_label(self, node: gram.Node) -> formatter.FormatObj:
-        assert isinstance(node, gram.Label)
         vl = formatter.VList(self._gen_stmts(node.child))
         if node.child.can_fail:
             vl += ['if self._failed:', '    return']
@@ -521,7 +520,7 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
         return vl
 
     def _ty_not_one(self, node: gram.Node) -> formatter.FormatObj:
-        sublines = self._gen_stmts(self.grammar.node(gram.Not, node.child))
+        sublines = self._gen_stmts(gram.Node('not', None, [node.child]))
         vl = formatter.VList()
         vl += sublines
         vl += ['if not self._failed:', '    self._r_any()']

@@ -147,7 +147,6 @@ class HardCodedGenerator(generator.Generator):
         )
 
     def _ty_apply(self, node: m_grammar.Node) -> formatter.FormatObj:
-        assert isinstance(node, m_grammar.Apply)
         if node.memoize:
             return formatter.HList(
                 self._gen_invoke(
@@ -205,7 +204,6 @@ class HardCodedGenerator(generator.Generator):
         return self._gen_lit(node.v)
 
     def _ty_e_minus(self, node: m_grammar.Node) -> formatter.Tree:
-        assert isinstance(node, m_grammar.EMinus)
         return formatter.Tree(
             self._gen_expr(node.left), '-', self._gen_expr(node.right)
         )
@@ -223,7 +221,6 @@ class HardCodedGenerator(generator.Generator):
         return self._gen_expr(node.child)
 
     def _ty_e_plus(self, node: m_grammar.Node) -> formatter.Tree:
-        assert isinstance(node, m_grammar.EPlus)
         return formatter.Tree(
             self._gen_expr(node.left), '+', self._gen_expr(node.right)
         )
@@ -234,7 +231,6 @@ class HardCodedGenerator(generator.Generator):
         assert False, '`e_qual` should never be invoked'
 
     def _ty_e_ident(self, node: m_grammar.Node) -> formatter.El:
-        assert isinstance(node, m_grammar.EIdent)
         if node.kind == 'outer':
             return self._gen_invoke(
                 self._gen_opname('lookup'), "'" + node.v + "'"
@@ -309,7 +305,7 @@ class HardCodedGenerator(generator.Generator):
         raise NotImplementedError
 
     def _ty_set(self, node) -> formatter.FormatObj:
-        new_node = m_grammar.Regexp('[' + node.v + ']')
+        new_node = m_grammar.Node('regexp', '[' + node.v + ']', [])
         return self._ty_regexp(new_node)
 
     def _ty_unicat(self, node) -> formatter.FormatObj:

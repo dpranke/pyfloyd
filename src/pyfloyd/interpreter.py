@@ -270,7 +270,6 @@ class Interpreter:
         self._succeed(node.v)
 
     def _ty_e_minus(self, node):
-        assert isinstance(node, m_grammar.EMinus)
         self._interpret(node.left)
         v1 = self._val
         self._interpret(node.right)
@@ -296,7 +295,6 @@ class Interpreter:
         self._interpret(node.child)
 
     def _ty_e_plus(self, node):
-        assert isinstance(node, m_grammar.EPlus)
         self._interpret(node.left)
         v1 = self._val
         self._interpret(node.right)
@@ -355,7 +353,7 @@ class Interpreter:
             self._interpret(node.child)
             if not self._failed:
                 return
-            self._ty_apply(self._grammar.node(m_grammar.Apply, 'any'))
+            self._ty_apply(m_grammar.Node('apply', 'any'))
             if self._failed:
                 return
 
@@ -419,9 +417,9 @@ class Interpreter:
             self._fail(val)
 
     def _ty_not_one(self, node):
-        self._ty_not(self._grammar.node(m_grammar.Not, node.child))
+        self._ty_not(m_grammar.Node('not', None, [node.child]))
         if not self._failed:
-            self._ty_apply(self._grammar.node(m_grammar.Apply, 'any'))
+            self._ty_apply(m_grammar.Node('apply', 'any'))
 
     def _ty_operator(self, node):
         pos = self._pos
@@ -545,7 +543,7 @@ class Interpreter:
                 break
 
     def _ty_set(self, node):
-        new_node = self._grammar.node(m_grammar.Regexp, '[' + node.v + ']')
+        new_node = m_grammar.Node('regexp', '[' + node.v + ']')
         self._interpret(new_node)
 
     def _ty_star(self, node):

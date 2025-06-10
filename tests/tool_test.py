@@ -31,35 +31,37 @@ class ToolTest(unittest.TestCase):
         ret = tool.main(['--ast', 'grammar.g', '-o', '-'], host=host)
         self.assertEqual(ret, 0)
         self.assertEqual(
-            host.stdout.getvalue(),
             textwrap.dedent("""\
             {
               "t": "rules",
-              "type": {
-                "base": "null",
-                "elements": []
-              },
-              "rules": [
+              "ch": [
                 {
                   "t": "rule",
-                  "name": "grammar",
+                  "v": "grammar",
+                  "ch": [
+                    {
+                      "t": "apply",
+                      "v": "end",
+                      "type": {
+                        "base": "null",
+                        "elements": []
+                      }
+                    }
+                  ],
                   "type": {
                     "base": "null",
                     "elements": []
-                  },
-                  "child": {
-                    "t": "apply",
-                    "rule_name": "end",
-                    "type": {
-                      "base": "null",
-                      "elements": []
-                    }
                   }
                 }
-              ]
+              ],
+              "type": {
+                "base": "null",
+                "elements": []
+              }
             }"""),
+            host.stdout.getvalue(),
         )
-        self.assertEqual(host.stderr.getvalue(), '')
+        self.assertEqual('', host.stderr.getvalue())
 
     def test_compile(self):
         host = support.FakeHost()
