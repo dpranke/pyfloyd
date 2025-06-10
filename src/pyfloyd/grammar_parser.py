@@ -136,7 +136,9 @@ class _Parser:
             return
         self._o_memoize('r_choice', self._r_choice)
         v__3 = self._val
-        self._o_succeed(['rule', v__1, [v__3]], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'rule', v__1, [v__3]), self._pos
+        )
 
     def _s_rule_1(self):
         self._o_memoize('r__filler', self._r__filler)
@@ -197,7 +199,12 @@ class _Parser:
         v__1 = self._val
         self._s_choice_1()
         v__2 = self._val
-        self._o_succeed(['choice', None, self._fn_cons(v__1, v__2)], self._pos)
+        self._o_succeed(
+            self._externs['node'](
+                self, 'choice', None, self._fn_cons(v__1, v__2)
+            ),
+            self._pos,
+        )
 
     def _s_choice_1(self):
         vs = []
@@ -223,7 +230,9 @@ class _Parser:
         if not self._failed:
             return
         self._o_rewind(pos)
-        self._o_succeed(['empty', None, []], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'empty', None, []), self._pos
+        )
 
     def _s_seq_1(self):
         self._o_memoize('r_expr', self._r_expr)
@@ -234,18 +243,26 @@ class _Parser:
             return
         self._s_seq_2()
         v__2 = self._val
-        self._o_succeed(['seq', None, self._fn_cons(v__1, v__2)], self._pos)
+        self._o_succeed(
+            self._externs['node'](
+                self, 'seq', None, self._fn_cons(v__1, v__2)
+            ),
+            self._pos,
+        )
 
     def _s_seq_2(self):
         vs = []
         while True:
             pos = self._pos
-            self._o_memoize('r_expr', self._r_expr)
+            self._s_seq_3()
             if self._failed or self._pos == pos:
                 self._o_rewind(pos)
                 break
             vs.append(self._val)
         self._o_succeed(vs, self._pos)
+
+    def _s_seq_3(self):
+        self._o_memoize('r_expr', self._r_expr)
 
     def _r_expr(self):
         pos = self._pos
@@ -278,7 +295,9 @@ class _Parser:
         v__2 = self._val
         if self._failed:
             return
-        self._o_succeed(['action', None, [v__2]], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'action', None, [v__2]), self._pos
+        )
 
     def _s_expr_2(self):
         self._o_memoize('r__filler', self._r__filler)
@@ -295,7 +314,9 @@ class _Parser:
         self._o_ch('}')
         if self._failed:
             return
-        self._o_succeed(['pred', None, [v__2]], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'pred', None, [v__2]), self._pos
+        )
 
     def _s_expr_3(self):
         self._o_memoize('r__filler', self._r__filler)
@@ -312,7 +333,9 @@ class _Parser:
         self._o_ch('}')
         if self._failed:
             return
-        self._o_succeed(['equals', None, [v__2]], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'equals', None, [v__2]), self._pos
+        )
 
     def _s_expr_4(self):
         self._o_memoize('r_post_expr', self._r_post_expr)
@@ -331,7 +354,9 @@ class _Parser:
         v__3 = self._val
         if self._failed:
             return
-        self._o_succeed(['label', v__3, [v__1]], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'label', v__3, [v__1]), self._pos
+        )
 
     def _s_expr_5(self):
         self._o_memoize('r__filler', self._r__filler)
@@ -368,7 +393,9 @@ class _Parser:
         self._o_ch('?')
         if self._failed:
             return
-        self._o_succeed(['opt', None, [v__1]], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'opt', None, [v__1]), self._pos
+        )
 
     def _s_post_expr_2(self):
         self._o_memoize('r_prim_expr', self._r_prim_expr)
@@ -381,7 +408,9 @@ class _Parser:
         self._o_ch('*')
         if self._failed:
             return
-        self._o_succeed(['star', None, [v__1]], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'star', None, [v__1]), self._pos
+        )
 
     def _s_post_expr_3(self):
         self._o_memoize('r_prim_expr', self._r_prim_expr)
@@ -394,7 +423,9 @@ class _Parser:
         self._o_ch('+')
         if self._failed:
             return
-        self._o_succeed(['plus', None, [v__1]], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'plus', None, [v__1]), self._pos
+        )
 
     def _s_post_expr_4(self):
         self._o_memoize('r_prim_expr', self._r_prim_expr)
@@ -409,7 +440,9 @@ class _Parser:
         v__2 = self._val
         if self._failed:
             return
-        self._o_succeed(['count', v__2, [v__1]], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'count', v__2, [v__1]), self._pos
+        )
 
     def _r_count(self):
         pos = self._pos
@@ -536,7 +569,9 @@ class _Parser:
         v__3 = self._val
         if self._failed:
             return
-        self._o_succeed(['range', [v__1, v__3], []], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'range', [v__1, v__3], []), self._pos
+        )
 
     def _s_prim_expr_2(self):
         self._o_memoize('r__filler', self._r__filler)
@@ -553,7 +588,9 @@ class _Parser:
         v__1 = self._val
         if self._failed:
             return
-        self._o_succeed(['lit', v__1, []], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'lit', v__1, []), self._pos
+        )
 
     def _s_prim_expr_5(self):
         self._o_memoize('r__filler', self._r__filler)
@@ -583,7 +620,9 @@ class _Parser:
         self._o_ch('}')
         if self._failed:
             return
-        self._o_succeed(['unicat', v__3, []], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'unicat', v__3, []), self._pos
+        )
 
     def _s_prim_expr_7(self):
         self._o_memoize('r__filler', self._r__filler)
@@ -596,7 +635,9 @@ class _Parser:
         v__1 = self._val
         if self._failed:
             return
-        self._o_succeed(['set', v__1, []], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'set', v__1, []), self._pos
+        )
 
     def _s_prim_expr_9(self):
         self._o_memoize('r__filler', self._r__filler)
@@ -609,7 +650,9 @@ class _Parser:
         v__1 = self._val
         if self._failed:
             return
-        self._o_succeed(['regexp', v__1, []], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'regexp', v__1, []), self._pos
+        )
 
     def _s_prim_expr_11(self):
         self._o_memoize('r__filler', self._r__filler)
@@ -626,7 +669,9 @@ class _Parser:
         v__2 = self._val
         if self._failed:
             return
-        self._o_succeed(['not', None, [v__2]], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'not', None, [v__2]), self._pos
+        )
 
     def _s_prim_expr_13(self):
         self._o_memoize('r__filler', self._r__filler)
@@ -639,7 +684,9 @@ class _Parser:
         v__2 = self._val
         if self._failed:
             return
-        self._o_succeed(['ends_in', None, [v__2]], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'ends_in', None, [v__2]), self._pos
+        )
 
     def _s_prim_expr_14(self):
         self._o_memoize('r__filler', self._r__filler)
@@ -652,7 +699,9 @@ class _Parser:
         v__2 = self._val
         if self._failed:
             return
-        self._o_succeed(['not_one', None, [v__2]], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'not_one', None, [v__2]), self._pos
+        )
 
     def _s_prim_expr_15(self):
         self._s_prim_expr_16()
@@ -664,7 +713,9 @@ class _Parser:
         self._s_prim_expr_17()
         if self._failed:
             return
-        self._o_succeed(['apply', v__1, []], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'apply', v__1, []), self._pos
+        )
 
     def _s_prim_expr_16(self):
         self._o_memoize('r__filler', self._r__filler)
@@ -696,7 +747,9 @@ class _Parser:
         self._o_ch(')')
         if self._failed:
             return
-        self._o_succeed(['paren', None, [v__2]], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'paren', None, [v__2]), self._pos
+        )
 
     def _s_prim_expr_20(self):
         self._o_memoize('r__filler', self._r__filler)
@@ -709,7 +762,9 @@ class _Parser:
         self._o_ch('>')
         if self._failed:
             return
-        self._o_succeed(['run', None, [v__2]], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'run', None, [v__2]), self._pos
+        )
 
     def _r_lit(self):
         pos = self._pos
@@ -1420,7 +1475,10 @@ class _Parser:
         v__3 = self._val
         if self._failed:
             return
-        self._o_succeed(['e_plus', None, [v__1, v__3]], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'e_plus', None, [v__1, v__3]),
+            self._pos,
+        )
 
     def _s_e_expr_2(self):
         self._o_memoize('r_e_qual', self._r_e_qual)
@@ -1439,7 +1497,10 @@ class _Parser:
         v__3 = self._val
         if self._failed:
             return
-        self._o_succeed(['e_minus', None, [v__1, v__3]], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'e_minus', None, [v__1, v__3]),
+            self._pos,
+        )
 
     def _s_e_expr_3(self):
         self._o_memoize('r__filler', self._r__filler)
@@ -1452,7 +1513,9 @@ class _Parser:
         v__2 = self._val
         if self._failed:
             return
-        self._o_succeed(['e_not', None, [v__2]], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'e_not', None, [v__2]), self._pos
+        )
 
     def _r_e_exprs(self):
         pos = self._pos
@@ -1524,7 +1587,12 @@ class _Parser:
         v__2 = self._val
         if self._failed:
             return
-        self._o_succeed(['e_qual', None, self._fn_cons(v__1, v__2)], self._pos)
+        self._o_succeed(
+            self._externs['node'](
+                self, 'e_qual', None, self._fn_cons(v__1, v__2)
+            ),
+            self._pos,
+        )
 
     def _s_e_qual_2(self):
         vs = []
@@ -1564,7 +1632,9 @@ class _Parser:
         self._o_ch(']')
         if self._failed:
             return
-        self._o_succeed(['e_getitem', None, [v__2]], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'e_getitem', None, [v__2]), self._pos
+        )
 
     def _s_e_post_op_2(self):
         self._o_memoize('r__filler', self._r__filler)
@@ -1577,7 +1647,9 @@ class _Parser:
         self._o_ch(')')
         if self._failed:
             return
-        self._o_succeed(['e_call', None, v__2], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'e_call', None, v__2), self._pos
+        )
 
     def _r_e_prim(self):
         pos = self._pos
@@ -1624,28 +1696,36 @@ class _Parser:
         self._o_str('false')
         if self._failed:
             return
-        self._o_succeed(['e_const', 'false', []], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'e_const', 'false', []), self._pos
+        )
 
     def _s_e_prim_2(self):
         self._o_memoize('r__filler', self._r__filler)
         self._o_str('null')
         if self._failed:
             return
-        self._o_succeed(['e_const', 'null', []], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'e_const', 'null', []), self._pos
+        )
 
     def _s_e_prim_3(self):
         self._o_memoize('r__filler', self._r__filler)
         self._o_str('true')
         if self._failed:
             return
-        self._o_succeed(['e_const', 'true', []], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'e_const', 'true', []), self._pos
+        )
 
     def _s_e_prim_4(self):
         self._o_memoize('r__filler', self._r__filler)
         self._o_str('func')
         if self._failed:
             return
-        self._o_succeed(['e_const', 'func', []], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'e_const', 'func', []), self._pos
+        )
 
     def _s_e_prim_5(self):
         self._s_e_prim_6()
@@ -1654,7 +1734,9 @@ class _Parser:
         v__1 = self._val
         if self._failed:
             return
-        self._o_succeed(['e_ident', v__1, []], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'e_ident', v__1, []), self._pos
+        )
 
     def _s_e_prim_6(self):
         self._o_memoize('r__filler', self._r__filler)
@@ -1667,7 +1749,9 @@ class _Parser:
         v__1 = self._val
         if self._failed:
             return
-        self._o_succeed(['e_num', v__1, []], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'e_num', v__1, []), self._pos
+        )
 
     def _s_e_prim_8(self):
         self._o_memoize('r__filler', self._r__filler)
@@ -1680,7 +1764,9 @@ class _Parser:
         v__1 = self._val
         if self._failed:
             return
-        self._o_succeed(['e_num', v__1, []], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'e_num', v__1, []), self._pos
+        )
 
     def _s_e_prim_10(self):
         self._o_memoize('r__filler', self._r__filler)
@@ -1693,7 +1779,9 @@ class _Parser:
         v__1 = self._val
         if self._failed:
             return
-        self._o_succeed(['e_lit', v__1, []], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'e_lit', v__1, []), self._pos
+        )
 
     def _s_e_prim_12(self):
         self._o_memoize('r__filler', self._r__filler)
@@ -1714,7 +1802,9 @@ class _Parser:
         self._o_ch(')')
         if self._failed:
             return
-        self._o_succeed(['e_paren', None, [v__2]], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'e_paren', None, [v__2]), self._pos
+        )
 
     def _s_e_prim_14(self):
         self._o_memoize('r__filler', self._r__filler)
@@ -1727,7 +1817,9 @@ class _Parser:
         self._o_ch(']')
         if self._failed:
             return
-        self._o_succeed(['e_arr', None, v__2], self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'e_arr', None, v__2), self._pos
+        )
 
     def _r_int(self):
         pos = self._pos

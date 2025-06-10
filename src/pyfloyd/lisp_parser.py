@@ -374,22 +374,25 @@ class _Parser:
         vs = []
         while True:
             pos = self._pos
-            pos = self._pos
-            errpos = self._errpos
-            self._o_ch('\n')
-            if self._failed:
-                self._o_succeed(None, pos)
-            else:
-                self._o_rewind(pos)
-                self._errpos = errpos
-                self._o_fail()
-            if not self._failed:
-                self._r_any()
+            self._s__comment_2()
             if self._failed or self._pos == pos:
                 self._o_rewind(pos)
                 break
             vs.append(self._val)
         self._o_succeed(vs, self._pos)
+
+    def _s__comment_2(self):
+        pos = self._pos
+        errpos = self._errpos
+        self._o_ch('\n')
+        if self._failed:
+            self._o_succeed(None, pos)
+        else:
+            self._o_rewind(pos)
+            self._errpos = errpos
+            self._o_fail()
+        if not self._failed:
+            self._r_any()
 
     def _r__filler(self):
         start = self._pos

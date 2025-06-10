@@ -235,7 +235,12 @@ functions = {
         doc: d"""
               Returns the given member of the dictionary.
               """
-        body: 'return d[attr]'
+        body: d"""
+              try:
+                  return d[attr]
+              except TypeError:
+                  return getattr(d, attr)
+              """
     }
     has: {
         params: [[d 'dict[str, any]'] [key str]]
@@ -243,7 +248,12 @@ functions = {
         doc: d"""
               Returns whether the key is in the dictionary.
               """
-        body: 'return key in d'
+        body: d"""
+              try:
+                  return key in d
+              except TypeError:
+                  return hasattr(d, key)
+              """
     }
     in: {
         params: [[lis 'list[any]'] [v 'any']]
