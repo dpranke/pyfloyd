@@ -22,7 +22,6 @@ from pyfloyd import (
     datafile_generator,
     generator,
     interpreter as m_interpreter,
-    javascript_generator,
     python_generator,
     grammar as m_grammar,
     grammar_parser,
@@ -36,7 +35,6 @@ __version__ = version.__version__
 
 _generators = (
     datafile_generator.DatafileGenerator,
-    javascript_generator.JavaScriptGenerator,
     python_generator.PythonGenerator,
 )
 
@@ -120,7 +118,7 @@ def compile_to_parser(  # pylint: disable=redefined-builtin
     This routine parses the provided grammar and returns an object
     that can parse strings according to the grammar.
     """
-    
+
     externs = _default_externs(externs)
     result = grammar_parser.parse(grammar, path, externs)
     if result.err:
