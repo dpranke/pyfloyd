@@ -282,4 +282,4 @@ def _default_externs(externs: Optional[Externs] = None) -> Externs:
 
 def _node(parser: grammar_parser._Parser, *args) -> Any:
     del parser
-    return list(args)
+    return m_grammar.Node(*args)

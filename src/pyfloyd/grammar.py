@@ -48,10 +48,6 @@ BUILTIN_RULES = (
 
 
 class Node:
-    @staticmethod
-    def to(val: list[Any]) -> 'Node':
-        return Node(val[0], val[1], [Node.to(c) for c in val[2]])
-
     def __init__(self, t: str, v: Any, ch: Optional[list['Node']] = None):
         self.t = t
         self.v = v
@@ -289,8 +285,9 @@ class Node:
 
 
 class Grammar:
-    def __init__(self, ast: Any):
-        self.ast: Node = Node.to(ast)
+    def __init__(self, ast: Node):
+        assert isinstance(ast, Node)
+        self.ast = ast
         self.errors: list[str] = []
         self.comment: Optional[Node] = None
         self.rules: dict[str, Node] = collections.OrderedDict()
