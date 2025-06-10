@@ -190,14 +190,23 @@ def add_arguments(
             else:
                 def_str = ''
             help_str = f'Generate {lang} code (using templates)' + def_str
-            parser.add_argument(
-                '--' + lang,
-                '--' + ext[1:],
-                action='store_const',
-                dest='template',
-                const=tmpl,
-                help=help_str,
-            )
+            if lang != ext[1:]:
+                parser.add_argument(
+                    '--' + lang,
+                    '--' + ext[1:],
+                    action='store_const',
+                    dest='template',
+                    const=tmpl,
+                    help=help_str,
+                )
+            else:
+                parser.add_argument(
+                    '--' + lang,
+                    action='store_const',
+                    dest='template',
+                    const=tmpl,
+                    help=help_str,
+                )
 
     parser.add_argument(
         '--indent',

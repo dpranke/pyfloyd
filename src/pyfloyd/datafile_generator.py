@@ -31,8 +31,9 @@ DEFAULT_TEMPLATE = 'python.dft'
 DEFAULT_LANGUAGE = DEFAULT_TEMPLATE[:-4]
 
 KNOWN_TEMPLATES = {
-    '.py': 'python',
+    '.go': 'go',
     '.js': 'javascript',
+    '.py': 'python',
 }
 
 KNOWN_LANGUAGES = {v: k for k, v in KNOWN_TEMPLATES.items()}
