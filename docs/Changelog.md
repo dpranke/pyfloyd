@@ -4,6 +4,26 @@ This doc attempts to keep a history of the more prominent changes
 to the project. For now I'm starting way late in the game, but
 perhaps at some point I'll go back and backfill things.
 
+* v0.26.0 (2025-06-10)
+  - Added the ability for a grammar/parser to call out to functions
+    provided by the caller. A function is declared as an `extern`
+    (although there is as yet no typechecking), and can override
+    an existing implementation of a function. External functions
+    are passed the parser object so that they can query parser state
+    (or, I suppose, mutate it, though at this point that's probably
+    a terrible idea).
+  - Restructured the grammar.Node / AST classes to collapse everything
+    to a single class, deleting a lot of code. Most of it was overhead
+    that wasn't pulling its weight.
+  - Modified the Floyd grammar to call an external `node()` function;
+    this moves the actual construction of the syntax nodes out of the grammar
+    and will make it easier to generate different kinds of syntax trees
+    as needed. The first use of this is to add position information to
+    each node. This allows us to report position information for semantic
+    errors like unknown rules and variables.
+  - Removed the hard-coded JavaScript code generator. Templates are the
+    way going forward, but at least for now it seems like a good idea to
+    have at least one non-template code generation mechanism for comparison.
 
 * v0.25.0 (2025-06-08)
   - Codegen for the Go programming language is supported
