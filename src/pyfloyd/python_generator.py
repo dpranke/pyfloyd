@@ -282,7 +282,10 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
         if self.grammar.externs:
             vl += 'self._externs = {'
             for k, v in self.grammar.externs.items():
-                vl += f"    '{k}': {v},"
+                if v == 'func':
+                    vl += f"    '{k}': self._fn_{k},"
+                else:
+                    vl += f"    '{k}': {v},"
             vl += '}'
         else:
             vl += 'self._externs = {}'
@@ -357,6 +360,7 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
                 f"""
                 def parse(self, externs: Externs = None, start: int = 0):
                     self._pos = start
+
                     errors = ''
                     if externs:
                         for k, v in externs.items():
@@ -364,6 +368,10 @@ class PythonGenerator(hard_coded_generator.HardCodedGenerator):
                                 self._externs[k] = v
                             else:
                                 errors += f'Unexpected extern "{{k}}"\\n'
+                    for k, v in self._externs.items():
+                        if v is None:
+                            errors += f'Missing required extern "{{k}}"\\n'
+
                     if errors:
                         return Result(None, errors, 0)
                     try:
@@ -863,6 +871,10 @@ _BUILTINS = {
         """,
     'fn_list': """
         def _fn_list(self, *args):
+            return list(args)
+        """,
+    'fn_node': """
+        def _fn_node(self, parser, *args):
             return list(args)
         """,
     'fn_otou': """

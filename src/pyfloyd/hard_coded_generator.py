@@ -177,6 +177,11 @@ class HardCodedGenerator(generator.Generator):
     def _ty_e_call_infix(self, node: m_grammar.Node) -> formatter.Pack:
         pfx = self._gen_expr(node.ch[0])
         args = [self._gen_expr(c) for c in node.ch[1:]]
+        if node.ch[0][1] in self.grammar.externs:
+            return formatter.Pack(
+                pfx,
+                formatter.Triangle('(', formatter.Comma('self', *args), ')'),
+            )
         return formatter.Pack(
             pfx, formatter.Triangle('(', formatter.Comma(*args), ')')
         )

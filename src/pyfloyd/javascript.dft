@@ -78,6 +78,7 @@ t_declare_vars: [fn [vars]
 t_end: ';'  # statement terminator
 t_eq: [fn [x y] [hl x ' === ' y]]
 t_false: 'false'
+t_func: 'func'
 t_if: [fn [cond body] [block [hl 'if (' cond ')'] body]]
 t_ifelse: [fn [cond if_body e_body]
               [vl [block [hl 'if (' cond ')'] if_body]
@@ -99,6 +100,7 @@ t_null: 'null'
 t_or: [fn [x y] [hl x ' || ' y]]
 t_pop: [fn [x] [hl x '.pop()']]
 t_return: 'return;'
+t_self: 'this'
 t_substr: [fn [s start end] [hl s '.substr(' start ', ' end ')']]
 t_throw: [fn [msg] [hl 'throw new ParsingRuntimeError(' msg ')' t_end]]
 t_to_str: [fn [x] x]
@@ -197,7 +199,9 @@ externs: [fn [] [if [dict_is_empty grammar.externs]
                                             [hl '['
                                                 [lit k]
                                                 ', '
-                                                [if v 'true' 'false']
+                                                [if [equal v t_func]
+                                                    [fld [fn_name k]]
+                                                    [if v 'true' 'false']]
                                                 '], ']]
                                         grammar.externs]]
                         ']);']]]
@@ -244,6 +248,11 @@ parse_with_exception: @"""
           errors += `Unexpected extern "${key}"\\n`;
         } else {
           this.externs.set(key, externs.get(key));
+        }
+      }
+      for (let key of this.externs.keys()) {
+        if (!this.externs.has(key) || this.externs.get(key) == null) {
+          errors += `Missing required extern "${key}"\\n`;
         }
       }
       if (errors != '') {
@@ -684,6 +693,8 @@ fn_itou: [meth q['n'] 'return String.fromCharCode(n);']
 fn_join: [meth q['s' 'vs'] 'return vs.join(s);']
 
 fn_list: [meth q['...args'] 'return args;']
+
+fn_node: [meth q['parser' '...args'] 'return args;']
 
 fn_scat: [meth q['ss'] "return ss.join('');"]
 

@@ -244,7 +244,7 @@ n_e_call_infix: [fn [node]
                           [tri '('
                                 [if [in grammar.externs
                                         [get [item node.ch 0] 1]]
-                                    [comma [cons 'self'
+                                    [comma [cons t_self
                                                  [map [fn [c] [expr c]]
                                                       [slice node.ch 1 0]]]]
                                     [comma [map [fn [c] [expr c]]

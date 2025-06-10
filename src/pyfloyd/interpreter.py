@@ -236,7 +236,10 @@ class Interpreter:
         for subnode in node.ch[1:]:
             self._interpret(subnode)
             vals.append(self._val)
-        self._val = left(*vals)
+        if node.ch[0].t == 'e_ident' and node.ch[0].name in self._externs:
+            self._val = left(self, *vals)
+        else:
+            self._val = left(*vals)
 
     def _ty_e_const(self, node):
         if node.v == 'true':
@@ -574,3 +577,7 @@ class Interpreter:
         while self._pos >= colno and self._text[self._pos - colno] != '\n':
             colno += 1
         return colno
+
+    def _fn_node(self, parser, *args) -> Any:
+        del parser
+        return list(args)

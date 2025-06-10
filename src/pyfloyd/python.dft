@@ -88,6 +88,7 @@ t_not: 'not '  # the logical operator
 t_null: 'None'
 t_pop: [fn [lst] [hl lst '.pop()']]
 t_return:  'return'
+t_self: 'self'
 t_substr: [fn [s start end] [hl s '[' start ':' end ']']]
 t_throw: [fn [msg] [hl 'raise _ParsingRuntimeError(' msg ')' t_end]]
 t_to_str: [fn [x] x]

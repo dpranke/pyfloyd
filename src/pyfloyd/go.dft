@@ -101,6 +101,7 @@ t_empty_str_list: '[]str{}'
 t_end: ''  # statement terminator
 t_eq: [fn [x y] [hl x ' == ' y]]
 t_false: 'false'
+t_func: 'func'
 
 t_if: [fn [expr body] [block [hl 'if ' expr] body]]
 
@@ -147,6 +148,7 @@ t_regexp: [fn [re_str]
                   '}'
                   'p.o_fail()']]
 
+t_self: 'p'
 t_substr: [fn [s start end]
               [tri 'string('
                    [pack [tri '[]rune(' s ')'] [tri '[' [hl start ':' end] ']']]
@@ -264,13 +266,13 @@ parse_function: d"""
     func Parse(text string, args ...any) (any, error) {
       var path string = "<string>"
       var start int = 0
-      externs := make(map[string]bool)
+      externs := make(map[string]any)
 
       if len(args) > 0 {
           path = args[0].(string)
       }
       if len(args) > 1 {
-          externs = args[1].(map[string]bool)
+          externs = args[1].(map[string]any)
       }
       if len(args) > 2 {
          start = args[2].(int)
@@ -292,7 +294,7 @@ parser_class: @"""
         pos  int
         end  int
         errpos int
-        externs map[string]bool
+        externs map[string]any
         @if[generator_options.memoize 'cache map[int]map[string]cacheEntry']
         @if[grammar.seeds_needed 'seeds map[int]map[string]cacheEntry']
         @if[grammar.leftrec_needed 'blocked map[string]bool']
@@ -332,12 +334,14 @@ parser_constructor: @"""
 
 
 externs: [fn []
-             [vl [hl 'p.externs = make(map[string]bool)']
+             [vl [hl 'p.externs = make(map[string]any)']
                  [map_items [fn [k v]
                                 [hl 'p.externs['
                                     [lit k]
                                     '] = '
-                                    [if v 'true' 'false']]]
+                                    [if [equal v t_func]
+                                        [fld [fn_name k]]
+                                        [if v t_true t_false]]]]
                             grammar.externs]]]
 
 operator_state: [fn [rule o]
@@ -382,14 +386,14 @@ operator_choices: [fn [o]
 
 parse_with_exception: @"""
     func (p *Parser) Parse(args ...any) (r Result) {
-      var externs map[string]bool
+      var externs map[string]any
       var start int
 
       if len(args) == 2 {
-          externs = args[0].(map[string]bool)
+          externs = args[0].(map[string]any)
           start = args[1].(int)
       } else if len(args) == 1 {
-          externs = args[0].(map[string]bool)
+          externs = args[0].(map[string]any)
           start = 0
       }
 
@@ -428,14 +432,14 @@ parse_with_exception: @"""
 
 parse_without_exception: @"""
     func (p *Parser) Parse(args ...any) (r Result) {
-      var externs map[string]bool
+      var externs map[string]any
       var start int
 
       if len(args) == 2 {
-          externs = args[0].(map[string]bool)
+          externs = args[0].(map[string]any)
           start = args[1].(int)
       } else if len(args) == 1 {
-          externs = args[0].(map[string]bool)
+          externs = args[0].(map[string]any)
           start = 0
       }
 
@@ -469,7 +473,7 @@ default_footer: null
 main_footer: d"""
 
     func main() {
-        externs := make(map[string]bool)
+        externs := make(map[string]any)
         var s string
         var filename string
         var i int = 1
@@ -486,7 +490,7 @@ main_footer: d"""
                 if err != nil {
                     panic(err)
                 }
-                externs[l[0]] = v.(bool)
+                externs[l[0]] = v
                 i += 2
             } else if os.Args[i] == "-c" || os.Args[i] == "--code" {
                 s = os.Args[i+1]
@@ -535,6 +539,22 @@ main_footer: d"""
 
 n_e_arr: [fn [node]
              [tri '[]any{' [comma [map [fn [c] [expr c]] node.ch]] '}']]
+
+n_e_call_infix: [fn [node]
+                    [pack [if [in grammar.externs [get [item node.ch 0] 1]]
+                              [hl '('
+                                  [extern [get [item node.ch 0] 1]]
+                                  '.(func(*Parser, ...any)(any)))']
+                              [expr [item node.ch 0]]]
+                          [hl '('
+                                [if [in grammar.externs
+                                        [get [item node.ch 0] 1]]
+                                    [comma [cons t_self
+                                                 [map [fn [c] [expr c]]
+                                                      [slice node.ch 1 0]]]]
+                                    [comma [map [fn [c] [expr c]]
+                                                [slice node.ch 1 0]]]]
+                                ')']]]
 
 n_e_getitem: [fn [node] [tri '.([]any)[' [expr node.child] ']']]
 
@@ -989,6 +1009,13 @@ fn_list: [def_method _t_name
                         return args
                     }
                     """]
+
+fn_node: [def_method _t_name
+                     q['parser *Parser' 'args ...any']
+                     ' any'
+                     d"""
+                     return args
+                     """]
 
 fn_scat: [def_method _t_name
                      q['hd any' 'tl any']

@@ -158,7 +158,10 @@ class _Analyzer:
             assert choice.ch[0].t == 'apply'
             key = choice.ch[0].rule_name
             assert choice.ch[1].t == 'action'
-            if choice.ch[1].child.t == 'e_ident' and choice.ch[1].child.name == 'func':
+            if (
+                choice.ch[1].child.t == 'e_ident'
+                and choice.ch[1].child.name == 'func'
+            ):
                 self.grammar.externs[key] = 'func'
             else:
                 assert choice.ch[1].child.t == 'e_const'
@@ -257,8 +260,10 @@ class _Analyzer:
     def check_for_unknown_functions(self, node):
         if node.t == 'e_qual' and node.ch[1].t == 'e_call':
             function_name = node.ch[0].v
-            if (function_name not in functions.ALL and
-                function_name not in self.grammar.externs):
+            if (
+                function_name not in functions.ALL
+                and function_name not in self.grammar.externs
+            ):
                 self.grammar.errors.append(
                     f'Unknown function "{function_name}" called'
                 )
