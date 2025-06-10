@@ -94,7 +94,6 @@ class _Analyzer:
     def __init__(self, grammar: m_grammar.Grammar):
         self.grammar = grammar
         assert self.grammar.ast.t == 'rules'
-        self.errors: list[str] = []
         self.current_prec = 0
         self.current_rule = None
 
@@ -104,6 +103,16 @@ class _Analyzer:
             if rule.v[0] == '%':
                 self.check_pragma(rule)
                 continue
+
+    def add_error(self, node, msg):
+        if node.parser:
+            # TODO: The column number might be slightly off at this point
+            # because we're looking at the wrong node. Leave it out for now.
+            # pylint: disable=protected-access
+            lineno, _ = node.parser._o_offsets(node.pos)
+            self.grammar.errors.append(f'{node.parser._path}:{lineno} {msg}')
+        else:
+            self.grammar.errors.append(msg)
 
     def run_checks(self):
         for rule in self.grammar.ast.ch:
@@ -130,7 +139,7 @@ class _Analyzer:
             self._collect_idents(self.grammar.tokens, rule)
             for t in self.grammar.tokens:
                 if t not in self.grammar.rules:
-                    self.grammar.errors.append(f'Unknown token rule "{t}"')
+                    self.add_error(rule, f'Unknown token rule "{t}"')
         elif rule.v == '%whitespace':
             self.grammar.whitespace = choice
         elif rule.v == '%comment':
@@ -149,7 +158,7 @@ class _Analyzer:
             direction = seq.ch[1].v
             self.grammar.assoc[operator] = direction
         else:
-            self.grammar.errors.append(f'Unknown pragma "{pragma}"')
+            self.add_error(rule, f'Unknown pragma "{pragma}"')
 
     def _collect_externs(self, n):
         assert n.child.t == 'choice'
@@ -184,7 +193,7 @@ class _Analyzer:
             return
         if node.t == 'apply':
             if node.v not in self.grammar.rules:
-                self.grammar.errors.append(f'Unknown rule "{node.v}"')
+                self.add_error(node, f'Unknown rule "{node.v}"')
                 return
             self._collect_operators(operators, self.grammar.rules[node.v])
             return
@@ -192,9 +201,7 @@ class _Analyzer:
             for c in node.ch:
                 self._collect_operators(operators, c)
             return
-        self.grammar.errors.append(
-            f'Unexpected AST node type {node.t} in %prec'
-        )
+        self.add_error(node, f'Unexpected AST node type {node.t} in %prec')
 
     def check_for_unknown_rules(self, node):
         if (
@@ -202,7 +209,7 @@ class _Analyzer:
             and node.v not in self.grammar.rules
             and node.v not in ('any', 'end')
         ):
-            self.grammar.errors.append(f'Unknown rule "{node.v}"')
+            self.add_error(node, f'Unknown rule "{node.v}"')
         for c in node.ch:
             self.check_for_unknown_rules(c)
 
@@ -224,9 +231,10 @@ class _Analyzer:
             name = f'${i}'
             if c.t == 'label':
                 if c.v[0] == '$':
-                    self.grammar.errors.append(
+                    self.add_error(
+                        c,
                         f'"{c.v}" is a reserved variable name '
-                        'and cannot be explicitly defined'
+                        'and cannot be explicitly defined',
                     )
                 self.check_positional_vars(c.child)
             if c.t in ('action', 'equals', 'pred'):
@@ -243,9 +251,10 @@ class _Analyzer:
             if node.v[0] == '$':
                 num = int(node.v[1:])
                 if num >= current_index:
-                    self.grammar.errors.append(
+                    self.add_error(
+                        node,
                         f'Variable "{node.v}" referenced before '
-                        'it was available'
+                        'it was available',
                     )
                 else:
                     # We don't want to think of unknown variables as
@@ -262,8 +271,8 @@ class _Analyzer:
                 function_name not in functions.ALL
                 and function_name not in self.grammar.externs
             ):
-                self.grammar.errors.append(
-                    f'Unknown function "{function_name}" called'
+                self.add_error(
+                    node, f'Unknown function "{function_name}" called'
                 )
         for c in node.ch:
             self.check_for_unknown_functions(c)
@@ -291,7 +300,7 @@ class _Analyzer:
                     self._check_named_vars(c, labels, local_labels, references)
 
             for v in set(local_labels.keys()) - set(references):
-                self.grammar.errors.append(f'Variable "{v}" never used')
+                self.add_error(node, f'Variable "{v}" never used')
 
             # Now remove any variables that were defined in this scope.
             for v in set(local_labels.keys()).difference(
@@ -323,8 +332,8 @@ class _Analyzer:
             elif var_name in self.grammar.externs:
                 node.attrs.kind = 'extern'
             else:
-                self.grammar.errors.append(
-                    f'Unknown identifier "{var_name}" referenced'
+                self.add_error(
+                    node, f'Unknown identifier "{var_name}" referenced'
                 )
 
         for c in node.ch:

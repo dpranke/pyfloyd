@@ -15,10 +15,6 @@
   to the existing support for constants. They should be able to override
   the builtin methods.
 
-* Change the floyd parser to use proper nodes that contain line number and
-  column info so that when we catch errors in analysis we can actually point
-  to where the error is happening.
-
 * Figure out how to generate a full concrete syntax tree with comments
   and whitespace properly annotated so we have a more generic DOM-like
   approach for manipulating parsed documents. Ultimately this should

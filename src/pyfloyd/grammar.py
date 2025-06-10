@@ -48,7 +48,13 @@ BUILTIN_RULES = (
 
 
 class Node:
-    def __init__(self, t: str, v: Any, ch: Optional[list['Node']] = None):
+    def __init__(
+        self,
+        t: str,
+        v: Any,
+        ch: Optional[list['Node']] = None,
+        parser: Any = None,
+    ):
         self.t = t
         self.v = v
         self.ch: list['Node'] = ch or []
@@ -69,6 +75,8 @@ class Node:
             self.attrs.local_vars = {}
         elif self.t == 'rule':
             self.attrs.vars = {}
+        self.parser = parser
+        self.pos: Optional[int] = parser._pos if parser else None
 
     def __eq__(self, other) -> bool:
         assert isinstance(other, Node)

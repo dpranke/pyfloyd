@@ -593,7 +593,7 @@ class ValuesMixin:
             'foobar',
             grammar_err=(
                 'Errors were found:\n'
-                '  "$1" is a reserved variable name '
+                '  <string>:1 "$1" is a reserved variable name '
                 'and cannot be explicitly defined\n'
             ),
         )
@@ -602,7 +602,7 @@ class ValuesMixin:
             'foobar',
             grammar_err=(
                 'Errors were found:\n'
-                '  Variable "$2" referenced before it was available\n'
+                '  <string>:1 Variable "$2" referenced before it was available\n'
             ),
         )
 
@@ -624,8 +624,8 @@ class ValuesMixin:
             'fooxxx',
             grammar_err=(
                 'Errors were found:\n'
-                '  Variable "x" never used\n'
-                '  Unknown identifier "x" referenced\n'
+                '  <string>:1 Variable "x" never used\n'
+                '  <string>:1 Unknown identifier "x" referenced\n'
             ),
         )
 
@@ -643,8 +643,8 @@ class ValuesMixin:
             'fooxfoo',
             grammar_err=(
                 'Errors were found:\n'
-                '  Variable "f" never used\n'
-                '  Unknown identifier "f" referenced\n'
+                '  <string>:2 Variable "f" never used\n'
+                '  <string>:4 Unknown identifier "f" referenced\n'
             ),
         )
 
@@ -997,7 +997,8 @@ class PragmasMixin:
             bar     = 'baz'
             """,
             'baz',
-            grammar_err='Errors were found:\n  Unknown token rule "quux"\n',
+            grammar_err='Errors were found:\n'
+            '  <string>:1 Unknown token rule "quux"\n',
         )
 
     def test_tokens(self):
@@ -1021,7 +1022,9 @@ class PragmasMixin:
             '%foo = end',
             '',
             out=None,
-            grammar_err=('Errors were found:\n  Unknown pragma "%foo"\n'),
+            grammar_err=(
+                'Errors were found:\n  <string>:1 Unknown pragma "%foo"\n'
+            ),
         )
 
     def test_whitespace_chars(self):
@@ -1154,7 +1157,9 @@ class OperatorsMixin:
         self.check(
             g,
             '1',
-            grammar_err=('Errors were found:\n  Unknown rule "a"\n'),
+            grammar_err=(
+                'Errors were found:\n  <string>:2 Unknown rule "a"\n'
+            ),
         )
 
     @skip('operators')
@@ -1410,8 +1415,8 @@ class ErrorsMixin:
             '',
             grammar_err=(
                 'Errors were found:\n'
-                '  Unknown function "foo" called\n'
-                '  Unknown identifier "foo" referenced\n'
+                '  <string>:1 Unknown function "foo" called\n'
+                '  <string>:1 Unknown identifier "foo" referenced\n'
             ),
         )
 
@@ -1420,7 +1425,8 @@ class ErrorsMixin:
             'grammar = -> v',
             '',
             grammar_err=(
-                'Errors were found:\n  Unknown identifier "v" referenced\n'
+                'Errors were found:\n'
+                '  <string>:1 Unknown identifier "v" referenced\n'
             ),
         )
 
@@ -1428,7 +1434,9 @@ class ErrorsMixin:
         self.check(
             'grammar = foo',
             '',
-            grammar_err=('Errors were found:\n  Unknown rule "foo"\n'),
+            grammar_err=(
+                'Errors were found:\n  <string>:1 Unknown rule "foo"\n'
+            ),
         )
 
         # Check that referring to a reserved rule is caught when the rule
@@ -1438,7 +1446,9 @@ class ErrorsMixin:
             grammar = _whitespace
             """),
             '',
-            grammar_err=('Errors were found:\n  Unknown rule "_whitespace"\n'),
+            grammar_err=(
+                'Errors were found:\n  <string>:1 Unknown rule "_whitespace"\n'
+            ),
         )
 
         # Check that referring to a reserved rule is caught when the rule
@@ -1449,7 +1459,9 @@ class ErrorsMixin:
             grammar = _whitespace
             """),
             '',
-            grammar_err=('Errors were found:\n  Unknown rule "_whitespace"\n'),
+            grammar_err=(
+                'Errors were found:\n  <string>:2 Unknown rule "_whitespace"\n'
+            ),
         )
 
     def test_unexpected_thing(self):
