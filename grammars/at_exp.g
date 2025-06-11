@@ -31,48 +31,57 @@
 
 %externs = allow_trailing                  -> false
 
-grammar = term* opt_end                    -> $1
+%comment = /@;{[^}]*}/
+         | /@;[^\n]*\n */
+         | /@;[^\n]*/ end
 
-term    = '@' at_expr
-        | '\n'
-        | /[^@\n]+/
+grammar  = term* opt_end                   -> $1
 
-opt_end = ?{allow_trailing}
-        | end
+term     = '@' at_expr
+         | '\n'
+         | /[^@\n]+/
 
-ws      =  /[ \t\n]+/
+opt_end  = ?{allow_trailing}
+         | end
 
-at_expr = opt_id list braces               -> concat(cons($1, $2), [$3])
-        | opt_id list                      -> cons($1, $2)
-        | opt_id braces                    -> [$1, $2]
-        | id                               -> $1
-        | string                           -> $1
 
-opt_id  = id
-        |                                  -> ['symbol', 'lisp']
+ws       =  /[ \t\n]+/
 
-id      = /[a-zA-Z_][\.a-zA-Z0-9_]*/       -> ['symbol', $1]
+at_expr  = opt_id list braces               -> concat(cons($1, $2), [$3])
+         | opt_id list                      -> cons($1, $2)
+         | opt_id braces                    -> cons($1, $2)
+         | id                               -> $1
+         | string                           -> $1
 
-expr    = id
-        | 'true'                           -> true
-        | 'false'                          -> false
-        | number
-        | string
-        | list
+opt_id   = id
+         |                                  -> ['symbol', 'lisp']
 
-number  = '0'                              -> 0
-        | /[1-9][0-9]*/                    -> atoi($1, 10)
+id       = /[a-zA-Z_][\.a-zA-Z0-9_]*/       -> ['symbol', $1]
 
-string  = '"' dqch* '"'                    -> join('', $2)
-        | "'" sqch* "'"                    -> join('', $2)
+expr     = id
+         | 'true'                           -> true
+         | 'false'                          -> false
+         | number
+         | string
+         | list
 
-dqch    = '\\"'                            -> '"'
-        | [^"]
+number   = '0'                              -> 0
+         | /[1-9][0-9]*/                    -> atoi($1, 10)
 
-sqch    = "\\'"                            -> "'"
-        | [^']
+string   = '"' dqch* '"'                    -> join('', $2)
+         | "'" sqch* "'"                    -> join('', $2)
 
-list = '[' ws? expr (ws expr)* ws? ']'     -> cons($3, $4)
-        | '[' ws? ']'                      -> []
+dqch     = '\\"'                            -> '"'
+         | [^"]
 
-braces   = '{' <(^'}')*> '}'               -> $2
+sqch     = "\\'"                            -> "'"
+         | [^']
+
+list     = '[' ws? expr (ws expr)* ws? ']'  -> cons($3, $4)
+         | '[' ws? ']'                      -> []
+
+braces   = '{' sub_term* '}'                -> $2
+
+sub_term = '@' at_expr
+         | '\n'
+         | /[^}@\n]+/

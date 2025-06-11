@@ -29,6 +29,21 @@ class Tests(unittest.TestCase):
         actual_lines = flatten_as_lisplist(actual_obj, indent=indent)
         self.assertEqual(expected_lines, actual_lines)
 
+    def check(self, s, expected):
+        interp = lisp_interpreter.Interpreter()
+        at_exp.bind_at_exps(interp, '  ', use_format_objs=False)
+        got = interp.eval([['symbol', 'at_exp'], s])
+        self.assertEqual(expected, got)
+
     def test_basic(self):
+        self.check('foo', ['foo'])
+        self.check('@list[]', [[]])
+        self.check('@list{foo}', [['foo']])
+        self.check('@list{foo @list{bar} baz}', [['foo ', ['bar'], ' baz']])
+
+    def test_comment(self):
+        self.check('@;foo', [])
+
+    def test_lines(self):
         self.check_lines('hello world', ["[vl 'hello world']"])
         self.check_lines('@strcat["foo" "bar"]', ["[vl 'foobar']"])
