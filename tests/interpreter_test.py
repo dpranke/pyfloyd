@@ -16,7 +16,7 @@ import textwrap
 
 import pyfloyd
 
-from . import grammar_test
+from tests import grammar_test
 
 
 class _Mixin(grammar_test.Mixin):

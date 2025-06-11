@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import grammar_test
+from tests import grammar_test
 
 
 class _Mixin(grammar_test.GeneratorMixin):
