@@ -379,20 +379,22 @@ class Decoder:
     def parse_string(self, tag, v, as_key):
         del as_key
         is_rstr = 'r' in tag
-        is_dstr = 'd' in tag
+        is_istr = 'i' in tag
+        if tag and tag not in ('i', 'r', 'ir', 'ri'):
+            raise DatafileError(f'Unsupported string tag `{tag}`')
+
         _, colno, s = v
         i = 0
         ret = []
         while i < len(s):
-            if s[i] == '\\' and not is_rstr:
-                i, c = decode_escape(s, i)
-                ret.append(c)
-            else:
+            if is_rstr or s[i] != '\\':
                 ret.append(s[i])
                 i += 1
-        if is_dstr:
-            return dedent(''.join(ret), colno=colno)
-        return ''.join(ret)
+            else:
+                i, c = decode_escape(s, i)
+                ret.append(c)
+        r = ''.join(ret)
+        return dedent(r, colno=colno, min_indent=1 if is_istr else -1)
 
     def parse_string_list(self, tag, strs):
         if tag:
@@ -525,8 +527,8 @@ def isoct(ch):
     return '0' <= ch <= '7'
 
 
-def dedent(s, colno=-1):
-    return functions.f_dedent(s, colno)
+def dedent(s, colno=-1, min_indent=-1):
+    return functions.f_dedent(s, colno, min_indent)
 
 
 def dump(

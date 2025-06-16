@@ -40,10 +40,10 @@ given types (using Python's type annotation syntax):
     Equivalent to `slice(l, 1, 0)`.
 
 * `colno() -> int`<br>
-     Returns the current (1-based) column number in the text at the
-     point where the function is called. If the text is empty,
-     returns 1. If at the end of the text, returns 1 + the colno of
-     the last character in the file.
+    Returns the current (1-based) column number in the text at the
+    point where the function is called. If the text is empty,
+    returns 1. If at the end of the text, returns 1 + the colno of
+    the last character in the file.
 
 * `concat(xs: list[any], ys: list[any]) -> list[any]`<br>
     Returns an array containing all of the elements of `x` followed
@@ -53,16 +53,24 @@ given types (using Python's type annotation syntax):
     Returns an array with `hd` as the first element, followed by
     the elements from `tl`. Equivalent to `concat([hd], tl)`.
 
-* `dedent(s: str, colno: int = -1) -> str`<br>
-    Returns an unindented version of the given string. Any
-    characters up to and including the first newline are discarded.
-    Then, looking at the remaining lines, the line with the fewest
-    number of spaces before a non-space character (or the end of
-    the string) is taken to be the indentation to undo. Each line
-    then has that many characters removed. Anything after the last
-    newline is discarded as well, and then the lines are cat'ed
-    together and returned as a string. See the documentation
-    on datafiles for more on how dedenting works.
+* `dedent(s: str, colno: int = -1, min_indent: int = -1) -> str`<br>
+    Returns a (possibly) unindented version of the given string, as
+    follows:
+    - A single-line string is returned unchanged.
+    - If `min_indent` is `-1`, The minimum indentation of the second
+      and subsequent lines of the string is calculated; that number is
+      compared to the column number of the first line as well (if
+      available). Otherwise, the given column number (1-based) is
+      used to determine the indentation to leave (A value of 0 or 1
+      means "leave as-is").
+    - If colno is not -1, that is used as the (1-based) column number
+      to use for the indentation on the first line.
+    - That number of leading spaces as determined from the above is
+      stripped from each line, and any trailing spaces are stripped
+      from each line. If the first line is blank, it is discarded
+      altogether. If the last line is blank it is also discarded;
+      however, if the string ends in a newline, the newline is
+      preserved.
 
 * `dict(pairs: list[any]) -> dict[str, any]`<br>
     Returns a dictionary containing all the key/value pairs.
@@ -75,8 +83,7 @@ given types (using Python's type annotation syntax):
     Returns whether the two values are equal.
 
 * `ftoa(f: float) -> str`<br>
-        Returns the string representation of the floating point
-    number.
+    Returns the string representation of the floating point number.
 
 * `ftoi(f: float) -> int`<br>
     Returns the integer equivalent of the floating point number.
@@ -178,9 +185,7 @@ given types (using Python's type annotation syntax):
     Returns a list of the [key, value] pairs in the dict `d`.
 
 * `pos() -> int`<br>
-
-                 Returns the current position in the parser.
-
+    Returns the current position in the parser.
 
 * `replace(s: str, old: str, new: str) -> str`<br>
     Returns a copy of `s` with all the occurrences of `old` replaced

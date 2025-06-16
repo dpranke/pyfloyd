@@ -1107,7 +1107,7 @@ _BUILTINS = {
             return [hd] + tl
         """,
     'fn_dedent': """
-        def _fn_dedent(self, s, colno):
+        def _fn_dedent(self, s, colno, min_indent):
             return s
         """,
     'fn_dict': """

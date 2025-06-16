@@ -903,7 +903,7 @@ class FunctionsMixin:
 
     def test_dedent(self):
         self.check(
-            'g = -> dedent("\n  foo\n    bar\n", -1)',
+            'g = -> dedent("\n  foo\n    bar\n", -1, -1)',
             '',
             out='foo\n  bar\n',
         )

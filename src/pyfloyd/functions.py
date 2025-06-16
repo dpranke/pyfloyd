@@ -77,7 +77,7 @@ def f_cons(hd: Any, tl: list[Any]) -> list[Any]:
     return [hd] + tl
 
 
-def f_dedent(s: str, colno: int = -1) -> str:
+def f_dedent(s: str, colno: int = -1, min_indent: int = -1) -> str:
     # TODO: Figure out what to do with tabs and other non-space
     # whitespace.
     def _indent(s):
@@ -88,9 +88,17 @@ def f_dedent(s: str, colno: int = -1) -> str:
 
     lines = s.splitlines()
     if len(lines) < 2:
-        return s.strip()
+        return s
 
-    min_indent = min(_indent(line) for line in lines[1:] if line)
+    if min_indent == 0:
+        # Treat 0 as if 1 was passed.
+        min_indent = 1
+    if min_indent == -1:
+        min_indent = min(_indent(line) for line in lines[1:] if line)
+    else:
+        # Adjust for being 1-based.
+        min_indent -= 1
+
     if lines[0] and not lines[0].isspace():
         if colno == -1:
             raise ValueError(
@@ -385,7 +393,7 @@ ALL: dict[str, dict[str, Any]] = {
     },
     'dedent': {
         'func': f_dedent,
-        'params': [['s', 'str'], ['colno', 'int']],
+        'params': [['s', 'str'], ['colno', 'int'], ['min_indent', 'int']],
         'ret': 'str',
     },
     'dict': {

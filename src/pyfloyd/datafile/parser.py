@@ -713,11 +713,11 @@ class _Parser:
 
     def _s_raw_str_tag_3(self):
         self._o_memoize('r__filler', self._r__filler)
-        self._o_str('rd')
+        self._o_str('ri')
 
     def _s_raw_str_tag_4(self):
         self._o_memoize('r__filler', self._r__filler)
-        self._o_str('dr')
+        self._o_str('ir')
 
     def _s_raw_str_tag_5(self):
         pos = self._pos
@@ -756,7 +756,7 @@ class _Parser:
 
     def _s_string_tag_2(self):
         self._o_memoize('r__filler', self._r__filler)
-        self._o_ch('d')
+        self._o_ch('i')
 
     def _s_string_tag_3(self):
         pos = self._pos
@@ -969,12 +969,6 @@ class _Parser:
         self._o_rewind(pos)
         self._scopes.append({})
         self._s_raw_str_31()
-        self._scopes.pop()
-        if not self._failed:
-            return
-        self._o_rewind(pos)
-        self._scopes.append({})
-        self._s_raw_str_40()
         self._scopes.pop()
 
     def _s_raw_str_1(self):
@@ -1360,103 +1354,6 @@ class _Parser:
     def _s_raw_str_39(self):
         self._o_str(self._o_lookup('lq'))
 
-    def _s_raw_str_40(self):
-        self._o_ch('[')
-        if self._failed:
-            return
-        self._s_raw_str_41()
-        if self._failed:
-            return
-        self._scopes[-1]['eqs'] = self._val
-        if self._failed:
-            return
-        self._o_ch('[')
-        if self._failed:
-            return
-        self._s_raw_str_42()
-        v_c = self._val
-        self._s_raw_str_43()
-        v_s = self._val
-        self._o_ch(']')
-        if self._failed:
-            return
-        self._o_str(self._o_lookup('eqs'))
-        if self._failed:
-            return
-        self._o_ch(']')
-        if self._failed:
-            return
-        self._o_succeed(
-            [
-                self._fn_strcat(
-                    '[',
-                    self._fn_strcat(
-                        self._fn_join('', self._o_lookup('eqs')), ']'
-                    ),
-                ),
-                v_c,
-                v_s,
-            ],
-            self._pos,
-        )
-
-    def _s_raw_str_41(self):
-        vs = []
-        self._o_ch('=')
-        if self._failed:
-            return
-        vs.append(self._val)
-        while True:
-            pos = self._pos
-            self._o_ch('=')
-            if self._failed or self._pos == pos:
-                self._o_rewind(pos)
-                break
-            vs.append(self._val)
-        self._o_succeed(vs, self._pos)
-
-    def _s_raw_str_42(self):
-        self._o_succeed(self._fn_colno(), self._pos)
-
-    def _s_raw_str_43(self):
-        start = self._pos
-        self._s_raw_str_44()
-        end = self._pos
-        self._val = self._text[start:end]
-
-    def _s_raw_str_44(self):
-        vs = []
-        while True:
-            pos = self._pos
-            self._s_raw_str_45()
-            if self._failed or self._pos == pos:
-                self._o_rewind(pos)
-                break
-            vs.append(self._val)
-        self._o_succeed(vs, self._pos)
-
-    def _s_raw_str_45(self):
-        pos = self._pos
-        errpos = self._errpos
-        self._s_raw_str_46()
-        if self._failed:
-            self._o_succeed(None, pos)
-        else:
-            self._o_rewind(pos)
-            self._errpos = errpos
-            self._o_fail()
-        if not self._failed:
-            self._r_any()
-
-    def _s_raw_str_46(self):
-        self._o_ch(']')
-        if self._failed:
-            return
-        self._o_str(self._o_lookup('eqs'))
-        if self._failed:
-            return
-        self._o_ch(']')
-
     def _r_str(self):
         pos = self._pos
         self._scopes.append({})
@@ -1497,12 +1394,6 @@ class _Parser:
         self._o_rewind(pos)
         self._scopes.append({})
         self._s_str_37()
-        self._scopes.pop()
-        if not self._failed:
-            return
-        self._o_rewind(pos)
-        self._scopes.append({})
-        self._s_str_47()
         self._scopes.pop()
 
     def _s_str_1(self):
@@ -1915,107 +1806,6 @@ class _Parser:
 
     def _s_str_46(self):
         self._o_str(self._o_lookup('lq'))
-
-    def _s_str_47(self):
-        self._o_ch('[')
-        if self._failed:
-            return
-        self._s_str_48()
-        if self._failed:
-            return
-        self._scopes[-1]['eqs'] = self._val
-        if self._failed:
-            return
-        self._o_ch('[')
-        if self._failed:
-            return
-        self._s_str_49()
-        v_c = self._val
-        self._s_str_50()
-        v_s = self._val
-        self._o_ch(']')
-        if self._failed:
-            return
-        self._o_str(self._o_lookup('eqs'))
-        if self._failed:
-            return
-        self._o_ch(']')
-        if self._failed:
-            return
-        self._o_succeed(
-            [
-                self._fn_strcat(
-                    '[',
-                    self._fn_strcat(
-                        self._fn_join('', self._o_lookup('eqs')), ']'
-                    ),
-                ),
-                v_c,
-                v_s,
-            ],
-            self._pos,
-        )
-
-    def _s_str_48(self):
-        vs = []
-        self._o_ch('=')
-        if self._failed:
-            return
-        vs.append(self._val)
-        while True:
-            pos = self._pos
-            self._o_ch('=')
-            if self._failed or self._pos == pos:
-                self._o_rewind(pos)
-                break
-            vs.append(self._val)
-        self._o_succeed(vs, self._pos)
-
-    def _s_str_49(self):
-        self._o_succeed(self._fn_colno(), self._pos)
-
-    def _s_str_50(self):
-        start = self._pos
-        self._s_str_51()
-        end = self._pos
-        self._val = self._text[start:end]
-
-    def _s_str_51(self):
-        vs = []
-        while True:
-            pos = self._pos
-            self._s_str_52()
-            if self._failed or self._pos == pos:
-                self._o_rewind(pos)
-                break
-            vs.append(self._val)
-        self._o_succeed(vs, self._pos)
-
-    def _s_str_52(self):
-        self._s_str_53()
-        if self._failed:
-            return
-        self._o_memoize('r_bchar', self._r_bchar)
-
-    def _s_str_53(self):
-        pos = self._pos
-        errpos = self._errpos
-        self._s_str_54()
-        if self._failed:
-            self._o_succeed(None, pos)
-        else:
-            self._o_rewind(pos)
-            self._errpos = errpos
-            self._o_fail()
-
-    def _s_str_54(self):
-        self._o_ch(']')
-        if self._failed:
-            return
-        self._o_str(self._o_lookup('eqs'))
-        if self._failed:
-            return
-        self._o_ch(']')
 
     def _r_punct(self):
         rexp = "(L'=+')|[/#'\"`\\[\\](){}:=,]"
@@ -2681,9 +2471,6 @@ class _Parser:
 
     def _fn_cons(self, hd, tl):
         return [hd] + tl
-
-    def _fn_join(self, sep, strs):
-        return sep.join(strs)
 
     def _fn_strcat(self, *args):
         return ''.join(args)

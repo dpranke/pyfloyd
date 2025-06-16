@@ -42,7 +42,7 @@ class Functions(_Mixin, grammar_test.FunctionsMixin):
     def test_dedent(self):
         # TODO: `dedent` isn't implemented properly in the JS templates yet.
         self.check(
-            'g = -> dedent("\n  foo\n     bar\n", -1)',
+            'g = -> dedent("\n  foo\n     bar\n", -1, -1)',
             text='',
             out='\n  foo\n     bar\n',
         )

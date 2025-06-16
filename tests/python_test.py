@@ -41,7 +41,7 @@ class Functions(_Mixin, grammar_test.FunctionsMixin):
         # TODO: `dedent` isn't implemented properly in the hardcoded
         # Python generator.
         self.check(
-            'g = -> dedent("\n  foo\n     bar\n", -1)',
+            'g = -> dedent("\n  foo\n     bar\n", -1, -1)',
             text='',
             out='\n  foo\n     bar\n',
         )

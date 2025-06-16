@@ -130,12 +130,12 @@ imports: [vl [if generator_options.main
              [if grammar.unicodedata_needed 'import unicodedata']]
 
 
-parsing_runtime_exception_class: d"""
+parsing_runtime_exception_class: """
     class _ParsingRuntimeError(Exception):
         pass
     """
 
-operator_state_class: d"""
+operator_state_class: """
     class _OperatorState:
         def __init__(self):
             self.current_depth: int = 0
@@ -146,7 +146,7 @@ operator_state_class: d"""
             self.choices: dict[str, Any] = {}  # really dict[str, grammar.Rule]
     """  # operator_state_class
 
-result_class: d'''
+result_class: '''
     class Result(NamedTuple):
         """The result returned from a `parse()` call.
 
@@ -163,7 +163,7 @@ result_class: d'''
     '''  # result_class
 
 
-parse_function: d'''
+parse_function: '''
     def parse(
         text: str, path: str = '<string>', externs: Externs = None, start: int = 0
     ) -> Result:
@@ -326,7 +326,7 @@ function_param_names: [fn [name] [map [fn [p] [item p 0]]
 
 default_footer: null
 
-main_footer: d"""
+main_footer: """
 
 
     def main(
@@ -411,21 +411,21 @@ n_set: [fn [node]
 #
 
 r_any: [
-    meth q[] d"
+    meth q[] "
         if self._pos < self._end:
             self._o_succeed(self._text[self._pos], self._pos + 1)
         else:
             self._o_fail()
         "]
 
-r_end: [meth q[] d"
+r_end: [meth q[] "
              if self._pos == self._end:
                  self._o_succeed(None, self._pos)
              else:
                  self._o_fail()
              "]
 
-o_ch: [meth q['ch'] d"
+o_ch: [meth q['ch'] "
            pos = self._pos
            if pos < self._end and self._text[pos] == ch:
                self._o_succeed(ch, self._pos + 1)
@@ -433,7 +433,7 @@ o_ch: [meth q['ch'] d"
                self._o_fail()
            "]
 
-o_offsets: [meth q['pos'] d'''
+o_offsets: [meth q['pos'] '''
                 lineno = 1
                 colno = 1
                 for i in range(pos):
@@ -445,7 +445,7 @@ o_offsets: [meth q['pos'] d'''
                 return lineno, colno
                 ''']
 
-o_error: [meth q[] d'''
+o_error: [meth q[] '''
               lineno, colno = self._o_offsets(self._errpos)
               if self._errpos == len(self._text):
                   thing = 'end of input'
@@ -455,13 +455,13 @@ o_error: [meth q[] d'''
               return f'{path}:{lineno} Unexpected {thing} at column {colno}'
               ''']
 
-o_fail: [meth q[] d'''
+o_fail: [meth q[] '''
               self._val = None
               self._failed = True
               self._errpos = max(self._errpos, self._pos)
               ''']
 
-o_leftrec: [meth q['rule' 'rule_name' 'left_assoc'] d'''
+o_leftrec: [meth q['rule' 'rule_name' 'left_assoc'] '''
                   pos = self._pos
                   key = (rule_name, pos)
                   seed = self._seeds.get(key)
@@ -490,7 +490,7 @@ o_leftrec: [meth q['rule' 'rule_name' 'left_assoc'] d'''
                           return
                   ''']
 
-o_lookup: [meth q['var'] d'''
+o_lookup: [meth q['var'] '''
                 i = len(self._scopes) - 1
                 while i >= 0:
                     if var in self._scopes[i]:
@@ -501,7 +501,7 @@ o_lookup: [meth q['var'] d'''
                 assert False, f'unknown var {var}'
                 ''']
 
-o_memoize: [meth q['rule_name' 'fn'] d'''
+o_memoize: [meth q['rule_name' 'fn'] '''
         pos = self._pos
         if pos not in self._cache:
             self._cache[pos] = {}
@@ -513,7 +513,7 @@ o_memoize: [meth q['rule_name' 'fn'] d'''
         c[rule_name] = (self._val, self._failed, self._pos)
         ''']
 
-o_operator: [meth q['rule_name'] d'''
+o_operator: [meth q['rule_name'] '''
         o = self._operators[rule_name]
         pos = self._pos
         cache = self._seeds.get(pos)
@@ -557,7 +557,7 @@ o_operator: [meth q['rule_name'] d'''
         self._val, self._failed, self._pos = entry
         ''']
 
-o_range: [meth q['i' 'j'] d'''
+o_range: [meth q['i' 'j'] '''
                pos = self._pos
                if pos != self._end and ord(i) <= ord(self._text[pos]) <= ord(j):
                    self._o_succeed(self._text[pos], self._pos + 1)
@@ -567,7 +567,7 @@ o_range: [meth q['i' 'j'] d'''
 
 o_rewind: [meth q['newpos'] 'self._o_succeed(None, newpos)']
 
-o_str: [meth q['s'] d'''
+o_str: [meth q['s'] '''
              for ch in s:
                  self._o_ch(ch)
                  if self._failed:
@@ -575,14 +575,14 @@ o_str: [meth q['s'] d'''
              self._val = s
              ''']
 
-o_succeed: [meth q['v' 'newpos'] d"
+o_succeed: [meth q['v' 'newpos'] "
                 self._val = v
                 self._failed = False
                 self._pos = newpos
                 "]
 
 o_unicat: [
-    meth q['cat'] d"
+    meth q['cat'] "
          pos = self._pos
          if pos < self._end and unicodedata.category(self._text[pos]) == cat:
              self._o_succeed(self._text[pos], self._pos + 1)
@@ -591,7 +591,7 @@ o_unicat: [
          "]
 
 fn_colno: [
-    meth q[] d"""
+    meth q[] """
             colno = 0
             if self._pos == self._end:
                 colno += 1
@@ -602,7 +602,7 @@ fn_colno: [
 
 fn_pos: [meth q[] 'return self.pos']
 
-fn_node: [meth q['parser' '*args'] d"""
+fn_node: [meth q['parser' '*args'] """
         del parser
         return list(args)
         """]

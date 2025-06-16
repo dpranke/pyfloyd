@@ -70,19 +70,27 @@ class Grammar(unittest.TestCase):
     def test_raw_str(self):
         self.check(r'r"foo\x"', r'foo\x')
 
-    def test_d_str(self):
-        self.check("d'\n  bar\n    baz'", 'bar\n  baz')
-        self.check("d'\n  bar\n    baz\n  '", 'bar\n  baz\n')
-        self.check("d'\n  \n    baz\n'", '\n  baz\n')
-        self.check("d'\n  bar\n\n    baz\n'", 'bar\n\n  baz\n')
+    def test_i_str(self):
+        self.check("i'\n  bar\n    baz'", '  bar\n    baz')
+        self.check("i'\n  bar\n    baz\n  '", '  bar\n    baz\n')
+        self.check("i'\n  \n    baz\n'", '\n    baz\n')
+        self.check("i'\n  bar\n\n    baz\n'", '  bar\n\n    baz\n')
+        self.check("i'foo'", 'foo')
+        self.check("i'  foo  '", '  foo  ')
+        self.check("i'  foo\n'", '  foo\n')
+        self.check("i'  foo  \nbar'", '    foo\nbar')
 
-    def test_d_str_text_on_first_line(self):
-        self.check("d'foo'", 'foo')
-        self.check("d'  foo  '", 'foo')
-        self.check("d'foo\n  bar'", 'foo\nbar')
-        self.check("d'  foo  \n  bar'", '  foo\nbar')
-        self.check("d'foo\n  bar \n    baz'", 'foo\nbar\n  baz')
-        self.check("  d'foo\n bar'", '   foo\nbar')
+    def test_str_dedented_by_default(self):
+        self.check("'\n  bar\n    baz'", 'bar\n  baz')
+        self.check("'\n  bar\n    baz\n  '", 'bar\n  baz\n')
+        self.check("'\n  \n    baz\n'", '\n  baz\n')
+        self.check("'\n  bar\n\n    baz\n'", 'bar\n\n  baz\n')
+        self.check("'foo'", 'foo')
+        self.check("'  foo  '", '  foo  ')
+        self.check("'foo\n  bar'", 'foo\n bar')
+        self.check("'  foo  \n  bar'", ' foo\nbar')
+        self.check("'foo\n  bar \n    baz'", 'foo\n bar\n   baz')
+        self.check("  'foo\n bar'", '  foo\nbar')
 
     def test_str(self):
         self.check('"foo"', 'foo')
@@ -109,9 +117,6 @@ class Grammar(unittest.TestCase):
         self.check("L'='foo'='", 'foo')
         self.check("L'=='foo'=='", 'foo')
         self.check("L'=='f'='o'=='", "f'='o")
-        self.check('[=[foo]=]', 'foo')
-        self.check('[==[foo]==]', 'foo')
-        self.check('[==[fo[=[]=]o]==]', 'fo[=[]=]o')
 
     def test_bare_word(self):
         self.check('foo', 'foo')

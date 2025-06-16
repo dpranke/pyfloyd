@@ -96,10 +96,10 @@ string       = raw_str_tag raw_str                    -> ['string', $1, $2]
 string_list  = string_tag
                '(' string (','? string)* ')'          -> ['string_list', $1,
                                                           cons($3, $4)]
-raw_str_tag  = ('r' | 'rd' | 'dr')
+raw_str_tag  = ('r' | 'ri' | 'ir')
                  ~(%whitespace | %comment)            -> $1
 
-string_tag   = ('d' | tag) ~(%whitespace | %comment)  -> $1
+string_tag   = ('i' | tag) ~(%whitespace | %comment)  -> $1
 
 tag          = bareword
              | %filler                                -> ''
@@ -126,15 +126,6 @@ raw_str      = tsq (-> colno()) <(^tsq)*> tsq         -> [$1, $2, $3]
                <(^(={lq}))*>:s
                ={lq}
                ->                             [strcat('L', lq), c, s]
-             | '['
-               '='+:eqs
-               '['
-               (-> colno()):c
-               <(^(']' ={eqs} ']'))*>:s
-               ']'
-               ={eqs}
-               ']'
-               ->    [strcat('[', strcat(join('', eqs), ']')), c, s]
 
 str          = tsq (-> colno()) <(~tsq bchar)*> tsq   -> [$1, $2, $3]
              | tdq (-> colno()) <(~tdq bchar)*> tdq   -> [$1, $2, $3]
@@ -148,15 +139,6 @@ str          = tsq (-> colno()) <(~tsq bchar)*> tsq   -> [$1, $2, $3]
                <(~(={lq}) bchar)*>:s
                ={lq}
                ->                             [strcat('L', lq), c, s]
-             | '['
-               '='+:eqs
-               '['
-               (-> colno()):c
-               <(~(']' ={eqs} ']') bchar)*>:s
-               ']'
-               ={eqs}
-               ']'
-               ->     [strcat('[', strcat(join('', eqs), ']')), c, s]
 
 punct        = /(L'=+')|[\/#'"`\[\](){}:=,]/
 

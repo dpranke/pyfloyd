@@ -17,127 +17,135 @@ functions = {
     atob: {
         params: [[s str]]
         ret: bool
-        doc: d"""
-              Returns either true or false depending on whether the string
-              is "true" or "false".
+        doc: """
+             Returns either true or false depending on whether the string
+             is "true" or "false".
+             """
+        body: """
+              if s == 'true':
+                  return True
+              if s == 'false':
+                  return False
+              raise HostError(f'Illegal value `{s}` passed to `atob()`')
               """
-        body: d"""
-               if s == 'true':
-                   return True
-               if s == 'false':
-                   return False
-               raise HostError(f'Illegal value `{s}` passed to `atob()`')
-               """
     }
     atof: {
         params: [[s str]]
         ret: float
-        doc: d"""
-              Returns the numeric equivalent of the string value, where the
-              string matches either a floating-point number.
-              """
+        doc: """
+             Returns the numeric equivalent of the string value, where the
+             string matches either a floating-point number.
+             """
         body: 'return float(s)'
     }
     atoi: {
         params: [[s str] [base int]]
         ret: float
-        doc: d"""
-              Returns the numeric (integer) equivalent of the string value
-              where the string is a series of digits in the given base (2, 8,
-              10, 16). Strings in bases other than 10 may optionally be
-              prefixed with the corresponding prefix. Strings in base 10
-              may optionally have a leading '-'.
-              """
+        doc: """
+             Returns the numeric (integer) equivalent of the string value
+             where the string is a series of digits in the given base (2, 8,
+             10, 16). Strings in bases other than 10 may optionally be
+             prefixed with the corresponding prefix. Strings in base 10
+             may optionally have a leading '-'.
+             """
         body: 'return int(s, base)'
     }
     atou: {
         params: [[s str] [base int 10]]
         ret: str
-        doc: d"""
-              Returns the unicode code point value corresponding to the
-              int value of s. Equivalent to `itou(atoi(s, base))`.
-              """
+        doc: """
+             Returns the unicode code point value corresponding to the
+             int value of s. Equivalent to `itou(atoi(s, base))`.
+             """
         body: 'return chr(int(s, base))'
     }
     btoa: {
         params: [[b bool]]
         ret: str
-        doc: d"""
-              Returns either 'true' or 'false' depending on the value of b.
-              """
+        doc: """
+             Returns either 'true' or 'false' depending on the value of b.
+             """
         body: "return 'true' if b else 'false'"
     }
     car: {
         params: [[lis 'list[any]']]
         ret: any
-        doc: d"""
-              Returns the first item in the list. Equivalent to `item(l, 0)`.
-              """
+        doc: """
+             Returns the first item in the list. Equivalent to `item(l, 0)`.
+             """
         body: 'return lis[0]'
     }
     cat: {
         params: [[strs 'list[str]']]
         ret: str
-        doc: d"""
-              Returns the string produced by concatenating all of the
-              elements of `strs` together Equivalent to `join('', strs)` or
-              `cat(*strs)`.
-              """
+        doc: """
+             Returns the string produced by concatenating all of the
+             elements of `strs` together Equivalent to `join('', strs)` or
+             `cat(*strs)`.
+             """
         body: "return ''.join(strs)"
     }
     cdr: {
         params: [[lis 'list[any]']]
         ret: 'list[any]'
-        doc: d"""
-              Returns the sublist with everything but the first element.
-              Equivalent to `slice(l, 1, 0)`.
-              """
+        doc: """
+             Returns the sublist with everything but the first element.
+             Equivalent to `slice(l, 1, 0)`.
+             """
         body: 'return lis[1:]'
     }
     colno: {
         name: colno
         params: []
         ret: int
-        doc: d"""
-              Returns the current (1-based) column number in the text at the
-              point where the function is called. If the text is empty,
-              returns 1. If at the end of the text, returns 1 + the colno of
-              the last character in the file.
+        doc: """
+             Returns the current (1-based) column number in the text at the
+             point where the function is called. If the text is empty,
+             returns 1. If at the end of the text, returns 1 + the colno of
+             the last character in the file.
              """
     }
     concat: {
         params: [[xs 'list[any]'] [ys 'list[any]']]
         ret: 'list[any]'
-        doc: d"""
-              Returns an array containing all of the elements of `x` followed
-              by all of the elements of `y`.
-              """
+        doc: """
+             Returns an array containing all of the elements of `x` followed
+             by all of the elements of `y`.
+             """
         body: 'return xs + ys'
     }
     cons: {
         params: [[hd 'any'] [tl 'list[any]']]
         ret: 'list[any]'
-        doc: d"""
-              Returns an array with `hd` as the first element, followed by
-              the elements from `tl`. Equivalent to `concat([hd], tl)`.
-              """
+        doc: """
+             Returns an array with `hd` as the first element, followed by
+             the elements from `tl`. Equivalent to `concat([hd], tl)`.
+             """
         body: 'return [hd] + tl'
     }
     dedent: {
-        params: [[s 'str'] [colno 'int' -1]]
+        params: [[s 'str'] [colno 'int' -1] [min_indent 'int' -1]]
         ret: str
-        doc: d"""
-              Returns an unindented version of the given string. Any
-              characters up to and including the first newline are discarded.
-              Then, looking at the remaining lines, the line with the fewest
-              number of spaces before a non-space character (or the end of
-              the string) is taken to be the indentation to undo. Each line
-              then has that many characters removed. Anything after the last
-              newline is discarded as well, and then the lines are cat'ed
-              together and returned as a string. See the documentation
-              on datafiles for more on how dedenting works.
-              """
-        body: rd"""
+        doc: """
+             Returns a (possibly) unindented version of the given string, as
+             follows:
+             - A single-line string is returned unchanged.
+             - If `min_indent` is `-1`, The minimum indentation of the second
+               and subsequent lines of the string is calculated; that number is
+               compared to the column number of the first line as well (if
+               available). Otherwise, the given column number (1-based) is
+               used to determine the indentation to leave (A value of 0 or 1
+               means "leave as-is").
+             - If colno is not -1, that is used as the (1-based) column number
+               to use for the indentation on the first line.
+             - That number of leading spaces as determined from the above is
+               stripped from each line, and any trailing spaces are stripped
+               from each line. If the first line is blank, it is discarded
+               altogether. If the last line is blank it is also discarded;
+               however, if the string ends in a newline, the newline is
+               preserved.
+             """
+        body: r"""
               # TODO: Figure out what to do with tabs and other non-space
               # whitespace.
               def _indent(s):
@@ -148,9 +156,12 @@ functions = {
 
               lines = s.splitlines()
               if len(lines) < 2:
-                  return s.strip()
+                  return s
 
-              min_indent = min(_indent(line) for line in lines[1:] if line)
+              if min_indent == 0:
+                  min_indent = 1
+              if min_indent == -1:
+                  min_indent = min(_indent(line) for line in lines[1:] if line)
               if lines[0] and not lines[0].isspace():
                   if colno == -1:
                       raise ValueError(
@@ -188,54 +199,55 @@ functions = {
         name: dict
         params: [[pairs 'list[any]']]
         ret: 'dict[str, any]'
-        doc: d"""
-              Returns a dictionary containing all the key/value pairs.
-              """
+        doc: """
+             Returns a dictionary containing all the key/value pairs.
+             """
         body: 'return dict(pairs)'
     }
     dict_is_empty: {
         name: dict_is_empty
         params: [[d 'dict[str, any]']]
         ret: bool
-        doc: d"""
-              Returns whether the dictionary contains no entries. Equivalent
-              to `length(keys(d)) == 0`.
-              """
+        doc: """
+             Returns whether the dictionary contains no entries. Equivalent
+             to `length(keys(d)) == 0`.
+             """
         body: 'return len(d) == 0'
     }
     equal: {
         params: [[x any] [y any]]
         ret: bool
-        doc: d"""
-              Returns whether the two values are equal.
-              """
+        doc: """
+             Returns whether the two values are equal.
+             """
         body: 'return x == y'
     }
     ftoa: {
         params: [[f float]]
         ret: str
-        doc: d"""Returns the string representation of the floating point
-             number."""
+        doc: """
+             Returns the string representation of the floating point number.
+             """
         body: 'return str(f)'
     }
     ftoi: {
         params: [[f float]]
         ret: int
-        doc: d"""
-              Returns the integer equivalent of the floating point number.
-              Values are truncated towards zero (i.e., `int(3.5)` returns
-              `3` and `int(-3.5)` returns `-3`).
-              """
+        doc: """
+             Returns the integer equivalent of the floating point number.
+             Values are truncated towards zero (i.e., `int(3.5)` returns
+             `3` and `int(-3.5)` returns `-3`).
+             """
         body: 'return int(f)'
     }
     get: {
         # TODO: Figure out how to get to `d: dict[str, any], attr: str`.
         params: [[d 'dict[str, any]'] [attr any]]
         ret: any
-        doc: d"""
-              Returns the given member of the dictionary.
-              """
-        body: d"""
+        doc: """
+             Returns the given member of the dictionary.
+             """
+        body: """
               try:
                   return d[attr]
               except TypeError:
@@ -245,10 +257,10 @@ functions = {
     has: {
         params: [[d 'dict[str, any]'] [key str]]
         ret: bool
-        doc: d"""
-              Returns whether the key is in the dictionary.
-              """
-        body: d"""
+        doc: """
+             Returns whether the key is in the dictionary.
+             """
+        body: """
               try:
                   return key in d
               except TypeError:
@@ -258,7 +270,7 @@ functions = {
     in: {
         params: [[lis 'list[any]'] [v 'any']]
         ret: bool
-        doc: d"""
+        doc: """
              Returns whether `lis` contains `v`.
              """
         body: 'return v in lis' # 'return lis.find(v) != -1'
@@ -266,59 +278,59 @@ functions = {
     is_atom: {
         params: [[el any]]
         ret: bool
-        doc: d"""
-              Returns whether the element is a primitive type
-              (null/bool/num/str).
-              """
+        doc: """
+             Returns whether the element is a primitive type
+             (null/bool/num/str).
+             """
         body: 'return isinstance(el, (bool, int, float, str)) or el is None'
     }
     is_bool: {
         params: [[el any]]
         ret: bool
-        doc: d"""
-              Returns whether the element is a boolean value.
-              """
+        doc: """
+             Returns whether the element is a boolean value.
+             """
         body: 'return isinstance(el, bool)'
     }
     is_dict: {
         params: [[el any]]
         ret: bool
-        doc: d"""
-              Returns whether the element is a dictionary/object/map.
-              """
+        doc: """
+             Returns whether the element is a dictionary/object/map.
+             """
         body: 'return isinstance(el, dict)'
     }
     is_empty: {
         params: [[lis 'list[any]']]
         ret: bool
-        doc: d"""
-              Returns whether the list has no elements. Equivalent to
-              `equal(length(lis), 0)`.
-              """
+        doc: """
+             Returns whether the list has no elements. Equivalent to
+             `equal(length(lis), 0)`.
+             """
         body: 'return len(lis) == 0'
     }
     is_float: {
         params: [[el any]]
         ret: bool
-        doc: d"""
-              Returns whether the element is a floating point number.
-              """
+        doc: """
+             Returns whether the element is a floating point number.
+             """
         body: 'return isinstance(el, float)'
     }
     is_int: {
         params: [[el any]]
         ret: bool
-        doc: d"""
-              Returns whether the element is an integer.
-              """
+        doc: """
+             Returns whether the element is an integer.
+             """
         body: 'return isinstance(el, int)'
     }
     is_list: {
         params: [[el any]]
         ret: bool
-        doc: d"""
-              Returns whether the element is a list.
-              """
+        doc: """
+             Returns whether the element is a list.
+             """
         body: 'return isinstance(el, list)'
     }
     is_number: {
@@ -326,48 +338,48 @@ functions = {
         # and `is_number`? and support both integers and floats?
         params: [[el any]]
         ret: bool
-        doc: d"""
-              Returns whether the element is some kind of number (int or
-              float).
-              """
+        doc: """
+             Returns whether the element is some kind of number (int or
+             float).
+             """
         body: 'return isinstance(el, (int, float))'
     }
     is_null: {
         params: [[el any]]
         ret: bool
-        doc: d"""
-              Returns whether the element is `null`.
-              """
+        doc: """
+             Returns whether the element is `null`.
+             """
         body: 'return el is None'
     }
     is_str: {
         params: [[el any]]
         ret: bool
-        doc: d"""
-              Returns whether the element is a string.
-              """
+        doc: """
+             Returns whether the element is a string.
+             """
         body: 'return isinstance(el, str)'
     }
     item: {
         params: [[lis 'list[any]'] [index int]]
         ret: any
-        doc: d"""
-              Returns the given member of the array. Indexes work as in
-              Python, so they are zero-based and negative numbers work
-              backwards from the end of the list.
-              """
+        doc: """
+             Returns the given member of the array. Indexes work as in
+             Python, so they are zero-based and negative numbers work
+             backwards from the end of the list.
+             """
         body: 'return lis[index]'
     }
     itoa: {
         params: [[i int] [base int 10]]
         ret: str
-        doc: d"""
-              Returns the string representation of integer `val` expressed in
-              the given base (either 2, 8, 10, or 16). Bases other than
-              10 are prefixed with the corresponding prefix ('0b', '0o', or
-              '0x').
-              """
-        body: d"""
+        doc: """
+             Returns the string representation of integer `val` expressed in
+             the given base (either 2, 8, 10, or 16). Bases other than
+             10 are prefixed with the corresponding prefix ('0b', '0o', or
+             '0x').
+             """
+        body: """
               if base == 10:
                   return f'{i:d}'
               if base == 16:
@@ -382,73 +394,73 @@ functions = {
     itof: {
         params: [[i int]]
         ret: float
-        doc: d"""
-              Returns the floating point equivalent of the integer `i`.
-              """
+        doc: """
+             Returns the floating point equivalent of the integer `i`.
+             """
         body: 'return float(i)'
     }
     itou: {
         params: [[i int]]
         ret: str
-        doc: d"""
-              Returns a string containing a single character with the code
-              point corresponding to `i`.
-              """
+        doc: """
+             Returns a string containing a single character with the code
+             point corresponding to `i`.
+             """
         body: 'return chr(i)'
     }
     join: {
         params: [[sep 'str'] [strs 'list[str]']]
         ret: str
-        doc: d"""
-              Returns the result of joining all the strings in `strs` with
-              the string in `sep` in between them.
-              """
+        doc: """
+             Returns the result of joining all the strings in `strs` with
+             the string in `sep` in between them.
+             """
         body: 'return sep.join(strs)'
     }
     keys: {
         params: [[d 'dict[str, any]']]
         ret: 'list[str]'
-        doc: d"""
-              Returns the keys in the dictionary.
-              """
+        doc: """
+             Returns the keys in the dictionary.
+             """
         body: 'return list(d.keys())'
     }
     len: {
         params: [[lis 'list[any]']]
         ret: int
-        doc: d"""
-              Returns the length of the list.
-              """
+        doc: """
+             Returns the length of the list.
+             """
         body: 'return len(lis)'
     }
     list: {
         params: [['*args' any]]
         ret: 'list[any]'
-        doc: d"""
-              Returns a list of the given arguments.
-              """
+        doc: """
+             Returns a list of the given arguments.
+             """
         body: 'return list(args)'
     }
     map: {
         params: [[fn 'func[[any], any]'] [lis 'list[any]']]
         ret: 'list[any]'
-        doc: d"""
-              Returns a list containing the values returned from calling `fn`
-              with every item in `lis`.
-              """
+        doc: """
+             Returns a list containing the values returned from calling `fn`
+             with every item in `lis`.
+             """
     }
     map_items: {
         params: [[fn 'func[[str, any], any]'] [lis 'list[any]']]
         ret: 'list[any]'
-        doc: d"""
-              Returns a list containing the values returned from calling `fn`
-              with each `key`, `value` pair in `d`.
-              """
+        doc: """
+             Returns a list containing the values returned from calling `fn`
+             with each `key`, `value` pair in `d`.
+             """
     }
     node: {
         params: [[parser any] ['*args' any]]
         ret: 'any'
-        doc: d"""
+        doc: """
              Hook function that can be used to synthesize custom AST nodes
              in the parser. By default this just returns a list of the args
              passed to it.
@@ -457,19 +469,19 @@ functions = {
     otou: {
         params: [[s str]]
         ret: str
-        doc: d"""
-              Returns a string containing a single character with the code
-              point corresponding to the given string of octal digits.
-              Equivalent to `itou(atoi(s, base=8))`.
-              """
+        doc: """
+             Returns a string containing a single character with the code
+             point corresponding to the given string of octal digits.
+             Equivalent to `itou(atoi(s, base=8))`.
+             """
         body: 'return chr(int(s, base=8))'
     }
     pairs: {
         params: [[d 'dict[str, any]']]
         ret: 'list[any]'  # really `list[list[str, any]]`
-        doc: d"""
-              Returns a list of the [key, value] pairs in the dict `d`.
-              """
+        doc: """
+             Returns a list of the [key, value] pairs in the dict `d`.
+             """
         body: 'return list(d.items())'
     }
     pos: {
@@ -482,89 +494,89 @@ functions = {
     replace: {
         params: [[s str] [old str] [new str]]
         ret: str
-        doc: d"""
-              Returns a copy of `s` with all the occurrences of `old` replaced
-              by `new`.
-              """
+        doc: """
+             Returns a copy of `s` with all the occurrences of `old` replaced
+             by `new`.
+             """
         body: 'return s.replace(old, new)'
     }
     scat: {
         params: [[hd str] [tl 'list[str]']]
         ret: str
-        doc: d"""
-              Returns a string formed by concatenating `hd` with every item
-              in `tl`. Equivalent to `strcat(hd, *tl)` or `cat(scons(hd, tl))`.
-              """
+        doc: """
+             Returns a string formed by concatenating `hd` with every item
+             in `tl`. Equivalent to `strcat(hd, *tl)` or `cat(scons(hd, tl))`.
+             """
         body: "return hd + ''.join(tl)"
     }
     scons: {
         params: [[hd str] [tl 'list[str]']]
         ret: 'list[str]'
-        doc: d"""
-              Returns an array with `hd` as the first element, followed by the
-              elements from `tl`. Equivalent to `cons`, but takes strings
-              instead of arbitrary values.
-              """
+        doc: """
+             Returns an array with `hd` as the first element, followed by the
+             elements from `tl`. Equivalent to `cons`, but takes strings
+             instead of arbitrary values.
+             """
         body: 'return [hd] + tl'
     }
     slice: {
         params: [[vs 'list[any]'] [start int] [end int]]
         ret: 'list[any]'
-        doc: d"""
-              Returns the sublist of `l` starting at `start` and ending at
-              `end`. `start` and `end` have almost the same meanings as in
-              Python, i.e., they are zero-based, and negative numbers count
-              backwards from the end of the list. Unlike Python, however,
-              a value of 0 for `end` means "to the end of the list", i.e.,
-              `slice(l, 1, 0)` is equivalent to Python's `l[1:]`.
-              """
+        doc: """
+             Returns the sublist of `l` starting at `start` and ending at
+             `end`. `start` and `end` have almost the same meanings as in
+             Python, i.e., they are zero-based, and negative numbers count
+             backwards from the end of the list. Unlike Python, however,
+             a value of 0 for `end` means "to the end of the list", i.e.,
+             `slice(l, 1, 0)` is equivalent to Python's `l[1:]`.
+             """
         body: 'return vs[start:] if end == 0 else vs[start:end]'
     }
     sort: {
         params: [[strs 'list[str]']]
         ret: 'list[str]'
-        doc: d"""
-              Returns a copy of `strs` where the elements have been sorted.
-              """
+        doc: """
+             Returns a copy of `strs` where the elements have been sorted.
+             """
         body: 'return sorted(strs)'
     }
     split: {
         params: [[s str] [sep str '']]
         ret: 'list[str]'
-        doc: d"""
-              Returns a list of strings obtained by splitting `s` whereever
-              `sep` occurs. If sep is the empty string, the string is split
-              into a list of individual characters.
-              """
+        doc: """
+             Returns a list of strings obtained by splitting `s` whereever
+             `sep` occurs. If sep is the empty string, the string is split
+             into a list of individual characters.
+             """
         body: 'return s.split(sep)'
     }
     str2td: {
         params: [[s str]]
         ret: 'dict[str, any]'
-        doc: d"""
-              Returns a descriptor containing a language-neutral parsed
-              version of a given language-neutral type string. Each descriptor
-              contains two fields, a `base` field with the base type (as a
-              string), and an `elements` field, for any type parameters.
-              For example, `list[str]` would be
-              `{base: list, elements[{base: str}]}`. Note: in some languages
-              this may return a dict-like object rather than an actual dict.
-              """
-        body: d'return type_desc.TypeDesc(s)'
+        doc: """
+             Returns a descriptor containing a language-neutral parsed
+             version of a given language-neutral type string. Each descriptor
+             contains two fields, a `base` field with the base type (as a
+             string), and an `elements` field, for any type parameters.
+             For example, `list[str]` would be
+             `{base: list, elements[{base: str}]}`. Note: in some languages
+             this may return a dict-like object rather than an actual dict.
+             """
+        body: 'return type_desc.TypeDesc(s)'
     }
     strcat: {
         params: [['*args' str]]
         ret: str
-        doc: d"""
-              Returns the string concatenation of the args. Equivalent to
-              `cat(args)` or `join('', args)`.
-              """
+        doc: """
+             Returns the string concatenation of the args. Equivalent to
+             `cat(args)` or `join('', args)`.
+             """
         body: "return ''.join(args)"
     }
     strin: {
         params: [[s str] [sub str]]
         ret: bool
-        doc: d"""
+        doc: """
              Returns whether `sub` is found in `s`.
              """
         body: "return sub in s"
@@ -572,115 +584,115 @@ functions = {
     strlen: {
         params: [[s str]]
         ret: int
-        doc: d"""
-              Returns the length of the string.
-              """
+        doc: """
+             Returns the length of the string.
+             """
         body: 'return len(s)'
     }
     substr: {
         params: [[s str] [start int] [end int]]
         ret: str
-        doc: d"""
-              Returns the substring of `s` from `start` to `end`. `start` and
-              `end` have almost the same meanings as in a Python slice, i.e.
-              they are zero-based and negative numbers count backwards from
-              the end. Unlike Python, however, a value of `0` for `end` can
-              be used for the end of the string.
-              """
+        doc: """
+             Returns the substring of `s` from `start` to `end`. `start` and
+             `end` have almost the same meanings as in a Python slice, i.e.
+             they are zero-based and negative numbers count backwards from
+             the end. Unlike Python, however, a value of `0` for `end` can
+             be used for the end of the string.
+             """
         body: 'return s[start:] if end == 0 else s[start:end]'
     }
     td2str: {
         params: [[d 'dict[str, any]']]
         ret: 'str'
-        doc: d"""
-              Returns a language-neutral string representative of a given
-              language-neutral type description. See `str2td` for the
-              dictionary structure. For example,
-              `td2str({base: list, elements: [{base: str, elements: []}]`
-              would return `list[str]`.
-              """
-        body: d'return type_desc.d2str(d)'
+        doc: """
+             Returns a language-neutral string representative of a given
+             language-neutral type description. See `str2td` for the
+             dictionary structure. For example,
+             `td2str({base: list, elements: [{base: str, elements: []}]`
+             would return `list[str]`.
+             """
+        body: 'return type_desc.d2str(d)'
     }
     throw: {
         params: [[msg str]]
         ret: str
-        doc: d"""
-              Throws (or raises) an exception with the given `msg` as a
-              message. The current `compile`, `parse`, or `generate` operation
-              completes immediately and returns the message as the error.
-              """
+        doc: """
+             Throws (or raises) an exception with the given `msg` as a
+             message. The current `compile`, `parse`, or `generate` operation
+             completes immediately and returns the message as the error.
+             """
         body: 'raise UserError(msg)'
     }
     ucategory: {
         params: [[s str]]
         ret: str
-        doc: d"""
-              Returns a string with the unicode category of the first
-              character in the string `s`. This may not be available in every
-              environment; if it isn't, a RuntimeError will be raised when
-              the runtime detects that you may want to use it (i.e., at parse
-              time, not runtime).
-              """
+        doc: """
+             Returns a string with the unicode category of the first
+             character in the string `s`. This may not be available in every
+             environment; if it isn't, a RuntimeError will be raised when
+             the runtime detects that you may want to use it (i.e., at parse
+             time, not runtime).
+             """
         body: 'return unicodedata.category(s[0])'
     }
     ulookup: {
         params: [[s str]]
         ret: str
-        doc: d"""
-              Returns a string containing the single character with the
-              unicode name given in `s`. This may not be available in every
-              environment; if it isn't, a RuntimeError will be raised when
-              the runtime detects that you may want to use it (i.e., at parse
-              time, not runtime).
-              """
+        doc: """
+             Returns a string containing the single character with the
+             unicode name given in `s`. This may not be available in every
+             environment; if it isn't, a RuntimeError will be raised when
+             the runtime detects that you may want to use it (i.e., at parse
+             time, not runtime).
+             """
         body: 'return unicodedata.lookup(s)'
     }
     uname: {
         params: [[s str]]
         ret: str
-        doc: d"""
-              Returns the unicode name for the first character in `s`. This
-              may not be available in every environment; if it isn't, a
-              RuntimeError will be raised when the runtime detects that you
-              may want to use it (i.e., at parse time, not runtime).
-              """
+        doc: """
+             Returns the unicode name for the first character in `s`. This
+             may not be available in every environment; if it isn't, a
+             RuntimeError will be raised when the runtime detects that you
+             may want to use it (i.e., at parse time, not runtime).
+             """
         body: 'return unicodedata.name(s[0])'
     }
     utoi: {
         params: [[u str]]
         ret: int
-        doc: d"""
-              Returns the unicode code point value of the first character in s.
-              """
+        doc: """
+             Returns the unicode code point value of the first character in s.
+             """
         body: 'return ord(u[0])'
     }
     values: {
         params: [[d 'dict[str, any]']]
         ret: 'list[any]'
-        doc: d"""
-              Returns the values in the given dictionary.
-              """
+        doc: """
+             Returns the values in the given dictionary.
+             """
         body: 'return list(d.values())'
     }
     xtoi: {
         params: [[s str]]
         ret: int
-        doc: d"""
-              Returns the integer value of the given hexadecimal string.
-              The string may have an optional '0x' at the front. Equivalent
-              to `atoi(s, base=16)`.
-              """
+        doc: """
+             Returns the integer value of the given hexadecimal string.
+             The string may have an optional '0x' at the front. Equivalent
+             to `atoi(s, base=16)`.
+             """
         body: 'return int(s, base=16)'
     }
     xtou: {
         params: [[s str]]
         ret: str
-        doc: d"""
-              Returns the Unicode character with the code point value that is
-              the hexadecimal value in `s`. The string may have an optional
-              "0x" in front, or it may be just a string of hexadecimal digits.
-              Equivalent to `atou(s, base=16)`.
-              """
+        doc: """
+             Returns the Unicode character with the code point value that is
+             the hexadecimal value in `s`. The string may have an optional
+             "0x" in front, or it may be just a string of hexadecimal digits.
+             Equivalent to `atou(s, base=16)`.
+             """
         body: 'return chr(int(s, base=16))'
     }
 }

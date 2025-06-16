@@ -13,7 +13,7 @@ given types (using Python's type annotation syntax):
 @vl[[map_items [fn [k v] [func k v]] functions]]
 """
 
-func: [fn [k v] [at_exp d"""
+func: [fn [k v] [at_exp """
                         * `@k(@params[v.params]) -> @v.ret`<br>
                         @ind[v.doc]
 

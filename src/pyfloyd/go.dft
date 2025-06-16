@@ -234,10 +234,10 @@ imports: @"""
     )
     """
 
-parsing_runtime_exception_class: d"""
+parsing_runtime_exception_class: """
     """
 
-operator_state_class: d"""
+operator_state_class: """
     type operatorState struct {
         currentDepth int
         currentPrec int
@@ -248,7 +248,7 @@ operator_state_class: d"""
     }
     """
 
-result_class: d"""
+result_class: """
     type cacheEntry struct {
         val any
         failed bool
@@ -262,7 +262,7 @@ result_class: d"""
     }
     """
 
-parse_function: d"""
+parse_function: """
     func Parse(text string, args ...any) (any, error) {
       var path string = "<string>"
       var start int = 0
@@ -470,7 +470,7 @@ parse_without_exception: @"""
 
 default_footer: null
 
-main_footer: d"""
+main_footer: """
 
     func main() {
         externs := make(map[string]any)
@@ -584,7 +584,7 @@ n_set: [fn [node] [t_regexp [strcat '[' node.v ']']]]
 #
 
 r_any: [meth q[]
-             d"""
+             """
              if p.pos < p.end {
                  p.o_succeed(string(p.text[p.pos]), p.pos + 1)
              } else {
@@ -593,7 +593,7 @@ r_any: [meth q[]
              """]
 
 r_end: [meth q[]
-             d"""
+             """
              if p.pos == p.end {
                  p.o_succeed(nil, p.pos)
              } else {
@@ -602,7 +602,7 @@ r_end: [meth q[]
              """]
 
 o_ch: [meth q['c string']
-            d"""
+            """
             pos := p.pos
             if pos < p.end && p.text[pos] == ([]rune(c)[0]) {
                 p.o_succeed(c, p.pos + 1)
@@ -611,7 +611,7 @@ o_ch: [meth q['c string']
             }
             """]
 
-o_offsets: d"""
+o_offsets: """
            func (p *Parser) o_offsets(pos int) (int, int) {
                lineno := 1
                colno := 1
@@ -627,7 +627,7 @@ o_offsets: d"""
            }
            """
 
-o_error: d"""
+o_error: """
          func (p *Parser) o_error() string {
              lineno, colno := p.o_offsets(p.errpos)
              var thing string
@@ -642,14 +642,14 @@ o_error: d"""
          """
 
 o_fail: [meth q[]
-              d"""
+              """
               p.val = nil
               p.failed = true
               p.errpos = max(p.errpos, p.pos)
               """]
 
 o_leftrec: [meth q['rule any' 'rule_name string' 'left_assoc bool']
-                 d"""
+                 """
                  pos := p.pos
                  var entry cacheEntry
                  var ok bool
@@ -694,7 +694,7 @@ o_leftrec: [meth q['rule any' 'rule_name string' 'left_assoc bool']
                  }
                  """]  # o_leftrec
 
-o_lookup: d"""
+o_lookup: """
           func (p *Parser) o_lookup(v string) any {
               var val any
               var ok bool
@@ -713,7 +713,7 @@ o_lookup: d"""
           """
 
 o_memoize: [meth q['rule_name string' 'fn any']
-                 d"""
+                 """
                  pos := p.pos
                  if _, ok := p.cache[pos]; !ok {
                     p.cache[pos] = make(map[string]cacheEntry)
@@ -732,7 +732,7 @@ o_memoize: [meth q['rule_name string' 'fn any']
                  """]
 
 o_operator: [meth q['rule_name string']
-                  d"""
+                  """
                   var entry cacheEntry
                   var cache map[string]cacheEntry
                   var ok bool
@@ -790,7 +790,7 @@ o_operator: [meth q['rule_name string']
                   """]  # o_operator
 
 o_range: [meth q['i string' 'j string']
-               d"""
+               """
                pos := p.pos
                if pos == p.end {
                  p.o_fail()
@@ -807,7 +807,7 @@ o_range: [meth q['i string' 'j string']
 o_rewind: [meth q['newpos int'] 'p.o_succeed(nil, newpos)']
 
 o_str: [meth q['s string']
-             d"""
+             """
              for _, r := range s {
                p.o_ch(string(r))
                if p.failed {
@@ -817,14 +817,14 @@ o_str: [meth q['s string']
              p.val = s
              """]
 
-o_succeed: [meth q['v any' 'newpos int'] d"""
+o_succeed: [meth q['v any' 'newpos int'] """
    p.val = v
    p.failed = false
    p.pos = newpos
    """]
 
 o_unicat: [meth q['cat string']
-                d"""
+                """
                 r, _ := regexp.Compile("(?m:\\\\p{" + cat + "})")
                 sub := string(p.text[p.pos:])
                 loc := r.FindStringIndex(sub)
@@ -839,7 +839,7 @@ o_unicat: [meth q['cat string']
 fn_aminus: [def_method _t_name
                       q['l any' 'r any']
                       ' any'
-                      d"""
+                      """
                       l_type := fmt.Sprintf("%T", l)
                       r_type := fmt.Sprintf("%T", r)
                       if l_type == "int" && r_type == "int" {
@@ -861,7 +861,7 @@ fn_getany: [def_method _t_name
 fn_aplus: [def_method _t_name
                       q['l any' 'r any']
                       ' any'
-                      d"""
+                      """
                       l_type := fmt.Sprintf("%T", l)
                       r_type := fmt.Sprintf("%T", r)
                       if l_type != r_type {
@@ -883,7 +883,7 @@ fn_aplus: [def_method _t_name
 fn_atof: [def_method _t_name
                      q['a any']
                      ' float64'
-                     d"""
+                     """
                      r, _ := strconv.ParseFloat(a.(string), 64)
                      return r
                      """]
@@ -891,7 +891,7 @@ fn_atof: [def_method _t_name
 fn_atoi: [def_method _t_name
                      q['a any' 'base int']
                      ' int'
-                     d"""
+                     """
                      s := a.(string)
                      if ((base == 16 && strings.HasPrefix(s, "0x")) ||
                          (base == 8 && strings.HasPrefix(s, "0o")) ||
@@ -905,7 +905,7 @@ fn_atoi: [def_method _t_name
 fn_atou: [def_method _t_name
                      q['a any' 'base int']
                      ' string'
-                     d"""
+                     """
                      s := a.(string)
                      if ((base == 16 && strings.HasPrefix(s, "0x")) ||
                          (base == 8 && strings.HasPrefix(s, "0o")) ||
@@ -919,7 +919,7 @@ fn_atou: [def_method _t_name
 fn_cat: [def_method _t_name
                     q['ss any']
                     ' string',
-                    d"""
+                    """
                     slis, ok := ss.([]string)
                     if ok {
                         return strings.Join(slis, "")
@@ -935,7 +935,7 @@ fn_cat: [def_method _t_name
 fn_colno: [def_method _t_name
                       q[]
                       " int"
-                      d"""
+                      """
                       colno := 0
                       if p.pos == p.end {
                           colno += 1
@@ -957,14 +957,14 @@ fn_cons: [def_method _t_name
                      'return append([]any{hd}, tl.([]any)...)']
 
 fn_dedent: [def_method _t_name
-                       q['s string', 'colno int']
+                       q['s string', 'colno int' 'min_indent int']
                        'string'
                        'return s']
 
 fn_dict: [def_method _t_name
                       q['pairs any']
                       ' map[string]any'
-                      d"""
+                      """
                       m := make(map[string]any)
                       for _, v := range pairs.([]any) {
                            l := v.([]any)
@@ -976,7 +976,7 @@ fn_dict: [def_method _t_name
 fn_in: [def_method _t_name
                     q['lis []any' 'v any']
                     ' bool'
-                    d"""
+                    """
                     for _, el := range lis {
                         if el == v {
                             return true
@@ -993,7 +993,7 @@ fn_itou: [def_method _t_name
 fn_join: [def_method _t_name
                      q['sep any' 'vs any']
                      'string'
-                     d"""
+                     """
                      strs := make([]string, len(vs.([]any)))
                      for i, v := range(vs.([]any)) {
                          strs[i] = v.(string)
@@ -1004,7 +1004,7 @@ fn_join: [def_method _t_name
 fn_list: [def_method _t_name
                     q['args ...any']
                     ' []any'
-                    d"""
+                    """
                     if len(args) == 0 {
                         return []any{}
                     } else {
@@ -1015,14 +1015,14 @@ fn_list: [def_method _t_name
 fn_node: [def_method _t_name
                      q['parser *Parser' 'args ...any']
                      ' any'
-                     d"""
+                     """
                      return args
                      """]
 
 fn_scat: [def_method _t_name
                      q['hd any' 'tl any']
                      ' string'
-                     d"""
+                     """
                       lis := make([]string, 0)
                       lis = append(lis, hd.(string))
                       for _, t := range tl.([]any) {
@@ -1034,7 +1034,7 @@ fn_scat: [def_method _t_name
 fn_scons: [def_method _t_name
                       q['hd any' 'tl any']
                       ' []string'
-                      d"""
+                      """
                       strs := make([]string, 0)
                       strs = append(strs, hd.(string))
                       if vals, ok := tl.([]string); ok {
@@ -1073,7 +1073,7 @@ fn_utoi: [def_method _t_name
 fn_xtoi: [def_method _t_name
                      q['x any']
                      ' int64'
-                     d"""
+                     """
                      s := x.(string)
                      if (strings.HasPrefix(s, "0x")) {
                          s = s[2:]
@@ -1085,7 +1085,7 @@ fn_xtoi: [def_method _t_name
 fn_xtou: [def_method _t_name
                      q['x any']
                      ' string'
-                     d"""
+                     """
                      s := x.(string)
                      if (strings.HasPrefix(s, "0x")) {
                          s = s[2:]
