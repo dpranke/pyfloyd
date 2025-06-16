@@ -255,6 +255,12 @@ class Runner:
             help='Stop on first fail or error',
         )
         subp.add_argument(
+            '-m',
+            '--show-missing',
+            action='store_true',
+            help='Show uncovered lines.',
+        )
+        subp.add_argument(
             '--omit',
             help='Omit files whose paths match one of these patterns.',
         )

@@ -159,9 +159,14 @@ functions = {
                   return s
 
               if min_indent == 0:
+                  # Treat 0 as if 1 was passed.
                   min_indent = 1
               if min_indent == -1:
                   min_indent = min(_indent(line) for line in lines[1:] if line)
+              else:
+                  # Adjust for being 1-based.
+                  min_indent -= 1
+
               if lines[0] and not lines[0].isspace():
                   if colno == -1:
                       raise ValueError(

@@ -4,6 +4,15 @@ This doc attempts to keep a history of the more prominent changes
 to the project. For now I'm starting way late in the game, but
 perhaps at some point I'll go back and backfill things.
 
+* v0.27.0 (2025-06-16)
+  - Make multiline strings dedented by default in datafiles. This removes
+    the `d` tag (since it is no longer necessary) but adds an `i` tag to
+    tell the datafile to leave the string indented.
+  - Remove support for the `[==[foo]==]` long quote syntax. I don't think
+    we need both this and `L'=='foo'=='`. It's somewhat debatable which
+    syntax is more aesthetically pleasing, but the former was overloading
+    the meaning of '[' and ']', which never seemed like a great idea.
+
 * v0.26.0 (2025-06-10)
   - Added the ability for a grammar/parser to call out to functions
     provided by the caller. A function is declared as an `extern`
