@@ -1,3 +1,5 @@
+%externs       = strict                          -> true
+
 %whitespace    = ' '
                | '\t'
                | '\n'
@@ -14,8 +16,6 @@
                | '/*' ^.'*/'
 
 %tokens        = ident num_literal string
-
-%externs       = strict                          -> true
 
 grammar        = value end                       -> $1
 

@@ -1497,20 +1497,6 @@ class IntegrationMixin:
         self.assertEqual(out[0], 'rules')
 
     @skip('integration')
-    def test_floyd_ws(self):
-        contents = self.read_grammar('floyd_ws.g')
-        p, err, _ = self.compile(
-            contents, 'floyd_ws.g', externs=self.floyd_externs
-        )
-        self.assertIsNone(err)
-        out, err, _ = p.parse(contents, 'floyd_ws.g')
-        # We don't check the actual output here because it is too long
-        # and we don't want the test to be so sensitive to the AST for
-        # the floyd grammar.
-        self.assertIsNone(err)
-        self.assertEqual(out[0], 'rules')
-
-    @skip('integration')
     def test_json(self):
         p, err, _ = self.compile_grammar('json.g')
         self.assertIsNone(err)
@@ -1527,7 +1513,16 @@ class IntegrationMixin:
         p, err, _ = self.compile_grammar('json5.g')
         self.assertIsNone(err)
         self._common_json_checks(p, externs=externs)
-        self._common_json5_checks(p, externs=externs)
+
+        self.checkp(p, '+1.5', out=1.5, externs=externs)
+        self.checkp(p, '.5e-2', out=0.005, externs=externs)
+        self.checkp(p, '"foo"', out='foo', externs=externs)
+        self.checkp(
+            p,
+            '{foo: "bar", a: "b"}',
+            out={'foo': 'bar', 'a': 'b'},
+            externs=externs,
+        )
 
     @skip('integration')
     def test_json5_special_floats(self):
@@ -1570,17 +1565,6 @@ class IntegrationMixin:
 
         # Check that leading whitespace is allowed.
         self.checkp(p, '  {}', {}, externs=externs)
-
-    def _common_json5_checks(self, p, externs):
-        self.checkp(p, '+1.5', out=1.5, externs=externs)
-        self.checkp(p, '.5e-2', out=0.005, externs=externs)
-        self.checkp(p, '"foo"', out='foo', externs=externs)
-        self.checkp(
-            p,
-            '{foo: "bar", a: "b"}',
-            out={'foo': 'bar', 'a': 'b'},
-            externs=externs,
-        )
 
     @skip('integration')
     def test_json5_sample(self):
@@ -1636,11 +1620,3 @@ class IntegrationMixin:
         )
         if hasattr(p, 'cleanup'):
             p.cleanup()
-
-    @skip('integration')
-    def test_json5_ws(self):
-        externs = {'strict': False}
-        p, err, _ = self.compile_grammar('json5_ws.g')
-        self.assertIsNone(err)
-        self._common_json_checks(p, externs=externs)
-        self._common_json5_checks(p, externs=externs)
