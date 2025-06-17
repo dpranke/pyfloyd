@@ -749,7 +749,7 @@ class Encoder:
                 s = self._encode_dict(obj, seen, level + 1, oneline=False)
         elif isinstance(obj, collections.abc.Sequence):
             s = self._encode_array(obj, seen, level + 1, oneline=True)
-            if len(s) > max_len or '\n' in s:
+            if len(s) > max_len and ('\n' not in s):
                 s = self._encode_array(obj, seen, level + 1, oneline=False)
 
         else:
