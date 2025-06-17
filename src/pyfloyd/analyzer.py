@@ -18,7 +18,12 @@ from pyfloyd import functions
 from pyfloyd import grammar as m_grammar
 
 
-def analyze(ast, rewrite_subrules: bool) -> m_grammar.Grammar:
+def analyze(
+    ast,
+    rewrite_subrules: bool,
+    for_pretty_printing: bool = False,
+    rewrite_filler: bool = True,
+) -> m_grammar.Grammar:
     """Analyze and optimize the AST.
 
     This runs any static analysis we can do over the grammars and
@@ -32,7 +37,15 @@ def analyze(ast, rewrite_subrules: bool) -> m_grammar.Grammar:
     a.add_pragmas()
 
     # Add in the _whitespace, _comment, and _filler rules.
-    _add_filler_rules(g)
+    if rewrite_filler:
+        _add_filler_rules(g)
+
+    if for_pretty_printing:
+        # Insert filler nodes, but otherwise don't do anything else, just
+        # return.
+        if rewrite_filler:
+            _rewrite_filler(g)
+        return g
 
     a.run_checks()
     if g.errors:

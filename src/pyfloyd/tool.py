@@ -70,7 +70,9 @@ def main(argv=None, host=None):
             if ast:
                 contents = json.dumps(ast.to_json(args.full_ast), indent=2)
         elif args.pretty_print:
-            contents, err = pyfloyd.pretty_print(grammar, args.grammar)
+            contents, err = pyfloyd.pretty_print(
+                grammar, args.grammar, args.rewrite_filler
+            )
         elif args.interpret:
             contents, err, _ = _interpret_grammar(
                 host, args, grammar, externs, options

@@ -226,6 +226,7 @@ def parse(
 def pretty_print(
     grammar: str,
     path: str = '<string>',
+    rewrite_filler: bool = False,
 ) -> tuple[Optional[str], Optional[str]]:
     """Pretty-print a grammar.
 
@@ -242,7 +243,13 @@ def pretty_print(
     result = grammar_parser.parse(grammar, path, externs)
     if result.err:
         return None, result.err
-    return printer.Printer(result.val).dumps(), None
+    g = analyzer.analyze(
+        result.val,
+        for_pretty_printing=True,
+        rewrite_subrules=False,
+        rewrite_filler=rewrite_filler
+    )
+    return printer.Printer(g.ast).dumps(), None
 
 
 def dump_ast(
