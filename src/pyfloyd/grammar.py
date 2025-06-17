@@ -342,7 +342,7 @@ class Grammar:
 
     def node(self, cls, *args, **kwargs) -> Node:
         n = cls(*args, **kwargs)
-        return self.update_node(n)
+        return self.update_node(n, True)
 
     def update_node(self, node: Node, typecheck: bool) -> Node:
         self._set_can_fail(node)

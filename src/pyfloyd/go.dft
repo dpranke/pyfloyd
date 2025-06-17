@@ -31,6 +31,7 @@ local_var_map = {
     count: ['cmin int' 'cmax int' 'i int' 'vs list[any]']
     not: ['errpos int' 'pos int']
     not_one: ['errpos int' 'pos int']
+    opt: ['pos int']
     plus: ['pos int' 'vs list[any]']
     pred: ['v any']
     run: ['end int' 'start int']
