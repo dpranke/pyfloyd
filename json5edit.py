@@ -4,7 +4,6 @@ import json
 import os
 import sys
 
-import json
 import json5
 import json5_cst
 
@@ -30,6 +29,10 @@ def main(
     arg_parser.add_argument('file', nargs='?')
     args = arg_parser.parse_args(argv)
 
+    del stdout
+    # pylint: disable=protected-access
+    fp = None
+    msg = None
     if args.code is not None:
         msg = args.code
         path = '<code>'
@@ -37,7 +40,7 @@ def main(
         path = '<stdin>'
         fp = stdin
     elif not exists(args.file):
-        print('Error: file "%s" not found.' % args.file, file=stderr)
+        print(f'Error: file "{args.file}" not found.', file=stderr)
         return 1
     else:
         path = args.file
@@ -53,16 +56,18 @@ def main(
 
     def _f3(parser, *args):
         del parser
-        l = []
+        fields = []
         for arg in args[0]:
-            l.append(arg[3])
-        return l
+            fields.append(arg[3])
+        return fields
 
     externs['f3'] = _f3
     externs['node'] = _node
 
     if args.code is None:
+        assert fp
         msg = fp.read()
+    assert msg is not None
     result = json5.parse(msg, path)
     cst_result = json5_cst.parse(msg, path, externs)
     if result.err:
@@ -77,11 +82,13 @@ def main(
         print('  ' + repr(r))
     if result.val != cst_result.val[3]:
         print("want:")
-        for l in repr(result.val):
-            print('  ' + l)
+        for line in repr(result.val):
+            print('  ' + line)
         print("got:")
-        for l in repr(cst_result.val):
-            print('  ' + l)
+        for line in repr(cst_result.val):
+            print('  ' + line)
+
+    walk2(msg, cst_result.val)
     if args.print:
         print()
         print(json.dumps(cst_result.val, indent=2))
@@ -114,6 +121,29 @@ def walk(s, obj, pos=0, should_print=False):
                 r += q
         return pos, r
     return pos, ''
+
+
+def walk2(msg, obj, level=0) -> int:
+    ind = '  ' * level
+    pos = obj[4]
+    if obj[0] in ('string', 'num_literal', 'ident', 'ws_', 'c_'):
+        print(f'{ind}{pos:2d}: {obj[0]}: {msg[obj[4]:obj[5]]!r}')
+        return obj[5]
+    print(f'{ind}{pos:2d}: {obj[0]}')
+    for el in obj[1]:
+        if isinstance(el, str):
+            print(f'{ind}    {pos:2d}: {el!r}')
+            pos += len(el)
+            continue
+
+        if el == []:
+            continue
+        if isinstance(el[0], list):
+            for el2 in el:
+                pos = walk2(msg, el2, level + 2)
+        else:
+            pos = walk2(msg, el, level + 1)
+    return pos
 
 
 if __name__ == '__main__':
