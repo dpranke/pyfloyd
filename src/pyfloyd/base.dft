@@ -324,9 +324,10 @@ n_not_one: [fn [node] [vl [n_not node]
 
 n_operator: [fn [node] [hl [call_op 'operator' [list [lit node.v]] t_end]]]
 
-n_opt: [fn [node] [vl [stmts node.child]
+n_opt: [fn [node] [vl [t_assign 'pos' f_pos]
+                      [stmts node.child]
                       [t_ifelse failed
-                                [vl [succeed t_list_zero_any f_pos]]
+                                [vl [succeed t_list_zero_any 'pos']]
                                 [vl [succeed [t_list_one_any f_val] f_pos]]]]]
 
 n_paren: [fn [node] [stmts node.child]]
