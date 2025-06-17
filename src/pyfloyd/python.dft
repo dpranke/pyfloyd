@@ -217,7 +217,7 @@ externs: [fn [] [if [dict_is_empty grammar.externs]
                                             [hl [lit k]
                                                 ": "
                                                 [if [equal v t_func]
-                                                    [fld [fn_name k]]
+                                                    'None' #  [fld [fn_name k]]
                                                     [if v t_true t_false]]
                                                 ","]]
                                         grammar.externs]]
@@ -600,7 +600,7 @@ fn_colno: [
             return colno
             """]
 
-fn_pos: [meth q[] 'return self.pos']
+fn_pos: [meth q[] 'return self._pos']
 
 fn_node: [meth q['parser' '*args'] """
         del parser
