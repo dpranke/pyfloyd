@@ -344,8 +344,11 @@ class Grammar:
         n = cls(*args, **kwargs)
         return self.update_node(n)
 
-    def update_node(self, node: Node) -> Node:
+    def update_node(self, node: Node, typecheck: bool) -> Node:
         self._set_can_fail(node)
+        if not typecheck:
+            return node
+
         node.infer_types(self, var_types={})
 
         def _patch_types(node):

@@ -84,7 +84,8 @@ def main(argv=None, host=None):
                     ext = host.splitext(args.output)[1]
                     args.template = pyfloyd.KNOWN_TEMPLATES.get(ext)
             v, err, _ = pyfloyd.generate(
-                grammar, path=args.grammar, options=options
+                grammar, path=args.grammar, options=options,
+                typecheck=args.typecheck
             )
             if v is not None:
                 contents, ext = v
@@ -181,6 +182,8 @@ def _parse_args(host, argv):
         help='path to read data from',
     )
     ap.add_argument('--post-mortem', '--pm', action='store_true')
+    ap.add_argument('--typecheck', action='store_true', default=True)
+    ap.add_argument('--no-typecheck', action='store_false', dest='typecheck')
 
     args = ap.parse_args(argv)
 

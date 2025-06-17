@@ -23,6 +23,7 @@ def analyze(
     rewrite_subrules: bool,
     for_pretty_printing: bool = False,
     rewrite_filler: bool = True,
+    typecheck: bool = True,
 ) -> m_grammar.Grammar:
     """Analyze and optimize the AST.
 
@@ -86,7 +87,7 @@ def analyze(
 
     # Do typechecking, figure out which nodes can fail, figure out which
     # nodes' values are used, etc.
-    g.update_node(g.ast)
+    g.update_node(g.ast, typecheck)
     if g.errors:
         return g
 

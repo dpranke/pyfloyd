@@ -135,6 +135,7 @@ def generate(
     path: str = '<string>',
     options: Optional[Union[GeneratorOptions, dict[str, Any]]] = None,
     externs: Optional[Externs] = None,
+    typecheck: bool = True,
 ) -> Result:
     """Generate the source code of a parser.
 
@@ -168,7 +169,9 @@ def generate(
     result = grammar_parser.parse(grammar, path, externs)
     if result.err:
         return result
-    grammar_obj = analyzer.analyze(result.val, rewrite_subrules=True)
+    grammar_obj = analyzer.analyze(
+        result.val, rewrite_subrules=True, typecheck=typecheck
+    )
     if grammar_obj.errors:
         return Result(None, _err_str(grammar_obj.errors))
 
