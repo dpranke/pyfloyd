@@ -238,6 +238,7 @@ class _Analyzer:
         if node.t != 'seq':
             for c in node.ch:
                 self.check_positional_vars(c)
+            return
 
         labels_needed = set()
         for i, c in enumerate(node.ch, start=1):
@@ -250,6 +251,8 @@ class _Analyzer:
                         'and cannot be explicitly defined',
                     )
                 self.check_positional_vars(c.child)
+            if c.t in ('count', 'ends_in', 'not', 'not_one', 'opt', 'paren', 'plus', 'run', 'star'):
+                self.check_positional_vars(c)
             if c.t in ('action', 'equals', 'pred'):
                 self._check_positional_var_refs(c.child, i, labels_needed)
 
