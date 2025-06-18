@@ -24,6 +24,7 @@ def analyze(
     for_pretty_printing: bool = False,
     rewrite_filler: bool = True,
     typecheck: bool = True,
+    tokenize: bool = False,
 ) -> m_grammar.Grammar:
     """Analyze and optimize the AST.
 
@@ -40,6 +41,11 @@ def analyze(
     # Add in the _whitespace, _comment, and _filler rules.
     if rewrite_filler:
         _add_filler_rules(g)
+
+    if (tokenize or g.tokenize) and g.tokens:
+        g.tokenize = True
+        g.needed_operators.append('tok')
+        _rewrite_rules_for_tokens(g)
 
     if for_pretty_printing:
         # Insert filler nodes, but otherwise don't do anything else, just
@@ -136,7 +142,7 @@ class _Analyzer:
                     'names starting with an "_" are reserved'
                 )
             self.current_rule = rule.v
-            if rule.v[0] == '%':
+            if rule.v[0] == '%' and rule.v not in ('%whitespace', '%comment'):
                 continue
             self.check_for_unknown_rules(rule)
             self.check_for_unknown_functions(rule)
@@ -252,7 +258,17 @@ class _Analyzer:
                         'and cannot be explicitly defined',
                     )
                 self.check_positional_vars(c.child)
-            if c.t in ('count', 'ends_in', 'not', 'not_one', 'opt', 'paren', 'plus', 'run', 'star'):
+            if c.t in (
+                'count',
+                'ends_in',
+                'not',
+                'not_one',
+                'opt',
+                'paren',
+                'plus',
+                'run',
+                'star',
+            ):
                 self.check_positional_vars(c)
             if c.t in ('action', 'equals', 'pred'):
                 self._check_positional_var_refs(c.child, i, labels_needed)
@@ -357,6 +373,17 @@ class _Analyzer:
             self._check_named_vars(c, labels, local_labels, references)
 
 
+def _rewrite_rules_for_tokens(grammar):
+    for rule in grammar.ast.ch:
+        if rule.v.startswith('%') and rule.v not in (
+            '%whitespace',
+            '%comment',
+        ):
+            continue
+        rule.child = m_grammar.Node('rule_wrapper', rule.v, [rule.child])
+        grammar.rules[rule.v] = rule
+
+
 def _rewrite_quals(grammar):
     def rewrite_node(node):
         if node.t == 'e_qual':
@@ -405,8 +432,12 @@ def _rewrite_recursion(grammar):
         if rule.v[0] == '%':
             continue
         name = rule.v
-        assert rule.child.t == 'choice'
-        choices = rule.child.ch
+        if rule.child.t == 'rule_wrapper':
+            assert rule.child.child.t == 'choice'
+            choices = rule.child.child.ch
+        else:
+            assert rule.child.t == 'choice'
+            choices = rule.child.ch
 
         operator_node = _check_operator(grammar, name, choices)
         if operator_node:
@@ -503,6 +534,8 @@ def _check_lr(rule_name, node, grammar, seen):
         'not',
         'opt',
         'paren',
+        'rule',
+        'rule_wrapper',
         'run',
         'scope',
         'star',
@@ -533,27 +566,28 @@ def _rewrite_filler(grammar):
         return
 
     # Compute the transitive closure of all the token rules.
-    _collect_tokens(grammar, grammar.ast)
+    grammar.subtokens = set(grammar.tokens)
+    _collect_subtokens(grammar, grammar.ast)
 
     # Now rewrite all the rules to insert the filler nodes.
     grammar.ast = _add_filler_nodes(grammar, grammar.ast)
     grammar.update_rules()
 
 
-def _collect_tokens(grammar, node):
+def _collect_subtokens(grammar, node):
     # Collect the list of all rules reachable from this token rule:
     # all of them should be treated as tokens as well.
     if node.t == 'rules':
         for rule in node.ch:
-            if rule.v in grammar.tokens:
-                _collect_tokens(grammar, rule)
+            if rule.v in grammar.subtokens:
+                _collect_subtokens(grammar, rule)
         return
 
     if node.t == 'apply' and node.v not in m_grammar.BUILTIN_RULES:
-        grammar.tokens.add(node.v)
+        grammar.subtokens.add(node.v)
 
     for c in node.ch:
-        _collect_tokens(grammar, c)
+        _collect_subtokens(grammar, c)
 
 
 def _add_filler_rules(grammar):
@@ -622,16 +656,8 @@ def _add_filler_nodes(grammar, node):
     if node.t == 'rule' and node.v.startswith('%'):
         # Don't mess with the pragmas.
         return node
-    if node.t == 'rule' and node.v in grammar.tokens:
+    if node.t == 'rule' and node.v in grammar.subtokens:
         # By definition we don't want to insert filler into token rules.
-        return node
-    if node.t == 'rule' and node.v in (
-        '%comment',
-        '%filler',
-        '%whitespace',
-    ):
-        # These *are* the filler rules, so we don't want to insert filler
-        # into them.
         return node
     if node.t == 'seq':
         children = []
@@ -750,6 +776,7 @@ class _SubRuleRewriter:
             'opt',
             'plus',
             'regexp',
+            'rule_wrapper',
             'run',
             'set',
             'seq',

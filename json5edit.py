@@ -52,8 +52,8 @@ def main(
 
     def _node(parser, *args):
         return [
-            parser._nodes[-1][0],
             parser._nodes[-1][1],
+            parser._nodes[-1][0],
             parser._pos,
             args[0],
             parser

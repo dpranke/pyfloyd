@@ -538,7 +538,7 @@ ALL: dict[str, dict[str, Any]] = {
     },
     'node': {
         'func': None,
-        'params': [['parser', 'any'], ['*args', 'any']],
+        'params': [['parser', 'any'], ['arg', 'any']],
         'ret': 'any',
     },
     'otou': {

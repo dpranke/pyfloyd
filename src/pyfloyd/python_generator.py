@@ -1127,8 +1127,8 @@ _BUILTINS = {
             return list(args)
         """,
     'fn_node': """
-        def _fn_node(self, parser, *args):
-            return list(args)
+        def _fn_node(self, parser, arg):
+            return arg
         """,
     'fn_otou': """
         def _fn_otou(self, s):

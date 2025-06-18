@@ -1014,10 +1014,10 @@ fn_list: [def_method _t_name
                     """]
 
 fn_node: [def_method _t_name
-                     q['parser *Parser' 'args ...any']
+                     q['parser *Parser' 'arg any']
                      ' any'
                      """
-                     return args
+                     return arg
                      """]
 
 fn_scat: [def_method _t_name

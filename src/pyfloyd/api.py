@@ -111,6 +111,8 @@ def compile_to_parser(  # pylint: disable=redefined-builtin
     grammar: str,
     path: str = '<string>',
     memoize: bool = False,
+    typecheck: bool = True,
+    tokenize: bool = False,
     externs: Optional[Externs] = None,
 ) -> CompiledResult:
     """Compile the grammar into an object that can parse strings.
@@ -123,10 +125,17 @@ def compile_to_parser(  # pylint: disable=redefined-builtin
     result = grammar_parser.parse(grammar, path, externs)
     if result.err:
         return CompiledResult(err=result.err, pos=result.pos)
-    g = analyzer.analyze(result.val, rewrite_subrules=False)
+    g = analyzer.analyze(
+        result.val,
+        rewrite_subrules=False,
+        typecheck=typecheck,
+        tokenize=tokenize
+    )
     if g.errors:
         return CompiledResult(None, _err_str(g.errors))
-    interpreter = m_interpreter.Interpreter(g, memoize=memoize)
+    interpreter = m_interpreter.Interpreter(
+        g, memoize=memoize, tokenize=tokenize
+    )
     return CompiledResult(interpreter, None)
 
 
@@ -136,13 +145,14 @@ def generate(
     options: Optional[Union[GeneratorOptions, dict[str, Any]]] = None,
     externs: Optional[Externs] = None,
     typecheck: bool = True,
+    tokenize: bool = False,
 ) -> Result:
     """Generate the source code of a parser.
 
     This generates the text of a parser. The text will be a module
     with a public `Result` type and a public `parse()` function.
 
-    If `options.main` is True, then the generated parser file will also have a
+    If `options.main` is true, then the generated parser file will also have a
     `main()` function that is called if the text is invoked directly. (i.e.,
     the module can be run from the command line). The command line interface
     will take one optional argument that is the path to a file to parse; if the
@@ -152,9 +162,18 @@ def generate(
     all be substituted in for `sys.stdin`, `sys.stdout`, and `sys.argv` for
     testing purposes.
 
-    If `options.memoize` is True, the parser will memoize (cache) the results
+    If `options.memoize` is true, the parser will memoize (cache) the results
     of each combination of rule and position during the parse. For some
     grammars, this may provide significant speedups.
+
+    If `typecheck` is true (the default), the grammar will be checked for
+    type errors. Set this to False if your grammar is too complicated (or
+    doesn't expose enough information) for the typechecker to handle.
+
+    If `tokenize` is true (it is False by default), the parser will include
+    logic to track the tokens in the parse tree; this can be used to produce
+    a full concrete syntax tree for uses that might need to preserve
+    comments, whitespace, and other such things.
 
     `path` represents an optional string that can be included in error
     messages, e.g., as a path to the file containing the grammar.
@@ -170,7 +189,10 @@ def generate(
     if result.err:
         return result
     grammar_obj = analyzer.analyze(
-        result.val, rewrite_subrules=True, typecheck=typecheck
+        result.val,
+        rewrite_subrules=True,
+        typecheck=typecheck,
+        tokenize=tokenize,
     )
     if grammar_obj.errors:
         return Result(None, _err_str(grammar_obj.errors))
@@ -200,6 +222,8 @@ def parse(
     path: str = '<string>',
     externs: Optional[Externs] = None,
     memoize: bool = False,
+    typecheck: bool = True,
+    tokenize: bool = False,
 ) -> Result:
     """Match an input text against the specified grammar.
 
@@ -219,7 +243,13 @@ def parse(
     string where the parser stopped. If there is an error, `pos` will
     indicate where in the string the error occurred.
     """
-    result = compile_to_parser(grammar, grammar_path, memoize=memoize)
+    result = compile_to_parser(
+        grammar,
+        grammar_path,
+        memoize=memoize,
+        typecheck=typecheck,
+        tokenize=tokenize
+    )
     if result.err:
         return Result(err='Error in grammar: ' + result.err, pos=result.pos)
     assert result.parser is not None
@@ -250,7 +280,7 @@ def pretty_print(
         result.val,
         for_pretty_printing=True,
         rewrite_subrules=False,
-        rewrite_filler=rewrite_filler
+        rewrite_filler=rewrite_filler,
     )
     return printer.Printer(g.ast).dumps(), None
 
@@ -291,4 +321,7 @@ def _default_externs(externs: Optional[Externs] = None) -> Externs:
 
 
 def _node(parser: grammar_parser._Parser, *args) -> Any:
-    return m_grammar.Node(args[0], args[1], args[2], parser=parser)
+    # TODO: support only a single arg once grammars are regenerated.
+    if len(args) == 3:
+        return m_grammar.Node(args[0], args[1], args[2], parser=parser)
+    return m_grammar.Node(args[0][0], args[0][1], args[0][2], parser=parser)

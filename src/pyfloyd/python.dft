@@ -187,18 +187,6 @@ parse_function: '''
 parser_class: @"""
     class _Parser:
         @parser_methods[]
-
-        def _o_tok(self, pos, in_token):
-            if not in_token and self._in_token:
-                return
-            if not self._failed and self._pos > pos:
-                val = (pos, self._text[pos:self._pos])
-                if self._tokens and self._tokens[-1][0] == pos:
-                    assert self._tokens[-1] == val
-                else:
-                    self._tokens.append((pos, self._text[pos:self._pos]))
-            if in_token:
-                self._in_token = False
     """
 
 parser_constructor: @"""
@@ -219,8 +207,10 @@ parser_constructor: @"""
         @if[grammar.operator_needed
             [vl 'self._operators = {}'
                 [map_items operator_state grammar.operators]]]
-        self._nodes: list[tuple[str, int]] = []
-        self._tokens: list[tuple[int, str]] = []
+        @if[grammar.tokenize
+            [vl 'self._nodes = []'
+                'self._tokens = []'
+                'self._in_token = False']]
 
     """  # parser_constructor
 
@@ -412,6 +402,17 @@ n_regexp: [fn [node]
                   '    return'
                   [fail]]]
 
+n_rule_wrapper: [fn [node]
+                    [let [[is_tok [in grammar.tokens node.v]]]
+                      [vl [t_declare_local_vars node]
+                          [hl "self._nodes.append((self._pos, '" node.v "'))"]
+                          [if is_tok
+                              'self._in_token = True']
+                          [stmts node.child]
+                          [if is_tok
+                              'self._o_tok(self._nodes[-1][0], True)']
+                          [hl "self._nodes.pop()"]]]]
+
 n_set: [fn [node]
            [vl [t_assign 'rexp' [lit [strcat '[' node.v ']']]]
                [t_if 'rexp not in self._regexps'
@@ -441,14 +442,18 @@ r_end: [meth q[] "
                  self._o_fail()
              "]
 
-o_ch: [meth q['ch'] "
-           pos = self._pos
-           if pos < self._end and self._text[pos] == ch:
-               self._o_succeed(ch, self._pos + 1)
-               self._o_tok(pos, False)
-           else:
-               self._o_fail()
-           "]
+o_ch: [meth q['ch']
+           [vl """
+               pos = self._pos
+               if pos < self._end and self._text[pos] == ch:
+                   self._o_succeed(ch, self._pos + 1)
+               """
+               [if grammar.tokenize
+                   [ind 'self._o_tok(pos, False)']]
+               """
+               else:
+                   self._o_fail()
+               """]]
 
 o_offsets: [meth q['pos'] '''
                 lineno = 1
@@ -582,30 +587,51 @@ o_range: [meth q['i' 'j'] '''
                    self._o_fail()
                ''']
 
-o_rewind: [meth q['newpos'] '''
-              self._o_succeed(None, newpos)
-              while self._tokens and self._tokens[-1][0] > newpos:
-                  self._tokens.pop()
-              ''']
+o_rewind: [meth q['newpos']
+                [vl 'self._o_succeed(None, newpos)'
+                    [if grammar.tokenize
+                        [vl 'while self._tokens and self._tokens[-1][0] > newpos:'
+                            [ind 'self._tokens.pop()']]]]]
 
-o_str: [meth q['s'] '''
-             in_token = self._in_token
-             self._in_token = True
-             pos = self._pos
-             for ch in s:
-                 self._o_ch(ch)
-                 if self._failed:
-                     return
-             self._val = s
-             self._in_token = in_token
-             self._o_tok(pos, False)
-             ''']
+o_str: [meth q['s']
+             [vl [if grammar.tokenize
+                     """
+                     in_token = self._in_token
+                     self._in_token = True
+                     """]
+                 """
+                 pos = self._pos
+                 for ch in s:
+                     self._o_ch(ch)
+                     if self._failed:
+                         return
+                 self._val = s
+                 """
+                 [if grammar.tokenize
+                     """
+                     self._in_token = in_token
+                     self._o_tok(pos, False)
+                     """]]]
 
 o_succeed: [meth q['v' 'newpos'] "
                 self._val = v
                 self._failed = False
                 self._pos = newpos
                 "]
+
+o_tok: [meth q['pos' 'in_token']
+             """
+             if not in_token and self._in_token:
+                 return
+             if not self._failed and self._pos > pos:
+                 val = (pos, self._text[pos:self._pos])
+                 if self._tokens and self._tokens[-1][0] == pos:
+                     assert self._tokens[-1] == val
+                 else:
+                     self._tokens.append((pos, self._text[pos:self._pos]))
+             if in_token:
+                 self._in_token = False
+             """]
 
 o_unicat: [
     meth q['cat'] "
@@ -628,9 +654,9 @@ fn_colno: [
 
 fn_pos: [meth q[] 'return self._pos']
 
-fn_node: [meth q['parser' '*args'] """
+fn_node: [meth q['parser' 'arg'] """
         del parser
-        return list(args)
+        return arg
         """]
 
 }

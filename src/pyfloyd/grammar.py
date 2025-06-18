@@ -190,6 +190,13 @@ class Node:
         assert self.ch[0].v in functions.ALL
         func_name = self.ch[0].v
         func = functions.ALL[func_name]
+
+        if func_name == 'node':
+            # TODO: We're treating node as special, until we can support
+            # a generic type T.
+            self.type = self.ch[1].type
+            return
+
         params = func['params']
         if len(params) and params[-1][0].startswith('*'):
             last = len(params) - 1
@@ -302,6 +309,7 @@ class Grammar:
         self.pragmas: list[Node] = []
         self.starting_rule: str = ''
         self.tokens: set[str] = set()
+        self.subtokens: set[str] = set()
         self.whitespace: Optional[Node] = None
         self.assoc: dict[str, str] = {}
         self.prec: dict[str, int] = {}
@@ -330,6 +338,7 @@ class Grammar:
         self.leftrec_rules: set[str] = set()
         self.outer_scope_rules: set[str] = set()
         self.externs: dict[str, bool] = {}
+        self.tokenize: bool = False
 
         has_starting_rule = False
         for rule in self.ast.ch:
@@ -416,7 +425,7 @@ class Grammar:
         if node.t in ('choice', 'rules'):
             r = all(self._can_fail(n, inline) for n in node.ch)
             return r
-        if node.t == 'scope':
+        if node.t in ('rule_wrapper', 'scope'):
             # TODO: is this right?
             # return self._can_fail(node.ch[0], False)
             return self._can_fail(node.ch[0], inline)

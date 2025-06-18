@@ -83,27 +83,9 @@ def_method: [fn [name param_names ret body]
 meth: [fn [params body] [def_method _t_name params '' body]]
 
 rule_method: [fn [rule node]
-                 [let [[rname [substr rule 2 0]]
-                       [is_rule [equal [substr rule 0 2] 'r_']]
-                       [is_tok [or [in grammar.tokens rname]
-                                   [equal rname 'ws_']
-                                   [equal rname 'c_']]]]
-                   [block [hl t_meth_def rule '(' [t_meth_params ''] ')']
-                          [if is_rule
-                              [vl 'try:'
-                                  [ind [hl "self._nodes.append(('"
-                                           rname
-                                           "', self._pos))"]
-                                       [if is_tok
-                                           'self._in_token = True']
-                                       [t_declare_local_vars node]
-                                       [stmts node]]
-                                  'finally:'
-                                  [ind [if is_tok
-                                           'self._o_tok(self._nodes[-1][1], True)']
-                                       'self._nodes.pop()']]
-                              [vl [t_declare_local_vars node]
-                                  [stmts node]]]]]]
+                 [block [hl t_meth_def rule '(' [t_meth_params ''] ')']
+                        [vl [t_declare_local_vars node]
+                            [stmts node]]]]
 
 # Generates code for a host expression node in the AST. Returns a `formatter.El`.
 expr:      [fn [node] [invoke [node_name node.t] node]]
@@ -374,6 +356,9 @@ n_range: [fn [node] [hl [call_op 'range'
                                  [list [lit [item node.v 0]]
                                        [lit [item node.v 1]]]]
                         t_end]]
+
+n_rule_wrapper: [fn [node] [vl [t_declare_local_vars node]
+                               [stmts node.child]]]
 
 n_run: [fn [node]
            [vl [t_assign 'start' f_pos]

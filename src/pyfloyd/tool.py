@@ -84,8 +84,11 @@ def main(argv=None, host=None):
                     ext = host.splitext(args.output)[1]
                     args.template = pyfloyd.KNOWN_TEMPLATES.get(ext)
             v, err, _ = pyfloyd.generate(
-                grammar, path=args.grammar, options=options,
-                typecheck=args.typecheck
+                grammar,
+                path=args.grammar,
+                options=options,
+                typecheck=args.typecheck,
+                tokenize=args.tokenize,
             )
             if v is not None:
                 contents, ext = v
@@ -184,6 +187,8 @@ def _parse_args(host, argv):
     ap.add_argument('--post-mortem', '--pm', action='store_true')
     ap.add_argument('--typecheck', action='store_true', default=True)
     ap.add_argument('--no-typecheck', action='store_false', dest='typecheck')
+    ap.add_argument('--tokenize', action='store_true', default=False)
+    ap.add_argument('--no-tokenize', action='store_false', default='tokenize')
 
     args = ap.parse_args(argv)
 
@@ -222,6 +227,8 @@ def _interpret_grammar(host, args, grammar, externs, options):
         path=path,
         externs=externs,
         memoize=options.memoize,
+        typecheck=args.typecheck,
+        tokenize=args.tokenize,
     )
     if err:
         return None, err, endpos
