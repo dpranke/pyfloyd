@@ -2,7 +2,8 @@
                | node                              -> func
                | f3                                -> func
 
-grammar        = value f_ end                      -> node('grammar', [$1, $2], [1, 2], $1[3])
+grammar        = value f_ end
+                   -> node([$1, $2], $1[1])
 
 ws_    = <(' '
            | '\t'
@@ -14,42 +15,42 @@ ws_    = <(' '
            | '\u2028'
            | '\u2029'
            | '\ufeff'
-           | \p{Zs})+>  -> node('ws_', [$1], [1, 2], $1)
+           | \p{Zs})+>  -> node([$1], [1, 2], $1)
 
-c_     = <'//' [^\r\n]*> -> node('c_', [$1], [1, 2], $1)
-       | <'/*' ^.'*/'>   -> node('c_', [$1], [1, 2], $1)
+c_     = <'//' [^\r\n]*> -> node([$1], [1, 2], $1)
+       | <'/*' ^.'*/'>   -> node([$1], [1, 2], $1)
 
 %tokens        = ident num_literal string
 
 value          = f_ 'null'
-                   -> node('value', [$1, $2], [2, 3], null)
+                   -> node([$1, $2], null)
                | f_ 'true'
-                   -> node('value', [$1, $2], [2, 3], true)
+                   -> node([$1, $2], true)
                | f_ 'false'
-                   -> node('value', [$1, $2], [2, 3], false)
+                   -> node([$1, $2], false)
                | f_ num_literal
-                   -> node('value', [$1, $2], [2, 3], $2[3])
+                   -> node([$1, $2], $2[1])
                | object
-                   -> node('value', [$1], [1, 2], $1[3])
+                   -> node([$1], $1[1])
                | array
-                   -> node('value', [$1], [1, 2], $1[3])
+                   -> node([$1], $1[1])
                | f_ string
-                   -> node('value', [$1, $2], [2, 3], $2[3])
+                   -> node([$1, $2], $2[1])
 
 object         = f_ '{' member_list f_ '}'
-                   -> node('object', [$1, $2, $3, $4, $5], [3, 4], dict($3[3]))
+                   -> node([$1, $2, $3, $4, $5], dict($3[1]))
                | f_ '{' f_ '}'
-                   -> node('object', [$1, $2, $3, $4], [3, 4], dict([]))
+                   -> node([$1, $2, $3, $4], dict([]))
 
 array          = f_ '[' element_list f_ ']'
-                   -> node('object', [$1, $2, $3, $4, $5], [3, 4], $3[3])
+                   -> node([$1, $2, $3, $4, $5], $3[1])
                | f_ '[' f_ ']'
-                   -> node('object', [$1, $2, $3, $4], [3, 4], [])
+                   -> node([$1, $2, $3, $4], [])
 
 string         = squote sqchar* squote
-                   -> node('string', [$1, $2, $3], [2, 3], cat($2))
+                   -> node([$1, $2, $3], cat($2))
                | dquote dqchar* dquote
-                   -> node('string', [$1, $2, $3], [2, 3], cat($2))
+                   -> node([$1, $2, $3], cat($2))
 
 sqchar         = bslash esc_char                   -> $2
                | bslash eol                        -> ''
@@ -92,43 +93,23 @@ hex_esc        = 'x' hex{2}                        -> xtou(cat($2))
 unicode_esc    = 'u' hex{4}                        -> xtou(cat($2))
 
 element_list   = value
-                 (f_ ',' value -> node('<>', [$1, $2, $3], [3, 4], $3[3]))*
-                 (f_ ',' -> node('<>', [$1, $2], [], []))?
-                   -> node(
-                          'element_list',
-                          [$1, $2, $3],
-                          [1, 2],
-                          cons($1[3], f3($2))
-                      )
+                 (f_ ',' value -> node([$1, $2, $3], $3[1]))*
+                 (f_ ',' -> node([$1, $2], []))?
+                   -> node([$1, $2, $3], cons($1[1], f3($2)))
 
 
 member_list    = member
-                 (f_ ',' member -> node('<>', [$1, $2, $3], [3, 4], $3[3]))*
-                 (f_ ',' -> node('<>', [$1, $2], [], []))?
-                   -> node(
-                          'member_list',
-                          [$1, $2, $3],
-                          [1, 2],
-                          cons($1[3], f3($2))
-                      )
+                 (f_ ',' member -> node([$1, $2, $3], $3[1]))*
+                 (f_ ',' -> node([$1, $2], []))?
+                   -> node([$1, $2, $3], cons($1[1], f3($2)))
 
 member         = f_ string f_ ':' value
-                   -> node(
-                          'member',
-                          [$1, $2, $3, $4, $5],
-                          [2, 5],
-                          [$2[3], $5[3]]
-                      )
+                   -> node([$1, $2, $3, $4, $5], [$2[1], $5[1]])
                | f_ ident f_ ':' value
-                   -> node(
-                          'member',
-                          [$1, $2, $3, $4, $5],
-                          [2, 5],
-                          [$2[3], $5[3]]
-                      )
+                   -> node([$1, $2, $3, $4, $5], [$2[1], $5[1]])
 
 ident          = id_start id_continue*
-                   -> node('ident', [], cat(scons($1[3], $2[3])))
+                   -> node([], cat(scons($1[1], $2[1])))
 
 id_start       = ascii_id_start
                | other_id_start
@@ -158,42 +139,17 @@ id_continue    = ascii_id_start
                | '\u200d'
 
 num_literal    = '-' num_literal
-                   -> node(
-                          'num_literal',
-                          [$1, $2],
-                          [2, 3],
-                          0 - $2
-                      )
+                   -> node([$1, $2], 0 - $2)
                | '+' num_literal
-                   -> node(
-                          'num_literal',
-                          [$1, $2],
-                          [2, 3],
-                          $2
-                      )
+                   -> node([$1, $2], $2)
                | dec_literal ~id_start
-                    -> node(
-                           'num_literal',
-                           [$1, $2],
-                           [1, 2],
-                           atof($1)
-                       )
+                    -> node([$1, $2], atof($1))
                | hex_literal
-                    -> node(
-                           'num_literal',
-                           [$1],
-                           [1, 2],
-                           atoi($1, 16)
-                       )
+                    -> node([$1], atoi($1, 16))
                | 'Infinity'
-                    -> node(
-                           'num_literal',
-                           [$1],
-                           [1, 2],
-                           'Infinity'
-                       )
+                    -> node([$1], 'Infinity')
                | 'NaN'
-                   -> node('num_literal' [$1], [1, 2], 'NaN')
+                   -> node([$1], 'NaN')
 
 dec_literal    = <dec_int_lit frac? exp?>
                | <frac exp?>

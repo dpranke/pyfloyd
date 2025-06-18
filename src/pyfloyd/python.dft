@@ -187,6 +187,18 @@ parse_function: '''
 parser_class: @"""
     class _Parser:
         @parser_methods[]
+
+        def _o_tok(self, pos, in_token):
+            if not in_token and self._in_token:
+                return
+            if not self._failed and self._pos > pos:
+                val = (pos, self._text[pos:self._pos])
+                if self._tokens and self._tokens[-1][0] == pos:
+                    assert self._tokens[-1] == val
+                else:
+                    self._tokens.append((pos, self._text[pos:self._pos]))
+            if in_token:
+                self._in_token = False
     """
 
 parser_constructor: @"""
@@ -207,6 +219,8 @@ parser_constructor: @"""
         @if[grammar.operator_needed
             [vl 'self._operators = {}'
                 [map_items operator_state grammar.operators]]]
+        self._nodes: list[tuple[str, int]] = []
+        self._tokens: list[tuple[int, str]] = []
 
     """  # parser_constructor
 
@@ -431,6 +445,7 @@ o_ch: [meth q['ch'] "
            pos = self._pos
            if pos < self._end and self._text[pos] == ch:
                self._o_succeed(ch, self._pos + 1)
+               self._o_tok(pos, False)
            else:
                self._o_fail()
            "]
@@ -567,14 +582,23 @@ o_range: [meth q['i' 'j'] '''
                    self._o_fail()
                ''']
 
-o_rewind: [meth q['newpos'] 'self._o_succeed(None, newpos)']
+o_rewind: [meth q['newpos'] '''
+              self._o_succeed(None, newpos)
+              while self._tokens and self._tokens[-1][0] > newpos:
+                  self._tokens.pop()
+              ''']
 
 o_str: [meth q['s'] '''
+             in_token = self._in_token
+             self._in_token = True
+             pos = self._pos
              for ch in s:
                  self._o_ch(ch)
                  if self._failed:
                      return
              self._val = s
+             self._in_token = in_token
+             self._o_tok(pos, False)
              ''']
 
 o_succeed: [meth q['v' 'newpos'] "
