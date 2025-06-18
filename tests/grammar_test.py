@@ -417,6 +417,11 @@ class RulesMixin:
             'd',
             err='<string>:1 Unexpected "d" at column 1',
         )
+        # Check to make sure we're using (start, end) and not (start, len)
+        # for the value. If we were doing the latter, we'll pass (2, 5) and
+        # but the value would be 'bbbcd' instead of 'bbb'.
+        # string
+        self.check("g = 'a'* <'b'*> 'cdef' -> $2", 'aabbbcdef', 'bbb')
 
     def test_seq(self):
         self.check("grammar = 'foo' 'bar'", 'foobar')

@@ -101,7 +101,7 @@ t_or: [fn [x y] [hl x ' || ' y]]
 t_pop: [fn [x] [hl x '.pop()']]
 t_return: 'return;'
 t_self: 'this'
-t_substr: [fn [s start end] [hl s '.substr(' start ', ' end ')']]
+t_substr: [fn [s start end] [hl s '.substring(' start ', ' end ')']]
 t_throw: [fn [msg] [hl 'throw new ParsingRuntimeError(' msg ')' t_end]]
 t_to_str: [fn [x] x]
 t_toplevel_extra_sep: null
