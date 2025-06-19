@@ -18,7 +18,7 @@
 name = 'Go'
 ext = '.go'
 indent = 4
-line_length = 79
+line_length = 120
 
 starting_template: 'generate'
 
@@ -1014,10 +1014,10 @@ fn_list: [def_method _t_name
                     """]
 
 fn_node: [def_method _t_name
-                     q['parser *Parser' 'arg any']
+                     q['parser *Parser' 'args ...any']
                      ' any'
                      """
-                     return arg
+                     return args[0]
                      """]
 
 fn_scat: [def_method _t_name

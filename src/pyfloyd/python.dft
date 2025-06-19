@@ -598,9 +598,9 @@ o_str: [meth q['s']
                      """
                      in_token = self._in_token
                      self._in_token = True
+                     pos = self._pos
                      """]
                  """
-                 pos = self._pos
                  for ch in s:
                      self._o_ch(ch)
                      if self._failed:
@@ -654,9 +654,9 @@ fn_colno: [
 
 fn_pos: [meth q[] 'return self._pos']
 
-fn_node: [meth q['parser' 'arg'] """
+fn_node: [meth q['parser' '*args'] """
         del parser
-        return arg
+        return args[0]
         """]
 
 }

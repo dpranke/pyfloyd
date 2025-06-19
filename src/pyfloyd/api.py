@@ -129,7 +129,7 @@ def compile_to_parser(  # pylint: disable=redefined-builtin
         result.val,
         rewrite_subrules=False,
         typecheck=typecheck,
-        tokenize=tokenize
+        tokenize=tokenize,
     )
     if g.errors:
         return CompiledResult(None, _err_str(g.errors))
@@ -248,7 +248,7 @@ def parse(
         grammar_path,
         memoize=memoize,
         typecheck=typecheck,
-        tokenize=tokenize
+        tokenize=tokenize,
     )
     if result.err:
         return Result(err='Error in grammar: ' + result.err, pos=result.pos)
