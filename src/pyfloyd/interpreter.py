@@ -258,7 +258,11 @@ class Interpreter:
             self._interpret(subnode)
             vals.append(self._val)
         if node.ch[0].t == 'e_ident' and node.ch[0].v in self._externs:
-            self._val = left(self, *vals)
+            if self._grammar.externs[node.ch[0].v] == 'func':
+                self._val = left(*vals)
+            else:
+                assert self._grammar.externs[node.ch[0].v] == 'pfunc'
+                self._val = left(self, *vals)
         else:
             self._val = left(*vals)
 

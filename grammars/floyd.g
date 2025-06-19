@@ -4,7 +4,7 @@
             | unicode                      -> true
             | unicode_categories           -> true
             | unicode_names                -> true
-            | node                         -> func
+            | node                         -> pfunc
 
 %whitespace = <(' ' | '\f' | '\n' | '\r' | '\t' | '\v')+>
 

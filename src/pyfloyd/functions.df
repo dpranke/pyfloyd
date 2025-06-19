@@ -202,7 +202,7 @@ functions = {
         # typing/mypy doesn't support that. We can't use `tuple[str, any]`
         # because typing/mypy will complain if you pass a list instead.
         name: dict
-        params: [[pairs 'list[any]']]
+        params: [[pairs 'any']]
         ret: 'dict[str, any]'
         doc: """
              Returns a dictionary containing all the key/value pairs.

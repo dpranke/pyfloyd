@@ -192,12 +192,24 @@ class _Analyzer:
                 and choice.ch[1].child.v == 'func'
             ):
                 self.grammar.externs[key] = 'func'
+            elif (
+                choice.ch[1].child.t == 'e_ident'
+                and choice.ch[1].child.v == 'pfunc'
+            ):
+                self.grammar.externs[key] = 'pfunc'
             else:
                 assert choice.ch[1].child.t == 'e_const'
-                assert choice.ch[1].child.v in ('true', 'false', 'func')
+                assert choice.ch[1].child.v in (
+                    'true',
+                    'false',
+                    'func',
+                    'pfunc',
+                )
                 value = choice.ch[1].child.v == 'true'
                 if choice.ch[1].child.v == 'func':
                     self.grammar.externs[key] = 'func'
+                elif choice.ch[1].child.v == 'pfunc':
+                    self.grammar.externs[key] = 'pfunc'
                 else:
                     self.grammar.externs[key] = value
 

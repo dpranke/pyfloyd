@@ -18,7 +18,7 @@
 name = 'Go'
 ext = '.go'
 indent = 4
-line_length = 120
+line_length = 140
 
 starting_template: 'generate'
 
@@ -47,6 +47,13 @@ templates = {
 
 block: [fn [head body] [vl [hl head ' {'] [ind body] '}']]
 
+fn_sig: [fn [params ret] [hl 'func('
+                             [map [fn [p] [t_type_str [str2td [item p 1]]]]
+                                  params
+                                  ', ']
+                             ')('
+                             [t_type_str [str2td ret]]
+                             ')']]
 #
 # How to refer to different types of identifiers:
 #
@@ -102,7 +109,6 @@ t_empty_str_list: '[]str{}'
 t_end: ''  # statement terminator
 t_eq: [fn [x y] [hl x ' == ' y]]
 t_false: 'false'
-t_func: 'func'
 
 t_if: [fn [expr body] [block [hl 'if ' expr] body]]
 
@@ -340,7 +346,7 @@ externs: [fn []
                                 [hl 'p.externs['
                                     [lit k]
                                     '] = '
-                                    [if [equal v t_func]
+                                    [if [or [equal v 'func'] [equal v 'pfunc']]
                                         [fld [fn_name k]]
                                         [if v t_true t_false]]]]
                             grammar.externs]]]
@@ -542,20 +548,29 @@ n_e_arr: [fn [node]
              [tri '[]any{' [comma [map [fn [c] [expr c]] node.ch]] '}']]
 
 n_e_call_infix: [fn [node]
-                    [pack [if [in grammar.externs [get [item node.ch 0] 'v']]
-                              [hl '('
-                                  [extern [get [item node.ch 0] 'v']]
-                                  '.(func(*Parser, ...any)(any)))']
-                              [expr [item node.ch 0]]]
-                          [hl '('
-                                [if [in grammar.externs
-                                        [get [item node.ch 0] 'v']]
+                    [let [[fname [get [item node.ch 0] 'v']]
+                          [is_extern [in grammar.externs fname]]
+                          [is_pfunc [and is_extern
+                                         [equal [get grammar.externs fname]
+                                                'pfunc']]]
+                          [sig [fn_sig [get [get functions fname] 'params']
+                                       [get [get functions fname] 'ret']]]]
+                      [pack [if is_extern
+                                [hl '('
+                                    [extern fname]
+                                    [if is_pfunc
+                                        '.(func(*Parser, ...any)(any))'
+                                        [hl '.(' sig ')']]
+                                    ')']
+                                [expr [item node.ch 0]]]
+                            [hl '('
+                                [if is_pfunc
                                     [comma [cons t_self
                                                  [map [fn [c] [expr c]]
                                                       [slice node.ch 1 0]]]]
                                     [comma [map [fn [c] [expr c]]
                                                 [slice node.ch 1 0]]]]
-                                ')']]]
+                                ')']]]]
 
 n_e_getitem: [fn [node] [tri '.([]any)[' [expr node.child] ']']]
 

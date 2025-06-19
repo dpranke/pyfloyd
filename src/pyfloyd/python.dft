@@ -62,7 +62,6 @@ t_append: [fn [lst val] [hl lst '.append(' val ')' t_end]]
 t_break:   'break'
 t_end: ''  # statement terminator (not used in Python)
 t_false: 'False'
-t_func: 'func'
 t_list_one_any: [fn [x] [hl '[' x ']']]
 t_list_zero_any: '[]'
 t_meth_def: 'def _'
@@ -220,7 +219,8 @@ externs: [fn [] [if [dict_is_empty grammar.externs]
                         [ind [map_items [fn [k v]
                                             [hl [lit k]
                                                 ": "
-                                                [if [equal v t_func]
+                                                [if [or [equal v 'func']
+                                                        [equal v 'pfunc']]
                                                     [if [has functions k]
                                                         [fld [fn_name k]]
                                                         'None']

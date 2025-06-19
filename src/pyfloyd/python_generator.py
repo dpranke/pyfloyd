@@ -361,7 +361,7 @@ class PythonGenerator(generator.Generator):
         if self.grammar.externs:
             vl += 'self._externs = {'
             for k, v in self.grammar.externs.items():
-                if v == 'func':
+                if v in ('func', 'pfunc'):
                     vl += f"    '{k}': self._fn_{k},"
                 else:
                     vl += f"    '{k}': {v},"
@@ -607,7 +607,8 @@ class PythonGenerator(generator.Generator):
     def _ty_e_call_infix(self, node: m_grammar.Node) -> formatter.Pack:
         pfx = self._gen_expr(node.ch[0])
         args = [self._gen_expr(c) for c in node.ch[1:]]
-        if node.ch[0].v in self.grammar.externs:
+        fname = node.ch[0].v
+        if self.grammar.externs.get(fname) == 'pfunc':
             return formatter.Pack(
                 pfx,
                 formatter.Triangle('(', formatter.Comma('self', *args), ')'),

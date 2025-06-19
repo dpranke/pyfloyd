@@ -50,7 +50,11 @@ def main(
         k, v = d.split('=', 1)
         externs[k] = json.loads(v)
 
+    def _dict(pairs):
+        return pairs
+
     externs['node'] = _node
+    externs['dict'] = _dict
 
     if args.code is None:
         assert fp

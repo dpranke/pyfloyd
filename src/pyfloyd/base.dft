@@ -238,18 +238,22 @@ n_e_arr: [fn [node] [if [is_empty node.ch]
                              ']']]]
 
 n_e_call_infix: [fn [node]
-                    [pack [if [in grammar.externs [get [item node.ch 0] 'v']]
-                              [extern [get [item node.ch 0] 'v']]
-                              [expr [item node.ch 0]]]
-                          [tri '('
-                                [if [in grammar.externs
-                                        [get [item node.ch 0] 'v']]
-                                    [comma [cons t_self
-                                                 [map [fn [c] [expr c]]
-                                                      [slice node.ch 1 0]]]]
-                                    [comma [map [fn [c] [expr c]]
-                                                [slice node.ch 1 0]]]]
-                                ')']]]
+                    [let [[fname [get [item node.ch 0] 'v']]
+                          [is_extern [in grammar.externs fname]]
+                          [is_pfunc [and is_extern
+                                         [equal [get grammar.externs fname]
+                                                'pfunc']]]]
+                      [pack [if is_extern
+                                [extern fname]
+                                [expr [item node.ch 0]]]
+                            [tri '('
+                                  [if is_pfunc
+                                      [comma [cons t_self
+                                                   [map [fn [c] [expr c]]
+                                                        [slice node.ch 1 0]]]]
+                                      [comma [map [fn [c] [expr c]]
+                                                  [slice node.ch 1 0]]]]
+                                  ')']]]]
 
 n_e_const: [fn [node] [invoke [strcat 't_' node.v]]]
 

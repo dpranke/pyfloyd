@@ -260,6 +260,8 @@ class Node:
             self.type = TD('null')
         elif self.v == 'func':
             self.type = TD('func')
+        elif self.v == 'pfunc':
+            self.type = TD('pfunc')
         else:
             self.type = TD('bool')
 

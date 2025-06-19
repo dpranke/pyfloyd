@@ -78,7 +78,6 @@ t_declare_vars: [fn [vars]
 t_end: ';'  # statement terminator
 t_eq: [fn [x y] [hl x ' === ' y]]
 t_false: 'false'
-t_func: 'func'
 t_if: [fn [cond body] [block [hl 'if (' cond ')'] body]]
 t_ifelse: [fn [cond if_body e_body]
               [vl [block [hl 'if (' cond ')'] if_body]
@@ -199,7 +198,8 @@ externs: [fn [] [if [dict_is_empty grammar.externs]
                                             [hl '['
                                                 [lit k]
                                                 ', '
-                                                [if [equal v t_func]
+                                                [if [or [equal v 'func']
+                                                        [equal v 'pfunc']]
                                                     [fld [fn_name k]]
                                                     [if v 'true' 'false']]
                                                 '], ']]
