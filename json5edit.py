@@ -50,23 +50,16 @@ def main(
         k, v = d.split('=', 1)
         externs[k] = json.loads(v)
 
-    def _node(parser, *args):
-        return [
-            parser._nodes[-1][1],
-            parser._nodes[-1][0],
-            parser._pos,
-            args[0],
-            parser
-        ]
-
     externs['node'] = _node
 
     if args.code is None:
         assert fp
         msg = fp.read()
+
     assert msg is not None
     result = json5.parse(msg, path)
     cst_result = json5_cst.parse(msg, path, externs)
+
     if result.err:
         print(result.err, file=stderr)
     if cst_result.err:
@@ -74,22 +67,25 @@ def main(
     if result.err or cst_result.err:
         return 1
 
-    val, pos = _val(cst_result.val, 0)
-    assert pos == len(cst_result.val[4]._tokens)
-    tokens = _tokens(val)
+    assert result.val == cst_result.val['v']
+
+    tokens = _tokens(cst_result.val)
     new_msg = ''.join(t[1] for t in tokens)
     assert new_msg == msg
+
     if args.print:
         print()
-        print(json.dumps(val, indent=2), file=stdout)
+        print(json.dumps(cst_result.val, indent=2), file=stdout)
 
     return 0
 
 
-def _val(obj, pos):
-    assert isinstance(obj, list) and len(obj) == 5 and isinstance(obj[0], str)
-    rule, begin, end, val, parser = obj
-    tokens = parser._tokens
+def _node(parser, *args):
+    rule = parser._nodes[-1][1]
+    begin = parser._nodes[-1][0]
+    end = parser._pos
+    val = args[0]
+
     r = {
         'r': rule,
         'v': None,
@@ -98,39 +94,23 @@ def _val(obj, pos):
         'l': [],
         'c': [],
         't': [],
-        'e': end
+        'e': end,
     }
 
-    while tokens[pos][0] < begin:
-        r['l'].append(tokens[pos])
-        pos += 1
-
-    def _merge(outer, inner, rule):
-        return {
-            'r': rule,
-            'v': inner['v'],
-            'b': outer['b'],
-            'l': outer['l'] + inner['l'],
-            'c': inner['c'],
-            't': inner['t'],
-            'e': outer['e'],
-        }
-
     if rule == 'grammar':
-        v, pos = _val(val, pos)
-        r = _merge(r, v, v['r'])
+        r['v'] = val['v']
+        r['c'] = val['c']
+        _ = _assign_tokens(parser._tokens, r, 0)
     elif rule == 'object':
         if val != []:
-            v, pos = _val(val, pos)
-            r = _merge(r, v, r['r'])
+            r['c'] = val['c']
             pairs = [c['v'] for c in r['c']]
             r['v'] = dict(pairs)
         else:
             r['v'] = {}
     elif rule == 'array':
         if val != []:
-            v, pos = _val(val, pos)
-            r = _merge(r, v, r['r'])
+            r['c'] = val['c']
             r['v'] = [c['v'] for c in r['c']]
         else:
             r['v'] = []
@@ -138,17 +118,27 @@ def _val(obj, pos):
         r['s'] = parser._text[begin:end]
         r['v'] = val
     elif rule in ('element_list', 'member', 'member_list'):
-        for el in val:
-            v, pos = _val(el, pos)
-            r['c'].append(v)
+        r['c'] = val
         r['v'] = [c['v'] for c in r['c']]
-    else:
-        assert False
+    return r
+
+
+def _assign_tokens(tokens, obj, pos):
+    begin = obj['b']
+    end = obj['e']
+    rule = obj['r']
+
+    while tokens[pos][0] < begin:
+        obj['l'].append(tokens[pos])
+        pos += 1
+
+    for c in obj['c']:
+        _, pos = _assign_tokens(tokens, c, pos)
 
     while pos < len(tokens) and tokens[pos][0] < end:
-        r['t'].append(tokens[pos])
+        obj['t'].append(tokens[pos])
         pos += 1
-    return r, pos
+    return obj, pos
 
 
 def _tokens(val):

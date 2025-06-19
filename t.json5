@@ -1,0 +1,10 @@
+// comment
+{
+  "foo": 4,
+  "blorp": {},
+
+  /* comment */
+  "bar": "baz", // eol
+  "qux": [1, /* c */ 2],
+  "quux": true
+}
