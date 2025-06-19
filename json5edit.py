@@ -98,28 +98,24 @@ def _node(parser, *args):
     }
 
     if rule == 'grammar':
+        r['r'] = val['r']
         r['v'] = val['v']
         r['c'] = val['c']
         _ = _assign_tokens(parser._tokens, r, 0)
-    elif rule == 'object':
-        if val != []:
-            r['c'] = val['c']
-            pairs = [c['v'] for c in r['c']]
-            r['v'] = dict(pairs)
+    elif rule in ('array', 'member', 'object'):
+        r['c'] = val
+        if r['c']:
+            v = [c['v'] for c in r['c']]
         else:
-            r['v'] = {}
-    elif rule == 'array':
-        if val != []:
-            r['c'] = val['c']
-            r['v'] = [c['v'] for c in r['c']]
-        else:
-            r['v'] = []
+            v = []
+        r['v'] = dict(v) if rule == 'object' else v
     elif rule in ('ident', 'num_literal', 'string', 'null', 'bool'):
         r['s'] = parser._text[begin:end]
         r['v'] = val
-    elif rule in ('element_list', 'member', 'member_list'):
-        r['c'] = val
-        r['v'] = [c['v'] for c in r['c']]
+    elif rule in ('%comment', '%whitespace'):
+        pass
+    else:
+        assert False
     return r
 
 
@@ -133,12 +129,12 @@ def _assign_tokens(tokens, obj, pos):
         pos += 1
 
     for c in obj['c']:
-        _, pos = _assign_tokens(tokens, c, pos)
+        pos = _assign_tokens(tokens, c, pos)
 
     while pos < len(tokens) and tokens[pos][0] < end:
         obj['t'].append(tokens[pos])
         pos += 1
-    return obj, pos
+    return pos
 
 
 def _tokens(val):

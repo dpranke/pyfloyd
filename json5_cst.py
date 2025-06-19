@@ -853,9 +853,7 @@ class _Parser:
         self._s_element_list_2()
         v__2 = self._val
         self._s_element_list_4()
-        self._o_succeed(
-            self._externs['node'](self, self._fn_cons(v__1, v__2)), self._pos
-        )
+        self._o_succeed(self._fn_cons(v__1, v__2), self._pos)
 
     def _s_element_list_2(self):
         vs = []
@@ -902,9 +900,7 @@ class _Parser:
         self._s_member_list_2()
         v__2 = self._val
         self._s_member_list_4()
-        self._o_succeed(
-            self._externs['node'](self, self._fn_cons(v__1, v__2)), self._pos
-        )
+        self._o_succeed(self._fn_cons(v__1, v__2), self._pos)
 
     def _s_member_list_2(self):
         vs = []

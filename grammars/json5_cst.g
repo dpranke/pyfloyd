@@ -81,9 +81,9 @@ hex_esc        = 'x' hex{2}                      -> xtou(cat($2))
 
 unicode_esc    = 'u' hex{4}                      -> xtou(cat($2))
 
-element_list   = value (',' value)* ','?         -> node(cons($1, $2))
+element_list   = value (',' value)* ','?         -> cons($1, $2)
 
-member_list    = member (',' member)* ','?       -> node(cons($1, $2))
+member_list    = member (',' member)* ','?       -> cons($1, $2)
 
 member         = string ':' value                -> node([$1, $3])
                | ident ':' value                 -> node([$1, $3])
