@@ -74,7 +74,7 @@ def main(
     assert result.val == cst_result.val['v']
 
     tokens = _tokens(cst_result.val)
-    new_msg = ''.join(t[1] for t in tokens)
+    new_msg = ''.join(t[2] for t in tokens)
     assert new_msg == msg
 
     if args.print:

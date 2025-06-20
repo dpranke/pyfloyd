@@ -394,7 +394,9 @@ class Decoder:
                 i, c = decode_escape(s, i)
                 ret.append(c)
         r = ''.join(ret)
-        return dedent(r, colno=colno, min_indent=1 if is_istr else -1)
+        if '\n' in s:
+            return dedent(r, colno=colno, min_indent=1 if is_istr else -1)
+        return r
 
     def parse_string_list(self, tag, strs):
         if tag:

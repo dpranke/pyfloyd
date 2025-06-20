@@ -129,12 +129,30 @@ def f_dedent(s: str, colno: int = -1, min_indent: int = -1) -> str:
     return r
 
 
-def f_dict(pairs: list[Any]) -> dict[str, Any]:
+def f_dict(pairs: Any) -> dict[str, Any]:
     return dict(pairs)
 
 
 def f_dict_is_empty(d: dict[str, Any]) -> bool:
     return len(d) == 0
+
+
+def f_encode_string(s: str) -> str:
+    r = []
+    for c in s:
+      if c == '"':
+          r.append('\\"')
+      elif c == '\\':
+          r.append('\\\\')
+      elif c.isprintable():
+          r.append(c)
+      elif c == '\n':
+          r.append('\\n')
+      elif ord(c) < 256:
+          r.append(f'\\x{ord(c):2x}')
+      else:
+          r.append(f'\\u{ord(c):4x}')
+    return '"' + ''.join(r) + '"'
 
 
 def f_equal(x: Any, y: Any) -> bool:
@@ -398,13 +416,18 @@ ALL: dict[str, dict[str, Any]] = {
     },
     'dict': {
         'func': f_dict,
-        'params': [['pairs', 'list[any]']],
+        'params': [['pairs', 'any']],
         'ret': 'dict[str, any]',
     },
     'dict_is_empty': {
         'func': f_dict_is_empty,
         'params': [['d', 'dict[str, any]']],
         'ret': 'bool',
+    },
+    'encode_string': {
+        'func': f_encode_string,
+        'params': [['s', 'str']],
+        'ret': 'str',
     },
     'equal': {
         'func': f_equal,

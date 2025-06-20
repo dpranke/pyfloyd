@@ -168,7 +168,7 @@ class _Parser:
         self._nodes.append((self._pos, 'null'))
         self._in_token = True
         self._s_null_1()
-        self._o_tok(self._nodes[-1][0], True)
+        self._o_tok(self._nodes[-1][0], self._nodes[-1][1], True)
         self._nodes.pop()
 
     def _s_null_1(self):
@@ -181,7 +181,7 @@ class _Parser:
         self._nodes.append((self._pos, 'bool'))
         self._in_token = True
         self._s_bool_1()
-        self._o_tok(self._nodes[-1][0], True)
+        self._o_tok(self._nodes[-1][0], self._nodes[-1][1], True)
         self._nodes.pop()
 
     def _s_bool_1(self):
@@ -294,7 +294,7 @@ class _Parser:
         self._nodes.append((self._pos, 'string'))
         self._in_token = True
         self._s_string_1()
-        self._o_tok(self._nodes[-1][0], True)
+        self._o_tok(self._nodes[-1][0], self._nodes[-1][1], True)
         self._nodes.pop()
 
     def _s_string_1(self):
@@ -1000,7 +1000,7 @@ class _Parser:
         self._nodes.append((self._pos, 'ident'))
         self._in_token = True
         self._s_ident_1()
-        self._o_tok(self._nodes[-1][0], True)
+        self._o_tok(self._nodes[-1][0], self._nodes[-1][1], True)
         self._nodes.pop()
 
     def _s_ident_1(self):
@@ -1165,7 +1165,7 @@ class _Parser:
         self._nodes.append((self._pos, 'num_literal'))
         self._in_token = True
         self._s_num_literal_1()
-        self._o_tok(self._nodes[-1][0], True)
+        self._o_tok(self._nodes[-1][0], self._nodes[-1][1], True)
         self._nodes.pop()
 
     def _s_num_literal_1(self):
@@ -1525,7 +1525,7 @@ class _Parser:
         self._nodes.append((self._pos, '%whitespace'))
         self._in_token = True
         self._s__whitespace_1()
-        self._o_tok(self._nodes[-1][0], True)
+        self._o_tok(self._nodes[-1][0], self._nodes[-1][1], True)
         self._nodes.pop()
 
     def _s__whitespace_1(self):
@@ -1608,7 +1608,7 @@ class _Parser:
         self._nodes.append((self._pos, '%comment'))
         self._in_token = True
         self._s__comment_1()
-        self._o_tok(self._nodes[-1][0], True)
+        self._o_tok(self._nodes[-1][0], self._nodes[-1][1], True)
         self._nodes.pop()
 
     def _s__comment_1(self):
@@ -1655,11 +1655,13 @@ class _Parser:
 
     def _s__comment_6(self):
         rexp = '[^\r\n]'
+        pos = self._pos
         if rexp not in self._regexps:
             self._regexps[rexp] = re.compile(rexp)
         m = self._regexps[rexp].match(self._text, self._pos)
         if m:
             self._o_succeed(m.group(0), m.end())
+            self._o_tok(pos, 'set', False)
             return
         self._o_fail()
 
@@ -1720,6 +1722,7 @@ class _Parser:
     def _r_any(self):
         if self._pos < self._end:
             self._o_succeed(self._text[self._pos], self._pos + 1)
+            self._o_tok(self._pos - 1, 'any', False)
         else:
             self._o_fail()
 
@@ -1733,7 +1736,7 @@ class _Parser:
         pos = self._pos
         if pos < self._end and self._text[pos] == ch:
             self._o_succeed(ch, self._pos + 1)
-            self._o_tok(pos, False)
+            self._o_tok(pos, 'lit', False)
         else:
             self._o_fail()
 
@@ -1784,22 +1787,22 @@ class _Parser:
                 return
         self._val = s
         self._in_token = in_token
-        self._o_tok(pos, False)
+        self._o_tok(pos, 'lit', False)
 
     def _o_succeed(self, v, newpos):
         self._val = v
         self._failed = False
         self._pos = newpos
 
-    def _o_tok(self, pos, in_token):
+    def _o_tok(self, pos, tag, in_token):
         if not in_token and self._in_token:
             return
         if not self._failed and self._pos > pos:
-            val = (pos, self._text[pos:self._pos])
+            val = (pos, tag, self._text[pos:self._pos])
             if self._tokens and self._tokens[-1][0] == pos:
                 assert self._tokens[-1] == val
             else:
-                self._tokens.append((pos, self._text[pos:self._pos]))
+                self._tokens.append((pos, tag, self._text[pos:self._pos]))
         if in_token:
             self._in_token = False
 

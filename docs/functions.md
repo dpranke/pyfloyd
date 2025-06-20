@@ -72,12 +72,15 @@ given types (using Python's type annotation syntax):
       however, if the string ends in a newline, the newline is
       preserved.
 
-* `dict(pairs: list[any]) -> dict[str, any]`<br>
+* `dict(pairs: any) -> dict[str, any]`<br>
     Returns a dictionary containing all the key/value pairs.
 
 * `dict_is_empty(d: dict[str, any]) -> bool`<br>
     Returns whether the dictionary contains no entries. Equivalent
     to `length(keys(d)) == 0`.
+
+* `encode_string(s: str) -> str`<br>
+    Returns a double-quoted, escaped representation of the string.
 
 * `equal(x: any, y: any) -> bool`<br>
     Returns whether the two values are equal.

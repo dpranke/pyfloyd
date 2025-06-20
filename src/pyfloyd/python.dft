@@ -394,12 +394,16 @@ main_footer: """
 
 n_regexp: [fn [node]
               [vl [t_assign 'rexp' [lit node.v]]
+                  [if grammar.tokenize
+                      'pos = self._pos']
                   'if rexp not in self._regexps:'
                   '    self._regexps[rexp] = re.compile(rexp)'
                   'm = self._regexps[rexp].match(self._text, self._pos)'
                   'if m:'
-                  '    self._o_succeed(m.group(0), m.end())'
-                  '    return'
+                  [ind 'self._o_succeed(m.group(0), m.end())'
+                       [if grammar.tokenize
+                           "self._o_tok(pos, 'regexp', False)"]
+                       'return']
                   [fail]]]
 
 n_rule_wrapper: [fn [node]
@@ -410,16 +414,21 @@ n_rule_wrapper: [fn [node]
                               'self._in_token = True']
                           [stmts node.child]
                           [if is_tok
-                              'self._o_tok(self._nodes[-1][0], True)']
+                              [hl 'self._o_tok(self._nodes[-1][0], '
+                                  'self._nodes[-1][1], True)']]
                           [hl "self._nodes.pop()"]]]]
 
 n_set: [fn [node]
            [vl [t_assign 'rexp' [lit [strcat '[' node.v ']']]]
+               [if grammar.tokenize
+                   'pos = self._pos']
                [t_if 'rexp not in self._regexps'
                      'self._regexps[rexp] = re.compile(rexp)']
                'm = self._regexps[rexp].match(self._text, self._pos)'
                [t_if 'm'
                      [vl [succeed 'm.group(0)' 'm.end()']
+                         [if grammar.tokenize
+                             "self._o_tok(pos, 'set', False)"]
                          t_return]]
                [fail]]]
 
@@ -428,12 +437,13 @@ n_set: [fn [node]
 #
 
 r_any: [
-    meth q[] "
-        if self._pos < self._end:
-            self._o_succeed(self._text[self._pos], self._pos + 1)
-        else:
-            self._o_fail()
-        "]
+    meth q[]
+        [vl 'if self._pos < self._end:'
+            [ind 'self._o_succeed(self._text[self._pos], self._pos + 1)'
+                 [if grammar.tokenize
+                     "self._o_tok(self._pos - 1, 'any', False)"]]
+            'else:'
+            [ind 'self._o_fail()']]]
 
 r_end: [meth q[] "
              if self._pos == self._end:
@@ -443,17 +453,13 @@ r_end: [meth q[] "
              "]
 
 o_ch: [meth q['ch']
-           [vl """
-               pos = self._pos
-               if pos < self._end and self._text[pos] == ch:
-                   self._o_succeed(ch, self._pos + 1)
-               """
-               [if grammar.tokenize
-                   [ind 'self._o_tok(pos, False)']]
-               """
-               else:
-                   self._o_fail()
-               """]]
+            [vl 'pos = self._pos'
+                'if pos < self._end and self._text[pos] == ch:'
+                [ind 'self._o_succeed(ch, self._pos + 1)'
+                     [if grammar.tokenize
+                         "self._o_tok(pos, 'lit', False)"]]
+                'else:'
+                [ind 'self._o_fail()']]]
 
 o_offsets: [meth q['pos'] '''
                 lineno = 1
@@ -610,7 +616,7 @@ o_str: [meth q['s']
                  [if grammar.tokenize
                      """
                      self._in_token = in_token
-                     self._o_tok(pos, False)
+                     self._o_tok(pos, 'lit', False)
                      """]]]
 
 o_succeed: [meth q['v' 'newpos'] "
@@ -619,16 +625,16 @@ o_succeed: [meth q['v' 'newpos'] "
                 self._pos = newpos
                 "]
 
-o_tok: [meth q['pos' 'in_token']
+o_tok: [meth q['pos' 'tag' 'in_token']
              """
              if not in_token and self._in_token:
                  return
              if not self._failed and self._pos > pos:
-                 val = (pos, self._text[pos:self._pos])
+                 val = (pos, tag, self._text[pos:self._pos])
                  if self._tokens and self._tokens[-1][0] == pos:
                      assert self._tokens[-1] == val
                  else:
-                     self._tokens.append((pos, self._text[pos:self._pos]))
+                     self._tokens.append((pos, tag, self._text[pos:self._pos]))
              if in_token:
                  self._in_token = False
              """]
