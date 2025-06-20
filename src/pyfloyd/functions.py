@@ -140,18 +140,18 @@ def f_dict_is_empty(d: dict[str, Any]) -> bool:
 def f_encode_string(s: str) -> str:
     r = []
     for c in s:
-      if c == '"':
-          r.append('\\"')
-      elif c == '\\':
-          r.append('\\\\')
-      elif c.isprintable():
-          r.append(c)
-      elif c == '\n':
-          r.append('\\n')
-      elif ord(c) < 256:
-          r.append(f'\\x{ord(c):2x}')
-      else:
-          r.append(f'\\u{ord(c):4x}')
+        if c == '"':
+            r.append('\\"')
+        elif c == '\\':
+            r.append('\\\\')
+        elif c.isprintable():
+            r.append(c)
+        elif c == '\n':
+            r.append('\\n')
+        elif ord(c) < 256:
+            r.append('\\x{ord(c):2x}')
+        else:
+            r.append('\\u{ord(c):4x}')
     return '"' + ''.join(r) + '"'
 
 

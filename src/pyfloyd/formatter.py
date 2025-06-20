@@ -13,35 +13,31 @@
 # limitations under the License.
 
 import copy
-from typing import Any, Callable, Optional, Sequence, Union
+from typing import Any, Callable, Optional, Sequence, Tuple, Union
 
 from pyfloyd import datafile
 
 
 El = Union[str, 'FormatObj', None]
-_Len = Union[int, None]
 _FmtFn = Callable[[El, '_FmtParams'], list[str]]
 
 
 class _FmtParams:
-    cur_len: _Len
-    max_len: _Len
+    cur_len: int  # Amount remaining on current line
+    max_len: int  # Max amount remaining for any line
     indent: str
     fn: _FmtFn
 
-    def __init__(self, cur_len: _Len, max_len: _Len, indent: str, fn: _FmtFn):
+    def __init__(self, cur_len: int, max_len: int, indent: str, fn: _FmtFn):
         self.cur_len = cur_len
         self.max_len = max_len
         self.indent = indent
         self.fn = fn
 
     def shrink(self, ln: int, max_ln: int = 0) -> '_FmtParams':
-        n_cur = _new_l(self.cur_len, ln)
-        n_max = _new_l(self.max_len, max_ln)
-        # print(f'shrink {self.cur_len} {self.max_len} -> {n_cur} {n_max}')
-        return self.adjust(n_cur, n_max)
+        return self.adjust(self.cur_len - ln, self.max_len - max_ln)
 
-    def adjust(self, new_cur: _Len, new_max: _Len) -> '_FmtParams':
+    def adjust(self, new_cur: int, new_max: int) -> '_FmtParams':
         return _FmtParams(new_cur, new_max, self.indent, self.fn)
 
     def fmt(self, obj):
@@ -50,7 +46,7 @@ class _FmtParams:
 
 def flatten(
     obj: El,
-    length: _Len = 79,
+    length: Optional[int] = 79,
     indent: str = '    ',
 ) -> list[str]:
     """Returns an object formatted into a list of 1 or more strings.
@@ -58,17 +54,21 @@ def flatten(
     Each string must be shorter than `length` characters, if possible. If
     length is None, lines can be arbitrarily long.
     """
+    if length is None:
+        length = 2**32 - 1
     p = _FmtParams(length, length, indent, _fmt)
     lines = p.fn(obj, p)
-    import pdb; pdb.set_trace()
     return lines
 
 
 def flatten_as_lisplist(
-    obj: El, length: _Len = 79, indent: str = '    '
+    obj: El, length: Optional[int] = 79, indent: str = '    '
 ) -> list[str]:
     """Returns an object formatted as a datafile-formatted representation of
     itself."""
+    if length is None:
+        length = 2**32 - 1
+
     r_obj = to_lisplist(obj)
     p = _FmtParams(length, length, indent, _fmt_quote)
     return p.fmt(r_obj)
@@ -152,20 +152,38 @@ def splitlines(s: str) -> list[str]:
     return lines
 
 
-def _new_l(l1: _Len, l2: int) -> _Len:
-    return l1 if l1 is None else l1 - l2
+def _fits(el: El, remaining: int, indent: str) -> Tuple[bool, int]:
+    if el is None:
+        return True, remaining
+    if isinstance(el, str):
+        ln = len(el)
+        if ln <= remaining:
+            return True, remaining - ln
+        return False, -1
+    return el.fits(remaining, indent)
 
 
-def _fits(p: _FmtParams, s: str) -> bool:
-    return p.cur_len is None or len(s) <= p.cur_len
+def _objs_fit_on_one(
+    objs: list[El], sep: str, remaining: int, indent: str
+) -> Tuple[bool, int]:
+    if not objs:
+        return True, remaining
+    for obj in objs[:-1]:
+        fit, remaining = _fits(obj, remaining, indent)
+        if not fit:
+            return False, -1
+        remaining -= len(sep)
+        if remaining is not None and remaining < 0:
+            return False, -1
+    return _fits(objs[-1], remaining, indent)
 
 
-def _fits_on_one(p, lines) -> bool:
-    if lines is None:
+def _lines_fit_on_one(lines, remaining: int) -> bool:
+    if lines is None or len(lines) > 1:
         return False
     if lines == []:
         return True
-    return len(lines) == 1 and _fits(p, lines[0])
+    return _fits(lines[0], remaining, '')[0]
 
 
 def indent_level(s: str, indent: str) -> int:
@@ -209,18 +227,18 @@ def _class_map():
 objects = []
 
 func_stats = {
-   'horiz': 0,
-   'vert': 0,
-   'pack': 0,
-   'vtree': 0,
-   'wrap': 0,
+    'horiz': 0,
+    'vert': 0,
+    'pack': 0,
+    'vtree': 0,
+    'wrap': 0,
 }
 
 
 class Stats:
     def __init__(self):
         self.n_fmts = 0
-        self.n_fmts_by_len: dict[int, int] = {}
+        self.n_fmts_by_len = {}  # dict[int, int]
 
 
 class FormatObj:
@@ -320,6 +338,11 @@ class FormatObj:
         """Returns a list of strings, each representing a line."""
         raise NotImplementedError
 
+    def fits(self, remaining: int, indent: str) -> Tuple[bool, int]:
+        """Returns whether the object will fit on one line with the
+        remaining space and, if so, how much space will remain."""
+        raise NotImplementedError
+
     def _stat(self, p: _FmtParams):
         self.stats.n_fmts += 1
         remaining = p.max_len - p.cur_len
@@ -346,20 +369,24 @@ class Comma(FormatObj):
 
     def fmt(self, p: _FmtParams) -> list[str]:
         self._stat(p)
-        # single line
+
         if len(self.objs) == 0:
             return []
+
         if len(self.objs) == 1:
             # Don't want a comma after a single arg.
             return p.fmt(self.objs[0])
 
-        lines = pack(p, self.objs, ', ')
-        if _fits_on_one(p, lines):
-            return lines
+        if _objs_fit_on_one(self.objs, ', ', p.cur_len, p.indent)[0]:
+            return pack(p, self.objs, ', ')
+
         lines = []
         for obj in self.objs:
             lines.extend(wrap(p, obj, '', '', '', ', '))
         return lines
+
+    def fits(self, remaining: int, indent: str) -> Tuple[bool, int]:
+        return _objs_fit_on_one(self.objs, ', ', remaining, indent)
 
 
 class Hang(FormatObj):
@@ -369,10 +396,10 @@ class Hang(FormatObj):
     The second and subsequent lines will be indented to align with the
     *second* argument, e.g. .[foo bar baz] will format as
 
-    [hang ' ']           = ''
-    [hang ' ' a]         = 'a'
-    [hang ' ' a b c ...] = 'a b c d'
-                           '  d e f'
+    [hang [] ' ']           = ''
+    [hang [a] ' ']          = 'a'
+    [hang [a b c ...] ' ' ] = 'a b c d'
+                              '  d e f'
     """
 
     tag = 'hang'
@@ -381,17 +408,24 @@ class Hang(FormatObj):
         self._stat(p)
         objs = self.objs[0]
         sep = self.objs[1]
+
         if len(objs) == 0:
             return []
+
         first = p.fmt(objs[0])[0]
         if len(objs) == 1:
             return [first]
+
+        if _objs_fit_on_one(objs, sep, p.cur_len, p.indent)[0]:
+            return pack(p, objs, sep)
+
         first += sep
         prefix = ' ' * len(first)
-        new_p = p.adjust(
-            _new_l(p.cur_len, len(first)), _new_l(p.max_len, len(first))
-        )
+        new_p = p.adjust(p.cur_len - len(first), p.max_len - len(first))
         return wrap(p, pack(new_p, objs[1:]), prefix, '', first, '')
+
+    def fits(self, remaining: int, indent: str) -> Tuple[bool, int]:
+        return _objs_fit_on_one(self.objs[0], self.objs[1], remaining, indent)
 
 
 class HList(FormatObj):
@@ -417,6 +451,9 @@ class HList(FormatObj):
         self._stat(p)
         return horiz(p, self.objs)
 
+    def fits(self, remaining: int, indent: str) -> Tuple[bool, int]:
+        return _objs_fit_on_one(self.objs, '', remaining, indent)
+
 
 class Indent(FormatObj):
     """Returns a list of objects laid out vertically, each line indented.
@@ -435,6 +472,16 @@ class Indent(FormatObj):
     def fmt(self, p: _FmtParams) -> list[str]:
         self._stat(p)
         return wrap(p, self.objs, p.indent)
+
+    def fits(self, remaining: int, indent: str) -> Tuple[bool, int]:
+        remaining -= len(indent)
+        remains = []
+        for obj in self.objs:
+            fit, new_remaining = _fits(obj, remaining, indent)
+            if not fit:
+                return False, -1
+            remains.append(new_remaining)
+        return True, min(remains)
 
 
 class LispList(FormatObj):
@@ -472,9 +519,15 @@ class LispList(FormatObj):
         hang = ' ' * len(first)
         new_p = p.shrink(len(first) + 1)
         sub_lines = pack(new_p, self.objs[1:])
-        if _fits_on_one(new_p, sub_lines):
+        if _lines_fit_on_one(sub_lines, new_p.cur_len):
             return [first + sub_lines[0] + ']']
         return wrap(new_p, vert(new_p, self.objs[1:]), hang, '', first, ']')
+
+    def fits(self, remaining: int, indent: str) -> Tuple[bool, int]:
+        remaining -= 2  # account for '[' and ']'
+        if remaining < 0:
+            return False, -1
+        return _objs_fit_on_one(self.objs, ' ', remaining, indent)
 
 
 class Pack(FormatObj):
@@ -492,6 +545,9 @@ class Pack(FormatObj):
     def fmt(self, p: _FmtParams) -> list[str]:
         self._stat(p)
         return pack(p, self.objs, sep='')
+
+    def fits(self, remaining: int, indent: str) -> Tuple[bool, int]:
+        return _objs_fit_on_one(self.objs, '', remaining, indent)
 
 
 class Triangle(FormatObj):
@@ -513,7 +569,7 @@ class Triangle(FormatObj):
     def fmt(self, p: _FmtParams) -> list[str]:
         self._stat(p)
         lines = pack(p, self.objs, '')
-        if _fits_on_one(p, lines):
+        if _lines_fit_on_one(lines, p.cur_len):
             return lines
 
         new_p = p.adjust(p.max_len, p.max_len)
@@ -524,6 +580,9 @@ class Triangle(FormatObj):
             + [self.objs[2]],
         )
 
+    def fits(self, remaining: int, indent: str) -> Tuple[bool, int]:
+        return _objs_fit_on_one(self.objs, '', remaining, indent)
+
 
 class Tree(FormatObj):
     """Formats a call or dereference.
@@ -532,7 +591,7 @@ class Tree(FormatObj):
     and ending string and a possibly more complex object in the middle,
     formats these thing over possibly multiple lines.
 
-    tree [a b [tree c d e]]  = 'a b c d e'
+    tree [a b [tree c d e]]  = 'abcde'
                              | 'a'
                                'b c'
                                'd e'
@@ -554,9 +613,12 @@ class Tree(FormatObj):
             lines = pack(p, self.objs, '')
         else:
             lines = pack(p, self.objs, ' ')
-        if _fits_on_one(p, lines):
+        if _lines_fit_on_one(lines, p.cur_len):
             return lines
         return vtree(p, self)
+
+    def fits(self, remaining: int, indent: str) -> Tuple[bool, int]:
+        return _objs_fit_on_one(self.objs, '', remaining, indent)
 
 
 class VList(FormatObj):
@@ -580,6 +642,15 @@ class VList(FormatObj):
     def fmt(self, p: _FmtParams) -> list[str]:
         self._stat(p)
         return vert(p, self.objs)
+
+    def fits(self, remaining: int, indent: str) -> Tuple[bool, int]:
+        remains = []
+        for obj in self.objs:
+            fits, new_remaining = _fits(obj, remaining, indent)
+            if not fits:
+                return False, -1
+            remains.append(new_remaining)
+        return True, min(remains)
 
 
 class Wrap(FormatObj):
@@ -607,6 +678,37 @@ class Wrap(FormatObj):
         self._stat(p)
         obj, prefix, suffix, first, last = self.objs
         return wrap(p, obj, prefix, suffix, first, last)
+
+    def fits(self, remaining: int, indent: str) -> Tuple[bool, int]:
+        objs, prefix, suffix, first, last = self.objs
+        remains = []
+        if objs is None or len(objs) == 0:
+            return True, remaining
+        if len(objs) == 1:
+            remaining -= len(first) + len(last)
+            if remaining < 0:
+                return False, -1
+            return True, remaining
+        fit, new_remaining = _fits(
+            objs[0], remaining - len(first) - len(suffix), indent
+        )
+        if not fit:
+            return False, -1
+        remains.append(new_remaining)
+        for obj in objs[1:-1]:
+            fit, new_remaining = _fits(
+                obj, remaining - len(prefix) - len(suffix), indent
+            )
+            if not fit:
+                return False, -1
+            remains.append(new_remaining)
+        fit, new_remaining = _fits(
+            objs[-1], remaining - len(prefix) - len(last), indent
+        )
+        if not fit:
+            return False, -1
+        remains.append(new_remaining)
+        return True, min(remains)
 
 
 def flatten_objs(obj: Any, lis: Optional[list[Any]] = None):
@@ -637,10 +739,7 @@ def horiz(p: _FmtParams, objs: list[El]) -> list[str]:
             lines[-1] += obj
         else:
             ind = len(lines[-1])
-            new_p = p.adjust(
-                _new_l(p.cur_len, len(lines[-1])),
-                _new_l(p.max_len, len(lines[-1])),
-            )
+            new_p = p.shrink(ind, ind)
             sublines = new_p.fmt(obj)
             if sublines:
                 lines[-1] += sublines[0]
@@ -674,7 +773,8 @@ def pack(p: _FmtParams, objs: list[FormatObj], sep: str = ' ') -> list[str]:
         sl = new_p.fmt(sub_obj)
         if not sl:
             continue
-        if _fits(new_p, sl[0]):
+        fit, remaining = _fits(sl[0], new_p.cur_len, new_p.indent)
+        if fit:
             if lines:
                 lines[-1] += sl[0]
                 lines.extend(sl[1:])

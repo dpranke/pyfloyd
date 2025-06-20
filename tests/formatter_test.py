@@ -148,6 +148,46 @@ class Tests(unittest.TestCase):
             lines,
         )
 
+    def test_complex_3(self):
+        obj = Pack(
+            'self._o_succeed',
+            Triangle(
+                '(',
+                Comma(
+                    Triangle(
+                        "self._externs['node'](",
+                        Comma(
+                            'self',
+                            Triangle(
+                                '[',
+                                Comma(
+                                    "'range'",
+                                    Triangle(
+                                        '[',
+                                        Comma('v__1', 'v__3'),
+                                        ']',
+                                    ),
+                                    '[]'
+                                ),
+                                ']'
+                            )
+                        ),
+                        ')'
+                    ),
+                'self._pos'
+                ),
+                ')'
+            )
+        )
+        self.assertEqual(
+            [
+                'self._o_succeed(',
+                "    self._externs['node'](self, ['range', [v__1, v__3], []]), self._pos",
+                ')'
+            ],
+            flatten(obj, 71)
+        )
+
     def test_from_list(self):
         obj = [
             'comma',
