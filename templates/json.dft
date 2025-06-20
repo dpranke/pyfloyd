@@ -10,25 +10,20 @@ templates = {
 
 generate: [fn [] [t_value data]]
 
-t_value: [fn [v] [if [is_str v]
-                     [hl '"' v '"']
-                     [if [is_int v]
-                         [itoa v 10]
-                         [if [is_float v]
-                             [ftoa v]
-                             [if [is_list v]
-                                 [t_list v]
-                                 [if [is_dict v]
-                                     [t_dict v]
-                                     [if [is_bool v]
-                                         [if v 'true' 'false']
-                                         [if [is_null v]
-                                             'null'
-                                             '<unknown value>']]]]]]]]
+t_value: [fn [v] [cond [[is_str v] [encode_string v]]
+                       [[is_int v] [itoa v 10]]
+                       [[is_float v] [ftoa v]]
+                       [[is_list v] [t_list v]]
+                       [[is_dict v] [t_dict v]]
+                       [[is_bool v] [if v 'true' 'false']]
+                       [[is_null v] 'null']
+                       [else '<unknown value>']]]
 
 t_dict: [fn [d]
             [hl [tri '{'
-                      [comma [map_items [fn [k v] [hl '"' k '": ' [t_value v]]]
+                      [comma [map_items [fn [k v] [hl [encode_string k]
+                                                      ': '
+                                                      [t_value v]]]
                                         d]]
                      '}']]]
 
