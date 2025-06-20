@@ -36,10 +36,10 @@ class _FmtParams:
         self.fn = fn
 
     def shrink(self, ln: int, max_ln: int = 0) -> '_FmtParams':
-        return self.adjust(
-            _new_l(self.cur_len, ln),
-            _new_l(self.max_len, max_ln),
-        )
+        n_cur = _new_l(self.cur_len, ln)
+        n_max = _new_l(self.max_len, max_ln)
+        # print(f'shrink {self.cur_len} {self.max_len} -> {n_cur} {n_max}')
+        return self.adjust(n_cur, n_max)
 
     def adjust(self, new_cur: _Len, new_max: _Len) -> '_FmtParams':
         return _FmtParams(new_cur, new_max, self.indent, self.fn)
@@ -59,7 +59,9 @@ def flatten(
     length is None, lines can be arbitrarily long.
     """
     p = _FmtParams(length, length, indent, _fmt)
-    return p.fn(obj, p)
+    lines = p.fn(obj, p)
+    import pdb; pdb.set_trace()
+    return lines
 
 
 def flatten_as_lisplist(
@@ -159,7 +161,11 @@ def _fits(p: _FmtParams, s: str) -> bool:
 
 
 def _fits_on_one(p, lines) -> bool:
-    return not lines or (len(lines) == 1 and _fits(p, lines[0]))
+    if lines is None:
+        return False
+    if lines == []:
+        return True
+    return len(lines) == 1 and _fits(p, lines[0])
 
 
 def indent_level(s: str, indent: str) -> int:
@@ -200,11 +206,30 @@ def _class_map():
     }
 
 
+objects = []
+
+func_stats = {
+   'horiz': 0,
+   'vert': 0,
+   'pack': 0,
+   'vtree': 0,
+   'wrap': 0,
+}
+
+
+class Stats:
+    def __init__(self):
+        self.n_fmts = 0
+        self.n_fmts_by_len: dict[int, int] = {}
+
+
 class FormatObj:
     tag: str = ''
 
     def __init__(self, *objs):
         self.objs = list(objs)
+        self.stats = Stats()
+        objects.append(self)
 
     def _optimize(self, objs, cls):
         objs = self._collapse(objs, cls)
@@ -295,6 +320,12 @@ class FormatObj:
         """Returns a list of strings, each representing a line."""
         raise NotImplementedError
 
+    def _stat(self, p: _FmtParams):
+        self.stats.n_fmts += 1
+        remaining = p.max_len - p.cur_len
+        self.stats.n_fmts_by_len.setdefault(remaining, 0)
+        self.stats.n_fmts_by_len[remaining] += 1
+
 
 class Comma(FormatObj):
     """Format a comma-separated list of arguments.
@@ -314,6 +345,7 @@ class Comma(FormatObj):
     tag = 'comma'
 
     def fmt(self, p: _FmtParams) -> list[str]:
+        self._stat(p)
         # single line
         if len(self.objs) == 0:
             return []
@@ -346,6 +378,7 @@ class Hang(FormatObj):
     tag = 'hang'
 
     def fmt(self, p: _FmtParams) -> list[str]:
+        self._stat(p)
         objs = self.objs[0]
         sep = self.objs[1]
         if len(objs) == 0:
@@ -381,6 +414,7 @@ class HList(FormatObj):
         self.objs = self._simplify_hlists(new_objs)
 
     def fmt(self, p: _FmtParams) -> list[str]:
+        self._stat(p)
         return horiz(p, self.objs)
 
 
@@ -399,6 +433,7 @@ class Indent(FormatObj):
         self.objs = self._optimize(objs, VList)
 
     def fmt(self, p: _FmtParams) -> list[str]:
+        self._stat(p)
         return wrap(p, self.objs, p.indent)
 
 
@@ -426,6 +461,7 @@ class LispList(FormatObj):
             assert isinstance(self.objs[0], str)
 
     def fmt(self, p: _FmtParams) -> list[str]:
+        self._stat(p)
         if len(self.objs) == 0:
             return ['[]']
 
@@ -454,6 +490,7 @@ class Pack(FormatObj):
     tag = 'pack'
 
     def fmt(self, p: _FmtParams) -> list[str]:
+        self._stat(p)
         return pack(p, self.objs, sep='')
 
 
@@ -474,6 +511,7 @@ class Triangle(FormatObj):
         assert isinstance(self.objs[2], str)
 
     def fmt(self, p: _FmtParams) -> list[str]:
+        self._stat(p)
         lines = pack(p, self.objs, '')
         if _fits_on_one(p, lines):
             return lines
@@ -511,6 +549,7 @@ class Tree(FormatObj):
         assert isinstance(op, str)
 
     def fmt(self, p: _FmtParams) -> list[str]:
+        self._stat(p)
         if self.objs[0] is None:
             lines = pack(p, self.objs, '')
         else:
@@ -539,6 +578,7 @@ class VList(FormatObj):
         return self
 
     def fmt(self, p: _FmtParams) -> list[str]:
+        self._stat(p)
         return vert(p, self.objs)
 
 
@@ -564,6 +604,7 @@ class Wrap(FormatObj):
         assert len(objs) == 5
 
     def fmt(self, p: _FmtParams) -> list[str]:
+        self._stat(p)
         obj, prefix, suffix, first, last = self.objs
         return wrap(p, obj, prefix, suffix, first, last)
 
@@ -581,6 +622,8 @@ def flatten_objs(obj: Any, lis: Optional[list[Any]] = None):
 
 def horiz(p: _FmtParams, objs: list[El]) -> list[str]:
     """Lay out objects horizontally."""
+    func_stats['horiz'] += 1
+
     lines: list[str] = []
     if len(objs) == 0:
         return ['']
@@ -608,6 +651,8 @@ def horiz(p: _FmtParams, objs: list[El]) -> list[str]:
 
 def vert(p: _FmtParams, objs: list[El]) -> list[str]:
     """Lay out objects vertically"""
+    func_stats['vert'] += 1
+
     lines = []
     for obj in flatten_objs(objs):
         lines.extend(p.fmt(obj))
@@ -616,6 +661,8 @@ def vert(p: _FmtParams, objs: list[El]) -> list[str]:
 
 def pack(p: _FmtParams, objs: list[FormatObj], sep: str = ' ') -> list[str]:
     """Lay out objects packed across multiple lines"""
+    func_stats['pack'] += 1
+
     if len(objs) == 0:
         return []
     lines = p.fmt(objs[0])
@@ -640,6 +687,8 @@ def pack(p: _FmtParams, objs: list[FormatObj], sep: str = ' ') -> list[str]:
 
 def vtree(p: _FmtParams, t: El):
     """Lay out objects as per Tree()."""
+    func_stats['vtree'] += 1
+
     if t is None:
         return []
     if isinstance(t, str):
@@ -671,6 +720,8 @@ def wrap(
     last: Optional[str] = None,
 ) -> list[str]:
     """Wraps a list of objects in text."""
+    func_stats['wrap'] += 1
+
     first = first or prefix
     last = last or suffix
     assert len(first) == len(prefix)
