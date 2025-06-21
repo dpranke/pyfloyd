@@ -167,25 +167,25 @@ class Tests(unittest.TestCase):
                                         Comma('v__1', 'v__3'),
                                         ']',
                                     ),
-                                    '[]'
+                                    '[]',
                                 ),
-                                ']'
-                            )
+                                ']',
+                            ),
                         ),
-                        ')'
+                        ')',
                     ),
-                'self._pos'
+                    'self._pos',
                 ),
-                ')'
-            )
+                ')',
+            ),
         )
         self.assertEqual(
             [
                 'self._o_succeed(',
                 "    self._externs['node'](self, ['range', [v__1, v__3], []]), self._pos",
-                ')'
+                ')',
             ],
-            flatten(obj, 71)
+            flatten(obj, 71),
         )
 
     def test_from_list(self):

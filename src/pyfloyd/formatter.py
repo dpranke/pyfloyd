@@ -316,7 +316,6 @@ class FormatObj(abc.ABC):
         remaining space and, if so, how much space will remain."""
         raise NotImplementedError
 
-
     def __eq__(self, other):
         return (
             (self.__class__ == other.__class__)
@@ -729,7 +728,9 @@ def horiz(p: _FmtParams, objs: list[El]) -> list[str]:
             if sublines:
                 lines[-1] += sublines[0]
                 if len(sublines) > 1:
-                    lines = lines + [(' ' * ind) + line for line in sublines[1:]]
+                    lines = lines + [
+                        (' ' * ind) + line for line in sublines[1:]
+                    ]
     return lines
 
 
@@ -900,4 +901,3 @@ def _has_single_format(obj):
     if obj is None or isinstance(obj, str):
         return True
     return obj.has_single_format()
-
