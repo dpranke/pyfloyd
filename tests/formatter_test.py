@@ -293,6 +293,8 @@ class Tests(unittest.TestCase):
 
         lis = LL('foo', LL('fn', LL('arg'), LL('length', 'arg')))
         self.assertEqual(['[foo [fn [arg] [length arg]]]'], flatten(lis))
+
+        lis = LL('foo', LL('fn', LL('arg'), LL('length', 'arg')))
         self.assertEqual(
             ['[foo [fn [arg]', '         [length arg]]]'],
             flatten(lis, length=14),
