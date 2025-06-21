@@ -33,11 +33,11 @@ null           = 'null'                          -> node(null)
 bool           = 'true'                          -> node(true)
                | 'false'                         -> node(false)
 
-object         = '{' member_list '}'              -> node(dict($2))
-               | '{' '}'                          -> node(dict([]))
+object         = '{' member_list '}'              -> node(dict($2), $1, $3)
+               | '{' '}'                          -> node(dict([]), $1, $2)
 
-array          = '[' element_list ']'            -> node($2)
-               | '[' ']'                         -> node([])
+array          = '[' element_list ']'            -> node($2, $1, $3)
+               | '[' ']'                         -> node([], $1, $2)
 
 string         = squote sqchar* squote           -> node(cat($2))
                | dquote dqchar* dquote           -> node(cat($2))

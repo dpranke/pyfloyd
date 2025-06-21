@@ -16,7 +16,7 @@ def main(
     opener=open,
 ) -> int:
     arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument('-p', '--print', action='store_true')
+    arg_parser.add_argument('-o', '--output', action='store', default='-')
     arg_parser.add_argument('-c', '--code')
     arg_parser.add_argument(
         '-D',
@@ -77,9 +77,11 @@ def main(
     new_msg = ''.join(t[2] for t in tokens)
     assert new_msg == msg
 
-    if args.print:
-        print()
-        print(json.dumps(cst_result.val, indent=2), file=stdout)
+    if args.output == '-':
+        out_fp = stdout
+    else:
+        out_fp = opener(args.output, 'w')
+    print(json.dumps(cst_result.val, indent=2), file=out_fp)
 
     return 0
 
@@ -91,35 +93,50 @@ def _node(parser, *args):
     val = args[0]
 
     r = {
-        'r': rule,
-        'v': None,
-        's': None,
-        'b': begin,
-        'l': [],
-        'c': [],
-        't': [],
-        'e': end,
+        'r': rule,   # rule name from grammar
+        'b': begin,  # beginning position
+        'e': end,    # ending position
     }
+    if len(args) > 1:
+        r['bt'] = args[1] # beginning token
+        r['et'] = args[2] # ending token
 
-    if rule == 'grammar':
-        r['r'] = val['r']
-        r['v'] = val['v']
-        r['c'] = val['c']
-        _ = _assign_tokens(parser._tokens, r, 0)
-    elif rule in ('array', 'member', 'object'):
-        r['c'] = val
-        if r['c']:
-            v = [c['v'] for c in r['c']]
-        else:
-            v = []
-        r['v'] = dict(v) if rule == 'object' else v
+    # Other possible fields in a parse node:
+    # 'c': children of the node, if any
+    # 'v': value of the node (includes values from children)
+    # 's': string representation of the node's value, if the node
+    #      represents a token that isn't a comment, whitespace, or a literal).
+    # 'l': any leading tokens (assigned by _assign_tokens)
+    # 't': any trailing tokens (assigned by _assign_tokens)
+
+    def _is_node(v):
+        return isinstance(v, dict) and 'r' in v and 'b' in v and 'e' in v
+
+    if rule in ('%comment', '%whitespace'):
+        pass
     elif rule in ('ident', 'num_literal', 'string', 'null', 'bool'):
         r['s'] = parser._text[begin:end]
         r['v'] = val
-    elif rule in ('%comment', '%whitespace'):
-        pass
+    elif isinstance(val, list):
+        # The value must be a list of nodes.
+        assert rule in ('array', 'member', 'object')
+        assert all(_is_node(c) for c in val)
+        r['c'] = val
+        vals = [c['v'] for c in val]
+        r['v'] = dict(vals) if rule == 'object' else vals
     else:
-        assert False
+        # The value must be a single (child) node.
+        assert _is_node(val)
+        assert rule == 'grammar'
+        # Merge the child node into this node, by keeping the begin and end
+        # from this node, but keeping everything else (including the rule
+        # name?) from the child.
+        for k in [k for k in val.keys() if k not in ('b', 'e')]:
+            r[k] = val[k]
+
+    if rule == 'grammar':
+        _ = _assign_tokens(parser._tokens, r, 0)
+
     return r
 
 
@@ -129,23 +146,41 @@ def _assign_tokens(tokens, obj, pos):
     rule = obj['r']
 
     while tokens[pos][0] < begin:
+        obj.setdefault('l', [])
+        obj['l'].append(tokens[pos])
+        pos += 1
+    if 'bt' in obj:
+        while tokens[pos][2] != obj['bt']:
+            obj.setdefault('l', [])
+            obj['l'].append(tokens[pos])
+            pos += 1
         obj['l'].append(tokens[pos])
         pos += 1
 
-    for c in obj['c']:
-        pos = _assign_tokens(tokens, c, pos)
+    assert ('c' in obj) ^ ('s' in obj)
+    if 's' in obj:
+        assert tokens[pos] == (obj['b'], obj['r'], obj['s'])
+        pos += 1
+    else:
+        for c in obj['c']:
+            pos = _assign_tokens(tokens, c, pos)
 
     while pos < len(tokens) and tokens[pos][0] < end:
+        obj.setdefault('t', [])
         obj['t'].append(tokens[pos])
         pos += 1
     return pos
 
 
-def _tokens(val):
-    toks = list(val['l'])
-    for c in val['c']:
-        toks.extend(_tokens(c))
-    toks.extend(val['t'])
+def _tokens(node):
+    toks = list(node.get('l', []))
+    assert ('s' in node) ^ ('c' in node)
+    if 's' in node:
+        toks.append((node['r'], node['b'], node['s']))
+    else:
+        for c in node['c']:
+            toks.extend(_tokens(c))
+    toks.extend(node.get('t', []))
     return toks
 
 
