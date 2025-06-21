@@ -17,8 +17,12 @@
 
 name = 'Go'
 ext = '.go'
-indent = 4
-line_length = 140
+
+# TODO: use `indent='\t' and add a 'template_indent' option so the formatter
+# knows how to translate the indentation used in the template to the
+# indentation that should be used in the output.
+indent = 4  # TODO: use tabs and add a 'template_indent' option
+line_length = 160
 
 starting_template: 'generate'
 

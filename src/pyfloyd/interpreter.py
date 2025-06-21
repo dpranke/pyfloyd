@@ -614,6 +614,6 @@ class Interpreter:
             colno += 1
         return colno
 
-    def _fn_node(self, parser, arg) -> Any:
+    def _fn_node(self, parser, *args) -> Any:
         del parser
-        return arg
+        return args[0]

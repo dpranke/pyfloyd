@@ -243,8 +243,8 @@ class FormatObj(abc.ABC):
     def __init__(self, *objs):
         self.objs = list(objs)
         self.cache = {}  # dict[cur_len, lines]
-        self.results: list[list[str]] = []
-        self._single_format: Optional[bool] = None
+        self.results = []  # list[list[str]]
+        self._single_format = None  # Optional[bool]
 
         # Note that while we track if some objects might have multiple
         # results even if all of their children don't, we don't attempt
@@ -759,7 +759,7 @@ def pack(p: _FmtParams, objs: list[FormatObj], sep: str = ' ') -> list[str]:
         sl = new_p.fmt(sub_obj)
         if not sl:
             continue
-        fit, remaining = _fits(sl[0], new_p.cur_len, new_p.indent)
+        fit, _ = _fits(sl[0], new_p.cur_len, new_p.indent)
         if fit:
             if lines:
                 lines[-1] += sl[0]
