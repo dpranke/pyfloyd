@@ -83,6 +83,8 @@ def main(argv=None, host=None):
                 if args.output and args.output != '-':
                     ext = host.splitext(args.output)[1]
                     args.template = pyfloyd.KNOWN_TEMPLATES.get(ext)
+            if options.template is None:
+                options.template = args.template
             v, err, _ = pyfloyd.generate(
                 grammar,
                 path=args.grammar,
