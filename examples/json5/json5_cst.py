@@ -12,11 +12,6 @@ Externs = Optional[Dict[str, Any]]
 
 # pylint: disable=too-many-lines
 
-
-class _ParsingRuntimeError(Exception):
-    pass
-
-
 class Result(NamedTuple):
     """The result returned from a `parse()` call.
 
@@ -52,15 +47,37 @@ def parse(
     return _Parser(text, path).parse(externs, start)
 
 
+class _State:
+    pos: int = 0
+    val: any = None
+    failed: bool = False
+    cur_token = 0
+    in_token = False
+
+    def __repr__(self):
+        return (f'_State(pos={self.pos}, failed={self.failed})')
+
+    def copy(self):
+        r = _State()
+        r.pos = self.pos
+        r.val = self.val
+        r.failed = self.failed
+        r.cur_token = self.cur_token
+        r.in_token = self.in_token
+        return r
+
+
+class _ParsingRuntimeError(Exception):
+    pass
+
+
 class _Parser:
     def __init__(self, text, path):
         self._text = text
         self._end = len(self._text)
         self._errpos = 0
-        self._failed = False
         self._path = path
-        self._pos = 0
-        self._val = None
+        self._state = _State()
         self._externs = {
             'strict': True,
             'node': self._fn_node,
@@ -69,8 +86,6 @@ class _Parser:
         self._regexps = {}
         self._nodes = []
         self._tokens = []
-        self._cur_token = 0
-        self._in_token = False
         self._token_rules = [
             '%comment',
             '%whitespace',
@@ -82,8 +97,12 @@ class _Parser:
             't',
         ]
 
+    def pos(self):
+        return self._state.pos
+
     def parse(self, externs: Externs = None, start: int = 0):
-        self._pos = start
+        self._state.pos = start
+        self._state.cur_token = 0
 
         errors = ''
         if externs:
@@ -101,9 +120,9 @@ class _Parser:
         try:
             self._r_grammar()
 
-            if self._failed:
+            if self._state.failed:
                 return Result(None, self._o_error(), self._errpos)
-            return Result(self._val, None, self._pos)
+            return Result(self._state.val, None, self._state.pos)
         except _ParsingRuntimeError as e:  # pragma: no cover
             lineno, _ = self._o_offsets(self._errpos)
             return Result(
@@ -113,50 +132,50 @@ class _Parser:
             )
 
     def _r_grammar(self):
-        self._nodes.append((self._pos, 'grammar'))
+        self._nodes.append((self.pos(), 'grammar'))
         self._s_grammar_1()
         self._nodes.pop()
 
     def _s_grammar_1(self):
         self._r_value()
-        if self._failed:
+        if self._state.failed:
             return
-        v__1 = self._val
-        if self._failed:
+        v__1 = self._state.val
+        if self._state.failed:
             return
         self._r__filler()
         self._r_end()
-        if self._failed:
+        if self._state.failed:
             return
-        self._o_succeed(self._externs['node'](self, v__1), self._pos)
+        self._o_succeed(self._externs['node'](self, v__1), self._state.pos)
 
     def _r_value(self):
-        self._nodes.append((self._pos, 'value'))
+        self._nodes.append((self.pos(), 'value'))
         self._s_value_1()
         self._nodes.pop()
 
     def _s_value_1(self):
-        pos = self._pos
+        state = self._state.copy()
         self._s_value_2()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_value_3()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_value_4()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._r_object()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._r_array()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_value_5()
 
     def _s_value_2(self):
@@ -176,80 +195,80 @@ class _Parser:
         self._r_string()
 
     def _r_null(self):
-        self._nodes.append((self._pos, 'null'))
-        self._in_token = True
+        self._nodes.append((self.pos(), 'null'))
+        self._state.in_token = True
         self._s_null_1()
-        self._in_token = False
+        self._state.in_token = False
         self._nodes.pop()
 
     def _s_null_1(self):
         self._o_str('null')
-        if self._failed:
+        if self._state.failed:
             return
-        self._o_succeed(self._externs['node'](self, None), self._pos)
+        self._o_succeed(self._externs['node'](self, None), self._state.pos)
 
     def _r_bool(self):
-        self._nodes.append((self._pos, 'bool'))
-        self._in_token = True
+        self._nodes.append((self.pos(), 'bool'))
+        self._state.in_token = True
         self._s_bool_1()
-        self._in_token = False
+        self._state.in_token = False
         self._nodes.pop()
 
     def _s_bool_1(self):
-        pos = self._pos
+        state = self._state.copy()
         self._s_bool_2()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_bool_3()
 
     def _s_bool_2(self):
         self._o_str('true')
-        if self._failed:
+        if self._state.failed:
             return
-        self._o_succeed(self._externs['node'](self, True), self._pos)
+        self._o_succeed(self._externs['node'](self, True), self._state.pos)
 
     def _s_bool_3(self):
         self._o_str('false')
-        if self._failed:
+        if self._state.failed:
             return
-        self._o_succeed(self._externs['node'](self, False), self._pos)
+        self._o_succeed(self._externs['node'](self, False), self._state.pos)
 
     def _r_object(self):
-        self._nodes.append((self._pos, 'object'))
+        self._nodes.append((self.pos(), 'object'))
         self._s_object_1()
         self._nodes.pop()
 
     def _s_object_1(self):
-        pos = self._pos
+        state = self._state.copy()
         self._s_object_2()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_object_4()
 
     def _s_object_2(self):
         self._s_object_3()
-        v__1 = self._val
+        v__1 = self._state.val
         self._r__filler()
         self._o_ch('{')
-        if self._failed:
+        if self._state.failed:
             return
         self._r_member_list()
-        if self._failed:
+        if self._state.failed:
             return
-        v__3 = self._val
-        if self._failed:
+        v__3 = self._state.val
+        if self._state.failed:
             return
         self._r__filler()
         self._o_ch('}')
-        if self._failed:
+        if self._state.failed:
             return
         self._o_succeed(
             self._externs['node'](
                 self, self._externs['dict'](v__3), v__1, '{'
             ),
-            self._pos,
+            self._state.pos,
         )
 
     def _s_object_3(self):
@@ -258,18 +277,18 @@ class _Parser:
 
     def _s_object_4(self):
         self._s_object_5()
-        v__1 = self._val
+        v__1 = self._state.val
         self._r__filler()
         self._o_ch('{')
-        if self._failed:
+        if self._state.failed:
             return
         self._r__filler()
         self._o_ch('}')
-        if self._failed:
+        if self._state.failed:
             return
         self._o_succeed(
             self._externs['node'](self, self._externs['dict']([]), v__1, '{'),
-            self._pos,
+            self._state.pos,
         )
 
     def _s_object_5(self):
@@ -277,44 +296,44 @@ class _Parser:
         self._r_t()
 
     def _r_t(self):
-        self._nodes.append((self._pos, 't'))
-        self._in_token = True
-        self._o_succeed(self._externs['node'](self, None), self._pos)
-        self._in_token = False
+        self._nodes.append((self.pos(), 't'))
+        self._state.in_token = True
+        self._o_succeed(self._externs['node'](self, None), self._state.pos)
+        self._state.in_token = False
         self._nodes.pop()
 
     def _r_array(self):
-        self._nodes.append((self._pos, 'array'))
+        self._nodes.append((self.pos(), 'array'))
         self._s_array_1()
         self._nodes.pop()
 
     def _s_array_1(self):
-        pos = self._pos
+        state = self._state.copy()
         self._s_array_2()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_array_4()
 
     def _s_array_2(self):
         self._s_array_3()
-        v__1 = self._val
+        v__1 = self._state.val
         self._r__filler()
         self._o_ch('[')
-        if self._failed:
+        if self._state.failed:
             return
         self._r_element_list()
-        if self._failed:
+        if self._state.failed:
             return
-        v__3 = self._val
-        if self._failed:
+        v__3 = self._state.val
+        if self._state.failed:
             return
         self._r__filler()
         self._o_ch(']')
-        if self._failed:
+        if self._state.failed:
             return
         self._o_succeed(
-            self._externs['node'](self, v__3, v__1, '['), self._pos
+            self._externs['node'](self, v__3, v__1, '['), self._state.pos
         )
 
     def _s_array_3(self):
@@ -323,526 +342,528 @@ class _Parser:
 
     def _s_array_4(self):
         self._s_array_5()
-        v__1 = self._val
+        v__1 = self._state.val
         self._r__filler()
         self._o_ch('[')
-        if self._failed:
+        if self._state.failed:
             return
         self._r__filler()
         self._o_ch(']')
-        if self._failed:
+        if self._state.failed:
             return
-        self._o_succeed(self._externs['node'](self, [], v__1, '['), self._pos)
+        self._o_succeed(
+            self._externs['node'](self, [], v__1, '['), self._state.pos
+        )
 
     def _s_array_5(self):
         self._r__filler()
         self._r_t()
 
     def _r_string(self):
-        self._nodes.append((self._pos, 'string'))
-        self._in_token = True
+        self._nodes.append((self.pos(), 'string'))
+        self._state.in_token = True
         self._s_string_1()
-        self._in_token = False
+        self._state.in_token = False
         self._nodes.pop()
 
     def _s_string_1(self):
-        pos = self._pos
+        state = self._state.copy()
         self._s_string_2()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_string_4()
 
     def _s_string_2(self):
         self._r_squote()
-        if self._failed:
+        if self._state.failed:
             return
         self._s_string_3()
-        v__2 = self._val
+        v__2 = self._state.val
         self._r_squote()
-        if self._failed:
+        if self._state.failed:
             return
         self._o_succeed(
-            self._externs['node'](self, self._fn_cat(v__2)), self._pos
+            self._externs['node'](self, self._fn_cat(v__2)), self._state.pos
         )
 
     def _s_string_3(self):
         vs = []
         while True:
-            pos = self._pos
+            state = self._state.copy()
             self._r_sqchar()
-            if self._failed or self._pos == pos:
-                self._o_rewind(pos)
+            if self._state.failed or self._state.pos == state.pos:
+                self._o_restore(state)
                 break
-            vs.append(self._val)
-        self._o_succeed(vs, self._pos)
+            vs.append(self._state.val)
+        self._o_succeed(vs, self._state.pos)
 
     def _s_string_4(self):
         self._r_dquote()
-        if self._failed:
+        if self._state.failed:
             return
         self._s_string_5()
-        v__2 = self._val
+        v__2 = self._state.val
         self._r_dquote()
-        if self._failed:
+        if self._state.failed:
             return
         self._o_succeed(
-            self._externs['node'](self, self._fn_cat(v__2)), self._pos
+            self._externs['node'](self, self._fn_cat(v__2)), self._state.pos
         )
 
     def _s_string_5(self):
         vs = []
         while True:
-            pos = self._pos
+            state = self._state.copy()
             self._r_dqchar()
-            if self._failed or self._pos == pos:
-                self._o_rewind(pos)
+            if self._state.failed or self._state.pos == state.pos:
+                self._o_restore(state)
                 break
-            vs.append(self._val)
-        self._o_succeed(vs, self._pos)
+            vs.append(self._state.val)
+        self._o_succeed(vs, self._state.pos)
 
     def _r_sqchar(self):
-        self._nodes.append((self._pos, 'sqchar'))
+        self._nodes.append((self.pos(), 'sqchar'))
         self._s_sqchar_1()
         self._nodes.pop()
 
     def _s_sqchar_1(self):
-        pos = self._pos
+        state = self._state.copy()
         self._s_sqchar_2()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_sqchar_3()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_sqchar_4()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_sqchar_8()
 
     def _s_sqchar_2(self):
         self._r_bslash()
-        if self._failed:
+        if self._state.failed:
             return
         self._r_esc_char()
-        if self._failed:
+        if self._state.failed:
             return
-        v__2 = self._val
-        if self._failed:
+        v__2 = self._state.val
+        if self._state.failed:
             return
-        self._o_succeed(v__2, self._pos)
+        self._o_succeed(v__2, self._state.pos)
 
     def _s_sqchar_3(self):
         self._r_bslash()
-        if self._failed:
+        if self._state.failed:
             return
         self._r_eol()
-        if self._failed:
+        if self._state.failed:
             return
-        self._o_succeed('', self._pos)
+        self._o_succeed('', self._state.pos)
 
     def _s_sqchar_4(self):
         self._s_sqchar_5()
-        if self._failed:
+        if self._state.failed:
             return
         self._s_sqchar_6()
-        if self._failed:
+        if self._state.failed:
             return
         self._s_sqchar_7()
-        if self._failed:
+        if self._state.failed:
             return
         self._r_any()
-        if self._failed:
+        if self._state.failed:
             return
-        v__4 = self._val
-        if self._failed:
+        v__4 = self._state.val
+        if self._state.failed:
             return
-        self._o_succeed(v__4, self._pos)
+        self._o_succeed(v__4, self._state.pos)
 
     def _s_sqchar_5(self):
-        pos = self._pos
+        state = self._state.copy()
         errpos = self._errpos
         self._r_bslash()
-        if self._failed:
-            self._o_succeed(None, pos)
+        if self._state.failed:
+            self._o_succeed(None, state.pos)
         else:
-            self._o_rewind(pos)
+            self._o_restore(state)
             self._errpos = errpos
             self._o_fail()
 
     def _s_sqchar_6(self):
-        pos = self._pos
+        state = self._state.copy()
         errpos = self._errpos
         self._r_squote()
-        if self._failed:
-            self._o_succeed(None, pos)
+        if self._state.failed:
+            self._o_succeed(None, state.pos)
         else:
-            self._o_rewind(pos)
+            self._o_restore(state)
             self._errpos = errpos
             self._o_fail()
 
     def _s_sqchar_7(self):
-        pos = self._pos
+        state = self._state.copy()
         errpos = self._errpos
         self._r_eol()
-        if self._failed:
-            self._o_succeed(None, pos)
+        if self._state.failed:
+            self._o_succeed(None, state.pos)
         else:
-            self._o_rewind(pos)
+            self._o_restore(state)
             self._errpos = errpos
             self._o_fail()
 
     def _s_sqchar_8(self):
         v = not self._externs['strict']
         if v is True:
-            self._o_succeed(v, self._pos)
+            self._o_succeed(v, state.pos)
         elif v is False:
             self._o_fail()
         else:
             raise _ParsingRuntimeError('Bad predicate value')
-        if self._failed:
+        if self._state.failed:
             return
         self._o_range('\x00', '\x1f')
 
     def _r_dqchar(self):
-        self._nodes.append((self._pos, 'dqchar'))
+        self._nodes.append((self.pos(), 'dqchar'))
         self._s_dqchar_1()
         self._nodes.pop()
 
     def _s_dqchar_1(self):
-        pos = self._pos
+        state = self._state.copy()
         self._s_dqchar_2()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_dqchar_3()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_dqchar_4()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_dqchar_8()
 
     def _s_dqchar_2(self):
         self._r_bslash()
-        if self._failed:
+        if self._state.failed:
             return
         self._r_esc_char()
-        if self._failed:
+        if self._state.failed:
             return
-        v__2 = self._val
-        if self._failed:
+        v__2 = self._state.val
+        if self._state.failed:
             return
-        self._o_succeed(v__2, self._pos)
+        self._o_succeed(v__2, self._state.pos)
 
     def _s_dqchar_3(self):
         self._r_bslash()
-        if self._failed:
+        if self._state.failed:
             return
         self._r_eol()
-        if self._failed:
+        if self._state.failed:
             return
-        self._o_succeed('', self._pos)
+        self._o_succeed('', self._state.pos)
 
     def _s_dqchar_4(self):
         self._s_dqchar_5()
-        if self._failed:
+        if self._state.failed:
             return
         self._s_dqchar_6()
-        if self._failed:
+        if self._state.failed:
             return
         self._s_dqchar_7()
-        if self._failed:
+        if self._state.failed:
             return
         self._r_any()
-        if self._failed:
+        if self._state.failed:
             return
-        v__4 = self._val
-        if self._failed:
+        v__4 = self._state.val
+        if self._state.failed:
             return
-        self._o_succeed(v__4, self._pos)
+        self._o_succeed(v__4, self._state.pos)
 
     def _s_dqchar_5(self):
-        pos = self._pos
+        state = self._state.copy()
         errpos = self._errpos
         self._r_bslash()
-        if self._failed:
-            self._o_succeed(None, pos)
+        if self._state.failed:
+            self._o_succeed(None, state.pos)
         else:
-            self._o_rewind(pos)
+            self._o_restore(state)
             self._errpos = errpos
             self._o_fail()
 
     def _s_dqchar_6(self):
-        pos = self._pos
+        state = self._state.copy()
         errpos = self._errpos
         self._r_dquote()
-        if self._failed:
-            self._o_succeed(None, pos)
+        if self._state.failed:
+            self._o_succeed(None, state.pos)
         else:
-            self._o_rewind(pos)
+            self._o_restore(state)
             self._errpos = errpos
             self._o_fail()
 
     def _s_dqchar_7(self):
-        pos = self._pos
+        state = self._state.copy()
         errpos = self._errpos
         self._r_eol()
-        if self._failed:
-            self._o_succeed(None, pos)
+        if self._state.failed:
+            self._o_succeed(None, state.pos)
         else:
-            self._o_rewind(pos)
+            self._o_restore(state)
             self._errpos = errpos
             self._o_fail()
 
     def _s_dqchar_8(self):
         v = not self._externs['strict']
         if v is True:
-            self._o_succeed(v, self._pos)
+            self._o_succeed(v, state.pos)
         elif v is False:
             self._o_fail()
         else:
             raise _ParsingRuntimeError('Bad predicate value')
-        if self._failed:
+        if self._state.failed:
             return
         self._o_range('\x00', '\x1f')
 
     def _r_bslash(self):
-        self._nodes.append((self._pos, 'bslash'))
+        self._nodes.append((self.pos(), 'bslash'))
         self._o_ch('\\')
         self._nodes.pop()
 
     def _r_squote(self):
-        self._nodes.append((self._pos, 'squote'))
+        self._nodes.append((self.pos(), 'squote'))
         self._o_ch("'")
         self._nodes.pop()
 
     def _r_dquote(self):
-        self._nodes.append((self._pos, 'dquote'))
+        self._nodes.append((self.pos(), 'dquote'))
         self._o_ch('"')
         self._nodes.pop()
 
     def _r_eol(self):
-        self._nodes.append((self._pos, 'eol'))
+        self._nodes.append((self.pos(), 'eol'))
         self._s_eol_1()
         self._nodes.pop()
 
     def _s_eol_1(self):
-        pos = self._pos
+        state = self._state.copy()
         self._s_eol_2()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_ch('\r')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_ch('\n')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_ch('\u2028')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_ch('\u2029')
 
     def _s_eol_2(self):
         self._o_ch('\r')
-        if self._failed:
+        if self._state.failed:
             return
         self._o_ch('\n')
 
     def _r_esc_char(self):
-        self._nodes.append((self._pos, 'esc_char'))
+        self._nodes.append((self.pos(), 'esc_char'))
         self._s_esc_char_1()
         self._nodes.pop()
 
     def _s_esc_char_1(self):
-        pos = self._pos
+        state = self._state.copy()
         self._s_esc_char_2()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_esc_char_3()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_esc_char_4()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_esc_char_5()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_esc_char_6()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_esc_char_7()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_esc_char_8()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_esc_char_9()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_esc_char_10()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_esc_char_11()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_esc_char_14()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._r_hex_esc()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._r_unicode_esc()
 
     def _s_esc_char_2(self):
         self._o_ch('b')
-        if self._failed:
+        if self._state.failed:
             return
-        self._o_succeed('\b', self._pos)
+        self._o_succeed('\b', self._state.pos)
 
     def _s_esc_char_3(self):
         self._o_ch('f')
-        if self._failed:
+        if self._state.failed:
             return
-        self._o_succeed('\f', self._pos)
+        self._o_succeed('\f', self._state.pos)
 
     def _s_esc_char_4(self):
         self._o_ch('n')
-        if self._failed:
+        if self._state.failed:
             return
-        self._o_succeed('\n', self._pos)
+        self._o_succeed('\n', self._state.pos)
 
     def _s_esc_char_5(self):
         self._o_ch('r')
-        if self._failed:
+        if self._state.failed:
             return
-        self._o_succeed('\r', self._pos)
+        self._o_succeed('\r', self._state.pos)
 
     def _s_esc_char_6(self):
         self._o_ch('t')
-        if self._failed:
+        if self._state.failed:
             return
-        self._o_succeed('\t', self._pos)
+        self._o_succeed('\t', self._state.pos)
 
     def _s_esc_char_7(self):
         self._o_ch('v')
-        if self._failed:
+        if self._state.failed:
             return
-        self._o_succeed('\v', self._pos)
+        self._o_succeed('\v', self._state.pos)
 
     def _s_esc_char_8(self):
         self._r_squote()
-        if self._failed:
+        if self._state.failed:
             return
-        self._o_succeed("'", self._pos)
+        self._o_succeed("'", self._state.pos)
 
     def _s_esc_char_9(self):
         self._r_dquote()
-        if self._failed:
+        if self._state.failed:
             return
-        self._o_succeed('"', self._pos)
+        self._o_succeed('"', self._state.pos)
 
     def _s_esc_char_10(self):
         self._r_bslash()
-        if self._failed:
+        if self._state.failed:
             return
-        self._o_succeed('\\', self._pos)
+        self._o_succeed('\\', self._state.pos)
 
     def _s_esc_char_11(self):
         self._s_esc_char_12()
-        if self._failed:
+        if self._state.failed:
             return
         self._r_any()
-        if self._failed:
+        if self._state.failed:
             return
-        v__2 = self._val
-        if self._failed:
+        v__2 = self._state.val
+        if self._state.failed:
             return
-        self._o_succeed(v__2, self._pos)
+        self._o_succeed(v__2, self._state.pos)
 
     def _s_esc_char_12(self):
-        pos = self._pos
+        state = self._state.copy()
         errpos = self._errpos
         self._s_esc_char_13()
-        if self._failed:
-            self._o_succeed(None, pos)
+        if self._state.failed:
+            self._o_succeed(None, state.pos)
         else:
-            self._o_rewind(pos)
+            self._o_restore(state)
             self._errpos = errpos
             self._o_fail()
 
     def _s_esc_char_13(self):
-        pos = self._pos
+        state = self._state.copy()
         self._o_ch('x')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_ch('u')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._r_digit()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._r_eol()
 
     def _s_esc_char_14(self):
         self._o_ch('0')
-        if self._failed:
+        if self._state.failed:
             return
         self._s_esc_char_15()
-        if self._failed:
+        if self._state.failed:
             return
-        self._o_succeed('\x00', self._pos)
+        self._o_succeed('\x00', self._state.pos)
 
     def _s_esc_char_15(self):
-        pos = self._pos
+        state = self._state.copy()
         errpos = self._errpos
         self._r_digit()
-        if self._failed:
-            self._o_succeed(None, pos)
+        if self._state.failed:
+            self._o_succeed(None, state.pos)
         else:
-            self._o_rewind(pos)
+            self._o_restore(state)
             self._errpos = errpos
             self._o_fail()
 
     def _r_hex_esc(self):
-        self._nodes.append((self._pos, 'hex_esc'))
+        self._nodes.append((self.pos(), 'hex_esc'))
         self._s_hex_esc_1()
         self._nodes.pop()
 
     def _s_hex_esc_1(self):
         self._o_ch('x')
-        if self._failed:
+        if self._state.failed:
             return
         self._s_hex_esc_2()
-        if self._failed:
+        if self._state.failed:
             return
-        v__2 = self._val
-        if self._failed:
+        v__2 = self._state.val
+        if self._state.failed:
             return
-        self._o_succeed(self._fn_xtou(self._fn_cat(v__2)), self._pos)
+        self._o_succeed(self._fn_xtou(self._fn_cat(v__2)), self._state.pos)
 
     def _s_hex_esc_2(self):
         vs = []
@@ -851,30 +872,30 @@ class _Parser:
         cmax = 2
         while i < cmax:
             self._r_hex()
-            if self._failed:
+            if self._state.failed:
                 if i >= cmin:
-                    self._o_succeed(vs, self._pos)
+                    self._o_succeed(vs, self._state.pos)
                 return
-            vs.append(self._val)
+            vs.append(self._state.val)
             i += 1
-        self._o_succeed(vs, self._pos)
+        self._o_succeed(vs, self._state.pos)
 
     def _r_unicode_esc(self):
-        self._nodes.append((self._pos, 'unicode_esc'))
+        self._nodes.append((self.pos(), 'unicode_esc'))
         self._s_unicode_esc_1()
         self._nodes.pop()
 
     def _s_unicode_esc_1(self):
         self._o_ch('u')
-        if self._failed:
+        if self._state.failed:
             return
         self._s_unicode_esc_2()
-        if self._failed:
+        if self._state.failed:
             return
-        v__2 = self._val
-        if self._failed:
+        v__2 = self._state.val
+        if self._state.failed:
             return
-        self._o_succeed(self._fn_xtou(self._fn_cat(v__2)), self._pos)
+        self._o_succeed(self._fn_xtou(self._fn_cat(v__2)), self._state.pos)
 
     def _s_unicode_esc_2(self):
         vs = []
@@ -883,139 +904,141 @@ class _Parser:
         cmax = 4
         while i < cmax:
             self._r_hex()
-            if self._failed:
+            if self._state.failed:
                 if i >= cmin:
-                    self._o_succeed(vs, self._pos)
+                    self._o_succeed(vs, self._state.pos)
                 return
-            vs.append(self._val)
+            vs.append(self._state.val)
             i += 1
-        self._o_succeed(vs, self._pos)
+        self._o_succeed(vs, self._state.pos)
 
     def _r_element_list(self):
-        self._nodes.append((self._pos, 'element_list'))
+        self._nodes.append((self.pos(), 'element_list'))
         self._s_element_list_1()
         self._nodes.pop()
 
     def _s_element_list_1(self):
         self._r_value()
-        if self._failed:
+        if self._state.failed:
             return
-        v__1 = self._val
-        if self._failed:
+        v__1 = self._state.val
+        if self._state.failed:
             return
         self._s_element_list_2()
-        v__2 = self._val
+        v__2 = self._state.val
         self._s_element_list_4()
-        self._o_succeed(self._fn_cons(v__1, v__2), self._pos)
+        self._o_succeed(self._fn_cons(v__1, v__2), self._state.pos)
 
     def _s_element_list_2(self):
         vs = []
         while True:
-            pos = self._pos
+            state = self._state.copy()
             self._s_element_list_3()
-            if self._failed or self._pos == pos:
-                self._o_rewind(pos)
+            if self._state.failed or self._state.pos == state.pos:
+                self._o_restore(state)
                 break
-            vs.append(self._val)
-        self._o_succeed(vs, self._pos)
+            vs.append(self._state.val)
+        self._o_succeed(vs, self._state.pos)
 
     def _s_element_list_3(self):
         self._r__filler()
         self._o_ch(',')
-        if self._failed:
+        if self._state.failed:
             return
         self._r_value()
 
     def _s_element_list_4(self):
-        pos = self._pos
+        state = self._state.copy()
         self._s_element_list_5()
-        if self._failed:
-            self._o_succeed([], pos)
+        if self._state.failed:
+            self._o_succeed([], state.pos)
         else:
-            self._o_succeed([self._val], self._pos)
+            self._o_succeed([self._state.val], state.pos)
 
     def _s_element_list_5(self):
         self._r__filler()
         self._o_ch(',')
 
     def _r_member_list(self):
-        self._nodes.append((self._pos, 'member_list'))
+        self._nodes.append((self.pos(), 'member_list'))
         self._s_member_list_1()
         self._nodes.pop()
 
     def _s_member_list_1(self):
         self._r_member()
-        if self._failed:
+        if self._state.failed:
             return
-        v__1 = self._val
-        if self._failed:
+        v__1 = self._state.val
+        if self._state.failed:
             return
         self._s_member_list_2()
-        v__2 = self._val
+        v__2 = self._state.val
         self._s_member_list_4()
-        self._o_succeed(self._fn_cons(v__1, v__2), self._pos)
+        self._o_succeed(self._fn_cons(v__1, v__2), self._state.pos)
 
     def _s_member_list_2(self):
         vs = []
         while True:
-            pos = self._pos
+            state = self._state.copy()
             self._s_member_list_3()
-            if self._failed or self._pos == pos:
-                self._o_rewind(pos)
+            if self._state.failed or self._state.pos == state.pos:
+                self._o_restore(state)
                 break
-            vs.append(self._val)
-        self._o_succeed(vs, self._pos)
+            vs.append(self._state.val)
+        self._o_succeed(vs, self._state.pos)
 
     def _s_member_list_3(self):
         self._r__filler()
         self._o_ch(',')
-        if self._failed:
+        if self._state.failed:
             return
         self._r_member()
 
     def _s_member_list_4(self):
-        pos = self._pos
+        state = self._state.copy()
         self._s_member_list_5()
-        if self._failed:
-            self._o_succeed([], pos)
+        if self._state.failed:
+            self._o_succeed([], state.pos)
         else:
-            self._o_succeed([self._val], self._pos)
+            self._o_succeed([self._state.val], state.pos)
 
     def _s_member_list_5(self):
         self._r__filler()
         self._o_ch(',')
 
     def _r_member(self):
-        self._nodes.append((self._pos, 'member'))
+        self._nodes.append((self.pos(), 'member'))
         self._s_member_1()
         self._nodes.pop()
 
     def _s_member_1(self):
-        pos = self._pos
+        state = self._state.copy()
         self._s_member_2()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_member_4()
 
     def _s_member_2(self):
         self._s_member_3()
-        if self._failed:
+        if self._state.failed:
             return
-        v__1 = self._val
-        if self._failed:
+        v__1 = self._state.val
+        if self._state.failed:
             return
         self._r__filler()
         self._o_ch(':')
-        if self._failed:
+        if self._state.failed:
             return
         self._r_value()
-        if self._failed:
+        if self._state.failed:
             return
-        v__3 = self._val
-        if self._failed:
+        v__3 = self._state.val
+        if self._state.failed:
             return
-        self._o_succeed(self._externs['node'](self, [v__1, v__3]), self._pos)
+        self._o_succeed(
+            self._externs['node'](self, [v__1, v__3]), self._state.pos
+        )
 
     def _s_member_3(self):
         self._r__filler()
@@ -1023,769 +1046,777 @@ class _Parser:
 
     def _s_member_4(self):
         self._s_member_5()
-        if self._failed:
+        if self._state.failed:
             return
-        v__1 = self._val
-        if self._failed:
+        v__1 = self._state.val
+        if self._state.failed:
             return
         self._r__filler()
         self._o_ch(':')
-        if self._failed:
+        if self._state.failed:
             return
         self._r_value()
-        if self._failed:
+        if self._state.failed:
             return
-        v__3 = self._val
-        if self._failed:
+        v__3 = self._state.val
+        if self._state.failed:
             return
-        self._o_succeed(self._externs['node'](self, [v__1, v__3]), self._pos)
+        self._o_succeed(
+            self._externs['node'](self, [v__1, v__3]), self._state.pos
+        )
 
     def _s_member_5(self):
         self._r__filler()
         self._r_ident()
 
     def _r_ident(self):
-        self._nodes.append((self._pos, 'ident'))
-        self._in_token = True
+        self._nodes.append((self.pos(), 'ident'))
+        self._state.in_token = True
         self._s_ident_1()
-        self._in_token = False
+        self._state.in_token = False
         self._nodes.pop()
 
     def _s_ident_1(self):
         self._s_ident_2()
-        if self._failed:
+        if self._state.failed:
             return
-        v__1 = self._val
-        if self._failed:
+        v__1 = self._state.val
+        if self._state.failed:
             return
-        self._o_succeed(self._externs['node'](self, v__1), self._pos)
+        self._o_succeed(self._externs['node'](self, v__1), self._state.pos)
 
     def _s_ident_2(self):
-        start = self._pos
+        start = self._state.pos
         self._s_ident_3()
-        if self._failed:
+        if self._state.failed:
             return
-        end = self._pos
-        self._val = self._text[start:end]
+        end = self._state.pos
+        self._state.val = self._text[start:end]
 
     def _s_ident_3(self):
         self._r_id_start()
-        if self._failed:
+        if self._state.failed:
             return
         self._s_ident_4()
 
     def _s_ident_4(self):
         vs = []
         while True:
-            pos = self._pos
+            state = self._state.copy()
             self._r_id_continue()
-            if self._failed or self._pos == pos:
-                self._o_rewind(pos)
+            if self._state.failed or self._state.pos == state.pos:
+                self._o_restore(state)
                 break
-            vs.append(self._val)
-        self._o_succeed(vs, self._pos)
+            vs.append(self._state.val)
+        self._o_succeed(vs, self._state.pos)
 
     def _r_id_start(self):
-        self._nodes.append((self._pos, 'id_start'))
+        self._nodes.append((self.pos(), 'id_start'))
         self._s_id_start_1()
         self._nodes.pop()
 
     def _s_id_start_1(self):
-        pos = self._pos
+        state = self._state.copy()
         self._r_ascii_id_start()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._r_other_id_start()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_id_start_2()
 
     def _s_id_start_2(self):
         self._r_bslash()
-        if self._failed:
+        if self._state.failed:
             return
         self._r_unicode_esc()
 
     def _r_ascii_id_start(self):
-        self._nodes.append((self._pos, 'ascii_id_start'))
+        self._nodes.append((self.pos(), 'ascii_id_start'))
         self._s_ascii_id_start_1()
         self._nodes.pop()
 
     def _s_ascii_id_start_1(self):
-        pos = self._pos
+        state = self._state.copy()
         self._o_range('a', 'z')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_range('A', 'Z')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_ch('$')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_ch('_')
 
     def _r_other_id_start(self):
-        self._nodes.append((self._pos, 'other_id_start'))
+        self._nodes.append((self.pos(), 'other_id_start'))
         self._s_other_id_start_1()
         self._nodes.pop()
 
     def _s_other_id_start_1(self):
-        pos = self._pos
+        state = self._state.copy()
         self._o_unicat('Ll')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_unicat('Lm')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_unicat('Lo')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_unicat('Lt')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_unicat('Lu')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_unicat('Nl')
 
     def _r_id_continue(self):
-        self._nodes.append((self._pos, 'id_continue'))
+        self._nodes.append((self.pos(), 'id_continue'))
         self._s_id_continue_1()
         self._nodes.pop()
 
     def _s_id_continue_1(self):
-        pos = self._pos
+        state = self._state.copy()
         self._r_ascii_id_start()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._r_digit()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._r_other_id_start()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_unicat('Mn')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_unicat('Mc')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_unicat('Nd')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_unicat('Pc')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_id_continue_2()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_ch('\u200c')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_ch('\u200d')
 
     def _s_id_continue_2(self):
         self._r_bslash()
-        if self._failed:
+        if self._state.failed:
             return
         self._r_unicode_esc()
 
     def _r_num_literal(self):
-        self._nodes.append((self._pos, 'num_literal'))
-        self._in_token = True
+        self._nodes.append((self.pos(), 'num_literal'))
+        self._state.in_token = True
         self._s_num_literal_1()
-        self._in_token = False
+        self._state.in_token = False
         self._nodes.pop()
 
     def _s_num_literal_1(self):
-        pos = self._pos
+        state = self._state.copy()
         self._s_num_literal_2()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_num_literal_3()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_num_literal_4()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_num_literal_6()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_num_literal_7()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_num_literal_8()
 
     def _s_num_literal_2(self):
         self._o_ch('-')
-        if self._failed:
+        if self._state.failed:
             return
         self._r_num_literal()
-        if self._failed:
+        if self._state.failed:
             return
-        v__2 = self._val
-        if self._failed:
+        v__2 = self._state.val
+        if self._state.failed:
             return
-        self._o_succeed(self._externs['node'](self, 0 - v__2), self._pos)
+        self._o_succeed(self._externs['node'](self, 0 - v__2), self._state.pos)
 
     def _s_num_literal_3(self):
         self._o_ch('+')
-        if self._failed:
+        if self._state.failed:
             return
         self._r_num_literal()
-        if self._failed:
+        if self._state.failed:
             return
-        v__2 = self._val
-        if self._failed:
+        v__2 = self._state.val
+        if self._state.failed:
             return
-        self._o_succeed(self._externs['node'](self, v__2), self._pos)
+        self._o_succeed(self._externs['node'](self, v__2), self._state.pos)
 
     def _s_num_literal_4(self):
         self._r_dec_literal()
-        if self._failed:
+        if self._state.failed:
             return
-        v__1 = self._val
-        if self._failed:
+        v__1 = self._state.val
+        if self._state.failed:
             return
         self._s_num_literal_5()
-        if self._failed:
+        if self._state.failed:
             return
         self._o_succeed(
-            self._externs['node'](self, self._fn_atof(v__1)), self._pos
+            self._externs['node'](self, self._fn_atof(v__1)), self._state.pos
         )
 
     def _s_num_literal_5(self):
-        pos = self._pos
+        state = self._state.copy()
         errpos = self._errpos
         self._r_id_start()
-        if self._failed:
-            self._o_succeed(None, pos)
+        if self._state.failed:
+            self._o_succeed(None, state.pos)
         else:
-            self._o_rewind(pos)
+            self._o_restore(state)
             self._errpos = errpos
             self._o_fail()
 
     def _s_num_literal_6(self):
         self._r_hex_literal()
-        if self._failed:
+        if self._state.failed:
             return
-        v__1 = self._val
-        if self._failed:
+        v__1 = self._state.val
+        if self._state.failed:
             return
         self._o_succeed(
-            self._externs['node'](self, self._fn_atoi(v__1, 16)), self._pos
+            self._externs['node'](self, self._fn_atoi(v__1, 16)),
+            self._state.pos,
         )
 
     def _s_num_literal_7(self):
         self._o_str('Infinity')
-        if self._failed:
+        if self._state.failed:
             return
-        self._o_succeed(self._externs['node'](self, 'Infinity'), self._pos)
+        self._o_succeed(
+            self._externs['node'](self, 'Infinity'), self._state.pos
+        )
 
     def _s_num_literal_8(self):
         self._o_str('NaN')
-        if self._failed:
+        if self._state.failed:
             return
-        self._o_succeed(self._externs['node'](self, 'NaN'), self._pos)
+        self._o_succeed(self._externs['node'](self, 'NaN'), self._state.pos)
 
     def _r_dec_literal(self):
-        self._nodes.append((self._pos, 'dec_literal'))
+        self._nodes.append((self.pos(), 'dec_literal'))
         self._s_dec_literal_1()
         self._nodes.pop()
 
     def _s_dec_literal_1(self):
-        pos = self._pos
+        state = self._state.copy()
         self._s_dec_literal_2()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_dec_literal_6()
 
     def _s_dec_literal_2(self):
-        start = self._pos
+        start = self._state.pos
         self._s_dec_literal_3()
-        if self._failed:
+        if self._state.failed:
             return
-        end = self._pos
-        self._val = self._text[start:end]
+        end = self._state.pos
+        self._state.val = self._text[start:end]
 
     def _s_dec_literal_3(self):
         self._r_dec_int_lit()
-        if self._failed:
+        if self._state.failed:
             return
         self._s_dec_literal_4()
         self._s_dec_literal_5()
 
     def _s_dec_literal_4(self):
-        pos = self._pos
+        state = self._state.copy()
         self._r_frac()
-        if self._failed:
-            self._o_succeed([], pos)
+        if self._state.failed:
+            self._o_succeed([], state.pos)
         else:
-            self._o_succeed([self._val], self._pos)
+            self._o_succeed([self._state.val], state.pos)
 
     def _s_dec_literal_5(self):
-        pos = self._pos
+        state = self._state.copy()
         self._r_exp()
-        if self._failed:
-            self._o_succeed([], pos)
+        if self._state.failed:
+            self._o_succeed([], state.pos)
         else:
-            self._o_succeed([self._val], self._pos)
+            self._o_succeed([self._state.val], state.pos)
 
     def _s_dec_literal_6(self):
-        start = self._pos
+        start = self._state.pos
         self._s_dec_literal_7()
-        if self._failed:
+        if self._state.failed:
             return
-        end = self._pos
-        self._val = self._text[start:end]
+        end = self._state.pos
+        self._state.val = self._text[start:end]
 
     def _s_dec_literal_7(self):
         self._r_frac()
-        if self._failed:
+        if self._state.failed:
             return
         self._s_dec_literal_8()
 
     def _s_dec_literal_8(self):
-        pos = self._pos
+        state = self._state.copy()
         self._r_exp()
-        if self._failed:
-            self._o_succeed([], pos)
+        if self._state.failed:
+            self._o_succeed([], state.pos)
         else:
-            self._o_succeed([self._val], self._pos)
+            self._o_succeed([self._state.val], state.pos)
 
     def _r_dec_int_lit(self):
-        self._nodes.append((self._pos, 'dec_int_lit'))
+        self._nodes.append((self.pos(), 'dec_int_lit'))
         self._s_dec_int_lit_1()
         self._nodes.pop()
 
     def _s_dec_int_lit_1(self):
-        pos = self._pos
+        state = self._state.copy()
         self._s_dec_int_lit_2()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s_dec_int_lit_4()
 
     def _s_dec_int_lit_2(self):
         self._o_ch('0')
-        if self._failed:
+        if self._state.failed:
             return
         self._s_dec_int_lit_3()
 
     def _s_dec_int_lit_3(self):
-        pos = self._pos
+        state = self._state.copy()
         errpos = self._errpos
         self._r_digit()
-        if self._failed:
-            self._o_succeed(None, pos)
+        if self._state.failed:
+            self._o_succeed(None, state.pos)
         else:
-            self._o_rewind(pos)
+            self._o_restore(state)
             self._errpos = errpos
             self._o_fail()
 
     def _s_dec_int_lit_4(self):
         self._r_nonzerodigit()
-        if self._failed:
+        if self._state.failed:
             return
         self._s_dec_int_lit_5()
 
     def _s_dec_int_lit_5(self):
         vs = []
         while True:
-            pos = self._pos
+            state = self._state.copy()
             self._r_digit()
-            if self._failed or self._pos == pos:
-                self._o_rewind(pos)
+            if self._state.failed or self._state.pos == state.pos:
+                self._o_restore(state)
                 break
-            vs.append(self._val)
-        self._o_succeed(vs, self._pos)
+            vs.append(self._state.val)
+        self._o_succeed(vs, self._state.pos)
 
     def _r_digit(self):
-        self._nodes.append((self._pos, 'digit'))
+        self._nodes.append((self.pos(), 'digit'))
         self._o_range('0', '9')
         self._nodes.pop()
 
     def _r_nonzerodigit(self):
-        self._nodes.append((self._pos, 'nonzerodigit'))
+        self._nodes.append((self.pos(), 'nonzerodigit'))
         self._o_range('1', '9')
         self._nodes.pop()
 
     def _r_hex_literal(self):
-        self._nodes.append((self._pos, 'hex_literal'))
+        self._nodes.append((self.pos(), 'hex_literal'))
         self._s_hex_literal_1()
         self._nodes.pop()
 
     def _s_hex_literal_1(self):
         self._s_hex_literal_2()
-        if self._failed:
+        if self._state.failed:
             return
         self._s_hex_literal_3()
-        if self._failed:
+        if self._state.failed:
             return
-        v__2 = self._val
-        if self._failed:
+        v__2 = self._state.val
+        if self._state.failed:
             return
-        self._o_succeed(self._fn_strcat('0x', self._fn_cat(v__2)), self._pos)
+        self._o_succeed(
+            self._fn_strcat('0x', self._fn_cat(v__2)), self._state.pos
+        )
 
     def _s_hex_literal_2(self):
-        pos = self._pos
+        state = self._state.copy()
         self._o_str('0x')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_str('0X')
 
     def _s_hex_literal_3(self):
         vs = []
         self._r_hex()
-        if self._failed:
+        if self._state.failed:
             return
-        vs.append(self._val)
+        vs.append(self._state.val)
         while True:
-            pos = self._pos
+            state = self._state.copy()
             self._r_hex()
-            if self._failed or self._pos == pos:
-                self._o_rewind(pos)
+            if self._state.failed or self._state.pos == state.pos:
+                self._o_restore(state)
                 break
-            vs.append(self._val)
-        self._o_succeed(vs, self._pos)
+            vs.append(self._state.val)
+        self._o_succeed(vs, self._state.pos)
 
     def _r_hex(self):
-        self._nodes.append((self._pos, 'hex'))
+        self._nodes.append((self.pos(), 'hex'))
         self._s_hex_1()
         self._nodes.pop()
 
     def _s_hex_1(self):
-        pos = self._pos
+        state = self._state.copy()
         self._o_range('a', 'f')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_range('A', 'F')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._r_digit()
 
     def _r_frac(self):
-        self._nodes.append((self._pos, 'frac'))
+        self._nodes.append((self.pos(), 'frac'))
         self._s_frac_1()
         self._nodes.pop()
 
     def _s_frac_1(self):
         self._o_ch('.')
-        if self._failed:
+        if self._state.failed:
             return
         self._s_frac_2()
 
     def _s_frac_2(self):
         vs = []
         self._r_digit()
-        if self._failed:
+        if self._state.failed:
             return
-        vs.append(self._val)
+        vs.append(self._state.val)
         while True:
-            pos = self._pos
+            state = self._state.copy()
             self._r_digit()
-            if self._failed or self._pos == pos:
-                self._o_rewind(pos)
+            if self._state.failed or self._state.pos == state.pos:
+                self._o_restore(state)
                 break
-            vs.append(self._val)
-        self._o_succeed(vs, self._pos)
+            vs.append(self._state.val)
+        self._o_succeed(vs, self._state.pos)
 
     def _r_exp(self):
-        self._nodes.append((self._pos, 'exp'))
+        self._nodes.append((self.pos(), 'exp'))
         self._s_exp_1()
         self._nodes.pop()
 
     def _s_exp_1(self):
         self._s_exp_2()
-        if self._failed:
+        if self._state.failed:
             return
         self._s_exp_3()
         self._s_exp_5()
 
     def _s_exp_2(self):
-        pos = self._pos
+        state = self._state.copy()
         self._o_ch('e')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_ch('E')
 
     def _s_exp_3(self):
-        pos = self._pos
+        state = self._state.copy()
         self._s_exp_4()
-        if self._failed:
-            self._o_succeed([], pos)
+        if self._state.failed:
+            self._o_succeed([], state.pos)
         else:
-            self._o_succeed([self._val], self._pos)
+            self._o_succeed([self._state.val], state.pos)
 
     def _s_exp_4(self):
-        pos = self._pos
+        state = self._state.copy()
         self._o_ch('+')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_ch('-')
 
     def _s_exp_5(self):
         vs = []
         self._r_digit()
-        if self._failed:
+        if self._state.failed:
             return
-        vs.append(self._val)
+        vs.append(self._state.val)
         while True:
-            pos = self._pos
+            state = self._state.copy()
             self._r_digit()
-            if self._failed or self._pos == pos:
-                self._o_rewind(pos)
+            if self._state.failed or self._state.pos == state.pos:
+                self._o_restore(state)
                 break
-            vs.append(self._val)
-        self._o_succeed(vs, self._pos)
+            vs.append(self._state.val)
+        self._o_succeed(vs, self._state.pos)
 
     def _r__whitespace(self):
-        self._nodes.append((self._pos, '%whitespace'))
-        self._in_token = True
+        self._nodes.append((self.pos(), '%whitespace'))
+        self._state.in_token = True
         self._s__whitespace_1()
-        self._in_token = False
+        self._state.in_token = False
         self._o_tok(self._nodes[-1][0], self._nodes[-1][1])
         self._nodes.pop()
 
     def _s__whitespace_1(self):
         self._s__whitespace_2()
-        if self._failed:
+        if self._state.failed:
             return
-        v__1 = self._val
-        if self._failed:
+        v__1 = self._state.val
+        if self._state.failed:
             return
-        self._o_succeed(self._externs['node'](self, v__1), self._pos)
+        self._o_succeed(self._externs['node'](self, v__1), self._state.pos)
 
     def _s__whitespace_2(self):
-        start = self._pos
+        start = self._state.pos
         self._s__whitespace_3()
-        if self._failed:
+        if self._state.failed:
             return
-        end = self._pos
-        self._val = self._text[start:end]
+        end = self._state.pos
+        self._state.val = self._text[start:end]
 
     def _s__whitespace_3(self):
         vs = []
         self._s__whitespace_4()
-        if self._failed:
+        if self._state.failed:
             return
-        vs.append(self._val)
+        vs.append(self._state.val)
         while True:
-            pos = self._pos
+            state = self._state.copy()
             self._s__whitespace_4()
-            if self._failed or self._pos == pos:
-                self._o_rewind(pos)
+            if self._state.failed or self._state.pos == state.pos:
+                self._o_restore(state)
                 break
-            vs.append(self._val)
-        self._o_succeed(vs, self._pos)
+            vs.append(self._state.val)
+        self._o_succeed(vs, self._state.pos)
 
     def _s__whitespace_4(self):
-        pos = self._pos
+        state = self._state.copy()
         self._o_ch(' ')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_ch('\t')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_ch('\n')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_ch('\r')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_ch('\v')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_ch('\f')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_ch('\xa0')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_ch('\u2028')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_ch('\u2029')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_ch('\ufeff')
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._o_unicat('Zs')
 
     def _r__comment(self):
-        self._nodes.append((self._pos, '%comment'))
-        self._in_token = True
+        self._nodes.append((self.pos(), '%comment'))
+        self._state.in_token = True
         self._s__comment_1()
-        self._in_token = False
+        self._state.in_token = False
         self._o_tok(self._nodes[-1][0], self._nodes[-1][1])
         self._nodes.pop()
 
     def _s__comment_1(self):
-        pos = self._pos
+        state = self._state.copy()
         self._s__comment_2()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._s__comment_7()
 
     def _s__comment_2(self):
         self._s__comment_3()
-        if self._failed:
+        if self._state.failed:
             return
-        v__1 = self._val
-        if self._failed:
+        v__1 = self._state.val
+        if self._state.failed:
             return
-        self._o_succeed(self._externs['node'](self, v__1), self._pos)
+        self._o_succeed(self._externs['node'](self, v__1), self._state.pos)
 
     def _s__comment_3(self):
-        start = self._pos
+        start = self._state.pos
         self._s__comment_4()
-        if self._failed:
+        if self._state.failed:
             return
-        end = self._pos
-        self._val = self._text[start:end]
+        end = self._state.pos
+        self._state.val = self._text[start:end]
 
     def _s__comment_4(self):
         self._o_str('//')
-        if self._failed:
+        if self._state.failed:
             return
         self._s__comment_5()
 
     def _s__comment_5(self):
         vs = []
         while True:
-            pos = self._pos
+            state = self._state.copy()
             self._s__comment_6()
-            if self._failed or self._pos == pos:
-                self._o_rewind(pos)
+            if self._state.failed or self._state.pos == state.pos:
+                self._o_restore(state)
                 break
-            vs.append(self._val)
-        self._o_succeed(vs, self._pos)
+            vs.append(self._state.val)
+        self._o_succeed(vs, self._state.pos)
 
     def _s__comment_6(self):
         rexp = '[^\r\n]'
-        pos = self._pos
+        pos = self.pos()
         if rexp not in self._regexps:
             self._regexps[rexp] = re.compile(rexp)
-        m = self._regexps[rexp].match(self._text, self._pos)
+        m = self._regexps[rexp].match(self._text, pos)
         if m:
-            self._o_succeed(m.group(0), m.end())
+            self._o_succeed(m.group(0), m.end() + 1)
             self._o_tok(pos, 'set')
             return
         self._o_fail()
 
     def _s__comment_7(self):
         self._s__comment_8()
-        if self._failed:
+        if self._state.failed:
             return
-        v__1 = self._val
-        if self._failed:
+        v__1 = self._state.val
+        if self._state.failed:
             return
-        self._o_succeed(self._externs['node'](self, v__1), self._pos)
+        self._o_succeed(self._externs['node'](self, v__1), self._state.pos)
 
     def _s__comment_8(self):
-        start = self._pos
+        start = self._state.pos
         self._s__comment_9()
-        if self._failed:
+        if self._state.failed:
             return
-        end = self._pos
-        self._val = self._text[start:end]
+        end = self._state.pos
+        self._state.val = self._text[start:end]
 
     def _s__comment_9(self):
         self._o_str('/*')
-        if self._failed:
+        if self._state.failed:
             return
         while True:
             self._o_str('*/')
-            if not self._failed:
+            if not self._state.failed:
                 break
             self._r_any()
-            if self._failed:
+            if self._state.failed:
                 break
 
     def _r__filler(self):
-        start = self._pos
+        start = self._state.pos
         self._s__filler_1()
-        end = self._pos
-        self._val = self._text[start:end]
+        end = self._state.pos
+        self._state.val = self._text[start:end]
 
     def _s__filler_1(self):
         vs = []
         while True:
-            pos = self._pos
+            state = self._state.copy()
             self._s__filler_2()
-            if self._failed or self._pos == pos:
-                self._o_rewind(pos)
+            if self._state.failed or self._state.pos == state.pos:
+                self._o_restore(state)
                 break
-            vs.append(self._val)
-        self._o_succeed(vs, self._pos)
+            vs.append(self._state.val)
+        self._o_succeed(vs, self._state.pos)
 
     def _s__filler_2(self):
-        pos = self._pos
+        state = self._state.copy()
         self._r__whitespace()
-        if not self._failed:
+        if not self._state.failed:
             return
-        self._o_rewind(pos)
+        self._o_restore(state)
         self._r__comment()
 
     def _r_any(self):
-        if self._pos < self._end:
-            self._o_succeed(self._text[self._pos], self._pos + 1)
-            self._o_tok(self._pos - 1, 'any')
+        pos = self.pos()
+        if pos < self._end:
+            self._o_succeed(self._text[pos], pos + 1)
+            self._o_tok(pos - 1, 'any')
         else:
             self._o_fail()
 
     def _r_end(self):
-        if self._pos == self._end:
-            self._o_succeed(None, self._pos)
+        if self.pos() == self._end:
+            self._o_succeed(None, self.pos())
         else:
             self._o_fail()
 
     def _o_ch(self, ch):
-        pos = self._pos
+        pos = self.pos()
         if pos < self._end and self._text[pos] == ch:
-            self._o_succeed(ch, self._pos + 1)
+            self._o_succeed(ch, pos + 1)
             self._o_tok(pos, 'lit')
         else:
             self._o_fail()
@@ -1800,9 +1831,9 @@ class _Parser:
         return f'{path}:{lineno} Unexpected {thing} at column {colno}'
 
     def _o_fail(self):
-        self._val = None
-        self._failed = True
-        self._errpos = max(self._errpos, self._pos)
+        self._state.val = None
+        self._state.failed = True
+        self._errpos = max(self._errpos, self._state.pos)
 
     def _o_offsets(self, pos):
         lineno = 1
@@ -1816,50 +1847,48 @@ class _Parser:
         return lineno, colno
 
     def _o_range(self, i, j):
-        pos = self._pos
+        pos = self.pos()
         if pos != self._end and ord(i) <= ord(self._text[pos]) <= ord(j):
-            self._o_succeed(self._text[pos], self._pos + 1)
+            self._o_succeed(self._text[pos], pos + 1)
         else:
             self._o_fail()
 
-    def _o_rewind(self, newpos):
-        self._o_succeed(None, newpos)
-        while self._tokens and self._tokens[-1][0] > newpos:
+    def _o_restore(self, state):
+        self._state = state
+        while self._tokens and self._tokens[-1][0] > self._state.pos:
             self._tokens.pop()
-        if self._cur_token > len(self._tokens):
-            self._cur_token = len(self._tokens) - 1
 
     def _o_str(self, s):
-        in_token = self._in_token
-        self._in_token = True
-        pos = self._pos
+        in_token = self._state.in_token
+        self._state.in_token = True
+        pos = self.pos()
         for ch in s:
             self._o_ch(ch)
-            if self._failed:
+            if self._state.failed:
                 return
-        self._val = s
-        self._in_token = in_token
+        self._state.val = s
+        self._state.in_token = in_token
         self._o_tok(pos, 'lit')
 
     def _o_succeed(self, v, newpos):
-        self._val = v
-        self._failed = False
-        self._pos = newpos
+        self._state.val = v
+        self._state.failed = False
+        self._state.pos = newpos
 
     def _o_tok(self, pos, tag):
-        if self._in_token:
+        if self._state.in_token:
             return
-        if not self._failed and self._pos > pos:
-            val = (pos, tag, self._text[pos:self._pos])
+        if not self._state.failed and self.pos() > pos:
+            val = (pos, tag, self._text[pos:self.pos()])
             if self._tokens and self._tokens[-1][0] == pos:
                 assert self._tokens[-1] == val
             else:
-                self._tokens.append((pos, tag, self._text[pos:self._pos]))
+                self._tokens.append((pos, tag, self._text[pos:self.pos()]))
 
     def _o_unicat(self, cat):
-        pos = self._pos
+        pos = self.pos()
         if pos < self._end and unicodedata.category(self._text[pos]) == cat:
-            self._o_succeed(self._text[pos], self._pos + 1)
+            self._o_succeed(self._text[pos], pos + 1)
         else:
             self._o_fail()
 
@@ -1882,8 +1911,12 @@ class _Parser:
         del parser
         return args[0]
 
+    def _fn_pos(self):
+        return self.pos()
+
     def _fn_strcat(self, *args):
         return ''.join(args)
 
     def _fn_xtou(self, s):
         return chr(int(s, base=16))
+

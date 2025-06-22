@@ -35,17 +35,17 @@ line_length = 79
 declare_local_vars = true
 
 local_var_map = {
-    choice: ['pos int']
-    count: ['cmin int' 'cmax int' 'i int' 'vs list[any]']
-    not: ['errpos int' 'pos int']
-    not_one: ['errpos int' 'pos int']
-    opt: ['pos int']
-    plus: ['pos int' 'vs list[any]']
+    choice: ['state any']
+    count: ['cmin any' 'cmax int' 'i int' 'vs list[any]']
+    not: ['state any' 'errpos int']
+    not_one: ['state any' 'errpos int']
+    opt: ['state any']
+    plus: ['state any' 'vs list[any]']
     pred: ['v any']
     regexp: ['found bool' 'r any']
     run: ['end int' 'start int']
     set: ['found bool' 'r any']
-    star: ['pos int' 'vs any']
+    star: ['state any' 'vs any']
 }
 
 
@@ -129,9 +129,9 @@ call:      [fn [name args] [tri [strcat [method_name name] '(']
 call_op:   [fn [name args] [call [op_name name] args]]
 call_rule: [fn [name args] [call [rule_name name] args]]
 
-succeed: [fn [val pos] [hl [call [op_name 'succeed'] [list val pos] t_end]]]
-rewind: [fn [pos] [hl [call [op_name 'rewind'] [list pos] t_end]]]
 fail: [fn [] [hl [call [op_name 'fail'] q[]] t_end]]
+restore: [fn [var] [hl [call [op_name 'restore'] [list var]] t_end]]
+succeed: [fn [val pos] [hl [call [op_name 'succeed'] [list val pos]] t_end]]
 
 break_if_failed: [fn [node] [if node.can_fail [t_if failed t_break]]]
 break_if_not_failed: [fn [node] [if node.can_fail
@@ -158,11 +158,6 @@ extern: null
 
 generate: @"""
     @if[generator_options.main [main_header] [default_header]]
-    @if[grammar.exception_needed 
-        [vl '' t_toplevel_extra_sep parsing_runtime_exception_class]]
-    @if[grammar.operators
-        [vl '' t_toplevel_extra_sep operator_state_class]]
-
     @t_toplevel_extra_sep
     @result_class
 
@@ -170,7 +165,15 @@ generate: @"""
     @parse_function
 
     @t_toplevel_extra_sep
+    @state_class[]
+    @if[grammar.exception_needed 
+        [vl '' t_toplevel_extra_sep parsing_runtime_exception_class]]
+    @if[grammar.operators
+        [vl '' t_toplevel_extra_sep operator_state_class]]
+
+    @t_toplevel_extra_sep
     @parser_class[]
+
     @if[generator_options.main main_footer default_footer]
     """
 
@@ -211,10 +214,10 @@ n_apply: [fn [node]
                      t_end]
                  [hl [call_rule node.v q[]] t_end]]]
 
-n_choice: [fn [node] [vl [t_assign 'pos' f_pos]
+n_choice: [fn [node] [vl [save 'state']
                          [map [fn [c] [vl [stmts c]
                                           [return_if_not_failed c]
-                                          [rewind 'pos']]]
+                                          [restore 'state']]]
                               [slice node.ch 0 -1]]
                          [stmts [item node.ch -1]]]]
 
@@ -314,12 +317,12 @@ n_lit: [fn [node] [hl [if [equal [strlen node.v] 1]
                           [call_op 'str' [list [lit node.v]]]]
                       t_end]]
 
-n_not: [fn [node] [vl [t_assign 'pos' f_pos]
+n_not: [fn [node] [vl [save 'state']
                       [t_assign 'errpos' [fld 'errpos']]
                       [stmts node.child]
                       [t_ifelse failed
-                                [vl [succeed t_null 'pos']]
-                                [vl [rewind 'pos']
+                                [vl [succeed t_null 'state.pos']]
+                                [vl [restore 'state']
                                     [t_assign [fld 'errpos'] 'errpos']
                                     [fail]]]]]
 
@@ -328,11 +331,11 @@ n_not_one: [fn [node] [vl [n_not node]
 
 n_operator: [fn [node] [hl [call_op 'operator' [list [lit node.v]] t_end]]]
 
-n_opt: [fn [node] [vl [t_assign 'pos' f_pos]
+n_opt: [fn [node] [vl [save 'state']
                       [stmts node.child]
                       [t_ifelse failed
-                                [vl [succeed t_list_zero_any 'pos']]
-                                [vl [succeed [t_list_one_any f_val] f_pos]]]]]
+                                [vl [succeed t_list_zero_any 'state.pos']]
+                                [vl [succeed [t_list_one_any f_val] 'state.pos']]]]]
 
 n_paren: [fn [node] [stmts node.child]]
 
@@ -342,17 +345,17 @@ n_plus: [fn [node]
                 [return_if_failed node.child]
                 [t_append 'vs' f_val]
                 [t_while t_true
-                    [vl [t_assign 'pos' f_pos]
+                    [vl [save 'state']
                         [stmts node.child]
-                        [t_if [t_or failed [t_eq f_pos 'pos']]
-                              [vl [rewind 'pos']
+                        [t_if [t_or failed [t_eq f_pos 'state.pos']]
+                              [vl [restore 'state']
                                   t_break]]
                         [t_append 'vs' f_val]]]
                 [succeed 'vs' f_pos]]]
 
 n_pred: [fn [node]
             [vl [t_assign 'v' [expr node.child]]
-                [t_ifelifelse [t_istrue 'v'] [succeed 'v' f_pos]
+                [t_ifelifelse [t_istrue 'v'] [succeed 'v' 'state.pos']
                               [t_isfalse 'v'] [fail]
                               [t_throw [lit 'Bad predicate value']]]]]
 
@@ -387,10 +390,10 @@ n_seq: [fn [node]
 n_star: [fn [node]
             [vl [t_assign 'vs' t_list_zero_any]
                 [t_while t_true
-                      [vl [t_assign 'pos' f_pos]
+                      [vl [save 'state']
                           [stmts node.child]
-                          [t_if [t_or failed [t_eq f_pos 'pos']]
-                                [vl [rewind 'pos']
+                          [t_if [t_or failed [t_eq f_pos 'state.pos']]
+                                [vl [restore 'state']
                                     t_break]]
                           [t_append 'vs' f_val]]]
                 [succeed 'vs' f_pos]]]

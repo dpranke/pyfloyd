@@ -324,13 +324,13 @@ class Grammar:
         self.str_needed: bool = False
         self.range_needed: bool = False
         self.re_needed: bool = False
-        self.needed_builtin_functions: list[str] = []
+        self.needed_builtin_functions: list[str] = ['pos']
         self.needed_builtin_rules: list[str] = []
         self.needed_operators: list[str] = [
             'error',
             'fail',
             'offsets',
-            'rewind',
+            'restore',
             'succeed',
         ]
         self.unicodedata_needed: bool = False

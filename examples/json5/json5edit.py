@@ -67,7 +67,7 @@ def main(
     if result.err:
         print(result.err, file=stderr)
     if cst_result.err:
-        print(result.err, file=stderr)
+        print(cst_result.err, file=stderr)
     if result.err or cst_result.err:
         return 1
 
@@ -89,13 +89,14 @@ def main(
 def _node(parser, val, t=None, bt=None, *args):
     rule = parser._nodes[-1][1]
     begin = parser._nodes[-1][0]
-    end = parser._pos
+    end = parser.pos()
     assert len(args) == 0
 
     r = {
         'r': rule,   # rule name from grammar
         'b': begin,  # beginning position
         'l': [],     # leading tokens, if any
+        'v': val,    # value, if any
     }
 
     # Other possible fields in a parse node:
@@ -113,7 +114,6 @@ def _node(parser, val, t=None, bt=None, *args):
         return r
     elif rule in ('ident', 'num_literal', 'string', 'null', 'bool', 't'):
         r['s'] = parser._text[begin:end]
-        r['v'] = val
     elif isinstance(val, list):
         # The value must be a list of nodes.
         assert rule in ('array', 'member', 'object')
@@ -131,9 +131,9 @@ def _node(parser, val, t=None, bt=None, *args):
         for k in [k for k in val.keys() if k not in ('b', 'e')]:
             r[k] = val[k]
 
-    r['t'] = []   # trailing tokens, if any
+    r.setdefault('t', [])  # trailing tokens, if any
     r['e'] = end   # ending position
-    initial_token = parser._cur_token
+    initial_token = parser._state.cur_token
     _assign_tokens(parser, r, t, bt)
     if not r['l']:
         del r['l']
@@ -154,10 +154,10 @@ def _assign_tokens(parser, obj, t, bt):
     if t:
         obj['l'].extend(t.get('l', []))
         obj['l'].extend(t.get('t', []))
-    while (parser._cur_token < len(tokens) and
-           tokens[parser._cur_token][0] < begin):
-        obj['l'].append(tokens[parser._cur_token])
-        parser._cur_token += 1
+    while (parser._state.cur_token < len(tokens) and
+           tokens[parser._state.cur_token][0] < begin):
+        obj['l'].append(tokens[parser._state.cur_token])
+        parser._state.cur_token += 1
     if bt:
         f = obj
         l = None
@@ -174,16 +174,16 @@ def _assign_tokens(parser, obj, t, bt):
             obj['l'].append(f['l'][0])
             f['l'] = f['l'][1:]
         else:
-            assert parser._cur_token < len(tokens)
-            assert tokens[parser._cur_token][2] == bt
-            obj['l'].append(tokens[parser._cur_token])
-            parser._cur_token += 1
+            assert parser._state.cur_token < len(tokens)
+            assert tokens[parser._state.cur_token][2] == bt
+            obj['l'].append(tokens[parser._state.cur_token])
+            parser._state.cur_token += 1
 
-    while (parser._cur_token < len(tokens) and
-           tokens[parser._cur_token][0] < end):
+    while (parser._state.cur_token < len(tokens) and
+           tokens[parser._state.cur_token][0] < end):
         obj.setdefault('t', [])
-        obj['t'].append(tokens[parser._cur_token])
-        parser._cur_token += 1
+        obj['t'].append(tokens[parser._state.cur_token])
+        parser._state.cur_token += 1
 
 
 def _tokens(node):

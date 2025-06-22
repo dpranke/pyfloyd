@@ -46,10 +46,13 @@ method_name: [fn [name] [fld name]]
 extern: [fn [name] [strcat 'self._externs[' [lit name] ']']]
 
 # Returns a field or method on the generated parse object.
-f_pos: [fld 'pos']
+f_state: [fld 'state']
 f_errpos: [fld 'errpos']
-f_val: [fld 'val']
-failed: [fld 'failed']
+f_pos: [strcat f_state '.pos']
+f_val: [strcat f_state '.val']
+failed: [strcat f_state '.failed']
+
+save: [fn [var] [hl var ' = self._state.copy()' t_end]]
 
 #
 # Helpers for generating text portably
@@ -134,15 +137,34 @@ parsing_runtime_exception_class: """
         pass
     """
 
+state_class: @"""
+    class _State:
+        pos: int = 0
+        val: any = None
+        failed: bool = False
+        @if[grammar.tokenize [vl 'cur_token = 0' 'in_token = False']]
+
+        def __repr__(self):
+            return (f'_State(pos={self.pos}, failed={self.failed})')
+
+        def copy(self):
+            r = _State()
+            r.pos = self.pos
+            r.val = self.val
+            r.failed = self.failed
+            @if[grammar.tokenize [vl 'r.cur_token = self.cur_token'
+                                     'r.in_token = self.in_token']]
+            return r
+    """
+
 operator_state_class: """
     class _OperatorState:
-        def __init__(self):
-            self.current_depth: int = 0
-            self.current_prec: int = 0
-            self.prec_ops: dict[int, str] = {}
-            self.precs: list[int] = []
-            self.rassoc: set[str] = set()
-            self.choices: dict[str, Any] = {}  # really dict[str, grammar.Rule]
+        current_depth: int = 0
+        current_prec: int = 0
+        prec_ops: dict[int, str] = {}
+        precs: list[int] = []
+        rassoc: set[str] = set()
+        choices: dict[str, Any] = {}  # really dict[str, grammar.Rule]
     """  # operator_state_class
 
 result_class: '''
@@ -193,10 +215,8 @@ parser_constructor: @"""
         self._text = text
         self._end = len(self._text)
         self._errpos = 0
-        self._failed = False
         self._path = path
-        self._pos = 0
-        self._val = None
+        self._state = _State()
         @externs[]
         @if[generator_options.memoize 'self._cache = {}']
         @if[grammar.seeds_needed 'self._seeds = {}']
@@ -209,11 +229,12 @@ parser_constructor: @"""
         @if[grammar.tokenize
             [vl 'self._nodes = []'
                 'self._tokens = []'
-                'self._cur_token = 0'
-                'self._in_token = False'
                 'self._token_rules = ['
                 [ind [comma [map [fn [t] [lit t]] [sort grammar.tokens]]]]
                 ']']]
+
+    def pos(self):
+        return self._state.pos
 
     """  # parser_constructor
 
@@ -270,7 +291,8 @@ operator_choices: [fn [o] [vl 'o.choices = {'
 
 parse_with_exception: @"""
     def parse(self, externs: Externs = None, start: int = 0):
-        self._pos = start
+        self._state.pos = start
+        @if[grammar.tokenize 'self._state.cur_token = 0']
 
         errors = ''
         if externs:
@@ -288,9 +310,9 @@ parse_with_exception: @"""
         try:
             self._r_@grammar.starting_rule()
 
-            if self._failed:
+            if self._state.failed:
                 return Result(None, self._o_error(), self._errpos)
-            return Result(self._val, None, self._pos)
+            return Result(self._state.val, None, self._state.pos)
         except _ParsingRuntimeError as e:  # pragma: no cover
             lineno, _ = self._o_offsets(self._errpos)
             return Result(
@@ -302,7 +324,8 @@ parse_with_exception: @"""
 
 parse_without_exception: @"""
     def parse(self, externs: Externs = None, start: int = 0):
-        self._pos = start
+        self._state.pos = start
+        @if[grammar.tokenize 'self._state.cur_token = 0']
 
         errors = ''
         if externs:
@@ -316,7 +339,7 @@ parse_without_exception: @"""
 
         self._r_@grammar.starting_rule()
 
-        if self._failed:
+        if self._state.failed:
             return Result(None, self._o_error(), self._errpos)
         return Result(@f_val, None, @f_pos)
     """
@@ -398,11 +421,10 @@ main_footer: """
 
 n_regexp: [fn [node]
               [vl [t_assign 'rexp' [lit node.v]]
-                  [if grammar.tokenize
-                      'pos = self._pos']
+                  'pos = self.pos()'
                   'if rexp not in self._regexps:'
                   '    self._regexps[rexp] = re.compile(rexp)'
-                  'm = self._regexps[rexp].match(self._text, self._pos)'
+                  'm = self._regexps[rexp].match(self._text, pos)'
                   'if m:'
                   [ind 'self._o_succeed(m.group(0), m.end())'
                        [if grammar.tokenize
@@ -413,13 +435,13 @@ n_regexp: [fn [node]
 n_rule_wrapper: [fn [node]
                     [let [[is_tok [in grammar.tokens node.v]]]
                       [vl [t_declare_local_vars node]
-                          [strcat "self._nodes.append((self._pos, '"
+                          [strcat "self._nodes.append((self.pos(), '"
                                   node.v
                                   "'))"]
-                          [if is_tok 'self._in_token = True']
+                          [if is_tok 'self._state.in_token = True']
                           [stmts node.child]
                           [if is_tok
-                              [vl 'self._in_token = False'
+                              [vl 'self._state.in_token = False'
                                   [if [or [equal node.v '%whitespace']
                                           [equal node.v '%comment']]
                                       [hl 'self._o_tok('
@@ -430,13 +452,12 @@ n_rule_wrapper: [fn [node]
 
 n_set: [fn [node]
            [vl [t_assign 'rexp' [lit [strcat '[' node.v ']']]]
-               [if grammar.tokenize
-                   'pos = self._pos']
+               'pos = self.pos()'
                [t_if 'rexp not in self._regexps'
                      'self._regexps[rexp] = re.compile(rexp)']
-               'm = self._regexps[rexp].match(self._text, self._pos)'
+               'm = self._regexps[rexp].match(self._text, pos)'
                [t_if 'm'
-                     [vl [succeed 'm.group(0)' 'm.end()']
+                     [vl [succeed 'm.group(0)' 'm.end() + 1']
                          [if grammar.tokenize
                              "self._o_tok(pos, 'set')"]
                          t_return]]
@@ -448,23 +469,24 @@ n_set: [fn [node]
 
 r_any: [
     meth q[]
-        [vl 'if self._pos < self._end:'
-            [ind 'self._o_succeed(self._text[self._pos], self._pos + 1)'
-                 [if grammar.tokenize "self._o_tok(self._pos - 1, 'any')"]]
+        [vl 'pos = self.pos()'
+            'if pos < self._end:'
+            [ind 'self._o_succeed(self._text[pos], pos + 1)'
+                 [if grammar.tokenize "self._o_tok(pos - 1, 'any')"]]
             'else:'
             [ind 'self._o_fail()']]]
 
 r_end: [meth q[] "
-             if self._pos == self._end:
-                 self._o_succeed(None, self._pos)
+             if self.pos() == self._end:
+                 self._o_succeed(None, self.pos())
              else:
                  self._o_fail()
              "]
 
 o_ch: [meth q['ch']
-            [vl 'pos = self._pos'
+            [vl 'pos = self.pos()'
                 'if pos < self._end and self._text[pos] == ch:'
-                [ind 'self._o_succeed(ch, self._pos + 1)'
+                [ind 'self._o_succeed(ch, pos + 1)'
                      [if grammar.tokenize "self._o_tok(pos, 'lit')"]]
                 'else:'
                 [ind 'self._o_fail()']]]
@@ -492,35 +514,35 @@ o_error: [meth q[] '''
               ''']
 
 o_fail: [meth q[] '''
-              self._val = None
-              self._failed = True
-              self._errpos = max(self._errpos, self._pos)
+              self._state.val = None
+              self._state.failed = True
+              self._errpos = max(self._errpos, self._state.pos)
               ''']
 
 o_leftrec: [meth q['rule' 'rule_name' 'left_assoc'] '''
-                  pos = self._pos
+                  pos = self.pos()
                   key = (rule_name, pos)
                   seed = self._seeds.get(key)
                   if seed:
-                      self._val, self._failed, self._pos = seed
+                      self._state = seed
                       return
                   if rule_name in self._blocked:
-                      self._val = None
-                      self._failed = True
+                      self._state.val = None
+                      self._state.failed = True
                       return
-                  current = (None, True, self._pos)
+                  current = self._state
                   self._seeds[key] = current
                   if left_assoc:
                       self._blocked.add(rule_name)
                   while True:
                       rule()
                       if self._pos > current[2]:
-                          current = (self._val, self._failed, self._pos)
+                          current = self._state
                           self._seeds[key] = current
                           self._pos = pos
                       else:
                           del self._seeds[key]
-                          self._val, self._failed, self._pos = current
+                          self._state = current
                           if left_assoc:
                               self._blocked.remove(rule_name)
                           return
@@ -538,30 +560,31 @@ o_lookup: [meth q['var'] '''
                 ''']
 
 o_memoize: [meth q['rule_name' 'fn'] '''
-        pos = self._pos
+        pos = self.pos()
         if pos not in self._cache:
             self._cache[pos] = {}
         c = self._cache[pos]
         if rule_name in c:
-            self._val, self._failed, self._pos = c[rule_name]
+            self._state = c[rule_name]
             return
         fn()
-        c[rule_name] = (self._val, self._failed, self._pos)
+        c[rule_name] = self._state
         ''']
 
 o_operator: [meth q['rule_name'] '''
         o = self._operators[rule_name]
-        pos = self._pos
+        state = self._state
+        pos = state.pos
         cache = self._seeds.get(pos)
         if not cache:
             self._seeds[pos] = {}
         cache = self._seeds[pos]
         entry = cache.get(rule_name)
         if entry:
-            self._val, self._failed, self._pos = entry
+            self._state = entry
             return
         o.current_depth += 1
-        entry = (None, True, self._pos)
+        entry = self._state
         cache[rule_name] = entry
         min_prec = o.current_prec
         i = 0
@@ -577,12 +600,12 @@ o_operator: [meth q['rule_name'] '''
             for j, _ in enumerate(prec_ops):
                 op = prec_ops[j]
                 o.choices[op]()
-                if not self._failed and self._pos > pos:
-                    entry = (self._val, self._failed, self._pos)
+                if not self._state.failed and self.pos() > pos:
+                    entry = self._state
                     cache[rule_name] = entry
                     repeat = True
                     break
-                self._o_rewind(pos)
+                self._o_restore(state)
             if not repeat:
                 i += 1
 
@@ -590,69 +613,67 @@ o_operator: [meth q['rule_name'] '''
         o.current_depth -= 1
         if o.current_depth == 0:
             o.current_prec = 0
-        self._val, self._failed, self._pos = entry
+        self._state = entry
         ''']
 
 o_range: [meth q['i' 'j'] '''
-               pos = self._pos
+               pos = self.pos()
                if pos != self._end and ord(i) <= ord(self._text[pos]) <= ord(j):
-                   self._o_succeed(self._text[pos], self._pos + 1)
+                   self._o_succeed(self._text[pos], pos + 1)
                else:
                    self._o_fail()
                ''']
 
-o_rewind: [meth q['newpos']
-                [vl 'self._o_succeed(None, newpos)'
-                    [if grammar.tokenize
-                        [vl [strcat 'while self._tokens and '
-                                    'self._tokens[-1][0] > newpos:']
-                            [ind 'self._tokens.pop()']
-                        'if self._cur_token > len(self._tokens):'
-                        [ind 'self._cur_token = len(self._tokens) - 1']]]]]
+o_restore: [meth q['state']
+                 [vl 'self._state = state'
+                     [if grammar.tokenize
+                         [vl [strcat 'while self._tokens and '
+                                     'self._tokens[-1][0] > self._state.pos:']
+                             [ind 'self._tokens.pop()']]]]]
 
 o_str: [meth q['s']
              [vl [if grammar.tokenize
                      """
-                     in_token = self._in_token
-                     self._in_token = True
-                     pos = self._pos
+                     in_token = self._state.in_token
+                     self._state.in_token = True
+                     pos = self.pos()
                      """]
                  """
                  for ch in s:
                      self._o_ch(ch)
-                     if self._failed:
+                     if self._state.failed:
                          return
-                 self._val = s
+                 self._state.val = s
                  """
                  [if grammar.tokenize
                      """
-                     self._in_token = in_token
+                     self._state.in_token = in_token
                      self._o_tok(pos, 'lit')
                      """]]]
 
 o_succeed: [meth q['v' 'newpos'] "
-                self._val = v
-                self._failed = False
-                self._pos = newpos
+                self._state.val = v
+                self._state.failed = False
+                self._state.pos = newpos
                 "]
 
 o_tok: [meth q['pos' 'tag']
              """
-             if self._in_token:
+             if self._state.in_token:
                  return
-             if not self._failed and self._pos > pos:
-                 val = (pos, tag, self._text[pos:self._pos])
+             if not self._state.failed and self.pos() > pos:
+                 val = (pos, tag, self._text[pos:self.pos()])
                  if self._tokens and self._tokens[-1][0] == pos:
                      assert self._tokens[-1] == val
                  else:
-                     self._tokens.append((pos, tag, self._text[pos:self._pos]))
+                     self._tokens.append((pos, tag, self._text[pos:self.pos()]))
              """]
 
 o_unicat: [
     meth q['cat'] "
-         pos = self._pos
+         pos = self.pos()
          if pos < self._end and unicodedata.category(self._text[pos]) == cat:
-             self._o_succeed(self._text[pos], self._pos + 1)
+             self._o_succeed(self._text[pos], pos + 1)
          else:
              self._o_fail()
          "]
@@ -660,14 +681,17 @@ o_unicat: [
 fn_colno: [
     meth q[] """
             colno = 0
-            if self._pos == self._end:
+            pos = self.pos()
+            if pos == self._end:
                 colno += 1
-            while self._pos >= colno and self._text[self._pos - colno] != '\\n':
+            while pos >= colno and self._text[pos - colno] != '\\n':
                 colno += 1
             return colno
             """]
 
-fn_pos: [meth q[] 'return self._pos']
+fn_failed: [meth q[] 'return self._state.failed']
+
+fn_pos: [meth q[] 'return self.pos()']
 
 fn_node: [meth q['parser' '*args'] """
         del parser
