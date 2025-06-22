@@ -139,19 +139,21 @@ parsing_runtime_exception_class: """
 
 state_class: @"""
     class _State:
-        pos: int = 0
-        val: any = None
-        failed: bool = False
-        @if[grammar.tokenize [vl 'cur_token = 0' 'in_token = False']]
+        def __init__(self, pos: int = 0, failed: bool = False, val: Any = None):
+            self.pos = pos
+            self.failed = failed
+            self.val = val
+            @if[grammar.tokenize [vl 'self.cur_token = 0'
+                                     'self.in_token = False']]
 
         def __repr__(self):
-            return (f'_State(pos={self.pos}, failed={self.failed})')
+            return f'_State(pos={self.pos}, failed={self.failed})'
 
         def copy(self):
             r = _State()
             r.pos = self.pos
-            r.val = self.val
             r.failed = self.failed
+            r.val = self.val
             @if[grammar.tokenize [vl 'r.cur_token = self.cur_token'
                                      'r.in_token = self.in_token']]
             return r
@@ -291,9 +293,7 @@ operator_choices: [fn [o] [vl 'o.choices = {'
 
 parse_with_exception: @"""
     def parse(self, externs: Externs = None, start: int = 0):
-        self._state.pos = start
-        @if[grammar.tokenize 'self._state.cur_token = 0']
-
+        self._state = _State(pos=start)
         errors = ''
         if externs:
             for k, v in externs.items():
@@ -457,7 +457,7 @@ n_set: [fn [node]
                      'self._regexps[rexp] = re.compile(rexp)']
                'm = self._regexps[rexp].match(self._text, pos)'
                [t_if 'm'
-                     [vl [succeed 'm.group(0)' 'm.end() + 1']
+                     [vl [succeed 'm.group(0)' 'm.end()']
                          [if grammar.tokenize
                              "self._o_tok(pos, 'set')"]
                          t_return]]
@@ -524,25 +524,25 @@ o_leftrec: [meth q['rule' 'rule_name' 'left_assoc'] '''
                   key = (rule_name, pos)
                   seed = self._seeds.get(key)
                   if seed:
-                      self._state = seed
+                      self._state = seed.copy()
                       return
                   if rule_name in self._blocked:
                       self._state.val = None
                       self._state.failed = True
                       return
-                  current = self._state
+                  current = _State(pos=pos, failed=True)
                   self._seeds[key] = current
                   if left_assoc:
                       self._blocked.add(rule_name)
                   while True:
                       rule()
-                      if self._pos > current[2]:
-                          current = self._state
+                      if self.pos() > current.pos:
+                          current = self._state.copy()
                           self._seeds[key] = current
-                          self._pos = pos
+                          self._state.pos = pos
                       else:
                           del self._seeds[key]
-                          self._state = current
+                          self._state = current.copy()
                           if left_assoc:
                               self._blocked.remove(rule_name)
                           return
@@ -565,15 +565,15 @@ o_memoize: [meth q['rule_name' 'fn'] '''
             self._cache[pos] = {}
         c = self._cache[pos]
         if rule_name in c:
-            self._state = c[rule_name]
+            self._state = c[rule_name].copy()
             return
         fn()
-        c[rule_name] = self._state
+        c[rule_name] = self._state.copy()
         ''']
 
 o_operator: [meth q['rule_name'] '''
         o = self._operators[rule_name]
-        state = self._state
+        state = self._state.copy()
         pos = state.pos
         cache = self._seeds.get(pos)
         if not cache:
@@ -581,10 +581,10 @@ o_operator: [meth q['rule_name'] '''
         cache = self._seeds[pos]
         entry = cache.get(rule_name)
         if entry:
-            self._state = entry
+            self._state = entry.copy()
             return
         o.current_depth += 1
-        entry = self._state
+        entry = _State(pos=pos, failed=True)
         cache[rule_name] = entry
         min_prec = o.current_prec
         i = 0
@@ -601,7 +601,7 @@ o_operator: [meth q['rule_name'] '''
                 op = prec_ops[j]
                 o.choices[op]()
                 if not self._state.failed and self.pos() > pos:
-                    entry = self._state
+                    entry = self._state.copy()
                     cache[rule_name] = entry
                     repeat = True
                     break
@@ -613,7 +613,7 @@ o_operator: [meth q['rule_name'] '''
         o.current_depth -= 1
         if o.current_depth == 0:
             o.current_prec = 0
-        self._state = entry
+        self._state = entry.copy()
         ''']
 
 o_range: [meth q['i' 'j'] '''
@@ -625,7 +625,7 @@ o_range: [meth q['i' 'j'] '''
                ''']
 
 o_restore: [meth q['state']
-                 [vl 'self._state = state'
+                 [vl 'self._state = state.copy()'
                      [if grammar.tokenize
                          [vl [strcat 'while self._tokens and '
                                      'self._tokens[-1][0] > self._state.pos:']
@@ -688,8 +688,6 @@ fn_colno: [
                 colno += 1
             return colno
             """]
-
-fn_failed: [meth q[] 'return self._state.failed']
 
 fn_pos: [meth q[] 'return self.pos()']
 

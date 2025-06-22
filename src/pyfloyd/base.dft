@@ -158,6 +158,7 @@ extern: null
 
 generate: @"""
     @if[generator_options.main [main_header] [default_header]]
+
     @t_toplevel_extra_sep
     @result_class
 
@@ -166,14 +167,13 @@ generate: @"""
 
     @t_toplevel_extra_sep
     @state_class[]
-    @if[grammar.exception_needed 
+    @if[grammar.exception_needed
         [vl '' t_toplevel_extra_sep parsing_runtime_exception_class]]
     @if[grammar.operators
         [vl '' t_toplevel_extra_sep operator_state_class]]
 
     @t_toplevel_extra_sep
     @parser_class[]
-
     @if[generator_options.main main_footer default_footer]
     """
 
@@ -335,7 +335,7 @@ n_opt: [fn [node] [vl [save 'state']
                       [stmts node.child]
                       [t_ifelse failed
                                 [vl [succeed t_list_zero_any 'state.pos']]
-                                [vl [succeed [t_list_one_any f_val] 'state.pos']]]]]
+                                [vl [succeed [t_list_one_any f_val] f_pos]]]]]
 
 n_paren: [fn [node] [stmts node.child]]
 
@@ -355,7 +355,7 @@ n_plus: [fn [node]
 
 n_pred: [fn [node]
             [vl [t_assign 'v' [expr node.child]]
-                [t_ifelifelse [t_istrue 'v'] [succeed 'v' 'state.pos']
+                [t_ifelifelse [t_istrue 'v'] [succeed 'v' f_pos]
                               [t_isfalse 'v'] [fail]
                               [t_throw [lit 'Bad predicate value']]]]]
 

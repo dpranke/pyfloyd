@@ -76,7 +76,7 @@ class Node:
         elif self.t == 'rule':
             self.attrs.vars = {}
         self.parser = parser
-        self.pos: Optional[int] = parser._pos if parser else None
+        self.pos: Optional[int] = parser.pos() if parser else None
 
     def __eq__(self, other) -> bool:
         assert isinstance(other, Node)
@@ -324,7 +324,7 @@ class Grammar:
         self.str_needed: bool = False
         self.range_needed: bool = False
         self.re_needed: bool = False
-        self.needed_builtin_functions: list[str] = ['pos']
+        self.needed_builtin_functions: list[str] = []
         self.needed_builtin_rules: list[str] = []
         self.needed_operators: list[str] = [
             'error',

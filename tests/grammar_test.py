@@ -659,6 +659,16 @@ class ValuesMixin:
     def test_long_unicode_literals(self):
         self.check("grammar = '\\U00000020' -> true", ' ', out=True)
 
+    def test_not(self):
+        grammar = "grammar = '-' | '0' ~'x' | '0x0'"
+        self.check(grammar, '0', out=None)
+        self.check(grammar, '0x0', out='0x0')
+
+        # This checks that the position is correctly restored after
+        # consuming one 'b' and then failing; `out=2` would
+        # indicate that we were not restoring the position properly.
+        self.check("grammar = 'a' ~('b'* 'c') -> pos()", 'ab', out=1)
+
     def test_not_one(self):
         self.check("grammar = ^'a' 'b'-> true", 'cb', out=True)
         self.check(
@@ -676,7 +686,8 @@ class ValuesMixin:
         self.check("grammar = ~~('a') 'a' -> true", 'a', out=True)
 
     def test_opt(self):
-        self.check("grammar = 'a' 'b'? -> true", 'a', out=True)
+        self.check("grammar = 'a' 'b'? end", 'a', out=None)
+        self.check("grammar = 'a' 'b'? end", 'ab', out=None)
 
     def test_paren_in_value(self):
         self.check('grammar = -> (true)', '', out=True)
