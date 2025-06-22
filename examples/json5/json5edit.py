@@ -86,20 +86,17 @@ def main(
     return 0
 
 
-def _node(parser, *args):
+def _node(parser, val, t=None, bt=None, *args):
     rule = parser._nodes[-1][1]
     begin = parser._nodes[-1][0]
     end = parser._pos
-    val = args[0]
+    assert len(args) == 0
 
     r = {
         'r': rule,   # rule name from grammar
         'b': begin,  # beginning position
-        'e': end,    # ending position
+        'l': [],     # leading tokens, if any
     }
-    if len(args) > 1:
-        r['bt'] = args[1] # beginning token
-        r['et'] = args[2] # ending token
 
     # Other possible fields in a parse node:
     # 'c': children of the node, if any
@@ -113,8 +110,8 @@ def _node(parser, *args):
         return isinstance(v, dict) and 'r' in v and 'b' in v and 'e' in v
 
     if rule in ('%comment', '%whitespace'):
-        pass
-    elif rule in ('ident', 'num_literal', 'string', 'null', 'bool'):
+        return r
+    elif rule in ('ident', 'num_literal', 'string', 'null', 'bool', 't'):
         r['s'] = parser._text[begin:end]
         r['v'] = val
     elif isinstance(val, list):
@@ -134,49 +131,66 @@ def _node(parser, *args):
         for k in [k for k in val.keys() if k not in ('b', 'e')]:
             r[k] = val[k]
 
-    if rule == 'grammar':
-        _ = _assign_tokens(parser._tokens, r, 0)
+    r['t'] = []   # trailing tokens, if any
+    r['e'] = end   # ending position
+    initial_token = parser._cur_token
+    _assign_tokens(parser, r, t, bt)
+    if not r['l']:
+        del r['l']
+    if not r['t']:
+        del r['t']
 
+    #assert (''.join(t[2] for t in _tokens(r) if t[0] >= r['b']) ==
+    #        parser._text[r['b']:r['e']])
     return r
 
 
-def _assign_tokens(tokens, obj, pos):
+def _assign_tokens(parser, obj, t, bt):
     begin = obj['b']
     end = obj['e']
     rule = obj['r']
+    tokens = parser._tokens
 
-    while tokens[pos][0] < begin:
-        obj.setdefault('l', [])
-        obj['l'].append(tokens[pos])
-        pos += 1
-    if 'bt' in obj:
-        while tokens[pos][2] != obj['bt']:
+    if t:
+        obj['l'].extend(t.get('l', []))
+        obj['l'].extend(t.get('t', []))
+    while (parser._cur_token < len(tokens) and
+           tokens[parser._cur_token][0] < begin):
+        obj['l'].append(tokens[parser._cur_token])
+        parser._cur_token += 1
+    if bt:
+        f = obj
+        l = None
+        while True:
+            if f.get('c', []):
+                f = f['c'][0]
+                if 'l' not in f and f.get('c', []):
+                    f = f['c'][0]
+                    continue
+            break
+        if f != obj:
+            assert f['l'][0][2] == bt
             obj.setdefault('l', [])
-            obj['l'].append(tokens[pos])
-            pos += 1
-        obj['l'].append(tokens[pos])
-        pos += 1
+            obj['l'].append(f['l'][0])
+            f['l'] = f['l'][1:]
+        else:
+            assert parser._cur_token < len(tokens)
+            assert tokens[parser._cur_token][2] == bt
+            obj['l'].append(tokens[parser._cur_token])
+            parser._cur_token += 1
 
-    assert ('c' in obj) ^ ('s' in obj)
-    if 's' in obj:
-        assert tokens[pos] == (obj['b'], obj['r'], obj['s'])
-        pos += 1
-    else:
-        for c in obj['c']:
-            pos = _assign_tokens(tokens, c, pos)
-
-    while pos < len(tokens) and tokens[pos][0] < end:
+    while (parser._cur_token < len(tokens) and
+           tokens[parser._cur_token][0] < end):
         obj.setdefault('t', [])
-        obj['t'].append(tokens[pos])
-        pos += 1
-    return pos
+        obj['t'].append(tokens[parser._cur_token])
+        parser._cur_token += 1
 
 
 def _tokens(node):
     toks = list(node.get('l', []))
     assert ('s' in node) ^ ('c' in node)
     if 's' in node:
-        toks.append((node['r'], node['b'], node['s']))
+        toks.append((node['b'], node['r'], node['s']))
     else:
         for c in node['c']:
             toks.extend(_tokens(c))

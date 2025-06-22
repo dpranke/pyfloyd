@@ -17,7 +17,7 @@
 %comment       = <'//' [^\r\n]*>                 -> node($1)
                | <'/*' ^.'*/'>                   -> node($1)
 
-%tokens        = bool ident null num_literal string
+%tokens        = bool ident null num_literal string t
 
 grammar        = value end                       -> node($1)
 
@@ -33,11 +33,13 @@ null           = 'null'                          -> node(null)
 bool           = 'true'                          -> node(true)
                | 'false'                         -> node(false)
 
-object         = '{' member_list '}'              -> node(dict($2), $1, $3)
-               | '{' '}'                          -> node(dict([]), $1, $2)
+object         = t '{' member_list '}'             -> node(dict($3), $1, '{')
+               | t '{' '}'                         -> node(dict([]), $1, '{')
 
-array          = '[' element_list ']'            -> node($2, $1, $3)
-               | '[' ']'                         -> node([], $1, $2)
+t              =                                   -> node(null)
+
+array          = t '[' element_list ']'            -> node($3, $1, '[')
+               | t '[' ']'                         -> node([], $1, '[')
 
 string         = squote sqchar* squote           -> node(cat($2))
                | dquote dqchar* dquote           -> node(cat($2))
