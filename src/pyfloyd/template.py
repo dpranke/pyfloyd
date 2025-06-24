@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import argparse
+import json
 import os
 import pdb
 import sys
@@ -31,6 +32,7 @@ def main(
 ) -> int:
     parser = argparse.ArgumentParser()
     generator.add_arguments(parser)
+    parser.add_argument('-j', '--json', action='store_true')
     parser.add_argument(
         '-k',
         '--key',
@@ -80,7 +82,10 @@ def main(
     options = generator.options_from_args(args, sys.argv)
 
     try:
-        df = datafile.load(fp, filename=path)
+        if args.json:
+            df = json.load(fp)
+        else:
+            df = datafile.load(fp, filename=path)
         if args.key is None:
             data = df
         else:

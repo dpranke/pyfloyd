@@ -1,4 +1,8 @@
-%whitespace    = ' '
+%externs       = strict                          -> true
+               | node                            -> pfunc
+               | dict                            -> func
+
+%whitespace    = <(' '
                | '\t'
                | '\n'
                | '\r'
@@ -8,33 +12,37 @@
                | '\u2028'
                | '\u2029'
                | '\ufeff'
-               | \p{Zs}
+               | \p{Zs})+>                       -> node($1)
 
-%comment       = '//' [^\r\n]*
-               | '/*' ^.'*/'
+%comment       = <'//' [^\r\n]*>                 -> node($1)
+               | <'/*' ^.'*/'>                   -> node($1)
 
-%tokens        = ident num_literal string
+%tokens        = bool ident null num_literal string t
 
-%externs       = strict                          -> true
+grammar        = value end                       -> node($1)
 
-grammar        = value end                       -> $1
-
-value          = 'null'                          -> null
-               | 'true'                          -> true
-               | 'false'                         -> false
+value          = null
+               | bool
                | num_literal
                | object
                | array
                | string
 
-object         = '{' member_list '}'             -> dict($2)
-               | '{' '}'                         -> dict([])
+null           = 'null'                          -> node(null)
 
-array          = '[' element_list ']'            -> $2
-               | '[' ']'                         -> []
+bool           = 'true'                          -> node(true)
+               | 'false'                         -> node(false)
 
-string         = squote sqchar* squote           -> cat($2)
-               | dquote dqchar* dquote           -> cat($2)
+object         = t '{' member_list '}'             -> node(dict($3), $1, '{')
+               | t '{' '}'                         -> node(dict([]), $1, '{')
+
+t              =                                   -> node(null)
+
+array          = t '[' element_list ']'            -> node($3, $1, '[')
+               | t '[' ']'                         -> node([], $1, '[')
+
+string         = squote sqchar* squote           -> node(cat($2))
+               | dquote dqchar* dquote           -> node(cat($2))
 
 sqchar         = bslash esc_char                 -> $2
                | bslash eol                      -> ''
@@ -80,10 +88,10 @@ element_list   = value (',' value)* ','?         -> cons($1, $2)
 
 member_list    = member (',' member)* ','?       -> cons($1, $2)
 
-member         = string ':' value                -> [$1, $3]
-               | ident ':' value                 -> [$1, $3]
+member         = string ':' value                -> node([$1, $3])
+               | ident ':' value                 -> node([$1, $3])
 
-ident          = id_start id_continue*           -> cat(scons($1, $2))
+ident          = <id_start id_continue*>         -> node($1)
 
 id_start       = ascii_id_start
                | other_id_start
@@ -112,12 +120,12 @@ id_continue    = ascii_id_start
                | '\u200c'
                | '\u200d'
 
-num_literal    = '-' num_literal                 -> 0 - $2
-               | '+' num_literal                 -> $2
-               | dec_literal ~id_start           -> atof($1)
-               | hex_literal                     -> atoi($1, 16)
-               | 'Infinity'                      -> 'Infinity'
-               | 'NaN'                           -> 'NaN'
+num_literal    = '-' num_literal                 -> node(0 - $2)
+               | '+' num_literal                 -> node($2)
+               | dec_literal ~id_start           -> node(atof($1))
+               | hex_literal                     -> node(atoi($1, 16))
+               | 'Infinity'                      -> node('Infinity')
+               | 'NaN'                           -> node('NaN')
 
 dec_literal    = <dec_int_lit frac? exp?>
                | <frac exp?>

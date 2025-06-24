@@ -394,7 +394,9 @@ class Decoder:
                 i, c = decode_escape(s, i)
                 ret.append(c)
         r = ''.join(ret)
-        return dedent(r, colno=colno, min_indent=1 if is_istr else -1)
+        if '\n' in s:
+            return dedent(r, colno=colno, min_indent=1 if is_istr else -1)
+        return r
 
     def parse_string_list(self, tag, strs):
         if tag:
@@ -749,7 +751,7 @@ class Encoder:
                 s = self._encode_dict(obj, seen, level + 1, oneline=False)
         elif isinstance(obj, collections.abc.Sequence):
             s = self._encode_array(obj, seen, level + 1, oneline=True)
-            if len(s) > max_len or '\n' in s:
+            if len(s) > max_len and ('\n' not in s):
                 s = self._encode_array(obj, seen, level + 1, oneline=False)
 
         else:

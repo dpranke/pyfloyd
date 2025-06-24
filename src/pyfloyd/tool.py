@@ -70,7 +70,9 @@ def main(argv=None, host=None):
             if ast:
                 contents = json.dumps(ast.to_json(args.full_ast), indent=2)
         elif args.pretty_print:
-            contents, err = pyfloyd.pretty_print(grammar, args.grammar)
+            contents, err = pyfloyd.pretty_print(
+                grammar, args.grammar, args.rewrite_filler
+            )
         elif args.interpret:
             contents, err, _ = _interpret_grammar(
                 host, args, grammar, externs, options
@@ -81,8 +83,14 @@ def main(argv=None, host=None):
                 if args.output and args.output != '-':
                     ext = host.splitext(args.output)[1]
                     args.template = pyfloyd.KNOWN_TEMPLATES.get(ext)
+            if options.template is None:
+                options.template = args.template
             v, err, _ = pyfloyd.generate(
-                grammar, path=args.grammar, options=options
+                grammar,
+                path=args.grammar,
+                options=options,
+                typecheck=args.typecheck,
+                tokenize=args.tokenize,
             )
             if v is not None:
                 contents, ext = v
@@ -179,6 +187,10 @@ def _parse_args(host, argv):
         help='path to read data from',
     )
     ap.add_argument('--post-mortem', '--pm', action='store_true')
+    ap.add_argument('--typecheck', action='store_true', default=True)
+    ap.add_argument('--no-typecheck', action='store_false', dest='typecheck')
+    ap.add_argument('--tokenize', action='store_true', default=False)
+    ap.add_argument('--no-tokenize', action='store_false', default='tokenize')
 
     args = ap.parse_args(argv)
 
@@ -217,6 +229,8 @@ def _interpret_grammar(host, args, grammar, externs, options):
         path=path,
         externs=externs,
         memoize=options.memoize,
+        typecheck=args.typecheck,
+        tokenize=args.tokenize,
     )
     if err:
         return None, err, endpos

@@ -76,7 +76,7 @@ class Node:
         elif self.t == 'rule':
             self.attrs.vars = {}
         self.parser = parser
-        self.pos: Optional[int] = parser._pos if parser else None
+        self.pos: Optional[int] = parser.pos() if parser else None
 
     def __eq__(self, other) -> bool:
         assert isinstance(other, Node)
@@ -190,6 +190,13 @@ class Node:
         assert self.ch[0].v in functions.ALL
         func_name = self.ch[0].v
         func = functions.ALL[func_name]
+
+        if func_name == 'node':
+            # TODO: We're treating node as special, until we can support
+            # a generic type T.
+            self.type = self.ch[1].type
+            return
+
         params = func['params']
         if len(params) and params[-1][0].startswith('*'):
             last = len(params) - 1
@@ -253,6 +260,8 @@ class Node:
             self.type = TD('null')
         elif self.v == 'func':
             self.type = TD('func')
+        elif self.v == 'pfunc':
+            self.type = TD('pfunc')
         else:
             self.type = TD('bool')
 
@@ -302,6 +311,7 @@ class Grammar:
         self.pragmas: list[Node] = []
         self.starting_rule: str = ''
         self.tokens: set[str] = set()
+        self.subtokens: set[str] = set()
         self.whitespace: Optional[Node] = None
         self.assoc: dict[str, str] = {}
         self.prec: dict[str, int] = {}
@@ -320,7 +330,7 @@ class Grammar:
             'error',
             'fail',
             'offsets',
-            'rewind',
+            'restore',
             'succeed',
         ]
         self.unicodedata_needed: bool = False
@@ -330,6 +340,7 @@ class Grammar:
         self.leftrec_rules: set[str] = set()
         self.outer_scope_rules: set[str] = set()
         self.externs: dict[str, bool] = {}
+        self.tokenize: bool = False
 
         has_starting_rule = False
         for rule in self.ast.ch:
@@ -342,10 +353,13 @@ class Grammar:
 
     def node(self, cls, *args, **kwargs) -> Node:
         n = cls(*args, **kwargs)
-        return self.update_node(n)
+        return self.update_node(n, True)
 
-    def update_node(self, node: Node) -> Node:
+    def update_node(self, node: Node, typecheck: bool) -> Node:
         self._set_can_fail(node)
+        if not typecheck:
+            return node
+
         node.infer_types(self, var_types={})
 
         def _patch_types(node):
@@ -413,7 +427,7 @@ class Grammar:
         if node.t in ('choice', 'rules'):
             r = all(self._can_fail(n, inline) for n in node.ch)
             return r
-        if node.t == 'scope':
+        if node.t in ('rule_wrapper', 'scope'):
             # TODO: is this right?
             # return self._can_fail(node.ch[0], False)
             return self._can_fail(node.ch[0], inline)

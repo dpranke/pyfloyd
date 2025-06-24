@@ -34,8 +34,11 @@ class _OperatorState:
 
 
 class Interpreter:
-    def __init__(self, grammar: m_grammar.Grammar, memoize: bool):
+    def __init__(
+        self, grammar: m_grammar.Grammar, memoize: bool, tokenize: bool
+    ):
         self._memoize = memoize
+        self._tokenize = tokenize
         self._grammar = grammar
 
         self._text = ''
@@ -54,6 +57,9 @@ class Interpreter:
         self._regexps: dict[str, re.Pattern] = {}
         self._externs: dict[str, Any] = grammar.externs
         self._functions = functions.ALL
+        self._nodes: list[tuple[int, str]] = []
+        self._tokens: list[tuple[int, str]] = []
+        self._in_token = False
 
     def parse(
         self, text: str, path: str = '<string>', externs=None
@@ -115,6 +121,7 @@ class Interpreter:
             self._succeed(self._text[pos : self._pos])
         else:
             self._fail()
+        self._tok(pos, False)
 
     def _succeed(self, val=None, newpos=None):
         self._val = val
@@ -125,6 +132,20 @@ class Interpreter:
 
     def _rewind(self, newpos):
         self._succeed(None, newpos)
+        while self._tokens and self._tokens[-1][0] > newpos:
+            self._tokens.pop()
+
+    def _tok(self, pos, in_token):
+        if not self._tokenize or (not in_token and self._in_token):
+            return
+        if not self._failed and self._pos > pos:
+            val = (pos, self._text[pos : self._pos])
+            if self._tokens and self._tokens[-1][0] == pos:
+                assert self._tokens[-1] == val
+            else:
+                self._tokens.append(val)
+        if in_token:
+            self._in_token = False
 
     def _format_error(self):
         lineno = 1
@@ -237,7 +258,11 @@ class Interpreter:
             self._interpret(subnode)
             vals.append(self._val)
         if node.ch[0].t == 'e_ident' and node.ch[0].v in self._externs:
-            self._val = left(self, *vals)
+            if self._grammar.externs[node.ch[0].v] == 'func':
+                self._val = left(*vals)
+            else:
+                assert self._grammar.externs[node.ch[0].v] == 'pfunc'
+                self._val = left(self, *vals)
         else:
             self._val = left(*vals)
 
@@ -524,6 +549,18 @@ class Interpreter:
             return
         self._fail()
 
+    def _ty_rule_wrapper(self, node):
+        rule_name = node.v
+        self._nodes.append((self._pos, rule_name))
+        if rule_name in self._grammar.tokens():
+            pos = self._pos
+            self._in_token = True
+        self._interpret(node.child)
+        if rule_name in self._grammar.tokens():
+            self._tokens.append((pos, self._text[pos : self._pos]))
+            self._in_token = False
+        self._nodes.pop()
+
     def _ty_run(self, node):
         start = self._pos
         self._interpret(node.child)
@@ -579,4 +616,7 @@ class Interpreter:
 
     def _fn_node(self, parser, *args) -> Any:
         del parser
-        return list(args)
+        return args[0]
+
+    def _fn_pos(self) -> int:
+        return self._pos
