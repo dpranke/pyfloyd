@@ -1135,6 +1135,10 @@ _BUILTINS = {
         def _fn_otou(self, s):
             return chr(int(s, base=8))
         """,
+    'fn_pos': """
+        def _fn_pos(self):
+            return self._pos
+        """,
     'fn_scat': """
         def _fn_scat(self, hd, tl):
             return self._fn_cat(self._fn_cons(hd, tl))

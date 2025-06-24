@@ -617,3 +617,6 @@ class Interpreter:
     def _fn_node(self, parser, *args) -> Any:
         del parser
         return args[0]
+
+    def _fn_pos(self) -> int:
+        return self._pos

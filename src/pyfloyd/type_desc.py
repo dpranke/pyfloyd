@@ -50,8 +50,7 @@ class TypeDesc(custom_dicts.FixedDict):
             return
         if base in BASIC_TYPES:
             assert len(elements) == 0
-        else:
-            assert base in COMPOUND_TYPES
+        elif base in COMPOUND_TYPES:
             if base == 'list':
                 if len(elements) != 1:
                     raise ValueError(
@@ -66,6 +65,10 @@ class TypeDesc(custom_dicts.FixedDict):
                     )
             for el in elements:
                 assert isinstance(el, TypeDesc)
+        else:
+            # Custom type; ignore it.
+            # TODO: is this the right thing to do?
+            pass
 
     def __repr__(self):
         return "TypeDesc('" + self.to_str() + "')"

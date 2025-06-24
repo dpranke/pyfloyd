@@ -31,15 +31,15 @@ inherit: ['base']
 declare_local_vars = true
 
 local_var_map = {
-    choice: ['pos int']
+    choice: ['state parserState']
     count: ['cmin int' 'cmax int' 'i int' 'vs list[any]']
-    not: ['errpos int' 'pos int']
-    not_one: ['errpos int' 'pos int']
-    opt: ['pos int']
-    plus: ['pos int' 'vs list[any]']
+    not: ['state parserState' 'errpos int']
+    not_one: ['state parserState' 'errpos int']
+    opt: ['state parserState']
+    plus: ['state parserState' 'vs list[any]']
     pred: ['v any']
     run: ['end int' 'start int']
-    star: ['pos int' 'vs list[any]']
+    star: ['state parserState' 'vs list[any]']
 }
 
 
@@ -65,10 +65,13 @@ fn_sig: [fn [params ret] [hl 'func('
 # Returns a field or method on the generated parse object.
 fld: [fn [name] [strcat 'p.' name]]
 
+f_state: [fld 'state']
 f_pos: [fld 'pos']
 f_errpos: [fld 'errpos']
 f_val: [fld 'val']
 failed: [fld 'failed']
+
+save: [fn [var] [hl var ' = p.parserState' t_end]]
 
 extern: [fn [name] [strcat "p.externs[" [lit name] "]"]]
 
@@ -245,6 +248,22 @@ imports: @"""
     )
     """
 
+result_class: """
+    type Result struct {
+        val any
+        err error
+        pos int
+    }
+    """
+
+state_class: @"""
+    type parserState struct {
+        pos int
+        failed bool
+        val any
+    }
+    """
+
 parsing_runtime_exception_class: """
     """
 
@@ -256,20 +275,6 @@ operator_state_class: """
         precs []int
         rassoc map[string]bool
         choices map[string](func ()())
-    }
-    """
-
-result_class: """
-    type cacheEntry struct {
-        val any
-        failed bool
-        pos int
-    }
-
-    type Result struct {
-        val any
-        err error
-        pos int
     }
     """
 
@@ -300,17 +305,19 @@ parser_class: @"""
     type Parser struct {
         text []rune
         path string
-        val any
-        failed bool
-        pos  int
+        parserState
         end  int
         errpos int
         externs map[string]any
-        @if[generator_options.memoize 'cache map[int]map[string]cacheEntry']
-        @if[grammar.seeds_needed 'seeds map[int]map[string]cacheEntry']
+        @if[generator_options.memoize 'cache map[int]map[string]parserState']
+        @if[grammar.seeds_needed 'seeds map[int]map[string]parserState']
         @if[grammar.leftrec_needed 'blocked map[string]bool']
         @if[grammar.lookup_needed 'scopes []map[string]any']
         @if[grammar.operator_needed 'operators map[string]*operatorState']
+    }
+
+    func (p *Parser) Pos() int {
+        return p.pos
     }
 
     @parser_methods[]
@@ -330,9 +337,9 @@ parser_constructor: @"""
         p.end = len(p.text)
         @externs[]
         @if[generator_options.memoize
-            'p.cache = make(map[int]map[string]cacheEntry)']
+            'p.cache = make(map[int]map[string]parserState)']
         @if[grammar.seeds_needed
-            'p.seeds = make(map[int]map[string]cacheEntry)']
+            'p.seeds = make(map[int]map[string]parserState)']
         @if[grammar.leftrec_needed
             'p.blocked = make(map[string]bool)']
         @if[grammar.operator_needed
@@ -342,7 +349,6 @@ parser_constructor: @"""
     }
 
     """
-
 
 externs: [fn []
              [vl [hl 'p.externs = make(map[string]any)']
@@ -671,11 +677,11 @@ o_fail: [meth q[]
 o_leftrec: [meth q['rule any' 'rule_name string' 'left_assoc bool']
                  """
                  pos := p.pos
-                 var entry cacheEntry
+                 var entry parserState
                  var ok bool
 
                  if _, ok = p.seeds[pos]; !ok {
-                    p.seeds[pos] = make(map[string]cacheEntry)
+                    p.seeds[pos] = make(map[string]parserState)
                  }
                  c := p.seeds[pos]
                  if entry, ok = c[rule_name]; ok {
@@ -689,7 +695,7 @@ o_leftrec: [meth q['rule any' 'rule_name string' 'left_assoc bool']
                      p.failed = true
                      return
                  }
-                 entry = cacheEntry{nil, true, p.pos}
+                 entry = parserState{pos: p.pos, failed: true}
                  p.seeds[pos][rule_name] = entry
                  if left_assoc {
                      p.blocked[rule_name] = true
@@ -698,14 +704,12 @@ o_leftrec: [meth q['rule any' 'rule_name string' 'left_assoc bool']
                      f := rule.(func ()())
                      f()
                      if p.pos > entry.pos {
-                         entry = cacheEntry{p.val, p.failed, p.pos}
+                         entry = p.parserState
                          c[rule_name] = entry
                          p.pos = pos
                      } else {
                          delete(c, rule_name)
-                         p.val = entry.val
-                         p.failed = entry.failed
-                         p.pos = entry.pos
+                         p.o_restore(entry)
                          if left_assoc {
                              delete(p.blocked, rule_name)
                          }
@@ -736,78 +740,71 @@ o_memoize: [meth q['rule_name string' 'fn any']
                  """
                  pos := p.pos
                  if _, ok := p.cache[pos]; !ok {
-                    p.cache[pos] = make(map[string]cacheEntry)
+                    p.cache[pos] = make(map[string]parserState)
                  }
                  c := p.cache[pos]
                  if _, ok := c[rule_name]; ok {
-                   r := c[rule_name]
-                   p.val = r.val
-                   p.failed = r.failed
-                   p.pos = r.pos
+                   p.parserState = c[rule_name]
                    return
                  }
                  f := fn.(func ()())
                  f()
-                 c[rule_name] = cacheEntry{p.val, p.failed, p.pos}
+                 c[rule_name] = p.parserState
                  """]
 
-o_operator: [meth q['rule_name string']
-                  """
-                  var entry cacheEntry
-                  var cache map[string]cacheEntry
-                  var ok bool
+o_operator: [meth q['rule_name string'] """
+        var entry parserState
+        var cache map[string]parserState
+        var ok bool
 
-                  o := p.operators[rule_name]
-                  pos := p.pos
-                  if _, ok = p.seeds[pos]; !ok {
-                      p.seeds[pos] = make(map[string]cacheEntry)
-                  }
-                  cache = p.seeds[pos]
-                  if entry, ok = cache[rule_name]; ok {
-                      p.val = entry.val
-                      p.failed = entry.failed
-                      p.pos = entry.pos
-                      return
-                  }
-                  o.currentDepth += 1
-                  entry = cacheEntry{nil, true, p.pos}
-                  cache[rule_name] = entry
-                  minPrec := o.currentPrec
-                  for i := 0; i < len(o.precs) ; {
-                      repeat := false
-                      prec := o.precs[i]
-                      precOps := o.precOps[prec]
-                      if prec < minPrec {
-                          break
-                      }
-                      o.currentPrec = prec
-                      if _, ok = o.rassoc[precOps[0]]; !ok {
-                          o.currentPrec += 1
-                      }
-                      for j := 0; j < len(precOps) ; j += 1 {
-                          op := precOps[j]
-                          o.choices[op]()
-                          if !p.failed && p.pos > pos {
-                              entry = cacheEntry{p.val, p.failed, p.pos}
-                              cache[rule_name] = entry
-                              repeat = true
-                              break
-                          }
-                          p.o_rewind(pos)
-                      }
-                      if !repeat {
-                          i += 1
-                      }
-                  }
-                  delete(cache, rule_name)
-                  o.currentDepth -= 1
-                  if o.currentDepth == 0 {
-                    o.currentPrec = 0
-                  }
-                  p.val = entry.val
-                  p.failed = entry.failed
-                  p.pos = entry.pos
-                  """]  # o_operator
+        o := p.operators[rule_name]
+        initialState := p.parserState
+        pos := initialState.pos
+        if _, ok = p.seeds[pos]; !ok {
+            p.seeds[pos] = make(map[string]parserState)
+        }
+        cache = p.seeds[pos]
+        if entry, ok = cache[rule_name]; ok {
+            p.parserState = entry  // p.o_restore(entry)
+            return
+        }
+        o.currentDepth += 1
+        entry = parserState{pos: pos, failed: true}
+        cache[rule_name] = entry
+        minPrec := o.currentPrec
+        for i := 0; i < len(o.precs) ; {
+            repeat := false
+            prec := o.precs[i]
+            precOps := o.precOps[prec]
+            if prec < minPrec {
+                break
+            }
+            o.currentPrec = prec
+            if _, ok = o.rassoc[precOps[0]]; !ok {
+                o.currentPrec += 1
+            }
+            for j := 0; j < len(precOps) ; j += 1 {
+                op := precOps[j]
+                o.choices[op]()
+                if !p.failed && p.pos > pos {
+                    entry = p.parserState
+                    cache[rule_name] = entry
+                    repeat = true
+                    break
+                }
+                p.parserState = initialState  // p.o_restore(entry)
+            }
+            if !repeat {
+                i += 1
+            }
+        }
+        delete(cache, rule_name)
+        o.currentDepth -= 1
+        if o.currentDepth == 0 {
+          o.currentPrec = 0
+        }
+        p.parserState = entry  // p.o_restore(initialState)
+        """]  # o_operator
 
 o_range: [meth q['i string' 'j string']
                """
@@ -824,7 +821,7 @@ o_range: [meth q['i string' 'j string']
                }
                """]
 
-o_rewind: [meth q['newpos int'] 'p.o_succeed(nil, newpos)']
+o_restore: [meth q['state parserState'] 'p.parserState = state']
 
 o_str: [meth q['s string']
              """
@@ -1038,6 +1035,13 @@ fn_node: [def_method _t_name
                      """
                      return args[0]
                      """]
+
+fn_pos: [def_method _t_name
+                    q[]
+                    ' int'
+                    """
+                    return p.Pos()
+                    """]
 
 fn_scat: [def_method _t_name
                      q['hd any' 'tl any']
