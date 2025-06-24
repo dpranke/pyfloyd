@@ -39,10 +39,13 @@ block: [fn [head body] [vl [hl head ' {'] [ind body] '}']]
 # Returns a field or method on the generated parse object.
 fld: [fn [name] [strcat 'this.' name]]
 
-f_pos: [fld 'pos']
+f_state: [fld 'state']
 f_errpos: [fld 'errpos']
-f_val: [fld 'val']
-failed: [fld 'failed']
+f_pos: [strcat f_state '.pos']
+f_val: [strcat f_state '.val']
+failed: [strcat f_state '.failed']
+
+save: [fn [var] [hl var ' = this.state.copy()' t_end]]
 
 extern: [fn [name] [strcat "this.externs.get(" [lit name] ")"]]
 
@@ -125,10 +128,26 @@ main_header: @"""
     @default_header[]
     """
 
-parsing_runtime_exception_class: """
-    class ParsingRuntimeError extends Error {
-      toString() {
-        return this.message.toString();
+result_class: """
+    class Result {
+      constructor(val, err, pos) {
+        this.val = val;
+        this.err = err;
+        this.pos = pos;
+      }
+    }
+    """
+
+state_class: @"""
+    class State {
+      constructor(pos, failed, val) {
+        this.pos = pos || 0;
+        this.failed = failed || false;
+        this.val = val || null;
+      }
+
+      copy() {
+        return new State(this.pos, this.failed, this.val);
       }
     }
     """
@@ -146,12 +165,10 @@ operator_state_class: """
     }
     """
 
-result_class: """
-    class Result {
-      constructor(val, err, pos) {
-        this.val = val;
-        this.err = err;
-        this.pos = pos;
+parsing_runtime_exception_class: """
+    class ParsingRuntimeError extends Error {
+      toString() {
+        return this.message.toString();
       }
     }
     """
@@ -175,10 +192,8 @@ parser_constructor: @"""
       this.text = text;
       this.end = text.length;
       this.errpos = 0;
-      this.failed = false;
       this.path = path;
-      this.pos = 0;
-      this.val = undefined;
+      this.state = new State();
       @externs[]
       @if[generator_options.memoize 'this.cache = new Map();']
       @if[grammar.seeds_needed 'this.seeds = {};']
@@ -189,8 +204,13 @@ parser_constructor: @"""
              'let o;'
              [map_items operator_state grammar.operators]]]
     }
+
+    pos() {
+      return this.state.pos;
+    }
+
     """  # parser_constructor
-      
+
 externs: [fn [] [if [dict_is_empty grammar.externs]
                     [vl 'this.externs = new Map();']
                     [vl 'this.externs = new Map(['
@@ -262,10 +282,10 @@ parse_with_exception: @"""
       try {
         this.r_@grammar.starting_rule();
 
-        if (this.failed) {
+        if (this.state.failed) {
           return new Result(null, this.o_error(), this.errpos);
         } else {
-          return new Result(this.val, null, this.pos);
+          return new Result(this.state.val, null, this.pos());
         }
       } catch (e) {
         if (e instanceof ParsingRuntimeError) {
@@ -296,10 +316,10 @@ parse_without_exception: @"""
 
       this.r_@grammar.starting_rule();
 
-      if (this.failed) {
+      if (this.state.failed) {
         return new Result(null, this.o_error(), this.errpos);
       } else {
-        return new Result(this.val, null, this.pos);
+        return new Result(this.state.val, null, this.pos());
       }
     }
     """  # parse_without_exception
@@ -401,10 +421,10 @@ main_footer: """
 
 n_regexp: [fn [node]
               [vl [hl "r = new RegExp(" [lit node.v] ", 'gy');"]
-                  'r.lastIndex = this.pos;'
+                  'r.lastIndex = this.pos();'
                   'found = r.exec(this.text);'
                   'if (found) {'
-                  '  this.o_succeed(found[0], this.pos + found[0].length);'
+                  '  this.o_succeed(found[0], this.pos() + found[0].length);'
                   '  return;'
                   '}'
                   'this.o_fail();']]
@@ -413,10 +433,10 @@ n_set: [fn [node]
            [vl [hl "r = new RegExp(" 
                    [lit [strcat '[' node.v  ']' ]]
                    ", 'gy');"]
-               'r.lastIndex = this.pos;'
+               'r.lastIndex = this.pos();'
                'found = r.exec(this.text);'
                'if (found) {'
-               '  this.o_succeed(found[0], this.pos + found[0].length);'
+               '  this.o_succeed(found[0], this.pos() + found[0].length);'
                '  return;'
                '}'
                'this.o_fail();']]
@@ -426,25 +446,27 @@ n_set: [fn [node]
 #
 
 r_any: [meth q[] """
-    if (this.pos < this.end) {
-      this.o_succeed(this.text[this.pos], this.pos + 1);
+    let pos = this.pos();
+    if (pos < this.end) {
+      this.o_succeed(this.text[pos], pos + 1);
     } else {
       this.o_fail();
     }
     """]
 
 r_end: [meth q[] """
-    if (this.pos === this.end) {
-      this.o_succeed(null, this.pos);
+    let pos = this.pos();
+    if (pos === this.end) {
+      this.o_succeed(null, pos);
     } else {
       this.o_fail();
     }
     """]
 
 o_ch: [meth q['c'] """
-    let pos = this.pos;
+    let pos = this.pos();
     if (pos < this.end && this.text[pos] === c) {
-      this.o_succeed(c, this.pos + 1);
+      this.o_succeed(c, pos + 1);
     } else {
       this.o_fail();
     }
@@ -476,38 +498,38 @@ o_error: [meth q[] """
     """]
 
 o_fail: [meth q[] """
-    this.val = undefined;
-    this.failed = true;
-    this.errpos = Math.max(this.errpos, this.pos);
+    this.state.val = undefined;
+    this.state.failed = true;
+    this.errpos = Math.max(this.errpos, this.pos());
     """]
 
 o_leftrec: [meth q['rule' 'rule_name' 'left_assoc'] """
-    let pos = this.pos;
+    let pos = this.pos();
     let key = [rule_name, pos];
     let seed = this.seeds[key];
     if (seed) {
-      [this.val, this.failed, this.pos] = seed;
+      this.state = seed.copy();
       return;
     }
     if (this.blocked.has(rule_name)) {
-      this.val = undefined;
-      this.failed = true;
+      this.state.val = undefined;
+      this.state.failed = true;
       return;
     }
-    let current = [undefined, true, this.pos];
+    let current = new State(this.pos(), true);
     this.seeds[key] = current;
     if (left_assoc) {
       this.blocked.add(rule_name);
     }
     while (true) {
       rule.call(this);
-      if (this.pos > current[2]) {
-        current = [this.val, this.failed, this.pos];
+      if (this.state.pos > current.pos) {
+        current = this.state.copy();
         this.seeds[key] = current;
-        this.pos = pos;
+        this.state.pos = pos;
       } else {
         delete this.seeds[key];
-        [this.val, this.failed, this.pos] = current;
+        this.state = current.copy();
         if (left_assoc) {
           this.blocked.delete(rule_name);
         }
@@ -531,31 +553,32 @@ o_lookup: [meth q['v'] """
     """]
 
 o_memoize: [meth q['rule_name' 'fn'] """
-    let pos = this.pos;
+    let pos = this.pos();
     if (!this.cache.has(pos)) {
       this.cache.set(pos, new Map());
     }
     let c = this.cache.get(pos);
     if (c.has(rule_name)) {
-      [this.val, this.failed, this.pos] = c.get(rule_name);
+      this.state = c.get(rule_name).copy();
       return;
     }
     fn.call(this);
-    c.set(rule_name, [this.val, this.failed, this.pos]);
+    c.set(rule_name, this.state.copy());
    """]
 
 o_operator: [meth q['rule_name'] """
     let o = this.operators[rule_name];
-    let pos = this.pos;
+    let state = this.state.copy();
+    let pos = state.pos;
     let key = [rule_name, pos];
     let seed = this.seeds[key];
     if (seed) {
-      [this.val, this.failed, this.pos] = seed;
+      this.state = seed.copy();
       return;
     }
     o.currentDepth += 1;
-    let current = [null, true, pos];
-    this.seeds[key] = current;
+    let entry = new State(pos, true);
+    this.seeds[key] = entry;
     let minPrec = o.currentPrec;
     let i = 0;
     while (i < o.precs.length) {
@@ -572,13 +595,13 @@ o_operator: [meth q['rule_name'] """
       for (let j = 0; j < precOps.length; j += 1) {
         let op = precOps[j];
         o.choices.get(op).call(this);
-        if (!this.failed && this.pos > pos) {
-          current = [this.val, this.failed, this.pos];
-          this.seeds[key] = current;
+        if (!this.state.failed && this.pos() > pos) {
+          entry = this.state.copy();
+          this.seeds[key] = entry;
           repeat = true;
           break;
         }
-        this.o_rewind(pos);
+        this.o_restore(state);
       }
       if (!repeat) {
         i += 1;
@@ -589,52 +612,55 @@ o_operator: [meth q['rule_name'] """
     if (o.currentDepth === 0) {
       o.currentPrec = 0;
     }
-    [this.val, this.failed, this.pos] = current;
+    this.state = entry.copy();
     """]  # o_operator
 
 o_range: [meth q['i' 'j'] """
-    let pos = this.pos;
+    let pos = this.pos();
     if (pos == this.end) {
       this.o_fail();
       return;
     }
     let c = this.text[pos];
     if (i <= c && c <= j) {
-      this.o_succeed(this.text[pos], this.pos + 1);
+      this.o_succeed(this.text[pos], pos + 1);
     } else {
       this.o_fail();
     }
     """]
 
-o_rewind: [meth q['newpos'] 'this.o_succeed(null, newpos);']
+o_restore: [meth q['state'] """
+    this.state = state.copy();
+    """]
 
 o_str: [meth q['s'] """
    for (let ch of s) {
      this.o_ch(ch);
-     if (this.failed) {
+     if (this.state.failed) {
        return;
      }
    }
-   this.val = s;
+   this.state.val = s;
    """]
 
 o_succeed: [meth q['v' 'newpos'] """
-   this.val = v;
-   this.failed = false;
+   this.state.val = v;
+   this.state.failed = false;
    if (newpos !== null) {
-     this.pos = newpos;
+     this.state.pos = newpos;
    }
    """]
 
 o_unicat: [meth q['cat'] """
-    if (this.pos == this.end) {
+    let pos = this.pos();
+    if (pos == this.end) {
       this.o_fail();
       return
     }
-    let c = this.text[this.pos];
+    let c = this.text[pos];
     let re = new RegExp(`\\\\p{${cat}}`, 'u');
     if (c.match(re)) {
-      this.o_succeed(c, this.pos + 1);
+      this.o_succeed(c, pos + 1);
     } else {
       this.o_fail();
     }
@@ -665,10 +691,11 @@ fn_cat: [meth q['ss'] "return ss.join('');"]
 fn_colno: [
     meth q[] """
           let colno = 0;
-          if (this.pos == this.end) {
+          let pos = this.pos();
+          if (pos == this.end) {
             colno += 1;
           }
-          while (this.pos >= colno && this.text[this.pos - colno] != '\\n') {
+          while (pos >= colno && this.text[pos - colno] != '\\n') {
             colno += 1;
           }
           return colno;
@@ -695,6 +722,8 @@ fn_join: [meth q['s' 'vs'] 'return vs.join(s);']
 fn_list: [meth q['...args'] 'return args;']
 
 fn_node: [meth q['parser' '...args'] 'return args[0];']
+
+fn_pos: [meth q['parser', '...args'] 'return this.state.pos;']
 
 fn_scat: [meth q['ss'] "return ss.join('');"]
 
