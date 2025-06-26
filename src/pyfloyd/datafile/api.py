@@ -331,7 +331,7 @@ class Decoder:
             s = s.decode(encoding)
 
         if not s:
-            raise DatafileError('Empty strings are not legal Floyd datafiles')
+            raise DatafileError('Empty strings are not legal datafiles')
         start = start or 0
         externs = {
             'allow_trailing': self._allow_trailing,
@@ -404,7 +404,9 @@ class Decoder:
         del as_key
         return val
 
-    def parse_string(self, val: Tuple[str, str, int, str], as_key: bool) -> Any:
+    def parse_string(
+        self, val: Tuple[str, str, int, str], as_key: bool
+    ) -> Any:
         del as_key
         tag, quote, colno, text = val
         is_raw_str = 'r' in tag
@@ -436,7 +438,9 @@ class Decoder:
         assert ty == 'numword'
         return self.parse_numword(val, as_key=True)
 
-    def parse_object_pairs(self, tag: str, pairs: list[Tuple[str, Any]]) -> Any:
+    def parse_object_pairs(
+        self, tag: str, pairs: list[Tuple[str, Any]]
+    ) -> Any:
         if tag:
             raise DatafileError(f'Unsupported object tag "{tag}"')
         keys = set()
@@ -526,14 +530,14 @@ def decode_escape(s: str, i: int, end: int, quote: str) -> Tuple[int, str]:
     if c == 'u':
         return decode_numeric_escape(s, i + 2, end, 1, 8, ishex, 16, quote)
     if c == 'N':
-        rbrace = s.find( '}', i + 3)
+        rbrace = s.find('}', i + 3)
         try:
-            ch = unicodedata.lookup(s[i+3: rbrace])
+            ch = unicodedata.lookup(s[i + 3 : rbrace])
             i = rbrace + 1
             return i, ch
         except KeyError as exc:
             raise DatafileError(
-                f'Unrecognized unicode name "{s[i+3: rbrace]}" at offset {i} '
+                f'Unrecognized unicode name "{s[i + 3 : rbrace]}" at offset {i} '
                 f'in string {quote}{s}{quote}'
             ) from exc
 
@@ -548,7 +552,7 @@ def decode_numeric_escape(
     max_num: int,
     fn: Callable[[str], bool],
     base: int,
-    quote: str
+    quote: str,
 ):
     """Decodes a numeric escape sequence in a string.
 
@@ -574,8 +578,7 @@ def decode_numeric_escape(
 
     def _raise(offset):
         raise DatafileError(
-            f'Bad escape sequence in string {quote}{s}{quote} at '
-            f'offset {i}'
+            f'Bad escape sequence in string {quote}{s}{quote} at offset {i}'
         )
 
     i = start
@@ -596,7 +599,7 @@ def isoct(ch: str) -> bool:
     return '0' <= ch <= '7'
 
 
-def dedent(s: str, colno: int = -1, min_indent = -1) -> str:
+def dedent(s: str, colno: int = -1, min_indent=-1) -> str:
     """Returns a dedented version of a string."""
     return functions.f_dedent(s, colno, min_indent)
 
@@ -788,7 +791,7 @@ class Encoder:
 
     def _encode_float(self, obj: float, *, as_key: bool) -> str:
         if obj == float('inf') or obj == float('-inf') or math.isnan(obj):
-            raise DatafileError('Illegal datafile value: f{obj}')
+            raise DatafileError(f'Illegal datafile value: `{obj}`')
         return f'"{repr(obj)}"' if as_key else repr(obj)
 
     def _encode_str(self, obj: str, *, as_key: bool) -> str:
@@ -821,7 +824,6 @@ class Encoder:
             s = self._encode_array(obj, seen, level + 1, oneline=True)
             if len(s) > max_len and ('\n' not in s):
                 s = self._encode_array(obj, seen, level + 1, oneline=False)
-
         else:
             s = self.encode(self.default(obj), seen, level + 1, as_key=False)
             assert s is not None
@@ -939,10 +941,10 @@ def encode_string(
 
 
 def encode_quoted_string(
-        s: str,
-        ensure_ascii: bool = True,
-        escape_newlines: bool = False,
-        quote: Optional[str]=None
+    s: str,
+    ensure_ascii: bool = True,
+    escape_newlines: bool = False,
+    quote: Optional[str] = None,
 ) -> str:
     """Returns a safely escaped, quoted version of the string.
 
@@ -1019,7 +1021,6 @@ def find_quote_for(s: str) -> str:
             quote = "L'" + '=' * i + "'"
             break
     return quote
-
 
 
 def escape_char(ch: str) -> str:

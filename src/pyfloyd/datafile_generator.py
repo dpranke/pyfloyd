@@ -181,7 +181,7 @@ class DatafileGenerator(generator.Generator):
     def _to_quoted_list(self, ty, tag, vals, as_key=False):
         assert ty == 'array' and tag == 'q' and not as_key, (
             f'Uexpected tag fn invocation: '
-            f'ty="{ty}" tag="{tag}" val={repr(val)}, as_key={as_key}'
+            f'ty="{ty}" tag="{tag}" vals={repr(vals)}, as_key={as_key}'
         )
         return [['symbol', 'quote'], vals]
 

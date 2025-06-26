@@ -17,7 +17,7 @@ import unittest
 from pyfloyd import datafile
 
 
-class Grammar(unittest.TestCase):
+class Tests(unittest.TestCase):
     def check(self, s, obj, **kwargs):
         self.assertEqual(obj, datafile.loads(s, **kwargs))
 
@@ -54,6 +54,14 @@ class Grammar(unittest.TestCase):
         self.check('[1, 2,]', [1, 2])
 
     def test_numword(self):
+        # Test that numwords are not allowed by default.
+        with self.assertRaises(datafile.DatafileError) as cm:
+            datafile.loads('4foo')
+        self.assertEqual(
+            str(cm.exception), '<string>:1 Unexpected "f" at column 2'
+        )
+
+        # Test that they do work if you enable them.
         self.check('123foo', '123foo', allow_numwords=True)
 
     def test_object(self):
