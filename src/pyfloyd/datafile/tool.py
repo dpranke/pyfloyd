@@ -49,8 +49,8 @@ def main(argv=None, host=None):
         host.print(version.__version__)
         return 0
 
-    if args.cmd:
-        inp = args.cmd
+    if args.code:
+        inp = args.code
     elif args.file == '-':
         inp = host.stdin.read()
     else:
@@ -90,8 +90,7 @@ class _HostedArgumentParser(argparse.ArgumentParser):
         sys.exit(status)
 
     def error(self, message):
-        self.host.print(f'usage: {self.usage}', end='', file=self.host.stderr)
-        self.host.print('    -h/--help for help\n', file=self.host.stderr)
+        self.print_usage(self.host.stderr)
         self.exit(2, f'error: {message}\n')
 
     def print_help(self, file=None):
@@ -99,12 +98,9 @@ class _HostedArgumentParser(argparse.ArgumentParser):
 
 
 def _parse_args(host, argv):
-    usage = 'fdf [options] [FILE]\n'
-
     parser = _HostedArgumentParser(
         host,
-        prog='fdf',
-        usage=usage,
+        prog='fld',
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -116,8 +112,9 @@ def _parse_args(host, argv):
     )
     parser.add_argument(
         '-c',
+        '--code',
         metavar='STR',
-        dest='cmd',
+        dest='code',
         help='inline string to read instead of reading from a file',
     )
     parser.add_argument(

@@ -53,6 +53,8 @@
 grammar      = member+ %filler trailing               -> ['object', '', $1]
              | value %filler trailing                 -> $1
 
+nofiller     = ~(%whitespace | %comment)
+
 trailing     = ?{!allow_trailing} end
              | ?{allow_trailing}
 
@@ -64,16 +66,16 @@ value        = string                                 -> ['string', $1, []]
              | 'true'                                 -> ['true', true, []]
              | 'false'                                -> ['false', false, []]
              | 'null'                                 -> ['null', null, []]
-             | ?{allow_numwords} numword
+             | ?{allow_numwords} numword              -> ['numword', $2, []]
              | number                                 -> ['number', $1, []]
              | bareword                               -> ['bareword', $1, []]
 
-string       = string_tag:q ={q}
-// string       = string_tag
-//                ~%filler
-//                quote:q
-//                (-> colno())
-//                ^.(={lq})                              -> [$1, $3, $4, $5]
+string       = string_tag
+               nofiller
+               quote:q
+               (-> colno())
+               <(('\\' any) | ~(={q}) any)*>
+               ={q}                                   -> [$1, q, $4, $5]
 
 // Only the 'r' and 'i' tags and their combinations are guaranteed to be
 // supported in every environment, as they can be directly represented in
@@ -134,7 +136,7 @@ escape       = [\\abfnrtv'"`]
 unicode_name = /[A-Z][A-Z0-9]*([ -][A-Z][A-Z0-9]*)*/
 
 array        = array_tag
-               ~%filler
+               nofiller
                '['
                value?
                (','? value)*
@@ -142,7 +144,7 @@ array        = array_tag
                ']'
                -> ['array', $1, concat($4, $5)]
              | array_tag
-               ~%filler
+               nofiller
                '('
                value?
                (','? value)*
@@ -163,7 +165,7 @@ array_tag    = 's'    // string list
              | <tag?>
 
 object       = object_tag
-               ~%filler
+               nofiller
                '{'
                member?
                (','? member)*

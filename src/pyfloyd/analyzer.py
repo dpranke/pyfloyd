@@ -377,7 +377,6 @@ class _Analyzer:
             elif var_name in self.grammar.externs:
                 node.attrs.kind = 'extern'
             else:
-                import pdb; pdb.set_trace()
                 self.add_error(
                     node, f'Unknown identifier "{var_name}" referenced'
                 )

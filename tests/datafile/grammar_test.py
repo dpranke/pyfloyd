@@ -19,7 +19,7 @@ from pyfloyd import datafile
 
 class Grammar(unittest.TestCase):
     def check(self, s, obj, **kwargs):
-        self.assertEqual(datafile.loads(s, **kwargs), obj)
+        self.assertEqual(obj, datafile.loads(s, **kwargs))
 
     def test_true(self):
         self.check('true', True)
@@ -104,14 +104,14 @@ class Grammar(unittest.TestCase):
         self.check('"\\\'\\"\\`"', '\'"`')
 
     def test_str_oct_escapes(self):
-        self.check(r'\0', chr(0))
-        self.check(r'\00', chr(0))
-        self.check(r'\000', chr(0))
-        self.check(r'\0000', chr(0) + '0')
-        self.check(r'\12', chr(10))
+        self.check(r"'\0'", chr(0))
+        self.check(r"'\00'", chr(0))
+        self.check(r"'\000'", chr(0))
+        self.check(r"'\0000'", chr(0) + '0')
+        self.check(r"'\12'", chr(10))
 
     def test_string_list(self):
-        self.check('("foo" bar)', 'foobar')
+        self.check('s["foo" bar]', 'foobar')
 
     def test_long_str(self):
         self.check("L'='foo'='", 'foo')

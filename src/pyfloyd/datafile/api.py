@@ -348,7 +348,7 @@ class Decoder:
         ty, val, ch = el
         if ty in ('true', 'false', 'null'):
             return val
-        elif ty == 'number':
+        if ty == 'number':
             return self.parse_number(val)
         if ty == 'numword':
             return self.parse_numword(val, as_key=False)
@@ -362,7 +362,7 @@ class Decoder:
         if ty == 'object':
             tag = val
             pairs = []
-            for key_ast, value_obj in val:
+            for key_ast, value_obj in ch:
                 key = self.parse_key(key_ast)
                 v = self._walk_ast(value_obj)
                 pairs.append((key, v))
@@ -370,7 +370,7 @@ class Decoder:
                 return self._custom_tags[tag](ty, tag, pairs)
             return self.parse_object_pairs(tag, pairs)
         if ty == 'array':
-            tag = v
+            tag = val
             vals = [self._walk_ast(c) for c in ch]
             if tag in self._custom_tags:
                 return self._custom_tags[tag](ty, tag, vals)
@@ -416,10 +416,12 @@ class Decoder:
             s = text
         else:
             s = decode_string(text, quote)
-        if '\n ' in text and not is_indented_str:
+        if '\n' in text:
             # Note: text, not s. We want to see if the original string had
-            # newlines and indented text.
-            return dedent(s, colno=colno)
+            # newlines.
+            return dedent(
+                s, colno=colno, min_indent=1 if is_indented_str else -1
+            )
         return s
 
     def parse_key(self, key_ast: Any) -> str:
@@ -529,11 +531,11 @@ def decode_escape(s: str, i: int, end: int, quote: str) -> Tuple[int, str]:
             ch = unicodedata.lookup(s[i+3: rbrace])
             i = rbrace + 1
             return i, ch
-        except KeyError:
+        except KeyError as exc:
             raise DatafileError(
                 f'Unrecognized unicode name "{s[i+3: rbrace]}" at offset {i} '
                 f'in string {quote}{s}{quote}'
-            )
+            ) from exc
 
     return decode_numeric_escape(s, i + 1, end, 1, 3, isoct, 8, quote)
 
@@ -544,7 +546,7 @@ def decode_numeric_escape(
     end: int,
     min_num: int,
     max_num: int,
-    fn: Callable[[str], bool], 
+    fn: Callable[[str], bool],
     base: int,
     quote: str
 ):
@@ -577,13 +579,13 @@ def decode_numeric_escape(
         )
 
     i = start
-    while i < min(end, max_num):
+    while i < min(end, start + max_num):
         if not fn(s[i]):
             _raise(i)
         i += 1
     if i - start < min_num:
         _raise(i)
-    return chr(int(s[start:i], base))
+    return i, chr(int(s[start:i], base))
 
 
 def ishex(ch: str) -> bool:
@@ -594,10 +596,9 @@ def isoct(ch: str) -> bool:
     return '0' <= ch <= '7'
 
 
-def dedent(s: str, colno: int = -1) -> str:
+def dedent(s: str, colno: int = -1, min_indent = -1) -> str:
     """Returns a dedented version of a string."""
-    # TODO: Do we still need min_indent?
-    return functions.f_dedent(s, colno, min_indent=-1)
+    return functions.f_dedent(s, colno, min_indent)
 
 
 def dump(
@@ -948,7 +949,7 @@ def encode_quoted_string(
     The returned value will have a minimal number of escaped quotes.
     """
 
-    if quote == None:
+    if quote is None:
         quote = find_quote_for(s)
 
     i = 0
