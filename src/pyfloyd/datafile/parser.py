@@ -443,21 +443,7 @@ class _Parser:
         if not self._failed:
             return
         self._o_rewind(p)
-        self._s_string_tag_1()
-
-    def _s_string_tag_1(self):
-        start = self._pos
-        self._s_string_tag_2()
-        end = self._pos
-        self._val = self._text[start:end]
-
-    def _s_string_tag_2(self):
-        p = self._pos
         self._o_memoize('r_tag', self._r_tag)
-        if self._failed:
-            self._o_succeed([], p)
-        else:
-            self._o_succeed([self._val])
 
     def _r_tag(self):
         p = self._pos
@@ -465,7 +451,11 @@ class _Parser:
         if not self._failed:
             return
         self._o_rewind(p)
-        self._o_succeed(None)
+        self._s_tag_1()
+
+    def _s_tag_1(self):
+        self._o_memoize('r__filler', self._r__filler)
+        self._o_succeed('')
 
     def _r_quote(self):
         p = self._pos
@@ -1331,7 +1321,7 @@ class _Parser:
         if not self._failed:
             return
         self._o_rewind(p)
-        self._s_array_tag_7()
+        self._o_memoize('r_tag', self._r_tag)
 
     def _s_array_tag_1(self):
         self._o_memoize('r__filler', self._r__filler)
@@ -1356,20 +1346,6 @@ class _Parser:
     def _s_array_tag_6(self):
         self._o_memoize('r__filler', self._r__filler)
         self._o_str('us')
-
-    def _s_array_tag_7(self):
-        start = self._pos
-        self._s_array_tag_8()
-        end = self._pos
-        self._val = self._text[start:end]
-
-    def _s_array_tag_8(self):
-        p = self._pos
-        self._o_memoize('r_tag', self._r_tag)
-        if self._failed:
-            self._o_succeed([], p)
-        else:
-            self._o_succeed([self._val])
 
     def _r_object(self):
         self._o_memoize('r_object_tag', self._r_object_tag)
@@ -1440,23 +1416,7 @@ class _Parser:
         self._o_ch(',')
 
     def _r_object_tag(self):
-        self._s_object_tag_1()
-        v__1 = self._val
-        self._o_succeed(v__1)
-
-    def _s_object_tag_1(self):
-        start = self._pos
-        self._s_object_tag_2()
-        end = self._pos
-        self._val = self._text[start:end]
-
-    def _s_object_tag_2(self):
-        p = self._pos
         self._o_memoize('r_tag', self._r_tag)
-        if self._failed:
-            self._o_succeed([], p)
-        else:
-            self._o_succeed([self._val])
 
     def _r_member(self):
         self._o_memoize('r_key', self._r_key)

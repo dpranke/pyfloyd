@@ -81,10 +81,10 @@ string       = string_tag
 // supported in every environment, as they can be directly represented in
 // JSON. 'x' and 'b64' are reserved and may be supported in some environments.
 string_tag   = 'r' | 'i' | 'ri' | 'ir'
-             | 'x' | 'b64' | <tag?>
+             | 'x' | 'b64' | tag
 
 tag          = bareword
-             |
+             | %filler                                -> ''
 
 quote        = "'''" | "'" | '"""'
              | '"' | '```' | '`'
@@ -162,7 +162,7 @@ array_tag    = 's'    // string list
              | 'qq'   // quasiquote
              | 'uq'   // unquote
              | 'us'   // unquote-splice
-             | <tag?>
+             | tag
 
 object       = object_tag
                nofiller
@@ -173,7 +173,7 @@ object       = object_tag
                '}'
                -> ['object', $1, concat($4, $5)]
 
-object_tag   = <tag?>                                 -> $1
+object_tag   = tag
 
 member       = key (':'|'=') value                    -> [$1, $3]
 

@@ -349,15 +349,15 @@ class Decoder:
         if ty in ('true', 'false', 'null'):
             return val
         if ty == 'number':
-            return self.parse_number(val)
+            return self._parse_number(val)
         if ty == 'numword':
-            return self.parse_numword(val, as_key=False)
+            return self._parse_numword(val, as_key=False)
         if ty == 'bareword':
-            return self.parse_bareword(val, as_key=False)
+            return self._parse_bareword(val, as_key=False)
         if ty == 'string':
             tag = val[0]
             if tag in self._custom_tags:
-                return self._custom_tags[tag](ty, val, as_key=False)
+                return self._custom_tags[tag](ty, tag, val, as_key=False)
             return self.parse_string(val, as_key=False)
         if ty == 'object':
             tag = val
@@ -381,7 +381,7 @@ class Decoder:
         if tag == 's':
             return ''.join(vals)
         if tag:
-            raise DatafileError(f'Unsupported array tag {tag}')
+            raise DatafileError(f'Unsupported array tag "{tag}"')
         return vals
 
     def parse_number(self, val: str) -> Any:
@@ -410,7 +410,7 @@ class Decoder:
         is_raw_str = 'r' in tag
         is_indented_str = 'i' in tag
         if tag and tag not in ('i', 'r', 'ir', 'ri'):
-            raise DatafileError(f'Unsupported string tag `{tag}`')
+            raise DatafileError(f'Unsupported string tag "{tag}"')
 
         if is_raw_str:
             s = text
@@ -429,7 +429,7 @@ class Decoder:
         tag = val[0]
         if ty == 'string':
             if tag in self._custom_tags:
-                return self._custom_tags[tag](ty, val, as_key=True)
+                return self._custom_tags[tag](ty, tag, val, as_key=True)
             return self.parse_string(val, as_key=True)
         if ty == 'bareword':
             return self.parse_bareword(val, as_key=True)
@@ -438,7 +438,7 @@ class Decoder:
 
     def parse_object_pairs(self, tag: str, pairs: list[Tuple[str, Any]]) -> Any:
         if tag:
-            raise DatafileError(f'Unsupported object tag {tag}')
+            raise DatafileError(f'Unsupported object tag "{tag}"')
         keys = set()
         key_pairs = []
         for key, val in pairs:

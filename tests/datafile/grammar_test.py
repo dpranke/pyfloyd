@@ -45,6 +45,7 @@ class Grammar(unittest.TestCase):
 
     def test_array(self):
         self.check('[]', [])
+        self.check('  []', [])
         self.check('[1]', [1])
         self.check('[foo]', ['foo'])
         self.check('["foo"]', ['foo'])
@@ -57,6 +58,7 @@ class Grammar(unittest.TestCase):
 
     def test_object(self):
         self.check('{}', {})
+        self.check('  {}', {})
         self.check('{foo: bar}', {'foo': 'bar'})
         self.check('{foo: "bar"}', {'foo': 'bar'})
         self.check("{foo: 'bar'}", {'foo': 'bar'})

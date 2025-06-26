@@ -168,20 +168,22 @@ class DatafileGenerator(generator.Generator):
             return s
         return ['symbol', s]
 
-    def _to_at_exp(self, ty, tag, obj, as_key=False):
-        assert ty == 'string' and tag == '@' and not as_key, (
+    def _to_at_exp(self, ty, tag, val, as_key=False):
+        assert ty == 'string' and tag == '@'
+        assert tag == '@' and not as_key, (
             f'Uexpected tag fn invocation: '
-            f'ty={ty} tag={tag} obj={repr(obj)}, as_key={as_key}'
+            f'ty="{ty}" tag="{tag}" val={repr(val)}, as_key={as_key}'
         )
-        s = datafile.dedent(obj[2], colno=obj[1])
+        _, _, colno, text = val
+        s = datafile.dedent(text, colno=colno)
         return [['symbol', 'fn'], [], [['symbol', 'at_exp'], s]]
 
-    def _to_quoted_list(self, ty, tag, obj, as_key=False):
+    def _to_quoted_list(self, ty, tag, vals, as_key=False):
         assert ty == 'array' and tag == 'q' and not as_key, (
             f'Uexpected tag fn invocation: '
-            f'ty={ty} tag={tag} obj={repr(obj)}, as_key={as_key}'
+            f'ty="{ty}" tag="{tag}" val={repr(val)}, as_key={as_key}'
         )
-        return [['symbol', 'quote'], obj]
+        return [['symbol', 'quote'], vals]
 
     def _process_templates(self):
         data = self.data
