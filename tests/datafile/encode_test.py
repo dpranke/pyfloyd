@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import io
 import unittest
 
 from pyfloyd import datafile
@@ -20,6 +21,11 @@ from pyfloyd import datafile
 class T(unittest.TestCase):
     def check(self, s, obj, **kwargs):
         self.assertEqual(obj, datafile.dumps(s, **kwargs))
+
+    def test_dump(self):
+        fp = io.StringIO()
+        datafile.dump(True, fp)
+        self.assertEqual('true', fp.getvalue())
 
     def test_true(self):
         self.check(True, 'true')

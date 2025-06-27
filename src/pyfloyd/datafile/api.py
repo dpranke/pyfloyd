@@ -496,11 +496,6 @@ def decode_escape(s: str, i: int, end: int, quote: str) -> Tuple[int, str]:
     a unicode name isn't recognized).
     """
 
-    if i + 1 >= end:
-        raise DatafileError(
-            f'Bad escape sequence at end of string {quote}{s}{quote}'
-        )
-
     c = s[i + 1]
     # Check escape sequences in (rough) order of likelihood.
     if c == 'n':
@@ -537,8 +532,8 @@ def decode_escape(s: str, i: int, end: int, quote: str) -> Tuple[int, str]:
             return i, ch
         except KeyError as exc:
             raise DatafileError(
-                f'Unrecognized unicode name "{s[i + 3 : rbrace]}" at offset {i} '
-                f'in string {quote}{s}{quote}'
+                f'Unrecognized unicode name "{s[i + 3 : rbrace]}" '
+                f'at offset {i+3} in string {quote}{s}{quote}'
             ) from exc
 
     return decode_numeric_escape(s, i + 1, end, 1, 3, isoct, 8, quote)
@@ -584,7 +579,7 @@ def decode_numeric_escape(
     i = start
     while i < min(end, start + max_num):
         if not fn(s[i]):
-            _raise(i)
+            break
         i += 1
     if i - start < min_num:
         _raise(i)
