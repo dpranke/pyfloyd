@@ -105,6 +105,9 @@ quote-style = "single"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"pyfloyd" = ["*.py", "*.df", "*.dft"]
+
 [tool.setuptools.dynamic]
 version = {attr = "pyfloyd.__version__"}
 
