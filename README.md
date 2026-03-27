@@ -28,6 +28,23 @@ format the code. `./run --help` is your friend to find out more.
 
 ## Version History / Release Notes
 
+* v0.28.0 (2026-03-27)
+    * Probably lots of changes since the last tagged version; I don't
+      even remember them all (and I'm not sure why this readme is so
+      out of date).
+    * Interpreters are now generated via templates and a lisp-based
+      templating engine largely inspired by Racket's @exp notation.
+    * Go, Javasript, and Python are now supported. Java support is
+      probably pretty trivial to add.
+    * I think (?) you can now generate parsers that preserve whitespace
+      and comments. Among other things, such parsers should be able
+      to generate better error messages during semantic analysis because
+      the parser preserved a mapping from the AST to the location in
+      the parsed file.
+    * Nearly all of the work between v0.19.0 and this release was
+      done in April - June of 2025, and work focused on the datafile
+      format and the templating engine.
+
 * v0.19.0 (2024-11-18)
     * Clean up handling of external values in grammars and add more
       error checking.
