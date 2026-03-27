@@ -533,7 +533,7 @@ def decode_escape(s: str, i: int, end: int, quote: str) -> Tuple[int, str]:
         except KeyError as exc:
             raise DatafileError(
                 f'Unrecognized unicode name "{s[i + 3 : rbrace]}" '
-                f'at offset {i+3} in string {quote}{s}{quote}'
+                f'at offset {i + 3} in string {quote}{s}{quote}'
             ) from exc
 
     return decode_numeric_escape(s, i + 1, end, 1, 3, isoct, 8, quote)

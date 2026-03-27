@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import io
-import os
 import unittest
 
 from pyfloyd import datafile
@@ -28,6 +27,7 @@ class Load(unittest.TestCase):
             self.assertEqual(tag, 'c')
             self.assertEqual(vals, [1])
             return [0]
+
         v = datafile.loads('c[1]', custom_tags={'c': tag_fn})
         self.assertEqual(v, [0])
 
@@ -50,6 +50,7 @@ class Load(unittest.TestCase):
             self.assertEqual(colno, 4)
             self.assertEqual(text, 'foo')
             return text + '_custom'
+
         v = datafile.loads('{c"foo": 1}', custom_tags={'c': tag_fn})
         self.assertEqual(v, {'foo_custom': 1})
 
@@ -68,6 +69,7 @@ class Load(unittest.TestCase):
             self.assertEqual(tag, 'c')
             self.assertEqual(pairs, [('foo', 1)])
             return {'foo_custom': 1}
+
         v = datafile.loads('c{foo: 1}', custom_tags={'c': tag_fn})
         self.assertEqual(v, {'foo_custom': 1})
 
@@ -90,6 +92,7 @@ class Load(unittest.TestCase):
             self.assertEqual(colno, 3)
             self.assertEqual(text, 'foo')
             return text + '_custom'
+
         v = datafile.loads('c"foo"', custom_tags={'c': tag_fn})
         self.assertEqual(v, 'foo_custom')
 
@@ -102,7 +105,6 @@ class Load(unittest.TestCase):
             datafile.loads('c"foo"')
         self.assertEqual(str(cm.exception), 'Unsupported string tag "c"')
 
-
     def test_load(self):
         fp = io.StringIO('4')
         doc = datafile.load(fp)
@@ -112,8 +114,7 @@ class Load(unittest.TestCase):
         with self.assertRaises(datafile.DatafileError) as cm:
             datafile.loads('')
         self.assertEqual(
-            str(cm.exception),
-            'Empty strings are not legal datafiles'
+            str(cm.exception), 'Empty strings are not legal datafiles'
         )
 
 

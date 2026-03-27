@@ -17,16 +17,26 @@ import shlex
 import sys
 from typing import Any, Optional, Sequence, Union
 
-import pyfloyd
 from pyfloyd import (
     custom_dicts,
     datafile,
     support,
     type_desc,
+    version,
 )
 
 
 DEFAULT_GENERATOR = 'datafile'
+DEFAULT_TEMPLATE = 'python.dft'
+DEFAULT_LANGUAGE = DEFAULT_TEMPLATE[:-4]
+
+KNOWN_TEMPLATES = {
+    '.go': 'go',
+    '.js': 'javascript',
+    '.py': 'python',
+}
+
+KNOWN_LANGUAGES = {v: k for k, v in KNOWN_TEMPLATES.items()}
 
 
 class GeneratorOptions(custom_dicts.AttrDict):
@@ -34,7 +44,7 @@ class GeneratorOptions(custom_dicts.AttrDict):
         self.argv = []
         self.command_line = ''
         self.dialect = ''
-        self.generator = pyfloyd.DEFAULT_GENERATOR
+        self.generator = DEFAULT_GENERATOR
         self.indent = None
         self.language = None
         self.line_length = None
@@ -43,7 +53,7 @@ class GeneratorOptions(custom_dicts.AttrDict):
         self.output_as_format_tree = False
         self.as_json = False
         self.template = None
-        self.version = pyfloyd.__version__
+        self.version = version.__version__
         self.unicodedata_needed = None
         super().__init__(*args, **kwargs)
 
@@ -179,13 +189,13 @@ def add_arguments(
             '--generator',
             action='store',
             choices=[gen.name.lower() for gen in generators],
-            default=pyfloyd.DEFAULT_GENERATOR,
-            help=f'Generator to use (default is {pyfloyd.DEFAULT_GENERATOR})',
+            default=DEFAULT_GENERATOR,
+            help=f'Generator to use (default is {DEFAULT_GENERATOR})',
         )
-        for lang in pyfloyd.KNOWN_LANGUAGES:
-            ext = pyfloyd.KNOWN_LANGUAGES[lang]
-            tmpl = pyfloyd.KNOWN_TEMPLATES[ext]
-            if lang.lower() == pyfloyd.DEFAULT_LANGUAGE.lower():
+        for lang in KNOWN_LANGUAGES:
+            ext = KNOWN_LANGUAGES[lang]
+            tmpl = KNOWN_TEMPLATES[ext]
+            if lang.lower() == DEFAULT_LANGUAGE.lower():
                 def_str = ' (the default)'
             else:
                 def_str = ''
@@ -247,7 +257,7 @@ def add_arguments(
         default=options.template,
         help=(
             f'datafile template to use for code generation '
-            f'(default is "{pyfloyd.DEFAULT_TEMPLATE}")'
+            f'(default is "{DEFAULT_TEMPLATE}")'
         ),
     )
     parser.add_argument(

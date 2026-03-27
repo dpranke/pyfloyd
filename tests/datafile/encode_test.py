@@ -58,7 +58,7 @@ class T(unittest.TestCase):
 
     def test_str(self):
         self.check('foo', 'foo')
-        self.check("bar\n  baz", "'bar\\n  baz'")
+        self.check('bar\n  baz', "'bar\\n  baz'")
 
     def test_str_quote_escapes(self):
         self.check('\'"`', "''''\"`'''")

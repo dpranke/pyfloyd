@@ -15,6 +15,7 @@
 import json
 from typing import Any, Union
 
+
 from pyfloyd import (
     at_exp,
     datafile,
@@ -24,19 +25,6 @@ from pyfloyd import (
     lisp_interpreter,
     support,
 )
-
-
-DEFAULT_TEMPLATE = 'python.dft'
-
-DEFAULT_LANGUAGE = DEFAULT_TEMPLATE[:-4]
-
-KNOWN_TEMPLATES = {
-    '.go': 'go',
-    '.js': 'javascript',
-    '.py': 'python',
-}
-
-KNOWN_LANGUAGES = {v: k for k, v in KNOWN_TEMPLATES.items()}
 
 
 class DatafileGenerator(generator.Generator):
@@ -61,9 +49,9 @@ class DatafileGenerator(generator.Generator):
         interp.add_foreign_handler(self._eval_node)
         interp.define_native_fn('invoke', self.f_invoke)
 
-        template = options.get('template', DEFAULT_TEMPLATE)
+        template = options.get('template', generator.DEFAULT_TEMPLATE)
         if template is None:
-            template = DEFAULT_TEMPLATE
+            template = generator.DEFAULT_TEMPLATE
         keys_to_merge = {'local_vars', 'templates'}
         if self.host.splitext(template)[1] == '':
             template = template + '.dft'

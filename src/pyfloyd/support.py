@@ -18,7 +18,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from typing import Callable, Optional, Union
+from typing import Any, Callable, Optional, Union
 import unittest
 
 
@@ -230,9 +230,7 @@ class _BaseTestCase(unittest.TestCase):
 
 class InlineTestCase(_BaseTestCase):
     host_fn: Optional[Callable[[], Optional[Union[Host, FakeHost]]]] = FakeHost
-    main: Optional[
-        Callable[[Optional[list[str]], Optional[Union[Host, FakeHost]]], int]
-    ] = None
+    main: Optional[Callable[[Any], Any]] = None
 
     def call(self, host, args, stdin):
         self.assertIsNotNone(self.__class__.main, '__class__.main is not set')

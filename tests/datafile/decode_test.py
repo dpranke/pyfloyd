@@ -127,46 +127,44 @@ class Tests(unittest.TestCase):
         self.check(r'"\uc0"', '\u00c0')
         self.check(r'"\u1000"', '\u1000')
         self.check(r'"\u10000"', '\U00010000')
-        self.check(r'"\u1F600"', '\U0001F600')
+        self.check(r'"\u1F600"', '\U0001f600')
 
     def test_str_unicode_name(self):
-        self.check(r'"\N{LATIN CAPITAL LETTER A WITH GRAVE}"',
-                   '\u00c0')
+        self.check(r'"\N{LATIN CAPITAL LETTER A WITH GRAVE}"', '\u00c0')
 
     def test_str_bad_escapes(self):
         with self.assertRaises(datafile.DatafileError) as cm:
             datafile.loads('"\\"')
         self.assertEqual(
-            str(cm.exception),
-            '<string>:1 Unexpected end of input at column 4'
+            str(cm.exception), '<string>:1 Unexpected end of input at column 4'
         )
 
         with self.assertRaises(datafile.DatafileError) as cm:
             datafile.loads(r'"\d"')
         self.assertEqual(
             str(cm.exception),
-            r'Bad escape sequence in string "\d" at offset 1'
+            r'Bad escape sequence in string "\d" at offset 1',
         )
 
         with self.assertRaises(datafile.DatafileError) as cm:
             datafile.loads(r'"\9"')
         self.assertEqual(
             str(cm.exception),
-            r'Bad escape sequence in string "\9" at offset 1'
+            r'Bad escape sequence in string "\9" at offset 1',
         )
 
         with self.assertRaises(datafile.DatafileError) as cm:
             datafile.loads(r'"\x"')
         self.assertEqual(
             str(cm.exception),
-            r'Bad escape sequence in string "\x" at offset 2'
+            r'Bad escape sequence in string "\x" at offset 2',
         )
 
         with self.assertRaises(datafile.DatafileError) as cm:
             datafile.loads(r'"\N{FOO}"')
         self.assertEqual(
             str(cm.exception),
-            r'Unrecognized unicode name "FOO" at offset 3 in string "\N{FOO}"'
+            r'Unrecognized unicode name "FOO" at offset 3 in string "\N{FOO}"',
         )
 
     def test_str_quote_escapes(self):
