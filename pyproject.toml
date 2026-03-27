@@ -113,7 +113,13 @@ where = ["src"]
 version = {attr = "pyfloyd.__version__"}
 
 [tool.uv]
+# 0.9.0 is the first version support Python 3.14
 required-version = ">=0.9.0"
+
+# By default, do not install/resolve to packages published within
+# the past 30 days; this gives us some protection against automatically
+# upgrading to a package that might have been newly compromised.
+exclude-newer = "30 days"
 
 [tool.uv.sources]
 typ = { git = "https://github.com/dpranke/typ-dev", branch = "main" }

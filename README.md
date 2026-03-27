@@ -28,6 +28,11 @@ format the code. `./run --help` is your friend to find out more.
 
 ## Version History / Release Notes
 
+* v0.29.0 (2026-03-27)
+    * Forgot to run `presubmit` on v0.28; that produced a few minor
+      issues that this cleans up. Also ran `uv lock --upgrade` to
+      update to the latest set of dependencies. No functional changes.
+
 * v0.28.0 (2026-03-27)
     * Probably lots of changes since the last tagged version; I don't
       even remember them all (and I'm not sure why this readme is so
