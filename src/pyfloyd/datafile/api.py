@@ -17,6 +17,7 @@
 import collections
 import math
 import re
+import unicodedata
 
 from typing import (
     Any,
@@ -330,7 +331,7 @@ class Decoder:
             s = s.decode(encoding)
 
         if not s:
-            raise DatafileError('Empty strings are not legal Floyd datafiles')
+            raise DatafileError('Empty strings are not legal datafiles')
         start = start or 0
         externs = {
             'allow_trailing': self._allow_trailing,
@@ -343,13 +344,48 @@ class Decoder:
         value = self._walk_ast(ast)
         return value, None, pos
 
-    def parse_array(self, tag, objs):
-        if tag:
-            raise DatafileError(f'Unsupported array tag {tag}')
-        return objs
+    def _walk_ast(self, el: Tuple[str, Any, list[Any]]) -> Any:
+        ty, val, ch = el
+        if ty in ('true', 'false', 'null'):
+            return val
+        if ty == 'number':
+            return self._parse_number(val)
+        if ty == 'numword':
+            return self._parse_numword(val, as_key=False)
+        if ty == 'bareword':
+            return self._parse_bareword(val, as_key=False)
+        if ty == 'string':
+            tag = val[0]
+            if tag in self._custom_tags:
+                return self._custom_tags[tag](ty, tag, val, as_key=False)
+            return self.parse_string(val, as_key=False)
+        if ty == 'object':
+            tag = val
+            pairs = []
+            for key_ast, value_obj in ch:
+                key = self.parse_key(key_ast)
+                v = self._walk_ast(value_obj)
+                pairs.append((key, v))
+            if tag in self._custom_tags:
+                return self._custom_tags[tag](ty, tag, pairs)
+            return self.parse_object_pairs(tag, pairs)
+        if ty == 'array':
+            tag = val
+            vals = [self._walk_ast(c) for c in ch]
+            if tag in self._custom_tags:
+                return self._custom_tags[tag](ty, tag, vals)
+            return self.parse_array(tag, vals)
+        raise DatafileError(f'unknown element type "{ty}"')  # pragma: no cover
 
-    def parse_number(self, s):
-        s = s.replace('_', '')
+    def parse_array(self, tag: str, vals: list[Any]) -> Any:
+        if tag == 's':
+            return ''.join(vals)
+        if tag:
+            raise DatafileError(f'Unsupported array tag "{tag}"')
+        return vals
+
+    def parse_number(self, val: str) -> Any:
+        s = val.replace('_', '')
         if s.startswith('0x'):
             return int(s, base=16)
         if s.startswith('0b'):
@@ -360,52 +396,53 @@ class Decoder:
             return float(s)
         return int(s)
 
-    def parse_numword(self, s):
+    def parse_numword(self, val: str, as_key: bool) -> Any:
+        del as_key
+        return val
+
+    def parse_bareword(self, val: str, as_key: bool) -> Any:
+        del as_key
+        return val
+
+    def parse_string(
+        self, val: Tuple[str, str, int, str], as_key: bool
+    ) -> Any:
+        del as_key
+        tag, quote, colno, text = val
+        is_raw_str = 'r' in tag
+        is_indented_str = 'i' in tag
+        if tag and tag not in ('i', 'r', 'ir', 'ri'):
+            raise DatafileError(f'Unsupported string tag "{tag}"')
+
+        if is_raw_str:
+            s = text
+        else:
+            s = decode_string(text, quote)
+        if '\n' in text:
+            # Note: text, not s. We want to see if the original string had
+            # newlines.
+            return dedent(
+                s, colno=colno, min_indent=1 if is_indented_str else -1
+            )
         return s
 
-    def parse_bareword(self, s, as_key):
-        del as_key
-        i = 0
-        ret = []
-        while i < len(s):
-            if s[i] == '\\':
-                i, c = decode_escape(s, i)
-                ret.append(c)
-            else:
-                ret.append(s[i])
-                i += 1
-        return ''.join(ret)
+    def parse_key(self, key_ast: Any) -> str:
+        ty, val, _ = key_ast
+        tag = val[0]
+        if ty == 'string':
+            if tag in self._custom_tags:
+                return self._custom_tags[tag](ty, tag, val, as_key=True)
+            return self.parse_string(val, as_key=True)
+        if ty == 'bareword':
+            return self.parse_bareword(val, as_key=True)
+        assert ty == 'numword'
+        return self.parse_numword(val, as_key=True)
 
-    def parse_string(self, tag, v, as_key):
-        del as_key
-        is_rstr = 'r' in tag
-        is_istr = 'i' in tag
-        if tag and tag not in ('i', 'r', 'ir', 'ri'):
-            raise DatafileError(f'Unsupported string tag `{tag}`')
-
-        _, colno, s = v
-        i = 0
-        ret = []
-        while i < len(s):
-            if is_rstr or s[i] != '\\':
-                ret.append(s[i])
-                i += 1
-            else:
-                i, c = decode_escape(s, i)
-                ret.append(c)
-        r = ''.join(ret)
-        if '\n' in s:
-            return dedent(r, colno=colno, min_indent=1 if is_istr else -1)
-        return r
-
-    def parse_string_list(self, tag, strs):
+    def parse_object_pairs(
+        self, tag: str, pairs: list[Tuple[str, Any]]
+    ) -> Any:
         if tag:
-            raise DatafileError(f'Unsupported string_list tag {tag}')
-        return ''.join(strs)
-
-    def parse_object_pairs(self, tag, pairs):
-        if tag:
-            raise DatafileError(f'Unsupported object tag {tag}')
+            raise DatafileError(f'Unsupported object tag "{tag}"')
         keys = set()
         key_pairs = []
         for key, val in pairs:
@@ -419,62 +456,60 @@ class Decoder:
             return self._parse_object(dict(key_pairs))
         return dict(key_pairs)
 
-    def _walk_ast(self, el):
-        ty, tag, v = el
-        if ty == 'true':
-            return True
-        if ty == 'false':
-            return False
-        if ty == 'null':
-            return None
-        if ty == 'number':
-            return self._parse_number(v)
-        if ty == 'numword':
-            return self._parse_numword(v)
-        if ty == 'bareword':
-            return self._parse_bareword(v, as_key=False)
-        if ty == 'string':
-            if tag in self._custom_tags:
-                return self._custom_tags[tag](ty, tag, v, as_key=False)
-            return self.parse_string(tag, v, as_key=False)
-        if ty == 'string_list':
-            r = [self._walk_ast(el) for el in v]
-            if tag in self._custom_tags:
-                return self._custom_tags[tag](ty, tag, v)
-            return self.parse_string_list(tag, r)
-        if ty == 'object':
-            pairs = []
-            for key_ast, obj in v:
-                ty, key_tag, s = key_ast
-                if ty == 'string':
-                    if key_tag in self._custom_tags:
-                        key = self._custom_tags[key_tag](
-                            ty, key_tag, s, as_key=True
-                        )
-                    else:
-                        key = self.parse_string(key_tag, s, as_key=True)
-                else:
-                    assert ty == 'bareword'
-                    key = self._parse_bareword(s, as_key=True)
-                v = self._walk_ast(obj)
-                pairs.append((key, v))
-            if tag in self._custom_tags:
-                return self._custom_tags[tag](ty, tag, pairs)
-            return self.parse_object_pairs(tag, pairs)
-        if ty == 'array':
-            vals = [self._walk_ast(el) for el in v]
-            if tag in self._custom_tags:
-                return self._custom_tags[tag](ty, tag, vals)
-            return self.parse_array(tag, [self._walk_ast(el) for el in v])
-        raise DatafileError('unknown el: ' + el)  # pragma: no cover
+
+def decode_string(s: str, quote: Optional[str] = None) -> str:
+    """Unescapes a string possibly containing escaped chars.
+
+    `quote` should be the quote string that was used to enclose the
+    string in the datafile, if possible. If that's unavailable, best
+    effort should be made to provide a quote string that will not
+    conflict with the undecoded string. This is used when raising an error.
+    You can call `find_quote_for()` to find an appropriate quote string.
+
+    Raises DatafileError if the string contains a bad escaped sequence
+    or if it refers to an unrecognized unicode name. `quote` will be
+    used during this, and if possible should be the quote character
+    sequence that wrapped the original string in the datafile.
+    """
+
+    if quote is None:
+        quote = find_quote_for(s)
+
+    i = 0
+    ret = []
+    end = len(s)
+    while i < end:
+        c = s[i]
+        if c != '\\':
+            i += 1
+        else:
+            i, c = decode_escape(s, i, end, quote)
+        ret.append(c)
+    return ''.join(ret)
 
 
-def decode_escape(s, i):
+def decode_escape(s: str, i: int, end: int, quote: str) -> Tuple[int, str]:
+    """Decodes a character escape sequence.
+
+    Returns the number of characters to advance and the decoded character.
+    Raises DatafileError if the escape sequence is invalid (including if
+    a unicode name isn't recognized).
+    """
+
     c = s[i + 1]
+    # Check escape sequences in (rough) order of likelihood.
     if c == 'n':
         return i + 2, '\n'
     if c == 't':
         return i + 2, '\t'
+    if c == '\\':
+        return i + 2, '\\'
+    if c == "'":
+        return i + 2, "'"
+    if c == '"':
+        return i + 2, '"'
+    if c == '`':
+        return i + 2, '`'
     if c == 'r':
         return i + 2, '\r'
     if c == 'b':
@@ -485,51 +520,82 @@ def decode_escape(s, i):
         return i + 2, '\a'
     if c == 'v':
         return i + 2, '\v'
-    if c == "'":
-        return i + 2, "'"
-    if c == '"':
-        return i + 2, '"'
-    if c == '`':
-        return i + 2, '`'
-    if c == '\\':
-        return i + 2, '\\'
     if c == 'x':
-        if _check(s, i + 2, 2, ishex):
-            return i + 4, chr(int(s[i + 2 : i + 4], base=16))
+        return decode_numeric_escape(s, i + 2, end, 1, 2, ishex, 16, quote)
     if c == 'u':
-        if _check(s, i + 2, 4, ishex):
-            return i + 6, chr(int(s[i + 2 : i + 6], base=16))
-    if c == 'U':
-        if _check(s, i + 2, 8, ishex):
-            return i + 10, chr(int(s[i + 2 : i + 10], base=16))
-    if len(s) > i + 1 and isoct(s[i + 1]):
-        x = int(s[i + 1], base=8)
-        j = 2
-        if len(s) > i + 2 and isoct(s[i + 2]):
-            x = x * 8 + int(s[i + 2], base=8)
-            j += 1
-        if len(s) > i + 3 and isoct(s[i + 3]):
-            x = x * 8 + int(s[i + 2], base=8)
-            j += 1
-        return j, chr(x)
-    raise DatafileError(f'Bad escape in str {repr(s)} at pos {i}')
+        return decode_numeric_escape(s, i + 2, end, 1, 8, ishex, 16, quote)
+    if c == 'N':
+        rbrace = s.find('}', i + 3)
+        try:
+            ch = unicodedata.lookup(s[i + 3 : rbrace])
+            i = rbrace + 1
+            return i, ch
+        except KeyError as exc:
+            raise DatafileError(
+                f'Unrecognized unicode name "{s[i + 3 : rbrace]}" '
+                f'at offset {i+3} in string {quote}{s}{quote}'
+            ) from exc
+
+    return decode_numeric_escape(s, i + 1, end, 1, 3, isoct, 8, quote)
 
 
-def _check(s, i, n, fn):
-    if len(s) < i + n:
-        return False
-    return all(fn(s[j]) for j in range(i, i + n))
+def decode_numeric_escape(
+    s: str,
+    start: int,
+    end: int,
+    min_num: int,
+    max_num: int,
+    fn: Callable[[str], bool],
+    base: int,
+    quote: str,
+):
+    """Decodes a numeric escape sequence in a string.
+
+    `start` is the offset into the string to start at.
+    `end` is the length of the string.
+    `min_num` is the minimum legal number of characters in the sequence.
+    `max_num` is the maximum legal number of characters in the sequence.
+    `fn` is a function that verifies if each character is legal.
+    `base` is the numeric base to use in the conversion. Legal values
+         are 8 and 16.
+    `quote` is the quote string to wrap the string with when reporting an
+        error.
+
+    Returns the corresponding character.
+
+    Raises DatafileError if the numeric escape is invalid.
+    """
+    i = 0
+
+    assert base in (8, 16), (
+        f'Unsupported base {base} passed to decode_numeric_escape()'
+    )
+
+    def _raise(offset):
+        raise DatafileError(
+            f'Bad escape sequence in string {quote}{s}{quote} at offset {i}'
+        )
+
+    i = start
+    while i < min(end, start + max_num):
+        if not fn(s[i]):
+            break
+        i += 1
+    if i - start < min_num:
+        _raise(i)
+    return i, chr(int(s[start:i], base))
 
 
-def ishex(ch):
+def ishex(ch: str) -> bool:
     return ch in '0123456789abcdefABCDEF'
 
 
-def isoct(ch):
+def isoct(ch: str) -> bool:
     return '0' <= ch <= '7'
 
 
-def dedent(s, colno=-1, min_indent=-1):
+def dedent(s: str, colno: int = -1, min_indent=-1) -> str:
+    """Returns a dedented version of a string."""
     return functions.f_dedent(s, colno, min_indent)
 
 
@@ -720,7 +786,7 @@ class Encoder:
 
     def _encode_float(self, obj: float, *, as_key: bool) -> str:
         if obj == float('inf') or obj == float('-inf') or math.isnan(obj):
-            raise DatafileError('Illegal datafile value: f{obj}')
+            raise DatafileError(f'Illegal datafile value: `{obj}`')
         return f'"{repr(obj)}"' if as_key else repr(obj)
 
     def _encode_str(self, obj: str, *, as_key: bool) -> str:
@@ -753,7 +819,6 @@ class Encoder:
             s = self._encode_array(obj, seen, level + 1, oneline=True)
             if len(s) > max_len and ('\n' not in s):
                 s = self._encode_array(obj, seen, level + 1, oneline=False)
-
         else:
             s = self.encode(self.default(obj), seen, level + 1, as_key=False)
             assert s is not None
@@ -871,9 +936,50 @@ def encode_string(
 
 
 def encode_quoted_string(
-    s: str, ensure_ascii=True, escape_newlines=False
+    s: str,
+    ensure_ascii: bool = True,
+    escape_newlines: bool = False,
+    quote: Optional[str] = None,
 ) -> str:
-    """Returns a quoted string with a minimal number of escaped quotes."""
+    """Returns a safely escaped, quoted version of the string.
+
+    The returned value will have a minimal number of escaped quotes.
+    """
+
+    if quote is None:
+        quote = find_quote_for(s)
+
+    i = 0
+    ret = []
+    while i < len(s):
+        if s.startswith(quote, i):
+            ret.append('\\')
+            ret.append(quote[0])
+            i += len(quote)
+            continue
+
+        ch = s[i]
+        o = ord(ch)
+        if o < 32:
+            ret.append(escape_char(ch))
+        elif o < 128 or (not ensure_ascii and ch not in ('\u2028', '\u2029')):
+            ret.append(ch)
+        else:
+            ret.append(escape_char(ch))
+        i += 1
+
+    if len(ret) > 10:
+        # Only allow "long" strings to span multiple lines. The number 10
+        # is pulled out of the air here as a heuristic for "long".
+        ret = [
+            '\n' if (r == '\\n' and not escape_newlines) else r for r in ret
+        ]
+
+    return quote + ''.join(ret) + quote
+
+
+def find_quote_for(s: str) -> str:
+    """Returns a quote string that can be used to safely enclose the string."""
     quote_map: dict[str, int] = {}
     for token in quote_tokens:
         quote_map[token] = 0
@@ -907,36 +1013,9 @@ def encode_quoted_string(
             if i in lstrs:
                 i += 1
                 continue
-            quote = "l'" + '=' * i + "'"
+            quote = "L'" + '=' * i + "'"
             break
-
-    i = 0
-    ret = []
-    while i < len(s):
-        if s.startswith(quote, i):
-            ret.append('\\')
-            ret.append(quote[0])
-            i += len(quote)
-            continue
-
-        ch = s[i]
-        o = ord(ch)
-        if o < 32:
-            ret.append(escape_char(ch))
-        elif o < 128 or (not ensure_ascii and ch not in ('\u2028', '\u2029')):
-            ret.append(ch)
-        else:
-            ret.append(escape_char(ch))
-        i += 1
-
-    if len(ret) > 10:
-        # Only allow "long" strings to span multiple lines. The number 10
-        # is pulled out of the air here as a heuristic for "long".
-        ret = [
-            '\n' if (r == '\\n' and not escape_newlines) else r for r in ret
-        ]
-
-    return quote + ''.join(ret) + quote
+    return quote
 
 
 def escape_char(ch: str) -> str:

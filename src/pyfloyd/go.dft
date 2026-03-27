@@ -18,6 +18,11 @@
 name = 'Go'
 ext = '.go'
 
+# TODO: Really, this value should be required, as if we're not building
+# a main package, we have no way of guessing what name to use. But, we
+# don't have a way to indicate that yet.
+package = 'dummy'
+
 # TODO: use `indent='\t' and add a 'template_indent' option so the formatter
 # knows how to translate the indentation used in the template to the
 # indentation that should be used in the output.
@@ -150,7 +155,7 @@ t_pop: [fn [x] [hl x ' = ' x '[:len(' x ') - 1]']]
 t_return: 'return'
 
 t_regexp: [fn [re_str]
-              [vl [hl "r, _ := regexp.Compile("
+              [vl [hl "r := regexp.MustCompile("
                       [lit [strcat "(?m:" re_str ')']]
                       ")"]
                   [hl "sub := string(p.text[p.pos : p.end])"]
@@ -212,7 +217,8 @@ default_header: @"""
     @wrap_argv['//    `' '//     ']
     //
 
-    @if[generator_options.main [vl 'package main' '']]
+    package @if[generator_options.main 'main' generator_options.package]
+
     @imports[]
     """
 

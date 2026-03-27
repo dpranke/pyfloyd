@@ -28,13 +28,15 @@ It also provides a number of other utility functions:
                   and error information (does not raise exceptions).
 - dedent        - Remove leading whitespace from a multiline string per the
                   datafile specification
+- decode_string - Returns a (potentially) unescaped, dedented version of a
+                  string.
 - decode_escape - Returns the unicode character for a given datafile
                   escape sequence.
-- escape_char   - Returns the matching datafile escape sequence for
-                  a unicode characer.
 - encode_string - Returns an encoded (quoted and escaped as appropriate)
                   string matching the datafile specification. This will
-                  return a string as an unqouted bareword if possible.
+                  return a string as an unquoted bareword if possible.
+- encode_escape - Returns the matching datafile escape sequence for
+                  a unicode characer.
 - encode_quoted_string - Returns an quoted (and escaped) string (no
                          barewords).
 - ishex         - Returns whether a character is a hex digit.

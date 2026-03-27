@@ -167,6 +167,25 @@ class _Parser:
             return
         self._o_succeed(v__1, self._state.pos)
 
+    def _r_nofiller(self):
+        state = self._state.copy()
+        errpos = self._errpos
+        self._s_nofiller_1()
+        if self._state.failed:
+            self._o_succeed(None, state.pos)
+        else:
+            self._o_restore(state)
+            self._errpos = errpos
+            self._o_fail()
+
+    def _s_nofiller_1(self):
+        state = self._state.copy()
+        self._o_memoize('r__whitespace', self._r__whitespace)
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._o_memoize('r__comment', self._r__comment)
+
     def _r_trailing(self):
         state = self._state.copy()
         self._s_trailing_1()
@@ -196,14 +215,26 @@ class _Parser:
 
     def _r_eol(self):
         state = self._state.copy()
+        self._s_eol_1()
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._s_eol_2()
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._s_eol_3()
+
+    def _s_eol_1(self):
+        self._o_memoize('r__filler', self._r__filler)
         self._o_str('\r\n')
-        if not self._state.failed:
-            return
-        self._o_restore(state)
+
+    def _s_eol_2(self):
+        self._o_memoize('r__filler', self._r__filler)
         self._o_ch('\r')
-        if not self._state.failed:
-            return
-        self._o_restore(state)
+
+    def _s_eol_3(self):
+        self._o_memoize('r__filler', self._r__filler)
         self._o_ch('\n')
 
     def _r_value(self):
@@ -212,7 +243,11 @@ class _Parser:
         if not self._state.failed:
             return
         self._o_restore(state)
-        self._s_value_2()
+        self._o_memoize('r_object', self._r_object)
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._o_memoize('r_array', self._r_array)
         if not self._state.failed:
             return
         self._o_restore(state)
@@ -228,61 +263,341 @@ class _Parser:
         if not self._state.failed:
             return
         self._o_restore(state)
-        self._o_memoize('r_array', self._r_array)
+        self._s_value_6()
         if not self._state.failed:
             return
         self._o_restore(state)
-        self._o_memoize('r_object', self._r_object)
+        self._s_value_8()
         if not self._state.failed:
             return
         self._o_restore(state)
-        self._o_memoize('r_string', self._r_string)
+        self._s_value_10()
 
     def _s_value_1(self):
-        self._o_memoize('r__filler', self._r__filler)
-        self._o_str('true')
-        if self._state.failed:
-            return
-        self._o_succeed(['true', '', None], self._state.pos)
-
-    def _s_value_2(self):
-        self._o_memoize('r__filler', self._r__filler)
-        self._o_str('false')
-        if self._state.failed:
-            return
-        self._o_succeed(['false', '', None], self._state.pos)
-
-    def _s_value_3(self):
-        self._o_memoize('r__filler', self._r__filler)
-        self._o_str('null')
-        if self._state.failed:
-            return
-        self._o_succeed(['null', '', None], self._state.pos)
-
-    def _s_value_4(self):
-        self._o_memoize('r__filler', self._r__filler)
-        self._o_memoize('r_numword', self._r_numword)
-
-    def _s_value_5(self):
-        self._s_value_6()
+        self._s_value_2()
         if self._state.failed:
             return
         v__1 = self._state.val
         if self._state.failed:
             return
-        self._o_succeed(['number', '', v__1], self._state.pos)
+        self._o_succeed(['string', v__1, []], self._state.pos)
+
+    def _s_value_2(self):
+        self._o_memoize('r__filler', self._r__filler)
+        self._o_memoize('r_string', self._r_string)
+
+    def _s_value_3(self):
+        self._o_memoize('r__filler', self._r__filler)
+        self._o_str('true')
+        if self._state.failed:
+            return
+        self._o_succeed(['true', True, []], self._state.pos)
+
+    def _s_value_4(self):
+        self._o_memoize('r__filler', self._r__filler)
+        self._o_str('false')
+        if self._state.failed:
+            return
+        self._o_succeed(['false', False, []], self._state.pos)
+
+    def _s_value_5(self):
+        self._o_memoize('r__filler', self._r__filler)
+        self._o_str('null')
+        if self._state.failed:
+            return
+        self._o_succeed(['null', None, []], self._state.pos)
 
     def _s_value_6(self):
-        start = self._state.pos
+        v = self._externs['allow_numwords']
+        if v is True:
+            self._o_succeed(v, self._state.pos)
+        elif v is False:
+            self._o_fail()
+        else:
+            raise _ParsingRuntimeError('Bad predicate value')
+        if self._state.failed:
+            return
         self._s_value_7()
+        if self._state.failed:
+            return
+        v__2 = self._state.val
+        if self._state.failed:
+            return
+        self._o_succeed(['numword', v__2, []], self._state.pos)
+
+    def _s_value_7(self):
+        self._o_memoize('r__filler', self._r__filler)
+        self._o_memoize('r_numword', self._r_numword)
+
+    def _s_value_8(self):
+        self._s_value_9()
+        if self._state.failed:
+            return
+        v__1 = self._state.val
+        if self._state.failed:
+            return
+        self._o_succeed(['number', v__1, []], self._state.pos)
+
+    def _s_value_9(self):
+        self._o_memoize('r__filler', self._r__filler)
+        self._o_memoize('r_number', self._r_number)
+
+    def _s_value_10(self):
+        self._s_value_11()
+        if self._state.failed:
+            return
+        v__1 = self._state.val
+        if self._state.failed:
+            return
+        self._o_succeed(['bareword', v__1, []], self._state.pos)
+
+    def _s_value_11(self):
+        self._o_memoize('r__filler', self._r__filler)
+        self._o_memoize('r_bareword', self._r_bareword)
+
+    def _r_string(self):
+        self._scopes.append({})
+        self._s_string_1()
+        self._scopes.pop()
+
+    def _s_string_1(self):
+        self._o_memoize('r_string_tag', self._r_string_tag)
+        v__1 = self._state.val
+        self._o_memoize('r_nofiller', self._r_nofiller)
+        if self._state.failed:
+            return
+        self._o_memoize('r_quote', self._r_quote)
+        if self._state.failed:
+            return
+        self._scopes[-1]['q'] = self._state.val
+        if self._state.failed:
+            return
+        self._s_string_2()
+        v__4 = self._state.val
+        self._s_string_3()
+        v__5 = self._state.val
+        self._o_str(self._o_lookup('q'))
+        if self._state.failed:
+            return
+        self._o_succeed(
+            [v__1, self._o_lookup('q'), v__4, v__5], self._state.pos
+        )
+
+    def _s_string_2(self):
+        self._o_succeed(self._fn_colno(), self._state.pos)
+
+    def _s_string_3(self):
+        start = self._state.pos
+        self._s_string_4()
+        end = self._state.pos
+        self._state.val = self._text[start:end]
+
+    def _s_string_4(self):
+        vs = []
+        while True:
+            state = self._state.copy()
+            self._s_string_5()
+            if self._state.failed or self._state.pos == state.pos:
+                self._o_restore(state)
+                break
+            vs.append(self._state.val)
+        self._o_succeed(vs, self._state.pos)
+
+    def _s_string_5(self):
+        state = self._state.copy()
+        self._s_string_6()
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._s_string_7()
+
+    def _s_string_6(self):
+        self._o_ch('\\')
+        if self._state.failed:
+            return
+        self._o_memoize('r_any', self._r_any)
+
+    def _s_string_7(self):
+        self._s_string_8()
+        if self._state.failed:
+            return
+        self._o_memoize('r_any', self._r_any)
+
+    def _s_string_8(self):
+        state = self._state.copy()
+        errpos = self._errpos
+        self._s_string_9()
+        if self._state.failed:
+            self._o_succeed(None, state.pos)
+        else:
+            self._o_restore(state)
+            self._errpos = errpos
+            self._o_fail()
+
+    def _s_string_9(self):
+        self._o_str(self._o_lookup('q'))
+
+    def _r_string_tag(self):
+        state = self._state.copy()
+        self._o_ch('r')
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._o_ch('i')
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._o_str('ri')
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._o_str('ir')
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._o_ch('x')
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._o_str('b64')
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._o_memoize('r_tag', self._r_tag)
+
+    def _r_tag(self):
+        state = self._state.copy()
+        self._o_memoize('r_bareword', self._r_bareword)
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._s_tag_1()
+
+    def _s_tag_1(self):
+        self._o_memoize('r__filler', self._r__filler)
+        self._o_succeed('', self._state.pos)
+
+    def _r_quote(self):
+        state = self._state.copy()
+        self._o_str("'''")
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._o_ch("'")
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._o_str('"""')
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._o_ch('"')
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._o_str('```')
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._o_ch('`')
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._s_quote_1()
+
+    def _s_quote_1(self):
+        self._o_ch('L')
+        if self._state.failed:
+            return
+        self._s_quote_2()
+        if self._state.failed:
+            return
+        v__2 = self._state.val
+        if self._state.failed:
+            return
+        self._o_succeed(v__2, self._state.pos)
+
+    def _s_quote_2(self):
+        start = self._state.pos
+        self._s_quote_3()
         if self._state.failed:
             return
         end = self._state.pos
         self._state.val = self._text[start:end]
 
-    def _s_value_7(self):
-        self._o_memoize('r__filler', self._r__filler)
+    def _s_quote_3(self):
+        self._o_ch("'")
+        if self._state.failed:
+            return
+        self._s_quote_4()
+        if self._state.failed:
+            return
+        self._o_ch("'")
+
+    def _s_quote_4(self):
+        vs = []
+        self._o_ch('=')
+        if self._state.failed:
+            return
+        vs.append(self._state.val)
+        while True:
+            state = self._state.copy()
+            self._o_ch('=')
+            if self._state.failed or self._state.pos == state.pos:
+                self._o_restore(state)
+                break
+            vs.append(self._state.val)
+        self._o_succeed(vs, self._state.pos)
+
+    def _r_numword(self):
+        start = self._state.pos
+        self._s_numword_1()
+        if self._state.failed:
+            return
+        end = self._state.pos
+        self._state.val = self._text[start:end]
+
+    def _s_numword_1(self):
         self._o_memoize('r_number', self._r_number)
+        if self._state.failed:
+            return
+        self._s_numword_2()
+
+    def _s_numword_2(self):
+        vs = []
+        self._s_numword_3()
+        if self._state.failed:
+            return
+        vs.append(self._state.val)
+        while True:
+            state = self._state.copy()
+            self._s_numword_3()
+            if self._state.failed or self._state.pos == state.pos:
+                self._o_restore(state)
+                break
+            vs.append(self._state.val)
+        self._o_succeed(vs, self._state.pos)
+
+    def _s_numword_3(self):
+        state = self._state.copy()
+        errpos = self._errpos
+        self._s_numword_4()
+        if self._state.failed:
+            self._o_succeed(None, state.pos)
+        else:
+            self._o_restore(state)
+            self._errpos = errpos
+            self._o_fail()
+        if not self._state.failed:
+            self._r_any()
+
+    def _s_numword_4(self):
+        state = self._state.copy()
+        self._o_memoize('r_punct', self._r_punct)
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._o_memoize('r__whitespace', self._r__whitespace)
 
     def _r_number(self):
         state = self._state.copy()
@@ -290,135 +605,167 @@ class _Parser:
         if not self._state.failed:
             return
         self._o_restore(state)
-        self._s_number_5()
+        self._s_number_6()
         if not self._state.failed:
             return
         self._o_restore(state)
-        self._s_number_9()
+        self._s_number_11()
         if not self._state.failed:
             return
         self._o_restore(state)
-        self._s_number_13()
+        self._s_number_16()
 
     def _s_number_1(self):
+        start = self._state.pos
+        self._s_number_2()
+        if self._state.failed:
+            return
+        end = self._state.pos
+        self._state.val = self._text[start:end]
+
+    def _s_number_2(self):
         self._o_str('0b')
         if self._state.failed:
             return
         self._o_memoize('r_bin', self._r_bin)
         if self._state.failed:
             return
-        self._s_number_2()
+        self._s_number_3()
 
-    def _s_number_2(self):
+    def _s_number_3(self):
         vs = []
         while True:
             state = self._state.copy()
-            self._s_number_3()
+            self._s_number_4()
             if self._state.failed or self._state.pos == state.pos:
                 self._o_restore(state)
                 break
             vs.append(self._state.val)
         self._o_succeed(vs, self._state.pos)
 
-    def _s_number_3(self):
+    def _s_number_4(self):
         state = self._state.copy()
-        self._s_number_4()
+        self._s_number_5()
         if not self._state.failed:
             return
         self._o_restore(state)
         self._o_memoize('r_bin', self._r_bin)
 
-    def _s_number_4(self):
+    def _s_number_5(self):
         self._o_ch('_')
         if self._state.failed:
             return
         self._o_memoize('r_bin', self._r_bin)
 
-    def _s_number_5(self):
+    def _s_number_6(self):
+        start = self._state.pos
+        self._s_number_7()
+        if self._state.failed:
+            return
+        end = self._state.pos
+        self._state.val = self._text[start:end]
+
+    def _s_number_7(self):
         self._o_str('0o')
         if self._state.failed:
             return
         self._o_memoize('r_oct', self._r_oct)
         if self._state.failed:
             return
-        self._s_number_6()
+        self._s_number_8()
 
-    def _s_number_6(self):
+    def _s_number_8(self):
         vs = []
         while True:
             state = self._state.copy()
-            self._s_number_7()
+            self._s_number_9()
             if self._state.failed or self._state.pos == state.pos:
                 self._o_restore(state)
                 break
             vs.append(self._state.val)
         self._o_succeed(vs, self._state.pos)
 
-    def _s_number_7(self):
+    def _s_number_9(self):
         state = self._state.copy()
-        self._s_number_8()
+        self._s_number_10()
         if not self._state.failed:
             return
         self._o_restore(state)
         self._o_memoize('r_oct', self._r_oct)
 
-    def _s_number_8(self):
+    def _s_number_10(self):
         self._o_ch('_')
         if self._state.failed:
             return
         self._o_memoize('r_oct', self._r_oct)
 
-    def _s_number_9(self):
+    def _s_number_11(self):
+        start = self._state.pos
+        self._s_number_12()
+        if self._state.failed:
+            return
+        end = self._state.pos
+        self._state.val = self._text[start:end]
+
+    def _s_number_12(self):
         self._o_str('0x')
         if self._state.failed:
             return
         self._o_memoize('r_hex', self._r_hex)
         if self._state.failed:
             return
-        self._s_number_10()
+        self._s_number_13()
 
-    def _s_number_10(self):
+    def _s_number_13(self):
         vs = []
         while True:
             state = self._state.copy()
-            self._s_number_11()
+            self._s_number_14()
             if self._state.failed or self._state.pos == state.pos:
                 self._o_restore(state)
                 break
             vs.append(self._state.val)
         self._o_succeed(vs, self._state.pos)
 
-    def _s_number_11(self):
+    def _s_number_14(self):
         state = self._state.copy()
-        self._s_number_12()
+        self._s_number_15()
         if not self._state.failed:
             return
         self._o_restore(state)
         self._o_memoize('r_hex', self._r_hex)
 
-    def _s_number_12(self):
+    def _s_number_15(self):
         self._o_ch('_')
         if self._state.failed:
             return
         self._o_memoize('r_hex', self._r_hex)
 
-    def _s_number_13(self):
-        self._s_number_14()
+    def _s_number_16(self):
+        start = self._state.pos
+        self._s_number_17()
+        if self._state.failed:
+            return
+        end = self._state.pos
+        self._state.val = self._text[start:end]
+
+    def _s_number_17(self):
+        self._s_number_18()
         self._o_memoize('r_int', self._r_int)
         if self._state.failed:
             return
-        self._s_number_16()
-        self._s_number_17()
+        self._s_number_20()
+        self._s_number_21()
 
-    def _s_number_14(self):
+    def _s_number_18(self):
         state = self._state.copy()
-        self._s_number_15()
+        self._s_number_19()
         if self._state.failed:
             self._o_succeed([], state.pos)
         else:
             self._o_succeed([self._state.val], self._state.pos)
 
-    def _s_number_15(self):
+    def _s_number_19(self):
         state = self._state.copy()
         self._o_ch('-')
         if not self._state.failed:
@@ -426,7 +773,7 @@ class _Parser:
         self._o_restore(state)
         self._o_ch('+')
 
-    def _s_number_16(self):
+    def _s_number_20(self):
         state = self._state.copy()
         self._o_memoize('r_frac', self._r_frac)
         if self._state.failed:
@@ -434,13 +781,101 @@ class _Parser:
         else:
             self._o_succeed([self._state.val], self._state.pos)
 
-    def _s_number_17(self):
+    def _s_number_21(self):
         state = self._state.copy()
         self._o_memoize('r_exp', self._r_exp)
         if self._state.failed:
             self._o_succeed([], state.pos)
         else:
             self._o_succeed([self._state.val], self._state.pos)
+
+    def _r_bareword(self):
+        self._s_bareword_1()
+        if self._state.failed:
+            return
+        self._s_bareword_3()
+
+    def _s_bareword_1(self):
+        state = self._state.copy()
+        errpos = self._errpos
+        self._s_bareword_2()
+        if self._state.failed:
+            self._o_succeed(None, state.pos)
+        else:
+            self._o_restore(state)
+            self._errpos = errpos
+            self._o_fail()
+
+    def _s_bareword_2(self):
+        state = self._state.copy()
+        self._o_str('true')
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._o_str('false')
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._o_str('null')
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._o_memoize('r_number', self._r_number)
+
+    def _s_bareword_3(self):
+        start = self._state.pos
+        self._s_bareword_4()
+        if self._state.failed:
+            return
+        end = self._state.pos
+        self._state.val = self._text[start:end]
+
+    def _s_bareword_4(self):
+        vs = []
+        self._s_bareword_5()
+        if self._state.failed:
+            return
+        vs.append(self._state.val)
+        while True:
+            state = self._state.copy()
+            self._s_bareword_5()
+            if self._state.failed or self._state.pos == state.pos:
+                self._o_restore(state)
+                break
+            vs.append(self._state.val)
+        self._o_succeed(vs, self._state.pos)
+
+    def _s_bareword_5(self):
+        state = self._state.copy()
+        errpos = self._errpos
+        self._s_bareword_6()
+        if self._state.failed:
+            self._o_succeed(None, state.pos)
+        else:
+            self._o_restore(state)
+            self._errpos = errpos
+            self._o_fail()
+        if not self._state.failed:
+            self._r_any()
+
+    def _s_bareword_6(self):
+        state = self._state.copy()
+        self._o_memoize('r_punct', self._r_punct)
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._o_memoize('r__whitespace', self._r__whitespace)
+
+    def _r_punct(self):
+        rexp = "(L'=+')|[\\/#'\"`\\[\\](){}:=,]"
+        pos = self.pos()
+        if rexp not in self._regexps:
+            self._regexps[rexp] = re.compile(rexp)
+        m = self._regexps[rexp].match(self._text, pos)
+        if m:
+            self._o_succeed(m.group(0), m.end())
+            return
+        self._o_fail()
 
     def _r_int(self):
         state = self._state.copy()
@@ -591,1282 +1026,6 @@ class _Parser:
             return
         self._o_fail()
 
-    def _r_string(self):
-        state = self._state.copy()
-        self._s_string_1()
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._s_string_3()
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._o_memoize('r_string_list', self._r_string_list)
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._s_string_5()
-
-    def _s_string_1(self):
-        self._o_memoize('r_raw_str_tag', self._r_raw_str_tag)
-        if self._state.failed:
-            return
-        v__1 = self._state.val
-        if self._state.failed:
-            return
-        self._s_string_2()
-        if self._state.failed:
-            return
-        v__2 = self._state.val
-        if self._state.failed:
-            return
-        self._o_succeed(['string', v__1, v__2], self._state.pos)
-
-    def _s_string_2(self):
-        self._o_memoize('r__filler', self._r__filler)
-        self._o_memoize('r_raw_str', self._r_raw_str)
-
-    def _s_string_3(self):
-        self._o_memoize('r_string_tag', self._r_string_tag)
-        if self._state.failed:
-            return
-        v__1 = self._state.val
-        if self._state.failed:
-            return
-        self._s_string_4()
-        if self._state.failed:
-            return
-        v__2 = self._state.val
-        if self._state.failed:
-            return
-        self._o_succeed(['string', v__1, v__2], self._state.pos)
-
-    def _s_string_4(self):
-        self._o_memoize('r__filler', self._r__filler)
-        self._o_memoize('r_str', self._r_str)
-
-    def _s_string_5(self):
-        self._s_string_6()
-        if self._state.failed:
-            return
-        v__1 = self._state.val
-        if self._state.failed:
-            return
-        self._o_succeed(['bareword', '', v__1], self._state.pos)
-
-    def _s_string_6(self):
-        self._o_memoize('r__filler', self._r__filler)
-        self._o_memoize('r_bareword', self._r_bareword)
-
-    def _r_string_list(self):
-        self._o_memoize('r_string_tag', self._r_string_tag)
-        if self._state.failed:
-            return
-        v__1 = self._state.val
-        if self._state.failed:
-            return
-        self._o_memoize('r__filler', self._r__filler)
-        self._o_ch('(')
-        if self._state.failed:
-            return
-        self._o_memoize('r_string', self._r_string)
-        if self._state.failed:
-            return
-        v__3 = self._state.val
-        if self._state.failed:
-            return
-        self._s_string_list_1()
-        v__4 = self._state.val
-        self._o_memoize('r__filler', self._r__filler)
-        self._o_ch(')')
-        if self._state.failed:
-            return
-        self._o_succeed(
-            ['string_list', v__1, self._fn_cons(v__3, v__4)], self._state.pos
-        )
-
-    def _s_string_list_1(self):
-        vs = []
-        while True:
-            state = self._state.copy()
-            self._s_string_list_2()
-            if self._state.failed or self._state.pos == state.pos:
-                self._o_restore(state)
-                break
-            vs.append(self._state.val)
-        self._o_succeed(vs, self._state.pos)
-
-    def _s_string_list_2(self):
-        self._s_string_list_3()
-        self._o_memoize('r_string', self._r_string)
-
-    def _s_string_list_3(self):
-        state = self._state.copy()
-        self._s_string_list_4()
-        if self._state.failed:
-            self._o_succeed([], state.pos)
-        else:
-            self._o_succeed([self._state.val], self._state.pos)
-
-    def _s_string_list_4(self):
-        self._o_memoize('r__filler', self._r__filler)
-        self._o_ch(',')
-
-    def _r_raw_str_tag(self):
-        self._s_raw_str_tag_1()
-        if self._state.failed:
-            return
-        v__1 = self._state.val
-        if self._state.failed:
-            return
-        self._s_raw_str_tag_5()
-        if self._state.failed:
-            return
-        self._o_succeed(v__1, self._state.pos)
-
-    def _s_raw_str_tag_1(self):
-        state = self._state.copy()
-        self._s_raw_str_tag_2()
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._s_raw_str_tag_3()
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._s_raw_str_tag_4()
-
-    def _s_raw_str_tag_2(self):
-        self._o_memoize('r__filler', self._r__filler)
-        self._o_ch('r')
-
-    def _s_raw_str_tag_3(self):
-        self._o_memoize('r__filler', self._r__filler)
-        self._o_str('ri')
-
-    def _s_raw_str_tag_4(self):
-        self._o_memoize('r__filler', self._r__filler)
-        self._o_str('ir')
-
-    def _s_raw_str_tag_5(self):
-        state = self._state.copy()
-        errpos = self._errpos
-        self._s_raw_str_tag_6()
-        if self._state.failed:
-            self._o_succeed(None, state.pos)
-        else:
-            self._o_restore(state)
-            self._errpos = errpos
-            self._o_fail()
-
-    def _s_raw_str_tag_6(self):
-        state = self._state.copy()
-        self._o_memoize('r__whitespace', self._r__whitespace)
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._o_memoize('r__comment', self._r__comment)
-
-    def _r_string_tag(self):
-        self._s_string_tag_1()
-        v__1 = self._state.val
-        self._s_string_tag_3()
-        if self._state.failed:
-            return
-        self._o_succeed(v__1, self._state.pos)
-
-    def _s_string_tag_1(self):
-        state = self._state.copy()
-        self._s_string_tag_2()
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._o_memoize('r_tag', self._r_tag)
-
-    def _s_string_tag_2(self):
-        self._o_memoize('r__filler', self._r__filler)
-        self._o_ch('i')
-
-    def _s_string_tag_3(self):
-        state = self._state.copy()
-        errpos = self._errpos
-        self._s_string_tag_4()
-        if self._state.failed:
-            self._o_succeed(None, state.pos)
-        else:
-            self._o_restore(state)
-            self._errpos = errpos
-            self._o_fail()
-
-    def _s_string_tag_4(self):
-        state = self._state.copy()
-        self._o_memoize('r__whitespace', self._r__whitespace)
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._o_memoize('r__comment', self._r__comment)
-
-    def _r_tag(self):
-        state = self._state.copy()
-        self._s_tag_1()
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._s_tag_2()
-
-    def _s_tag_1(self):
-        self._o_memoize('r__filler', self._r__filler)
-        self._o_memoize('r_bareword', self._r_bareword)
-
-    def _s_tag_2(self):
-        self._o_memoize('r__filler', self._r__filler)
-        self._o_succeed('', self._state.pos)
-
-    def _r_bareword(self):
-        self._s_bareword_1()
-        if self._state.failed:
-            return
-        self._s_bareword_3()
-
-    def _s_bareword_1(self):
-        state = self._state.copy()
-        errpos = self._errpos
-        self._s_bareword_2()
-        if self._state.failed:
-            self._o_succeed(None, state.pos)
-        else:
-            self._o_restore(state)
-            self._errpos = errpos
-            self._o_fail()
-
-    def _s_bareword_2(self):
-        state = self._state.copy()
-        self._o_str('true')
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._o_str('false')
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._o_str('null')
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._o_memoize('r_number', self._r_number)
-
-    def _s_bareword_3(self):
-        start = self._state.pos
-        self._s_bareword_4()
-        if self._state.failed:
-            return
-        end = self._state.pos
-        self._state.val = self._text[start:end]
-
-    def _s_bareword_4(self):
-        vs = []
-        self._s_bareword_5()
-        if self._state.failed:
-            return
-        vs.append(self._state.val)
-        while True:
-            state = self._state.copy()
-            self._s_bareword_5()
-            if self._state.failed or self._state.pos == state.pos:
-                self._o_restore(state)
-                break
-            vs.append(self._state.val)
-        self._o_succeed(vs, self._state.pos)
-
-    def _s_bareword_5(self):
-        state = self._state.copy()
-        errpos = self._errpos
-        self._s_bareword_6()
-        if self._state.failed:
-            self._o_succeed(None, state.pos)
-        else:
-            self._o_restore(state)
-            self._errpos = errpos
-            self._o_fail()
-        if not self._state.failed:
-            self._r_any()
-
-    def _s_bareword_6(self):
-        state = self._state.copy()
-        self._o_memoize('r_punct', self._r_punct)
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._o_memoize('r__whitespace', self._r__whitespace)
-
-    def _r_numword(self):
-        self._s_numword_1()
-        if self._state.failed:
-            return
-        v__1 = self._state.val
-        if self._state.failed:
-            return
-        self._o_succeed(['numword', '', v__1], self._state.pos)
-
-    def _s_numword_1(self):
-        start = self._state.pos
-        self._s_numword_2()
-        if self._state.failed:
-            return
-        end = self._state.pos
-        self._state.val = self._text[start:end]
-
-    def _s_numword_2(self):
-        self._o_memoize('r_number', self._r_number)
-        if self._state.failed:
-            return
-        self._s_numword_3()
-
-    def _s_numword_3(self):
-        vs = []
-        self._s_numword_4()
-        if self._state.failed:
-            return
-        vs.append(self._state.val)
-        while True:
-            state = self._state.copy()
-            self._s_numword_4()
-            if self._state.failed or self._state.pos == state.pos:
-                self._o_restore(state)
-                break
-            vs.append(self._state.val)
-        self._o_succeed(vs, self._state.pos)
-
-    def _s_numword_4(self):
-        state = self._state.copy()
-        errpos = self._errpos
-        self._s_numword_5()
-        if self._state.failed:
-            self._o_succeed(None, state.pos)
-        else:
-            self._o_restore(state)
-            self._errpos = errpos
-            self._o_fail()
-        if not self._state.failed:
-            self._r_any()
-
-    def _s_numword_5(self):
-        state = self._state.copy()
-        self._o_memoize('r_punct', self._r_punct)
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._o_memoize('r__whitespace', self._r__whitespace)
-
-    def _r_raw_str(self):
-        state = self._state.copy()
-        self._scopes.append({})
-        self._s_raw_str_1()
-        self._scopes.pop()
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._scopes.append({})
-        self._s_raw_str_6()
-        self._scopes.pop()
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._scopes.append({})
-        self._s_raw_str_11()
-        self._scopes.pop()
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._scopes.append({})
-        self._s_raw_str_16()
-        self._scopes.pop()
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._scopes.append({})
-        self._s_raw_str_21()
-        self._scopes.pop()
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._scopes.append({})
-        self._s_raw_str_26()
-        self._scopes.pop()
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._scopes.append({})
-        self._s_raw_str_31()
-        self._scopes.pop()
-
-    def _s_raw_str_1(self):
-        self._o_memoize('r_tsq', self._r_tsq)
-        if self._state.failed:
-            return
-        v__1 = self._state.val
-        if self._state.failed:
-            return
-        self._s_raw_str_2()
-        v__2 = self._state.val
-        self._s_raw_str_3()
-        v__3 = self._state.val
-        self._o_memoize('r_tsq', self._r_tsq)
-        if self._state.failed:
-            return
-        self._o_succeed([v__1, v__2, v__3], self._state.pos)
-
-    def _s_raw_str_2(self):
-        self._o_succeed(self._fn_colno(), self._state.pos)
-
-    def _s_raw_str_3(self):
-        start = self._state.pos
-        self._s_raw_str_4()
-        end = self._state.pos
-        self._state.val = self._text[start:end]
-
-    def _s_raw_str_4(self):
-        vs = []
-        while True:
-            state = self._state.copy()
-            self._s_raw_str_5()
-            if self._state.failed or self._state.pos == state.pos:
-                self._o_restore(state)
-                break
-            vs.append(self._state.val)
-        self._o_succeed(vs, self._state.pos)
-
-    def _s_raw_str_5(self):
-        state = self._state.copy()
-        errpos = self._errpos
-        self._o_memoize('r_tsq', self._r_tsq)
-        if self._state.failed:
-            self._o_succeed(None, state.pos)
-        else:
-            self._o_restore(state)
-            self._errpos = errpos
-            self._o_fail()
-        if not self._state.failed:
-            self._r_any()
-
-    def _s_raw_str_6(self):
-        self._o_memoize('r_tdq', self._r_tdq)
-        if self._state.failed:
-            return
-        v__1 = self._state.val
-        if self._state.failed:
-            return
-        self._s_raw_str_7()
-        v__2 = self._state.val
-        self._s_raw_str_8()
-        v__3 = self._state.val
-        self._o_memoize('r_tdq', self._r_tdq)
-        if self._state.failed:
-            return
-        self._o_succeed([v__1, v__2, v__3], self._state.pos)
-
-    def _s_raw_str_7(self):
-        self._o_succeed(self._fn_colno(), self._state.pos)
-
-    def _s_raw_str_8(self):
-        start = self._state.pos
-        self._s_raw_str_9()
-        end = self._state.pos
-        self._state.val = self._text[start:end]
-
-    def _s_raw_str_9(self):
-        vs = []
-        while True:
-            state = self._state.copy()
-            self._s_raw_str_10()
-            if self._state.failed or self._state.pos == state.pos:
-                self._o_restore(state)
-                break
-            vs.append(self._state.val)
-        self._o_succeed(vs, self._state.pos)
-
-    def _s_raw_str_10(self):
-        state = self._state.copy()
-        errpos = self._errpos
-        self._o_memoize('r_tdq', self._r_tdq)
-        if self._state.failed:
-            self._o_succeed(None, state.pos)
-        else:
-            self._o_restore(state)
-            self._errpos = errpos
-            self._o_fail()
-        if not self._state.failed:
-            self._r_any()
-
-    def _s_raw_str_11(self):
-        self._o_memoize('r_tbq', self._r_tbq)
-        if self._state.failed:
-            return
-        v__1 = self._state.val
-        if self._state.failed:
-            return
-        self._s_raw_str_12()
-        v__2 = self._state.val
-        self._s_raw_str_13()
-        v__3 = self._state.val
-        self._o_memoize('r_tbq', self._r_tbq)
-        if self._state.failed:
-            return
-        self._o_succeed([v__1, v__2, v__3], self._state.pos)
-
-    def _s_raw_str_12(self):
-        self._o_succeed(self._fn_colno(), self._state.pos)
-
-    def _s_raw_str_13(self):
-        start = self._state.pos
-        self._s_raw_str_14()
-        end = self._state.pos
-        self._state.val = self._text[start:end]
-
-    def _s_raw_str_14(self):
-        vs = []
-        while True:
-            state = self._state.copy()
-            self._s_raw_str_15()
-            if self._state.failed or self._state.pos == state.pos:
-                self._o_restore(state)
-                break
-            vs.append(self._state.val)
-        self._o_succeed(vs, self._state.pos)
-
-    def _s_raw_str_15(self):
-        state = self._state.copy()
-        errpos = self._errpos
-        self._o_memoize('r_tbq', self._r_tbq)
-        if self._state.failed:
-            self._o_succeed(None, state.pos)
-        else:
-            self._o_restore(state)
-            self._errpos = errpos
-            self._o_fail()
-        if not self._state.failed:
-            self._r_any()
-
-    def _s_raw_str_16(self):
-        self._o_memoize('r_sq', self._r_sq)
-        if self._state.failed:
-            return
-        v__1 = self._state.val
-        if self._state.failed:
-            return
-        self._s_raw_str_17()
-        v__2 = self._state.val
-        self._s_raw_str_18()
-        v__3 = self._state.val
-        self._o_memoize('r_sq', self._r_sq)
-        if self._state.failed:
-            return
-        self._o_succeed([v__1, v__2, v__3], self._state.pos)
-
-    def _s_raw_str_17(self):
-        self._o_succeed(self._fn_colno(), self._state.pos)
-
-    def _s_raw_str_18(self):
-        start = self._state.pos
-        self._s_raw_str_19()
-        end = self._state.pos
-        self._state.val = self._text[start:end]
-
-    def _s_raw_str_19(self):
-        vs = []
-        while True:
-            state = self._state.copy()
-            self._s_raw_str_20()
-            if self._state.failed or self._state.pos == state.pos:
-                self._o_restore(state)
-                break
-            vs.append(self._state.val)
-        self._o_succeed(vs, self._state.pos)
-
-    def _s_raw_str_20(self):
-        state = self._state.copy()
-        errpos = self._errpos
-        self._o_memoize('r_sq', self._r_sq)
-        if self._state.failed:
-            self._o_succeed(None, state.pos)
-        else:
-            self._o_restore(state)
-            self._errpos = errpos
-            self._o_fail()
-        if not self._state.failed:
-            self._r_any()
-
-    def _s_raw_str_21(self):
-        self._o_memoize('r_dq', self._r_dq)
-        if self._state.failed:
-            return
-        v__1 = self._state.val
-        if self._state.failed:
-            return
-        self._s_raw_str_22()
-        v__2 = self._state.val
-        self._s_raw_str_23()
-        v__3 = self._state.val
-        self._o_memoize('r_dq', self._r_dq)
-        if self._state.failed:
-            return
-        self._o_succeed([v__1, v__2, v__3], self._state.pos)
-
-    def _s_raw_str_22(self):
-        self._o_succeed(self._fn_colno(), self._state.pos)
-
-    def _s_raw_str_23(self):
-        start = self._state.pos
-        self._s_raw_str_24()
-        end = self._state.pos
-        self._state.val = self._text[start:end]
-
-    def _s_raw_str_24(self):
-        vs = []
-        while True:
-            state = self._state.copy()
-            self._s_raw_str_25()
-            if self._state.failed or self._state.pos == state.pos:
-                self._o_restore(state)
-                break
-            vs.append(self._state.val)
-        self._o_succeed(vs, self._state.pos)
-
-    def _s_raw_str_25(self):
-        state = self._state.copy()
-        errpos = self._errpos
-        self._o_memoize('r_dq', self._r_dq)
-        if self._state.failed:
-            self._o_succeed(None, state.pos)
-        else:
-            self._o_restore(state)
-            self._errpos = errpos
-            self._o_fail()
-        if not self._state.failed:
-            self._r_any()
-
-    def _s_raw_str_26(self):
-        self._o_memoize('r_bq', self._r_bq)
-        if self._state.failed:
-            return
-        v__1 = self._state.val
-        if self._state.failed:
-            return
-        self._s_raw_str_27()
-        v__2 = self._state.val
-        self._s_raw_str_28()
-        v__3 = self._state.val
-        self._o_memoize('r_bq', self._r_bq)
-        if self._state.failed:
-            return
-        self._o_succeed([v__1, v__2, v__3], self._state.pos)
-
-    def _s_raw_str_27(self):
-        self._o_succeed(self._fn_colno(), self._state.pos)
-
-    def _s_raw_str_28(self):
-        start = self._state.pos
-        self._s_raw_str_29()
-        end = self._state.pos
-        self._state.val = self._text[start:end]
-
-    def _s_raw_str_29(self):
-        vs = []
-        while True:
-            state = self._state.copy()
-            self._s_raw_str_30()
-            if self._state.failed or self._state.pos == state.pos:
-                self._o_restore(state)
-                break
-            vs.append(self._state.val)
-        self._o_succeed(vs, self._state.pos)
-
-    def _s_raw_str_30(self):
-        state = self._state.copy()
-        errpos = self._errpos
-        self._o_memoize('r_bq', self._r_bq)
-        if self._state.failed:
-            self._o_succeed(None, state.pos)
-        else:
-            self._o_restore(state)
-            self._errpos = errpos
-            self._o_fail()
-        if not self._state.failed:
-            self._r_any()
-
-    def _s_raw_str_31(self):
-        self._o_ch('L')
-        if self._state.failed:
-            return
-        self._s_raw_str_32()
-        if self._state.failed:
-            return
-        self._scopes[-1]['lq'] = self._state.val
-        if self._state.failed:
-            return
-        self._s_raw_str_35()
-        v_c = self._state.val
-        self._s_raw_str_36()
-        v_s = self._state.val
-        self._o_str(self._o_lookup('lq'))
-        if self._state.failed:
-            return
-        self._o_succeed(
-            [self._fn_strcat('L', self._o_lookup('lq')), v_c, v_s],
-            self._state.pos,
-        )
-
-    def _s_raw_str_32(self):
-        start = self._state.pos
-        self._s_raw_str_33()
-        if self._state.failed:
-            return
-        end = self._state.pos
-        self._state.val = self._text[start:end]
-
-    def _s_raw_str_33(self):
-        self._o_memoize('r_sq', self._r_sq)
-        if self._state.failed:
-            return
-        self._s_raw_str_34()
-        if self._state.failed:
-            return
-        self._o_memoize('r_sq', self._r_sq)
-
-    def _s_raw_str_34(self):
-        vs = []
-        self._o_ch('=')
-        if self._state.failed:
-            return
-        vs.append(self._state.val)
-        while True:
-            state = self._state.copy()
-            self._o_ch('=')
-            if self._state.failed or self._state.pos == state.pos:
-                self._o_restore(state)
-                break
-            vs.append(self._state.val)
-        self._o_succeed(vs, self._state.pos)
-
-    def _s_raw_str_35(self):
-        self._o_succeed(self._fn_colno(), self._state.pos)
-
-    def _s_raw_str_36(self):
-        start = self._state.pos
-        self._s_raw_str_37()
-        end = self._state.pos
-        self._state.val = self._text[start:end]
-
-    def _s_raw_str_37(self):
-        vs = []
-        while True:
-            state = self._state.copy()
-            self._s_raw_str_38()
-            if self._state.failed or self._state.pos == state.pos:
-                self._o_restore(state)
-                break
-            vs.append(self._state.val)
-        self._o_succeed(vs, self._state.pos)
-
-    def _s_raw_str_38(self):
-        state = self._state.copy()
-        errpos = self._errpos
-        self._s_raw_str_39()
-        if self._state.failed:
-            self._o_succeed(None, state.pos)
-        else:
-            self._o_restore(state)
-            self._errpos = errpos
-            self._o_fail()
-        if not self._state.failed:
-            self._r_any()
-
-    def _s_raw_str_39(self):
-        self._o_str(self._o_lookup('lq'))
-
-    def _r_str(self):
-        state = self._state.copy()
-        self._scopes.append({})
-        self._s_str_1()
-        self._scopes.pop()
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._scopes.append({})
-        self._s_str_7()
-        self._scopes.pop()
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._scopes.append({})
-        self._s_str_13()
-        self._scopes.pop()
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._scopes.append({})
-        self._s_str_19()
-        self._scopes.pop()
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._scopes.append({})
-        self._s_str_25()
-        self._scopes.pop()
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._scopes.append({})
-        self._s_str_31()
-        self._scopes.pop()
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._scopes.append({})
-        self._s_str_37()
-        self._scopes.pop()
-
-    def _s_str_1(self):
-        self._o_memoize('r_tsq', self._r_tsq)
-        if self._state.failed:
-            return
-        v__1 = self._state.val
-        if self._state.failed:
-            return
-        self._s_str_2()
-        v__2 = self._state.val
-        self._s_str_3()
-        v__3 = self._state.val
-        self._o_memoize('r_tsq', self._r_tsq)
-        if self._state.failed:
-            return
-        self._o_succeed([v__1, v__2, v__3], self._state.pos)
-
-    def _s_str_2(self):
-        self._o_succeed(self._fn_colno(), self._state.pos)
-
-    def _s_str_3(self):
-        start = self._state.pos
-        self._s_str_4()
-        end = self._state.pos
-        self._state.val = self._text[start:end]
-
-    def _s_str_4(self):
-        vs = []
-        while True:
-            state = self._state.copy()
-            self._s_str_5()
-            if self._state.failed or self._state.pos == state.pos:
-                self._o_restore(state)
-                break
-            vs.append(self._state.val)
-        self._o_succeed(vs, self._state.pos)
-
-    def _s_str_5(self):
-        self._s_str_6()
-        if self._state.failed:
-            return
-        self._o_memoize('r_bchar', self._r_bchar)
-
-    def _s_str_6(self):
-        state = self._state.copy()
-        errpos = self._errpos
-        self._o_memoize('r_tsq', self._r_tsq)
-        if self._state.failed:
-            self._o_succeed(None, state.pos)
-        else:
-            self._o_restore(state)
-            self._errpos = errpos
-            self._o_fail()
-
-    def _s_str_7(self):
-        self._o_memoize('r_tdq', self._r_tdq)
-        if self._state.failed:
-            return
-        v__1 = self._state.val
-        if self._state.failed:
-            return
-        self._s_str_8()
-        v__2 = self._state.val
-        self._s_str_9()
-        v__3 = self._state.val
-        self._o_memoize('r_tdq', self._r_tdq)
-        if self._state.failed:
-            return
-        self._o_succeed([v__1, v__2, v__3], self._state.pos)
-
-    def _s_str_8(self):
-        self._o_succeed(self._fn_colno(), self._state.pos)
-
-    def _s_str_9(self):
-        start = self._state.pos
-        self._s_str_10()
-        end = self._state.pos
-        self._state.val = self._text[start:end]
-
-    def _s_str_10(self):
-        vs = []
-        while True:
-            state = self._state.copy()
-            self._s_str_11()
-            if self._state.failed or self._state.pos == state.pos:
-                self._o_restore(state)
-                break
-            vs.append(self._state.val)
-        self._o_succeed(vs, self._state.pos)
-
-    def _s_str_11(self):
-        self._s_str_12()
-        if self._state.failed:
-            return
-        self._o_memoize('r_bchar', self._r_bchar)
-
-    def _s_str_12(self):
-        state = self._state.copy()
-        errpos = self._errpos
-        self._o_memoize('r_tdq', self._r_tdq)
-        if self._state.failed:
-            self._o_succeed(None, state.pos)
-        else:
-            self._o_restore(state)
-            self._errpos = errpos
-            self._o_fail()
-
-    def _s_str_13(self):
-        self._o_memoize('r_tbq', self._r_tbq)
-        if self._state.failed:
-            return
-        v__1 = self._state.val
-        if self._state.failed:
-            return
-        self._s_str_14()
-        v__2 = self._state.val
-        self._s_str_15()
-        v__3 = self._state.val
-        self._o_memoize('r_tbq', self._r_tbq)
-        if self._state.failed:
-            return
-        self._o_succeed([v__1, v__2, v__3], self._state.pos)
-
-    def _s_str_14(self):
-        self._o_succeed(self._fn_colno(), self._state.pos)
-
-    def _s_str_15(self):
-        start = self._state.pos
-        self._s_str_16()
-        end = self._state.pos
-        self._state.val = self._text[start:end]
-
-    def _s_str_16(self):
-        vs = []
-        while True:
-            state = self._state.copy()
-            self._s_str_17()
-            if self._state.failed or self._state.pos == state.pos:
-                self._o_restore(state)
-                break
-            vs.append(self._state.val)
-        self._o_succeed(vs, self._state.pos)
-
-    def _s_str_17(self):
-        self._s_str_18()
-        if self._state.failed:
-            return
-        self._o_memoize('r_bchar', self._r_bchar)
-
-    def _s_str_18(self):
-        state = self._state.copy()
-        errpos = self._errpos
-        self._o_memoize('r_tbq', self._r_tbq)
-        if self._state.failed:
-            self._o_succeed(None, state.pos)
-        else:
-            self._o_restore(state)
-            self._errpos = errpos
-            self._o_fail()
-
-    def _s_str_19(self):
-        self._o_memoize('r_sq', self._r_sq)
-        if self._state.failed:
-            return
-        v__1 = self._state.val
-        if self._state.failed:
-            return
-        self._s_str_20()
-        v__2 = self._state.val
-        self._s_str_21()
-        v__3 = self._state.val
-        self._o_memoize('r_sq', self._r_sq)
-        if self._state.failed:
-            return
-        self._o_succeed([v__1, v__2, v__3], self._state.pos)
-
-    def _s_str_20(self):
-        self._o_succeed(self._fn_colno(), self._state.pos)
-
-    def _s_str_21(self):
-        start = self._state.pos
-        self._s_str_22()
-        end = self._state.pos
-        self._state.val = self._text[start:end]
-
-    def _s_str_22(self):
-        vs = []
-        while True:
-            state = self._state.copy()
-            self._s_str_23()
-            if self._state.failed or self._state.pos == state.pos:
-                self._o_restore(state)
-                break
-            vs.append(self._state.val)
-        self._o_succeed(vs, self._state.pos)
-
-    def _s_str_23(self):
-        self._s_str_24()
-        if self._state.failed:
-            return
-        self._o_memoize('r_bchar', self._r_bchar)
-
-    def _s_str_24(self):
-        state = self._state.copy()
-        errpos = self._errpos
-        self._o_memoize('r_sq', self._r_sq)
-        if self._state.failed:
-            self._o_succeed(None, state.pos)
-        else:
-            self._o_restore(state)
-            self._errpos = errpos
-            self._o_fail()
-
-    def _s_str_25(self):
-        self._o_memoize('r_dq', self._r_dq)
-        if self._state.failed:
-            return
-        v__1 = self._state.val
-        if self._state.failed:
-            return
-        self._s_str_26()
-        v__2 = self._state.val
-        self._s_str_27()
-        v__3 = self._state.val
-        self._o_memoize('r_dq', self._r_dq)
-        if self._state.failed:
-            return
-        self._o_succeed([v__1, v__2, v__3], self._state.pos)
-
-    def _s_str_26(self):
-        self._o_succeed(self._fn_colno(), self._state.pos)
-
-    def _s_str_27(self):
-        start = self._state.pos
-        self._s_str_28()
-        end = self._state.pos
-        self._state.val = self._text[start:end]
-
-    def _s_str_28(self):
-        vs = []
-        while True:
-            state = self._state.copy()
-            self._s_str_29()
-            if self._state.failed or self._state.pos == state.pos:
-                self._o_restore(state)
-                break
-            vs.append(self._state.val)
-        self._o_succeed(vs, self._state.pos)
-
-    def _s_str_29(self):
-        self._s_str_30()
-        if self._state.failed:
-            return
-        self._o_memoize('r_bchar', self._r_bchar)
-
-    def _s_str_30(self):
-        state = self._state.copy()
-        errpos = self._errpos
-        self._o_memoize('r_dq', self._r_dq)
-        if self._state.failed:
-            self._o_succeed(None, state.pos)
-        else:
-            self._o_restore(state)
-            self._errpos = errpos
-            self._o_fail()
-
-    def _s_str_31(self):
-        self._o_memoize('r_bq', self._r_bq)
-        if self._state.failed:
-            return
-        v__1 = self._state.val
-        if self._state.failed:
-            return
-        self._s_str_32()
-        v__2 = self._state.val
-        self._s_str_33()
-        v__3 = self._state.val
-        self._o_memoize('r_bq', self._r_bq)
-        if self._state.failed:
-            return
-        self._o_succeed([v__1, v__2, v__3], self._state.pos)
-
-    def _s_str_32(self):
-        self._o_succeed(self._fn_colno(), self._state.pos)
-
-    def _s_str_33(self):
-        start = self._state.pos
-        self._s_str_34()
-        end = self._state.pos
-        self._state.val = self._text[start:end]
-
-    def _s_str_34(self):
-        vs = []
-        while True:
-            state = self._state.copy()
-            self._s_str_35()
-            if self._state.failed or self._state.pos == state.pos:
-                self._o_restore(state)
-                break
-            vs.append(self._state.val)
-        self._o_succeed(vs, self._state.pos)
-
-    def _s_str_35(self):
-        self._s_str_36()
-        if self._state.failed:
-            return
-        self._o_memoize('r_bchar', self._r_bchar)
-
-    def _s_str_36(self):
-        state = self._state.copy()
-        errpos = self._errpos
-        self._o_memoize('r_bq', self._r_bq)
-        if self._state.failed:
-            self._o_succeed(None, state.pos)
-        else:
-            self._o_restore(state)
-            self._errpos = errpos
-            self._o_fail()
-
-    def _s_str_37(self):
-        self._o_ch('L')
-        if self._state.failed:
-            return
-        self._s_str_38()
-        if self._state.failed:
-            return
-        self._scopes[-1]['lq'] = self._state.val
-        if self._state.failed:
-            return
-        self._s_str_41()
-        v_c = self._state.val
-        self._s_str_42()
-        v_s = self._state.val
-        self._o_str(self._o_lookup('lq'))
-        if self._state.failed:
-            return
-        self._o_succeed(
-            [self._fn_strcat('L', self._o_lookup('lq')), v_c, v_s],
-            self._state.pos,
-        )
-
-    def _s_str_38(self):
-        start = self._state.pos
-        self._s_str_39()
-        if self._state.failed:
-            return
-        end = self._state.pos
-        self._state.val = self._text[start:end]
-
-    def _s_str_39(self):
-        self._o_memoize('r_sq', self._r_sq)
-        if self._state.failed:
-            return
-        self._s_str_40()
-        if self._state.failed:
-            return
-        self._o_memoize('r_sq', self._r_sq)
-
-    def _s_str_40(self):
-        vs = []
-        self._o_ch('=')
-        if self._state.failed:
-            return
-        vs.append(self._state.val)
-        while True:
-            state = self._state.copy()
-            self._o_ch('=')
-            if self._state.failed or self._state.pos == state.pos:
-                self._o_restore(state)
-                break
-            vs.append(self._state.val)
-        self._o_succeed(vs, self._state.pos)
-
-    def _s_str_41(self):
-        self._o_succeed(self._fn_colno(), self._state.pos)
-
-    def _s_str_42(self):
-        start = self._state.pos
-        self._s_str_43()
-        end = self._state.pos
-        self._state.val = self._text[start:end]
-
-    def _s_str_43(self):
-        vs = []
-        while True:
-            state = self._state.copy()
-            self._s_str_44()
-            if self._state.failed or self._state.pos == state.pos:
-                self._o_restore(state)
-                break
-            vs.append(self._state.val)
-        self._o_succeed(vs, self._state.pos)
-
-    def _s_str_44(self):
-        self._s_str_45()
-        if self._state.failed:
-            return
-        self._o_memoize('r_bchar', self._r_bchar)
-
-    def _s_str_45(self):
-        state = self._state.copy()
-        errpos = self._errpos
-        self._s_str_46()
-        if self._state.failed:
-            self._o_succeed(None, state.pos)
-        else:
-            self._o_restore(state)
-            self._errpos = errpos
-            self._o_fail()
-
-    def _s_str_46(self):
-        self._o_str(self._o_lookup('lq'))
-
-    def _r_punct(self):
-        rexp = "(L'=+')|[/#'\"`\\[\\](){}:=,]"
-        pos = self.pos()
-        if rexp not in self._regexps:
-            self._regexps[rexp] = re.compile(rexp)
-        m = self._regexps[rexp].match(self._text, pos)
-        if m:
-            self._o_succeed(m.group(0), m.end())
-            return
-        self._o_fail()
-
-    def _r_sq(self):
-        self._o_ch("'")
-
-    def _r_dq(self):
-        self._o_ch('"')
-
-    def _r_bq(self):
-        self._o_ch('`')
-
-    def _r_tsq(self):
-        self._o_str("'''")
-
-    def _r_tbq(self):
-        self._o_str('```')
-
-    def _r_tdq(self):
-        self._o_str('"""')
-
     def _r_bchar(self):
         state = self._state.copy()
         self._s_bchar_1()
@@ -1876,25 +1035,15 @@ class _Parser:
         self._o_memoize('r_any', self._r_any)
 
     def _s_bchar_1(self):
-        self._o_memoize('r_bslash', self._r_bslash)
+        self._o_memoize('r__filler', self._r__filler)
+        self._o_ch('\\')
         if self._state.failed:
             return
         self._o_memoize('r_escape', self._r_escape)
 
-    def _r_bslash(self):
-        self._o_ch('\\')
-
     def _r_escape(self):
         state = self._state.copy()
-        self._o_memoize('r_bslash', self._r_bslash)
-        if not self._state.failed:
-            return
-        self._o_restore(state)
         self._s_escape_1()
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._s_escape_2()
         if not self._state.failed:
             return
         self._o_restore(state)
@@ -1902,18 +1051,22 @@ class _Parser:
         if not self._state.failed:
             return
         self._o_restore(state)
-        self._s_escape_5()
+        self._s_escape_4()
         if not self._state.failed:
             return
         self._o_restore(state)
-        self._s_escape_7()
+        self._s_escape_6()
         if not self._state.failed:
             return
         self._o_restore(state)
-        self._s_escape_9()
+        self._s_escape_8()
 
     def _s_escape_1(self):
-        rexp = '[abfnrtv\'"`]'
+        self._o_memoize('r__filler', self._r__filler)
+        self._s_escape_2()
+
+    def _s_escape_2(self):
+        rexp = '[\\abfnrtv\'"`]'
         pos = self.pos()
         if rexp not in self._regexps:
             self._regexps[rexp] = re.compile(rexp)
@@ -1923,7 +1076,7 @@ class _Parser:
             return
         self._o_fail()
 
-    def _s_escape_2(self):
+    def _s_escape_3(self):
         vs = []
         i = 0
         cmin = 1
@@ -1938,16 +1091,17 @@ class _Parser:
             i += 1
         self._o_succeed(vs, self._state.pos)
 
-    def _s_escape_3(self):
+    def _s_escape_4(self):
+        self._o_memoize('r__filler', self._r__filler)
         self._o_ch('x')
         if self._state.failed:
             return
-        self._s_escape_4()
+        self._s_escape_5()
 
-    def _s_escape_4(self):
+    def _s_escape_5(self):
         vs = []
         i = 0
-        cmin = 2
+        cmin = 1
         cmax = 2
         while i < cmax:
             self._o_memoize('r_hex', self._r_hex)
@@ -1959,7 +1113,7 @@ class _Parser:
             i += 1
         self._o_succeed(vs, self._state.pos)
 
-    def _s_escape_5(self):
+    def _s_escape_6(self):
         v = self._externs['unicode']
         if v is True:
             self._o_succeed(v, self._state.pos)
@@ -1969,45 +1123,16 @@ class _Parser:
             raise _ParsingRuntimeError('Bad predicate value')
         if self._state.failed:
             return
+        self._o_memoize('r__filler', self._r__filler)
         self._o_ch('u')
         if self._state.failed:
             return
-        self._s_escape_6()
-
-    def _s_escape_6(self):
-        vs = []
-        i = 0
-        cmin = 4
-        cmax = 4
-        while i < cmax:
-            self._o_memoize('r_hex', self._r_hex)
-            if self._state.failed:
-                if i >= cmin:
-                    self._o_succeed(vs, self._state.pos)
-                return
-            vs.append(self._state.val)
-            i += 1
-        self._o_succeed(vs, self._state.pos)
+        self._s_escape_7()
 
     def _s_escape_7(self):
-        v = self._externs['unicode']
-        if v is True:
-            self._o_succeed(v, self._state.pos)
-        elif v is False:
-            self._o_fail()
-        else:
-            raise _ParsingRuntimeError('Bad predicate value')
-        if self._state.failed:
-            return
-        self._o_ch('U')
-        if self._state.failed:
-            return
-        self._s_escape_8()
-
-    def _s_escape_8(self):
         vs = []
         i = 0
-        cmin = 8
+        cmin = 1
         cmax = 8
         while i < cmax:
             self._o_memoize('r_hex', self._r_hex)
@@ -2019,7 +1144,7 @@ class _Parser:
             i += 1
         self._o_succeed(vs, self._state.pos)
 
-    def _s_escape_9(self):
+    def _s_escape_8(self):
         v = self._externs['unicode_names']
         if v is True:
             self._o_succeed(v, self._state.pos)
@@ -2029,31 +1154,22 @@ class _Parser:
             raise _ParsingRuntimeError('Bad predicate value')
         if self._state.failed:
             return
+        self._o_memoize('r__filler', self._r__filler)
         self._o_str('N{')
         if self._state.failed:
             return
-        self._s_escape_10()
+        self._o_memoize('r_unicode_name', self._r_unicode_name)
         if self._state.failed:
             return
+        self._o_memoize('r__filler', self._r__filler)
         self._o_ch('}')
 
-    def _s_escape_10(self):
-        rexp = '[A-Z][A-Z0-9]*(( [A-Z][A-Z0-9]*|(-[A-Z0-9]*)))*'
-        pos = self.pos()
-        if rexp not in self._regexps:
-            self._regexps[rexp] = re.compile(rexp)
-        m = self._regexps[rexp].match(self._text, pos)
-        if m:
-            self._o_succeed(m.group(0), m.end())
-            return
-        self._o_fail()
-
-    def _r_nchar(self):
+    def _r_unicode_name(self):
         self._o_memoize('r__filler', self._r__filler)
-        self._s_nchar_1()
+        self._s_unicode_name_1()
 
-    def _s_nchar_1(self):
-        rexp = '[0-9A-Z -]'
+    def _s_unicode_name_1(self):
+        rexp = '[A-Z][A-Z0-9]*([ -][A-Z][A-Z0-9]*)*'
         pos = self.pos()
         if rexp not in self._regexps:
             self._regexps[rexp] = re.compile(rexp)
@@ -2064,30 +1180,37 @@ class _Parser:
         self._o_fail()
 
     def _r_array(self):
-        self._o_memoize('r_array_tag', self._r_array_tag)
-        if self._state.failed:
+        state = self._state.copy()
+        self._s_array_1()
+        if not self._state.failed:
             return
+        self._o_restore(state)
+        self._s_array_9()
+
+    def _s_array_1(self):
+        self._o_memoize('r_array_tag', self._r_array_tag)
         v__1 = self._state.val
+        self._o_memoize('r_nofiller', self._r_nofiller)
         if self._state.failed:
             return
         self._o_memoize('r__filler', self._r__filler)
         self._o_ch('[')
         if self._state.failed:
             return
-        self._s_array_1()
-        v__3 = self._state.val
         self._s_array_2()
         v__4 = self._state.val
-        self._s_array_6()
+        self._s_array_3()
+        v__5 = self._state.val
+        self._s_array_7()
         self._o_memoize('r__filler', self._r__filler)
         self._o_ch(']')
         if self._state.failed:
             return
         self._o_succeed(
-            ['array', v__1, self._fn_concat(v__3, v__4)], self._state.pos
+            ['array', v__1, self._fn_concat(v__4, v__5)], self._state.pos
         )
 
-    def _s_array_1(self):
+    def _s_array_2(self):
         state = self._state.copy()
         self._o_memoize('r_value', self._r_value)
         if self._state.failed:
@@ -2095,77 +1218,171 @@ class _Parser:
         else:
             self._o_succeed([self._state.val], self._state.pos)
 
-    def _s_array_2(self):
+    def _s_array_3(self):
         vs = []
         while True:
             state = self._state.copy()
-            self._s_array_3()
+            self._s_array_4()
             if self._state.failed or self._state.pos == state.pos:
                 self._o_restore(state)
                 break
             vs.append(self._state.val)
         self._o_succeed(vs, self._state.pos)
 
-    def _s_array_3(self):
-        self._s_array_4()
+    def _s_array_4(self):
+        self._s_array_5()
         self._o_memoize('r_value', self._r_value)
 
-    def _s_array_4(self):
+    def _s_array_5(self):
         state = self._state.copy()
-        self._s_array_5()
+        self._s_array_6()
         if self._state.failed:
             self._o_succeed([], state.pos)
         else:
             self._o_succeed([self._state.val], self._state.pos)
 
-    def _s_array_5(self):
+    def _s_array_6(self):
         self._o_memoize('r__filler', self._r__filler)
         self._o_ch(',')
 
-    def _s_array_6(self):
+    def _s_array_7(self):
         state = self._state.copy()
-        self._s_array_7()
+        self._s_array_8()
         if self._state.failed:
             self._o_succeed([], state.pos)
         else:
             self._o_succeed([self._state.val], self._state.pos)
 
-    def _s_array_7(self):
+    def _s_array_8(self):
+        self._o_memoize('r__filler', self._r__filler)
+        self._o_ch(',')
+
+    def _s_array_9(self):
+        self._o_memoize('r_array_tag', self._r_array_tag)
+        v__1 = self._state.val
+        self._o_memoize('r_nofiller', self._r_nofiller)
+        if self._state.failed:
+            return
+        self._o_memoize('r__filler', self._r__filler)
+        self._o_ch('(')
+        if self._state.failed:
+            return
+        self._s_array_10()
+        v__4 = self._state.val
+        self._s_array_11()
+        v__5 = self._state.val
+        self._s_array_15()
+        self._o_memoize('r__filler', self._r__filler)
+        self._o_ch(')')
+        if self._state.failed:
+            return
+        self._o_succeed(
+            ['array', v__1, self._fn_concat(v__4, v__5)], self._state.pos
+        )
+
+    def _s_array_10(self):
+        state = self._state.copy()
+        self._o_memoize('r_value', self._r_value)
+        if self._state.failed:
+            self._o_succeed([], state.pos)
+        else:
+            self._o_succeed([self._state.val], self._state.pos)
+
+    def _s_array_11(self):
+        vs = []
+        while True:
+            state = self._state.copy()
+            self._s_array_12()
+            if self._state.failed or self._state.pos == state.pos:
+                self._o_restore(state)
+                break
+            vs.append(self._state.val)
+        self._o_succeed(vs, self._state.pos)
+
+    def _s_array_12(self):
+        self._s_array_13()
+        self._o_memoize('r_value', self._r_value)
+
+    def _s_array_13(self):
+        state = self._state.copy()
+        self._s_array_14()
+        if self._state.failed:
+            self._o_succeed([], state.pos)
+        else:
+            self._o_succeed([self._state.val], self._state.pos)
+
+    def _s_array_14(self):
+        self._o_memoize('r__filler', self._r__filler)
+        self._o_ch(',')
+
+    def _s_array_15(self):
+        state = self._state.copy()
+        self._s_array_16()
+        if self._state.failed:
+            self._o_succeed([], state.pos)
+        else:
+            self._o_succeed([self._state.val], self._state.pos)
+
+    def _s_array_16(self):
         self._o_memoize('r__filler', self._r__filler)
         self._o_ch(',')
 
     def _r_array_tag(self):
-        self._o_memoize('r_tag', self._r_tag)
-        v__1 = self._state.val
+        state = self._state.copy()
         self._s_array_tag_1()
-        if self._state.failed:
-            return
-        self._o_succeed(v__1, self._state.pos)
-
-    def _s_array_tag_1(self):
-        state = self._state.copy()
-        errpos = self._errpos
-        self._s_array_tag_2()
-        if self._state.failed:
-            self._o_succeed(None, state.pos)
-        else:
-            self._o_restore(state)
-            self._errpos = errpos
-            self._o_fail()
-
-    def _s_array_tag_2(self):
-        state = self._state.copy()
-        self._o_memoize('r__whitespace', self._r__whitespace)
         if not self._state.failed:
             return
         self._o_restore(state)
-        self._o_memoize('r__comment', self._r__comment)
+        self._s_array_tag_2()
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._s_array_tag_3()
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._s_array_tag_4()
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._s_array_tag_5()
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._s_array_tag_6()
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._o_memoize('r_tag', self._r_tag)
+
+    def _s_array_tag_1(self):
+        self._o_memoize('r__filler', self._r__filler)
+        self._o_ch('s')
+
+    def _s_array_tag_2(self):
+        self._o_memoize('r__filler', self._r__filler)
+        self._o_ch('b')
+
+    def _s_array_tag_3(self):
+        self._o_memoize('r__filler', self._r__filler)
+        self._o_ch('q')
+
+    def _s_array_tag_4(self):
+        self._o_memoize('r__filler', self._r__filler)
+        self._o_str('qq')
+
+    def _s_array_tag_5(self):
+        self._o_memoize('r__filler', self._r__filler)
+        self._o_str('uq')
+
+    def _s_array_tag_6(self):
+        self._o_memoize('r__filler', self._r__filler)
+        self._o_str('us')
 
     def _r_object(self):
         self._o_memoize('r_object_tag', self._r_object_tag)
-        if self._state.failed:
-            return
         v__1 = self._state.val
+        self._o_memoize('r_nofiller', self._r_nofiller)
         if self._state.failed:
             return
         self._o_memoize('r__filler', self._r__filler)
@@ -2173,16 +1390,16 @@ class _Parser:
         if self._state.failed:
             return
         self._s_object_1()
-        v__3 = self._state.val
-        self._s_object_2()
         v__4 = self._state.val
+        self._s_object_2()
+        v__5 = self._state.val
         self._s_object_6()
         self._o_memoize('r__filler', self._r__filler)
         self._o_ch('}')
         if self._state.failed:
             return
         self._o_succeed(
-            ['object', v__1, self._fn_concat(v__3, v__4)], self._state.pos
+            ['object', v__1, self._fn_concat(v__4, v__5)], self._state.pos
         )
 
     def _s_object_1(self):
@@ -2234,30 +1451,6 @@ class _Parser:
 
     def _r_object_tag(self):
         self._o_memoize('r_tag', self._r_tag)
-        v__1 = self._state.val
-        self._s_object_tag_1()
-        if self._state.failed:
-            return
-        self._o_succeed(v__1, self._state.pos)
-
-    def _s_object_tag_1(self):
-        state = self._state.copy()
-        errpos = self._errpos
-        self._s_object_tag_2()
-        if self._state.failed:
-            self._o_succeed(None, state.pos)
-        else:
-            self._o_restore(state)
-            self._errpos = errpos
-            self._o_fail()
-
-    def _s_object_tag_2(self):
-        state = self._state.copy()
-        self._o_memoize('r__whitespace', self._r__whitespace)
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._o_memoize('r__comment', self._r__comment)
 
     def _r_member(self):
         self._o_memoize('r_key', self._r_key)
@@ -2295,13 +1488,43 @@ class _Parser:
 
     def _r_key(self):
         state = self._state.copy()
-        self._o_memoize('r_string', self._r_string)
+        self._s_key_1()
         if not self._state.failed:
             return
         self._o_restore(state)
-        self._s_key_1()
+        self._s_key_3()
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._s_key_5()
 
     def _s_key_1(self):
+        self._s_key_2()
+        if self._state.failed:
+            return
+        v__1 = self._state.val
+        if self._state.failed:
+            return
+        self._o_succeed(['string', v__1, []], self._state.pos)
+
+    def _s_key_2(self):
+        self._o_memoize('r__filler', self._r__filler)
+        self._o_memoize('r_string', self._r_string)
+
+    def _s_key_3(self):
+        self._s_key_4()
+        if self._state.failed:
+            return
+        v__1 = self._state.val
+        if self._state.failed:
+            return
+        self._o_succeed(['bareword', v__1, []], self._state.pos)
+
+    def _s_key_4(self):
+        self._o_memoize('r__filler', self._r__filler)
+        self._o_memoize('r_bareword', self._r_bareword)
+
+    def _s_key_5(self):
         v = self._externs['allow_numwords']
         if v is True:
             self._o_succeed(v, self._state.pos)
@@ -2311,8 +1534,14 @@ class _Parser:
             raise _ParsingRuntimeError('Bad predicate value')
         if self._state.failed:
             return
+        v__1 = self._state.val
+        if self._state.failed:
+            return
         self._o_memoize('r__filler', self._r__filler)
         self._o_memoize('r_numword', self._r_numword)
+        if self._state.failed:
+            return
+        self._o_succeed(['numword', v__1, []], self._state.pos)
 
     def _r__whitespace(self):
         vs = []
@@ -2346,15 +1575,24 @@ class _Parser:
         if not self._state.failed:
             return
         self._o_restore(state)
-        self._s__comment_4()
+        self._s__comment_9()
 
     def _s__comment_1(self):
+        start = self._state.pos
         self._s__comment_2()
         if self._state.failed:
             return
-        self._s__comment_3()
+        end = self._state.pos
+        self._state.val = self._text[start:end]
 
     def _s__comment_2(self):
+        self._s__comment_3()
+        if self._state.failed:
+            return
+        self._s__comment_4()
+        self._s__comment_6()
+
+    def _s__comment_3(self):
         state = self._state.copy()
         self._o_ch('#')
         if not self._state.failed:
@@ -2362,28 +1600,63 @@ class _Parser:
         self._o_restore(state)
         self._o_str('//')
 
-    def _s__comment_3(self):
+    def _s__comment_4(self):
         vs = []
         while True:
             state = self._state.copy()
-            state = self._state.copy()
-            errpos = self._errpos
-            self._o_memoize('r_eol', self._r_eol)
-            if self._state.failed:
-                self._o_succeed(None, state.pos)
-            else:
-                self._o_restore(state)
-                self._errpos = errpos
-                self._o_fail()
-            if not self._state.failed:
-                self._r_any()
+            self._s__comment_5()
             if self._state.failed or self._state.pos == state.pos:
                 self._o_restore(state)
                 break
             vs.append(self._state.val)
         self._o_succeed(vs, self._state.pos)
 
-    def _s__comment_4(self):
+    def _s__comment_5(self):
+        rexp = '[^\r\n]'
+        pos = self.pos()
+        if rexp not in self._regexps:
+            self._regexps[rexp] = re.compile(rexp)
+        m = self._regexps[rexp].match(self._text, pos)
+        if m:
+            self._o_succeed(m.group(0), m.end())
+            return
+        self._o_fail()
+
+    def _s__comment_6(self):
+        state = self._state.copy()
+        self._o_memoize('r_end', self._r_end)
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._s__comment_7()
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._o_ch('\n')
+
+    def _s__comment_7(self):
+        self._o_ch('\r')
+        if self._state.failed:
+            return
+        self._s__comment_8()
+
+    def _s__comment_8(self):
+        state = self._state.copy()
+        self._o_ch('\n')
+        if self._state.failed:
+            self._o_succeed([], state.pos)
+        else:
+            self._o_succeed([self._state.val], self._state.pos)
+
+    def _s__comment_9(self):
+        start = self._state.pos
+        self._s__comment_10()
+        if self._state.failed:
+            return
+        end = self._state.pos
+        self._state.val = self._text[start:end]
+
+    def _s__comment_10(self):
         self._o_str('/*')
         if self._state.failed:
             return
@@ -2512,9 +1785,3 @@ class _Parser:
 
     def _fn_concat(self, xs, ys):
         return xs + ys
-
-    def _fn_cons(self, hd, tl):
-        return [hd] + tl
-
-    def _fn_strcat(self, *args):
-        return ''.join(args)

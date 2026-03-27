@@ -66,9 +66,8 @@ class _Tests:
             ['--unknown-switch'],
             returncode=2,
             err=(
-                'usage: fdf [options] [FILE]\n'
-                '    -h/--help for help\n'
-                '\n'
+                'usage: fld [-h] [-V] [-c STR] [--as-json] [--indent INDENT]'
+                ' [FILE]\n'
                 'error: unrecognized arguments: --unknown-switch\n'
             ),
         )

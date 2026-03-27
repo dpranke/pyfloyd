@@ -17,9 +17,9 @@ import unittest
 from pyfloyd import datafile
 
 
-class Grammar(unittest.TestCase):
+class Tests(unittest.TestCase):
     def check(self, s, obj, **kwargs):
-        self.assertEqual(datafile.loads(s, **kwargs), obj)
+        self.assertEqual(obj, datafile.loads(s, **kwargs))
 
     def test_true(self):
         self.check('true', True)
@@ -45,6 +45,7 @@ class Grammar(unittest.TestCase):
 
     def test_array(self):
         self.check('[]', [])
+        self.check('  []', [])
         self.check('[1]', [1])
         self.check('[foo]', ['foo'])
         self.check('["foo"]', ['foo'])
@@ -53,10 +54,19 @@ class Grammar(unittest.TestCase):
         self.check('[1, 2,]', [1, 2])
 
     def test_numword(self):
+        # Test that numwords are not allowed by default.
+        with self.assertRaises(datafile.DatafileError) as cm:
+            datafile.loads('4foo')
+        self.assertEqual(
+            str(cm.exception), '<string>:1 Unexpected "f" at column 2'
+        )
+
+        # Test that they do work if you enable them.
         self.check('123foo', '123foo', allow_numwords=True)
 
     def test_object(self):
         self.check('{}', {})
+        self.check('  {}', {})
         self.check('{foo: bar}', {'foo': 'bar'})
         self.check('{foo: "bar"}', {'foo': 'bar'})
         self.check("{foo: 'bar'}", {'foo': 'bar'})
@@ -100,18 +110,77 @@ class Grammar(unittest.TestCase):
         self.check("'''foo'''", 'foo')
         self.check('```foo```', 'foo')
 
+    def test_str_alpha_escapes(self):
+        self.check(r'"\a\b\f\n\r\t\v"', '\a\b\f\n\r\t\v')
+
+    def test_str_backslash_escape(self):
+        self.check(r'"\\"', '\\')
+
+    def test_str_hex_escapes(self):
+        self.check(r'"\xa\x20"', '\n ')
+
+    def test_str_unicode_escapes(self):
+        self.check(r'"\ua"', '\n')
+        self.check(r'"\u20"', ' ')
+        self.check(r'"\u030"', '0')
+        self.check(r'"\u0040"', '@')
+        self.check(r'"\uc0"', '\u00c0')
+        self.check(r'"\u1000"', '\u1000')
+        self.check(r'"\u10000"', '\U00010000')
+        self.check(r'"\u1F600"', '\U0001F600')
+
+    def test_str_unicode_name(self):
+        self.check(r'"\N{LATIN CAPITAL LETTER A WITH GRAVE}"',
+                   '\u00c0')
+
+    def test_str_bad_escapes(self):
+        with self.assertRaises(datafile.DatafileError) as cm:
+            datafile.loads('"\\"')
+        self.assertEqual(
+            str(cm.exception),
+            '<string>:1 Unexpected end of input at column 4'
+        )
+
+        with self.assertRaises(datafile.DatafileError) as cm:
+            datafile.loads(r'"\d"')
+        self.assertEqual(
+            str(cm.exception),
+            r'Bad escape sequence in string "\d" at offset 1'
+        )
+
+        with self.assertRaises(datafile.DatafileError) as cm:
+            datafile.loads(r'"\9"')
+        self.assertEqual(
+            str(cm.exception),
+            r'Bad escape sequence in string "\9" at offset 1'
+        )
+
+        with self.assertRaises(datafile.DatafileError) as cm:
+            datafile.loads(r'"\x"')
+        self.assertEqual(
+            str(cm.exception),
+            r'Bad escape sequence in string "\x" at offset 2'
+        )
+
+        with self.assertRaises(datafile.DatafileError) as cm:
+            datafile.loads(r'"\N{FOO}"')
+        self.assertEqual(
+            str(cm.exception),
+            r'Unrecognized unicode name "FOO" at offset 3 in string "\N{FOO}"'
+        )
+
     def test_str_quote_escapes(self):
         self.check('"\\\'\\"\\`"', '\'"`')
 
     def test_str_oct_escapes(self):
-        self.check(r'\0', chr(0))
-        self.check(r'\00', chr(0))
-        self.check(r'\000', chr(0))
-        self.check(r'\0000', chr(0) + '0')
-        self.check(r'\12', chr(10))
+        self.check(r"'\0'", chr(0))
+        self.check(r"'\00'", chr(0))
+        self.check(r"'\000'", chr(0))
+        self.check(r"'\0000'", chr(0) + '0')
+        self.check(r"'\12'", chr(10))
 
     def test_string_list(self):
-        self.check('("foo" bar)', 'foobar')
+        self.check('s["foo" bar]', 'foobar')
 
     def test_long_str(self):
         self.check("L'='foo'='", 'foo')
