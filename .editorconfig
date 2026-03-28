@@ -1,0 +1,5 @@
+# For editors that support the .editorconfig format spec
+
+# This file contains embedded tabs that must not be automatically expanded.
+[src/pyfloyd/go.dft]
+indent_style = tab

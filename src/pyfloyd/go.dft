@@ -20,10 +20,13 @@ ext = '.go'
 
 required_generator_options = ['package']
 
-# TODO: use `indent='\t' and add a 'template_indent' option so the formatter
-# knows how to translate the indentation used in the template to the
-# indentation that should be used in the output.
-indent = 4  # TODO: use tabs and add a 'template_indent' option
+# NOTE: This file contains embedded tabs that are required to properly
+# indent the generated go code. Make sure your editor does not automatically
+# rewrite and expand the tabs. TODO: Maybe eventually rewrite to use
+# format objects instead of multiline string literals, so we don't have to
+# worry about this.
+indent = '	'
+
 line_length = 160
 
 starting_template: 'generate'
@@ -232,45 +235,45 @@ main_header: @"""
 
 imports: @"""
     import (
-        "errors"
-        "fmt"
-        @if[generator_options.main [vl '"encoding/json"' '"io"' '"os"']]
-        @if[[or grammar.re_needed [in grammar.needed_operators 'unicat']]
-            '"regexp"']
-        @if[grammar.operator_needed '"slices"']
-        @if[[or [in grammar.needed_builtin_functions 'atoi']
-                [in grammar.needed_builtin_functions 'atof']
-                [in grammar.needed_builtin_functions 'atou']
-                [in grammar.needed_builtin_functions 'xtoi']
-                [in grammar.needed_builtin_functions 'xtou']
-                ]
-            '"strconv"']
-        @if[[or generator_options.main
-                [in grammar.needed_builtin_functions 'atoi']
-                [in grammar.needed_builtin_functions 'atou']
-                [in grammar.needed_builtin_functions 'cat']
-                [in grammar.needed_builtin_functions 'join']
-                [in grammar.needed_builtin_functions 'scat']
-                [in grammar.needed_builtin_functions 'xtoi']
-                [in grammar.needed_builtin_functions 'xtou']
-                ]
-            '"strings"']
+    	"errors"
+    	"fmt"
+    	@if[generator_options.main [vl '"encoding/json"' '"io"' '"os"']]
+    	@if[[or grammar.re_needed [in grammar.needed_operators 'unicat']]
+    	    '"regexp"']
+    	@if[grammar.operator_needed '"slices"']
+    	@if[[or [in grammar.needed_builtin_functions 'atoi']
+    	        [in grammar.needed_builtin_functions 'atof']
+    	        [in grammar.needed_builtin_functions 'atou']
+    	        [in grammar.needed_builtin_functions 'xtoi']
+    	        [in grammar.needed_builtin_functions 'xtou']
+    	        ]
+    	    '"strconv"']
+    	@if[[or generator_options.main
+    	        [in grammar.needed_builtin_functions 'atoi']
+    	        [in grammar.needed_builtin_functions 'atou']
+    	        [in grammar.needed_builtin_functions 'cat']
+    	        [in grammar.needed_builtin_functions 'join']
+    	        [in grammar.needed_builtin_functions 'scat']
+    	        [in grammar.needed_builtin_functions 'xtoi']
+    	        [in grammar.needed_builtin_functions 'xtou']
+    	        ]
+    	    '"strings"']
     )
     """
 
 result_class: """
     type Result struct {
-        val any
-        err error
-        pos int
+    	val any
+    	err error
+    	pos int
     }
     """
 
 state_class: @"""
     type parserState struct {
-        pos int
-        failed bool
-        val any
+    	pos    int
+    	failed bool
+    	val    any
     }
     """
 
@@ -279,55 +282,55 @@ parsing_runtime_exception_class: """
 
 operator_state_class: """
     type operatorState struct {
-        currentDepth int
-        currentPrec int
-        precOps map[int][]string
-        precs []int
-        rassoc map[string]bool
-        choices map[string](func ()())
+    	currentDepth int
+    	currentPrec  int
+    	precOps      map[int][]string
+    	precs        []int
+    	rassoc       map[string]bool
+    	choices      map[string](func ()())
     }
     """
 
 parse_function: """
     func Parse(text string, args ...any) (any, error) {
-      var path string = "<string>"
-      var start int = 0
-      externs := make(map[string]any)
+    	var path string = "<string>"
+    	var start int = 0
+    	externs := make(map[string]any)
 
-      if len(args) > 0 {
-          path = args[0].(string)
-      }
-      if len(args) > 1 {
-          externs = args[1].(map[string]any)
-      }
-      if len(args) > 2 {
-         start = args[2].(int)
-      }
+    	if len(args) > 0 {
+    		path = args[0].(string)
+    	}
+    	if len(args) > 1 {
+    		externs = args[1].(map[string]any)
+    	}
+    	if len(args) > 2 {
+    		tart = args[2].(int)
+    	}
 
-      p := NewParser(text, path);
+    	p := NewParser(text, path)
 
-      r := p.Parse(externs, start);
-      return r.val, r.err
+    	r := p.Parse(externs, start)
+    	return r.val, r.err
     }
     """
 
 parser_class: @"""
     type Parser struct {
-        text []rune
-        path string
-        parserState
-        end  int
-        errpos int
-        externs map[string]any
-        @if[generator_options.memoize 'cache map[int]map[string]parserState']
-        @if[grammar.seeds_needed 'seeds map[int]map[string]parserState']
-        @if[grammar.leftrec_needed 'blocked map[string]bool']
-        @if[grammar.lookup_needed 'scopes []map[string]any']
-        @if[grammar.operator_needed 'operators map[string]*operatorState']
+    	text []rune
+    	path string
+    	parserState
+    	end     int
+    	errpos  int
+    	externs map[string]any
+    	@if[generator_options.memoize 'cache map[int]map[string]parserState']
+    	@if[grammar.seeds_needed 'seeds map[int]map[string]parserState']
+    	@if[grammar.leftrec_needed 'blocked map[string]bool']
+    	@if[grammar.lookup_needed 'scopes []map[string]any']
+    	@if[grammar.operator_needed 'operators map[string]*operatorState']
     }
 
     func (p *Parser) Pos() int {
-        return p.pos
+    	return p.pos
     }
 
     @parser_methods[]
@@ -335,19 +338,19 @@ parser_class: @"""
 
 parser_constructor: @"""
     func NewParser(text string, path string) *Parser {
-        p := Parser{text: []rune(text), path: path}
-        p.end = len(p.text)
-        @externs[]
-        @if[generator_options.memoize
-            'p.cache = make(map[int]map[string]parserState)']
-        @if[grammar.seeds_needed
-            'p.seeds = make(map[int]map[string]parserState)']
-        @if[grammar.leftrec_needed
-            'p.blocked = make(map[string]bool)']
-        @if[grammar.operator_needed
-            [vl 'p.operators = make(map[string]*operatorState)'
-                [map_items operator_state grammar.operators]]]
-        return &p
+    	p := Parser{text: []rune(text), path: path}
+    	p.end = len(p.text)
+    	@externs[]
+    	@if[generator_options.memoize
+    	    'p.cache = make(map[int]map[string]parserState)']
+    	@if[grammar.seeds_needed
+    	    'p.seeds = make(map[int]map[string]parserState)']
+    	@if[grammar.leftrec_needed
+    	    'p.blocked = make(map[string]bool)']
+    	@if[grammar.operator_needed
+    	    [vl 'p.operators = make(map[string]*operatorState)'
+    	        [map_items operator_state grammar.operators]]]
+    	return &p
     }
 
     """
@@ -405,85 +408,85 @@ operator_choices: [fn [o]
 
 parse_with_exception: @"""
     func (p *Parser) Parse(args ...any) (r Result) {
-      var externs map[string]any
-      var start int
+    	var externs map[string]any
+    	var start int
 
-      if len(args) == 2 {
-          externs = args[0].(map[string]any)
-          start = args[1].(int)
-      } else if len(args) == 1 {
-          externs = args[0].(map[string]any)
-          start = 0
-      }
+    	if len(args) == 2 {
+    		externs = args[0].(map[string]any)
+    		start = args[1].(int)
+    	} else if len(args) == 1 {
+    		externs = args[0].(map[string]any)
+    		start = 0
+    	}
 
-      errs := ""
-      for key, value := range externs {
-          if _, ok := p.externs[key] ; !ok {
-              errs += "Unexpected extern '" + key + "'\\n"
-          } else {
-              p.externs[key] = value
-          }
-      }
+    	errs := ""
+    	for key, value := range externs {
+    		if _, ok := p.externs[key]; !ok {
+    			errs += "Unexpected extern '" + key + "'\\n"
+    		} else {
+    			p.externs[key] = value
+    		}
+    	}
 
-      if errs != "" {
-          return Result{nil, errors.New(errs), 0}
-      }
+    	if errs != "" {
+    		return Result{nil, errors.New(errs), 0}
+    	}
 
-      defer func() {
-        if msg := recover(); msg != nil {
-            lineno, _ := p.o_offsets(p.errpos)
-            err_msg := fmt.Sprintf("%s:%d %s", p.path, lineno, msg.(string))
-            r = Result{nil, errors.New(err_msg), 0}
-        }
-      }()
+    	defer func() {
+    		if msg := recover(); msg != nil {
+    			lineno, _ := p.o_offsets(p.errpos)
+    			err_msg := fmt.Sprintf("%s:%d %s", p.path, lineno, msg.(string))
+    			r = Result{nil, errors.New(err_msg), 0}
+    		}
+    	}()
 
-      p.pos = start
-      p.r_@grammar.starting_rule()
+    	p.pos = start
+    	p.r_@grammar.starting_rule()
 
-      if p.failed {
-          r = Result{nil, errors.New(p.o_error()), p.errpos}
-      } else {
-          r = Result{p.val, nil, p.pos}
-      }
-      return
+    	if p.failed {
+    		r = Result{nil, errors.New(p.o_error()), p.errpos}
+    	} else {
+    		r = Result{p.val, nil, p.pos}
+    	}
+    	return
     }
     """  # parse_with_exception
 
 parse_without_exception: @"""
     func (p *Parser) Parse(args ...any) (r Result) {
-      var externs map[string]any
-      var start int
+    	var externs map[string]any
+    	var start int
 
-      if len(args) == 2 {
-          externs = args[0].(map[string]any)
-          start = args[1].(int)
-      } else if len(args) == 1 {
-          externs = args[0].(map[string]any)
-          start = 0
-      }
+    	if len(args) == 2 {
+    		externs = args[0].(map[string]any)
+    		start = args[1].(int)
+    	} else if len(args) == 1 {
+    		externs = args[0].(map[string]any)
+    		start = 0
+    	}
 
-      errs := ""
-      for key, value := range externs {
-          if _, ok := p.externs[key] ; !ok {
-              errs += "Unexpected extern '" + key + "'\\n"
-          } else {
-              p.externs[key] = value
-          }
-      }
+    	errs := ""
+    	for key, value := range externs {
+    		if _, ok := p.externs[key]; !ok {
+    			errs += "Unexpected extern '" + key + "'\\n"
+    		} else {
+    			p.externs[key] = value
+    		}
+    	}
 
-      if errs != "" {
-          return Result{nil, errors.New(errs), 0}
-      }
+    	if errs != "" {
+    		return Result{nil, errors.New(errs), 0}
+    	}
 
-      p.pos = start
-      p.r_@grammar.starting_rule()
+    	p.pos = start
+    	p.r_@grammar.starting_rule()
 
-      if p.failed {
-          r = Result{nil, errors.New(p.o_error()), p.errpos}
-      } else {
-          r = Result{p.val, nil, p.pos}
-      }
-      return
+    	if p.failed {
+    		r = Result{nil, errors.New(p.o_error()), p.errpos}
+    	} else {
+    		r = Result{p.val, nil, p.pos}
+    	}
+    	return
     }
     """  # parse_without_exception
 
@@ -492,63 +495,62 @@ default_footer: null
 main_footer: """
 
     func main() {
-        externs := make(map[string]any)
-        var s string
-        var filename string
-        var i int = 1
-        var err error
+    	var s        string
+    	var filename string
+    	var i        int = 1
+    	var err      error
+    	externs := make(map[string]any)
 
-        for i < len(os.Args) {
-            if os.Args[i] == "-h" || os.Args[i] == "--help" {
-                fmt.Println("usage [-h] [-D var=val] [-c str] [file]")
-                os.Exit(2)
-            } else if os.Args[i] == "-D" || os.Args[i] == "--define" {
-                l := strings.SplitN(os.Args[i+1], "=", 2)
-                var v any
-                err = json.Unmarshal([]byte(l[1]), &v)
-                if err != nil {
-                    panic(err)
-                }
-                externs[l[0]] = v
-                i += 2
-            } else if os.Args[i] == "-c" || os.Args[i] == "--code" {
-                s = os.Args[i+1]
-                filename = "<code>"
-                break
-            } else {
-                break
-            }
-        }
+    	for i < len(os.Args) {
+    		if os.Args[i] == "-h" || os.Args[i] == "--help" {
+    			fmt.Println("usage [-h] [-D var=val] [-c str] [file]")
+    			os.Exit(2)
+    		} else if os.Args[i] == "-D" || os.Args[i] == "--define" {
+    			l := strings.SplitN(os.Args[i+1], "=", 2)
+    			var v any
+    			err = json.Unmarshal([]byte(l[1]), &v)
+    			if err != nil {
+    				panic(err)
+    			}
+    			externs[l[0]] = v
+    			i += 2
+    		} else if os.Args[i] == "-c" || os.Args[i] == "--code" {
+    			s = os.Args[i+1]
+    			filename = "<code>"
+    			break
+    		} else {
+    			break
+    		}
+    }
 
-        var d []byte
+    var d []byte
 
-        if s == "" {
-            if len(os.Args) == i || os.Args[i] == "-" {
-                d, err = io.ReadAll(os.Stdin)
-                filename = "<stdin>"
-            } else {
-                filename = os.Args[i]
-                d, err = os.ReadFile(os.Args[i])
-            }
-            if err != nil {
-                panic(err)
-            }
-            s = string(d)
-        }
+    if s == "" {
+    	if len(os.Args) == i || os.Args[i] == "-" {
+    		d, err = io.ReadAll(os.Stdin)
+    		filename = "<stdin>"
+    	} else {
+    		filename = os.Args[i]
+    		d, err = os.ReadFile(os.Args[i])
+    	}
+    	if err != nil {
+    		panic(err)
+    	}
+    	s = string(d)
+    }
 
-        val, err := Parse(string(d), filename, externs)
-        if err == nil {
-            b, _ := json.Marshal(val)
-            if err != nil {
-                fmt.Fprintln(os.Stderr, "Failed to marshal `%v`", val)
-            } else {
-                fmt.Fprintln(os.Stdout, string(b))
-            }
-        } else {
-            fmt.Fprintln(os.Stderr, err)
-            os.Exit(1)
-        }
-
+    val, err := Parse(string(d), filename, externs)
+    if err == nil {
+    	b, _ := json.Marshal(val)
+    	if err != nil {
+    		fmt.Fprintln(os.Stderr, "Failed to marshal `%v`", val)
+    	} else {
+    		fmt.Fprintln(os.Stdout, string(b))
+    	}
+    	} else {
+    		fmt.Fprintln(os.Stderr, err)
+    		os.Exit(1)
+    	}
     }
     """  # main_footer
 
@@ -614,18 +616,18 @@ n_set: [fn [node] [t_regexp [strcat '[' node.v ']']]]
 r_any: [meth q[]
              """
              if p.pos < p.end {
-                 p.o_succeed(string(p.text[p.pos]), p.pos + 1)
+             	p.o_succeed(string(p.text[p.pos]), p.pos + 1)
              } else {
-                 p.o_fail()
+             	p.o_fail()
              }
              """]
 
 r_end: [meth q[]
              """
              if p.pos == p.end {
-                 p.o_succeed(nil, p.pos)
+             	p.o_succeed(nil, p.pos)
              } else {
-                 p.o_fail()
+             	p.o_fail()
              }
              """]
 
@@ -633,39 +635,39 @@ o_ch: [meth q['c string']
             """
             pos := p.pos
             if pos < p.end && p.text[pos] == ([]rune(c)[0]) {
-                p.o_succeed(c, p.pos + 1)
+            	p.o_succeed(c, p.pos+1)
             } else {
-                p.o_fail()
+            	p.o_fail()
             }
             """]
 
 o_offsets: """
            func (p *Parser) o_offsets(pos int) (int, int) {
-               lineno := 1
-               colno := 1
-               for i := 0 ; i < pos ; i++ {
-                   if p.text[i] == '\\n' {
-                       lineno += 1
-                       colno = 1
-                   } else {
-                       colno += 1
-                   }
-               }
-               return lineno, colno
+           	lineno := 1
+           	colno := 1
+           	for i := 0; i < pos; i++ {
+           		if p.text[i] == '\\n' {
+           			lineno += 1
+           			colno = 1
+           		} else {
+           			colno += 1
+           		}
+           	}
+           	return lineno, colno
            }
            """
 
 o_error: """
          func (p *Parser) o_error() string {
-             lineno, colno := p.o_offsets(p.errpos)
-             var thing string
-             if p.errpos == p.end {
-                 thing = "end of input"
-             } else {
-                 thing = fmt.Sprintf("%q", string(p.text[p.errpos]))
-             }
-             return fmt.Sprintf("%s:%d Unexpected %s at column %d",
-                                p.path, lineno, thing, colno)
+         	lineno, colno := p.o_offsets(p.errpos)
+         	var thing string
+         	if p.errpos == p.end {
+         		thing = "end of input"
+         	} else {
+         		thing = fmt.Sprintf("%q", string(p.text[p.errpos]))
+         	}
+         	return fmt.Sprintf("%s:%d Unexpected %s at column %d",
+         		p.path, lineno, thing, colno)
          }
          """
 
@@ -683,58 +685,58 @@ o_leftrec: [meth q['rule any' 'rule_name string' 'left_assoc bool']
                  var ok bool
 
                  if _, ok = p.seeds[pos]; !ok {
-                    p.seeds[pos] = make(map[string]parserState)
+                 	p.seeds[pos] = make(map[string]parserState)
                  }
                  c := p.seeds[pos]
                  if entry, ok = c[rule_name]; ok {
-                     p.val = entry.val
-                     p.failed = entry.failed
-                     p.pos = entry.pos
-                     return
+                 	p.val = entry.val
+                 	p.failed = entry.failed
+                 	p.pos = entry.pos
+                 	return
                  }
                  if _, ok = p.blocked[rule_name]; ok {
-                     p.val = nil
-                     p.failed = true
-                     return
+                 	p.val = nil
+                 	p.failed = true
+                 	return
                  }
                  entry = parserState{pos: p.pos, failed: true}
                  p.seeds[pos][rule_name] = entry
                  if left_assoc {
-                     p.blocked[rule_name] = true
+                 	p.blocked[rule_name] = true
                  }
                  for true {
-                     f := rule.(func ()())
-                     f()
-                     if p.pos > entry.pos {
-                         entry = p.parserState
-                         c[rule_name] = entry
-                         p.pos = pos
-                     } else {
-                         delete(c, rule_name)
-                         p.o_restore(entry)
-                         if left_assoc {
-                             delete(p.blocked, rule_name)
-                         }
-                         return
-                     }
+                 	f := rule.(func ()())
+                 	f()
+                 	if p.pos > entry.pos {
+                 		entry = p.parserState
+                 		c[rule_name] = entry
+                 		p.pos = pos
+                 	} else {
+                 		delete(c, rule_name)
+                 		p.o_restore(entry)
+                 		if left_assoc {
+                 			delete(p.blocked, rule_name)
+                 		}
+                 		return
+                 	}
                  }
                  """]  # o_leftrec
 
 o_lookup: """
           func (p *Parser) o_lookup(v string) any {
-              var val any
-              var ok bool
-              l := len(p.scopes) - 1
-              for l >= 0 {
-                if val, ok = p.scopes[l][v] ; ok {
-                  return val
-                }
-                l -= 1
-              }
-              if val, ok = p.externs[v]; ok {
-                return val
-              }
-              panic("Unknown var '" + v + "'")
+          	var val any
+          	var ok  bool
+          	l := len(p.scopes) - 1
+          	for l >= 0 {
+          		if val, ok = p.scopes[l][v] ; ok {
+          			return val
+          		}
+          		l -= 1
+          	}
+          	if val, ok = p.externs[v]; ok {
+          		return val
+          	}
+          	panic("Unknown var '" + v + "'")
           }
           """
 
@@ -742,12 +744,12 @@ o_memoize: [meth q['rule_name string' 'fn any']
                  """
                  pos := p.pos
                  if _, ok := p.cache[pos]; !ok {
-                    p.cache[pos] = make(map[string]parserState)
+                 	p.cache[pos] = make(map[string]parserState)
                  }
                  c := p.cache[pos]
                  if _, ok := c[rule_name]; ok {
-                   p.parserState = c[rule_name]
-                   return
+                 	p.parserState = c[rule_name]
+                 	return
                  }
                  f := fn.(func ()())
                  f()
@@ -757,53 +759,53 @@ o_memoize: [meth q['rule_name string' 'fn any']
 o_operator: [meth q['rule_name string'] """
         var entry parserState
         var cache map[string]parserState
-        var ok bool
+        var ok    bool
 
         o := p.operators[rule_name]
         initialState := p.parserState
         pos := initialState.pos
         if _, ok = p.seeds[pos]; !ok {
-            p.seeds[pos] = make(map[string]parserState)
+        	p.seeds[pos] = make(map[string]parserState)
         }
         cache = p.seeds[pos]
         if entry, ok = cache[rule_name]; ok {
-            p.parserState = entry  // p.o_restore(entry)
-            return
+        	p.parserState = entry  // p.o_restore(entry)
+        	return
         }
         o.currentDepth += 1
         entry = parserState{pos: pos, failed: true}
         cache[rule_name] = entry
         minPrec := o.currentPrec
         for i := 0; i < len(o.precs) ; {
-            repeat := false
-            prec := o.precs[i]
-            precOps := o.precOps[prec]
-            if prec < minPrec {
-                break
-            }
-            o.currentPrec = prec
-            if _, ok = o.rassoc[precOps[0]]; !ok {
-                o.currentPrec += 1
-            }
-            for j := 0; j < len(precOps) ; j += 1 {
-                op := precOps[j]
-                o.choices[op]()
-                if !p.failed && p.pos > pos {
-                    entry = p.parserState
-                    cache[rule_name] = entry
-                    repeat = true
-                    break
-                }
-                p.parserState = initialState  // p.o_restore(entry)
-            }
-            if !repeat {
-                i += 1
-            }
+        	repeat := false
+        	prec := o.precs[i]
+        	precOps := o.precOps[prec]
+        	if prec < minPrec {
+        		break
+        	}
+        	o.currentPrec = prec
+        	if _, ok = o.rassoc[precOps[0]]; !ok {
+        		o.currentPrec += 1
+        	}
+        	for j := 0; j < len(precOps) ; j += 1 {
+        		op := precOps[j]
+        		o.choices[op]()
+        		if !p.failed && p.pos > pos {
+        			entry = p.parserState
+        			cache[rule_name] = entry
+        			repeat = true
+        			break
+        		}
+        		p.parserState = initialState  // p.o_restore(entry)
+        	}
+        	if !repeat {
+        		i += 1
+        	}
         }
         delete(cache, rule_name)
         o.currentDepth -= 1
         if o.currentDepth == 0 {
-          o.currentPrec = 0
+        	o.currentPrec = 0
         }
         p.parserState = entry  // p.o_restore(initialState)
         """]  # o_operator
@@ -812,14 +814,14 @@ o_range: [meth q['i string' 'j string']
                """
                pos := p.pos
                if pos == p.end {
-                 p.o_fail()
-                 return
+               	p.o_fail()
+               	return
                }
                c := p.text[pos]
                if []rune(i)[0] <= c && c <= []rune(j)[0] {
-                 p.o_succeed(string(c), p.pos + 1)
+               	p.o_succeed(string(c), p.pos + 1)
                } else {
-                 p.o_fail()
+               	p.o_fail()
                }
                """]
 
@@ -828,10 +830,10 @@ o_restore: [meth q['state parserState'] 'p.parserState = state']
 o_str: [meth q['s string']
              """
              for _, r := range s {
-               p.o_ch(string(r))
-               if p.failed {
-                 return
-               }
+             	p.o_ch(string(r))
+             	if p.failed {
+             		return
+             	}
              }
              p.val = s
              """]
@@ -848,9 +850,9 @@ o_unicat: [meth q['cat string']
                 sub := string(p.text[p.pos:])
                 loc := r.FindStringIndex(sub)
                 if (loc != nil) && (loc[0] == 0) {
-                    end := p.pos + loc[1]
-                    p.o_succeed(p.text[p.pos:end], end)
-                    return
+                	end := p.pos + loc[1]
+                	p.o_succeed(p.text[p.pos:end], end)
+                	return
                 }
                 p.o_fail()
                 """]
@@ -862,13 +864,13 @@ fn_aminus: [def_method _t_name
                       l_type := fmt.Sprintf("%T", l)
                       r_type := fmt.Sprintf("%T", r)
                       if l_type == "int" && r_type == "int" {
-                          return l.(int) - r.(int)
+                      	return l.(int) - r.(int)
                       } else if l_type == "int" && r_type == "float64" {
-                          return float64(l.(int)) - r.(float64)
+                      	return float64(l.(int)) - r.(float64)
                       } else if l_type == "float64" && r_type == "int" {
-                          return l.(float64) - float64(r.(int))
+                      	return l.(float64) - float64(r.(int))
                       } else {
-                          return l.(float64) - r.(float64)
+                      	return l.(float64) - r.(float64)
                       }
                       """]
 
@@ -884,18 +886,17 @@ fn_aplus: [def_method _t_name
                       l_type := fmt.Sprintf("%T", l)
                       r_type := fmt.Sprintf("%T", r)
                       if l_type != r_type {
-                          panic(fmt.Sprintf("Different types for `+`: %s, %s",
-                                            l_type, r_type))
+                      	panic(fmt.Sprintf("Different types for `+`: %s, %s", l_type, r_type))
                       }
                       switch l_type {
                       case "string":
-                          return l.(string) + r.(string)
+                      	return l.(string) + r.(string)
                       case "int":
-                          return l.(int) + r.(int)
+                      	return l.(int) + r.(int)
                       case "float64":
-                          return l.(float64) + r.(float64)
+                      	return l.(float64) + r.(float64)
                       default:
-                          panic(fmt.Sprintf("Unsupported type for `+`: %s", l_type))
+                      	panic(fmt.Sprintf("Unsupported type for `+`: %s", l_type))
                       }
                       """]
 
@@ -913,10 +914,10 @@ fn_atoi: [def_method _t_name
                      """
                      s := a.(string)
                      if ((base == 16 && strings.HasPrefix(s, "0x")) ||
-                         (base == 8 && strings.HasPrefix(s, "0o")) ||
-                         (base == 2 && strings.HasPrefix(s, "0b"))) {
-                        s = s[2:]
-                    }
+                     	(base == 8 && strings.HasPrefix(s, "0o")) ||
+                     	(base == 2 && strings.HasPrefix(s, "0b"))) {
+                     	s = s[2:]
+                     }
                      r, _ := strconv.ParseInt(s, base, 64)
                      return int(r)
                      """]
@@ -927,10 +928,10 @@ fn_atou: [def_method _t_name
                      """
                      s := a.(string)
                      if ((base == 16 && strings.HasPrefix(s, "0x")) ||
-                         (base == 8 && strings.HasPrefix(s, "0o")) ||
-                         (base == 2 && strings.HasPrefix(s, "0b"))) {
-                        s = s[2:]
-                    }
+                     	(base == 8 && strings.HasPrefix(s, "0o")) ||
+                     	(base == 2 && strings.HasPrefix(s, "0b"))) {
+                     	s = s[2:]
+                     }
                      r, _ := strconv.ParseInt(s, base, 64)
                      return string(rune(r))
                      """]
@@ -941,12 +942,12 @@ fn_cat: [def_method _t_name
                     """
                     slis, ok := ss.([]string)
                     if ok {
-                        return strings.Join(slis, "")
+                    	return strings.Join(slis, "")
                     }
 
                     lis := make([]string, 0)
                     for _, s := range ss.([]any) {
-                        lis = append(lis, s.(string))
+                    	lis = append(lis, s.(string))
                     }
                     return strings.Join(lis, "")
                     """]
@@ -957,10 +958,10 @@ fn_colno: [def_method _t_name
                       """
                       colno := 0
                       if p.pos == p.end {
-                          colno += 1
+                      	colno += 1
                       }
                       for (p.pos >= colno) && (p.text[p.pos - colno] != '\\n') {
-                          colno += 1
+                      	colno += 1
                       }
                       return colno
                       """]
@@ -986,8 +987,8 @@ fn_dict: [def_method _t_name
                       """
                       m := make(map[string]any)
                       for _, v := range pairs.([]any) {
-                           l := v.([]any)
-                           m[l[0].(string)] = l[1]
+                      	l := v.([]any)
+                      	m[l[0].(string)] = l[1]
                       }
                       return m
                       """]
@@ -997,9 +998,9 @@ fn_in: [def_method _t_name
                     ' bool'
                     """
                     for _, el := range lis {
-                        if el == v {
-                            return true
-                        }
+                    	if el == v {
+                    		return true
+                    	}
                     }
                     return false
                     """]
@@ -1015,7 +1016,7 @@ fn_join: [def_method _t_name
                      """
                      strs := make([]string, len(vs.([]any)))
                      for i, v := range(vs.([]any)) {
-                         strs[i] = v.(string)
+                     	strs[i] = v.(string)
                      }
                      return strings.Join(strs, sep.(string))
                      """]
@@ -1025,9 +1026,9 @@ fn_list: [def_method _t_name
                     ' []any'
                     """
                     if len(args) == 0 {
-                        return []any{}
+                    	return []any{}
                     } else {
-                        return args
+                    	return args
                     }
                     """]
 
@@ -1049,11 +1050,11 @@ fn_scat: [def_method _t_name
                      q['hd any' 'tl any']
                      ' string'
                      """
-                      lis := make([]string, 0)
-                      lis = append(lis, hd.(string))
-                      for _, t := range tl.([]any) {
-                          lis = append(lis, t.(string))
-                      }
+                     lis := make([]string, 0)
+                     lis = append(lis, hd.(string))
+                     for _, t := range tl.([]any) {
+                     	lis = append(lis, t.(string))
+                     }
                      return strings.Join("", lis)
                      """]
 
@@ -1064,11 +1065,11 @@ fn_scons: [def_method _t_name
                       strs := make([]string, 0)
                       strs = append(strs, hd.(string))
                       if vals, ok := tl.([]string); ok {
-                          strs = append(strs, vals...)
+                      	strs = append(strs, vals...)
                       } else {
-                          for _, v := range tl.([]any) {
-                              strs = append(strs, v.(string))
-                          }
+                      	for _, v := range tl.([]any) {
+                      		strs = append(strs, v.(string))
+                      	}
                       }
                       return strs
                       """]
@@ -1102,7 +1103,7 @@ fn_xtoi: [def_method _t_name
                      """
                      s := x.(string)
                      if (strings.HasPrefix(s, "0x")) {
-                         s = s[2:]
+                     	s = s[2:]
                      }
                      r, _ := strconv.ParseInt(s, 16, 64)
                      return r
@@ -1114,10 +1115,18 @@ fn_xtou: [def_method _t_name
                      """
                      s := x.(string)
                      if (strings.HasPrefix(s, "0x")) {
-                         s = s[2:]
+                     	s = s[2:]
                      }
                      r, _ := strconv.ParseInt(s, 16, 64)
                      return string(rune(r))
                      """]
 
 }
+
+# Tell emacs not to expand tabs:
+# Local variables:
+# indent-tabs-mode: t
+# End:
+
+# Tell vim not to expand tabs:
+# vim: noexpandtab
