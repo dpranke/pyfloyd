@@ -39,6 +39,10 @@ KNOWN_TEMPLATES = {
 KNOWN_LANGUAGES = {v: k for k, v in KNOWN_TEMPLATES.items()}
 
 
+class GeneratorException(Exception):
+    pass
+
+
 class GeneratorOptions(custom_dicts.AttrDict):
     def __init__(self, *args, **kwargs):
         self.argv = []

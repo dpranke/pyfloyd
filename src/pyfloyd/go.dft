@@ -18,10 +18,7 @@
 name = 'Go'
 ext = '.go'
 
-# TODO: Really, this value should be required, as if we're not building
-# a main package, we have no way of guessing what name to use. But, we
-# don't have a way to indicate that yet.
-package = 'dummy'
+required_generator_options = ['package']
 
 # TODO: use `indent='\t' and add a 'template_indent' option so the formatter
 # knows how to translate the indentation used in the template to the

@@ -65,8 +65,13 @@ local_var_map = {
 needed_template_functions_map = {}
 needed_template_functions = []
 
-
 datafiles = ['functions']
+
+# Some generators may need particular options to always (or conditionally)
+# be specified when the file is compiled, as there may be no obvious way
+# to generate the appropriate default value. For example, in Go, every
+# file has to declare what package it is a part of (e.g., `package foo`),
+required_generator_options = []
 
 templates = {
 

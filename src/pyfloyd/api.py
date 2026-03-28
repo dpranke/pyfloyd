@@ -207,9 +207,12 @@ def generate(
     for cls in _generators:
         if options.generator.lower() == cls.name.lower():
             data = {'grammar': grammar_obj}
-            gen = cls(support.Host(), data, options)
-            text = gen.generate()
-            return Result((text, gen.ext))
+            try:
+                gen = cls(support.Host(), data, options)
+                text = gen.generate()
+                return Result((text, gen.ext))
+            except generator.GeneratorException as e:
+                return Result(None, e)
 
     err = f'Unsupported generator "{options.generator}"'
     return Result(None, err, 0)
