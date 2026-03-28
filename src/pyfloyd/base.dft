@@ -48,6 +48,23 @@ local_var_map = {
     star: ['state any' 'vs any']
 }
 
+# Some generators may need to define auxiliary helper functions in
+# order to implement particular node types in the grammar. They
+# can specify those functions in this map and they will be conditionally
+# included in the generated grammar if the grammar uses the node type
+# in question. For example, if a template set:
+#
+#   needed_template_functions_map = {'run': ['run_func']}
+#
+# then, if a grammar uses the run node (`[a-z]`), the code defined by
+# the `run_func` value in the template will be included in the generated
+# grammar. The list of functions that are determined to be needed is
+# available in the `needed_template_functions` value (the computed value
+# will override whatever the default value is here, but the default value
+# is used if the map is empty).
+needed_template_functions_map = {}
+needed_template_functions = []
+
 
 datafiles = ['functions']
 
@@ -193,7 +210,8 @@ parser_methods: [fn [] [vl [parser_constructor]
                                         [invoke [op_name name]]]]
                                 grammar.needed_operators]
                            [map builtin_fn
-                                grammar.needed_builtin_functions]]]
+                                grammar.needed_builtin_functions]
+                           [map builtin_fn needed_template_functions]]]
 
 parse_method: [fn [] [if grammar.exception_needed
                          [parse_with_exception]

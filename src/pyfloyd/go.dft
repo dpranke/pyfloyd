@@ -47,6 +47,13 @@ local_var_map = {
     star: ['state parserState' 'vs list[any]']
 }
 
+needed_template_functions_map = {
+    e_getitem_infix: ['getany']
+    e_not: ['to_bool']
+    e_plus: ['aplus']
+    e_minus: ['aminus']
+}
+
 
 templates = {
 
@@ -327,14 +334,6 @@ parser_class: @"""
     }
 
     @parser_methods[]
-
-    @fn_aminus
-
-    @fn_aplus
-
-    @fn_getany
-
-    @fn_to_bool
     """
 
 parser_constructor: @"""
@@ -891,17 +890,17 @@ fn_aplus: [def_method _t_name
                           panic(fmt.Sprintf("Different types for `+`: %s, %s",
                                             l_type, r_type))
                       }
-                      if l_type == "string" {
+                      switch l_type {
+                      case "string":
                           return l.(string) + r.(string)
-                      } else if l_type == "int" {
+                      case "int":
                           return l.(int) + r.(int)
-                      } else if l_type == "float64" {
+                      case "float64":
                           return l.(float64) + r.(float64)
-                      } else {
-                          panic(fmt.Sprintf("Unsupported type for `+`: %s",
-                                            l_type))
-                     }
-                     """]
+                      default:
+                          panic(fmt.Sprintf("Unsupported type for `+`: %s", l_type))
+                      }
+                      """]
 
 fn_atof: [def_method _t_name
                      q['a any']

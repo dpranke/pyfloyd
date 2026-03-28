@@ -79,6 +79,25 @@ class DatafileGenerator(generator.Generator):
                 local_var_map = {}
             self._process_grammar(local_var_map)
 
+            if self.data.needed_template_functions_map:
+                funcs = self._derive_needed_template_functions(
+                        self.data.grammar,
+                        self.data.needed_template_functions_map
+                )
+                interp.env.set('needed_template_functions', funcs)
+
+    def _derive_needed_template_functions(self, grammar, functions_map):
+        def _walk(node) -> [str]:
+            return (
+                functions_map.get(node.t, []) +
+                [f for c in node.ch for f in _walk(c)]
+            )
+        functions = []
+        for _, node in grammar.rules.items():
+            functions += _walk(node)
+        return list(set(functions))
+
+
     def _load_datafile(self, name, keys_to_merge, as_template=True):
         if name in self._loaded_datafiles:
             return
