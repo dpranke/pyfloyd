@@ -19,6 +19,7 @@ class _Mixin(grammar_test.GeneratorMixin):
     cmd = ['go', 'run']
     generator = 'datafile'
     template = 'go'
+    options = 'package = dummy'
     ext = '.go'
 
 

@@ -127,8 +127,16 @@ class Mixin(unittest.TestCase):
 class GeneratorMixin(Mixin):
     cmd: Optional[list] = None
     template: Optional[str] = None
+    options: Optional[str] = None
 
-    def compile(self, grammar, path='<string>', memoize=False, externs=None):
+    def compile(
+        self,
+        grammar,
+        path='<string>',
+        memoize=False,
+        externs=None,
+        options=None,
+    ):
         if self.cmd is None:
             if self.exe == 'python':
                 cmd = [sys.executable]
@@ -138,20 +146,30 @@ class GeneratorMixin(Mixin):
             cmd = self.cmd
 
         generate_cmd = f'flc -g {self.generator} -T {self.template} --main'
+        extra_g_opts = {}
+        if options:
+            generate_cmd += f' -G {repr(options)}'
+            extra_g_opts = pyfloyd.datafile.loads(options)
+        elif self.options:
+            generate_cmd += f' -G {repr(self.options)}'
+            extra_g_opts = pyfloyd.datafile.loads(self.options)
         if memoize:
             generate_cmd += ' -G "memoize = true"'
         if externs:
             generate_cmd += ' -E {externs!r}'
 
-        v, err, endpos = pyfloyd.generate(
-            textwrap.dedent(grammar),
-            path=path,
-            options=pyfloyd.GeneratorOptions(
+        g_options = pyfloyd.GeneratorOptions(
                 generator=self.generator,
                 template=self.template,
                 main=True,
                 memoize=memoize,
-            ),
+                **extra_g_opts,
+            )
+
+        v, err, endpos = pyfloyd.generate(
+            textwrap.dedent(grammar),
+            path=path,
+            options=g_options,
             externs=externs,
         )
         if err:
