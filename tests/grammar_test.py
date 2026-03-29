@@ -159,12 +159,12 @@ class GeneratorMixin(Mixin):
             generate_cmd += ' -E {externs!r}'
 
         g_options = pyfloyd.GeneratorOptions(
-                generator=self.generator,
-                template=self.template,
-                main=True,
-                memoize=memoize,
-                **extra_g_opts,
-            )
+            generator=self.generator,
+            template=self.template,
+            main=True,
+            memoize=memoize,
+            **extra_g_opts,
+        )
 
         v, err, endpos = pyfloyd.generate(
             textwrap.dedent(grammar),
@@ -625,7 +625,7 @@ class ValuesMixin:
             'foobar',
             grammar_err=(
                 'Errors were found:\n'
-                '  <string>:1 Variable "$2" referenced before it was available\n'
+                "  <string>:1 Can't use '$2', there is only 1 positional variable available\n"
             ),
         )
 
@@ -1045,10 +1045,10 @@ class PragmasMixin:
 
     def test_nofiller_neither(self):
         grammar = "grammar = 'foo' __ '1' -> true"
-        self.check
+        self.check(
             grammar,
             'foo 1',
-            grammar_err="Errors were found:\n  <string>:1 Can't use '__' without %comment or %whitespace\n"
+            grammar_err="Errors were found:\n  <string>:1 Can't use '__' without %comment or %whitespace\n",
         )
 
     def test_nofiller_ws_only(self):

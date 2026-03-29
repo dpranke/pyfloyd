@@ -236,10 +236,12 @@ class _Analyzer:
         self.add_error(node, f'Unexpected AST node type {node.t} in %prec')
 
     def check_for_unknown_rules(self, node):
-        if (node.t == 'apply' and
-            node.v == '__' and
-            not self.grammar.comment and
-            not self.grammar.whitespace):
+        if (
+            node.t == 'apply'
+            and node.v == '__'
+            and not self.grammar.comment
+            and not self.grammar.whitespace
+        ):
             self.add_error(
                 node, "Can't use '__' without %comment or %whitespace"
             )
@@ -268,8 +270,26 @@ class _Analyzer:
             return
 
         labels_needed = set()
-        for i, c in enumerate(node.ch, start=1):
-            name = f'${i}'
+        i = 0
+        max_pos = 0
+        while i < len(node.ch):
+            if node.ch[i].t == 'apply' and node.ch[i].v == '__':
+                i += 1
+                continue
+            i += 1
+            max_pos += 1
+        if node.ch[-1].t == 'action':
+            max_pos -= 1
+
+        i = 0
+        j = 1
+        while i < len(node.ch):
+            c = node.ch[i]
+            if c.t == 'apply' and c.v == '__':
+                i += 1
+                continue
+
+            name = f'${j}'
             if c.t == 'label':
                 if c.v[0] == '$':
                     self.add_error(
@@ -291,19 +311,61 @@ class _Analyzer:
             ):
                 self.check_positional_vars(c)
             if c.t in ('action', 'equals', 'pred'):
-                self._check_positional_var_refs(c.child, i, labels_needed)
+                self._check_positional_var_refs(
+                    c.child, j, max_pos, labels_needed
+                )
+            i += 1
+            j += 1
 
-        # Now define all the positional vars we need.
-        for i, c in enumerate(node.ch, start=1):
-            name = f'${i}'
+        # Now define all the positional vars we need. Note that we
+        # need to skip over any references to '__' as those will be
+        # filtered out later.
+        i = 0
+        j = 1
+        while i < len(node.ch):
+            c = node.ch[i]
+            if c.t == 'apply' and c.v == '__':
+                i += 1
+                continue
+            name = f'${j}'
             if name in labels_needed:
-                node.ch[i - 1] = m_grammar.Node('label', name, [c])
+                node.ch[i] = m_grammar.Node('label', name, [c])
+            i += 1
+            j += 1
 
-    def _check_positional_var_refs(self, node, current_index, labels_needed):
+    def _check_positional_var_refs(
+        self, node, current_index, max_pos, labels_needed
+    ):
         if node.t == 'e_ident':
             if node.v[0] == '$':
                 num = int(node.v[1:])
-                if num >= current_index:
+                if num > max_pos:
+                    if max_pos == 0:
+                        self.add_error(
+                            node,
+                            (
+                                f"Can't use '{node.v}', there are no "
+                                f'positional variables available'
+                            ),
+                        )
+                    elif max_pos == 1:
+                        self.add_error(
+                            node,
+                            (
+                                f"Can't use '{node.v}', there is only "
+                                f'{max_pos} positional variable available'
+                            ),
+                        )
+                    else:
+                        self.add_error(
+                            node,
+                            (
+                                f"Can't use '{node.v}', there are only "
+                                f'{max_pos} positional variables available'
+                            ),
+                        )
+
+                elif num >= current_index:
                     self.add_error(
                         node,
                         f'Variable "{node.v}" referenced before '
@@ -315,7 +377,9 @@ class _Analyzer:
                     labels_needed.add(node.v)
 
         for n in node.ch:
-            self._check_positional_var_refs(n, current_index, labels_needed)
+            self._check_positional_var_refs(
+                n, current_index, max_pos, labels_needed
+            )
 
     def check_for_unknown_functions(self, node):
         if node.t == 'e_qual' and node.ch[1].t == 'e_call':
@@ -687,7 +751,7 @@ def _add_filler_nodes(grammar, node):
         while i < len(node.ch):
             c = node.ch[i]
             if c.t == 'apply' and c.v == '__' and i < len(node.ch) - 1:
-                children.append(node.ch[i+1])
+                children.append(node.ch[i + 1])
                 i += 2
                 continue
             if should_fill(c):

@@ -269,7 +269,12 @@ class Node:
         if self.attrs.kind == 'function':
             self.type = TD('func')
         elif self.attrs.kind in ('local', 'outer'):
-            self.type = var_types[self.v]
+            try:
+                self.type = var_types[self.v]
+            except:
+                import pdb
+
+                pdb.set_trace()
         else:
             assert self.attrs.kind == 'extern'
             if g.externs[self.v] == 'func':
@@ -403,6 +408,10 @@ class Grammar:
         if node.t in ('action', 'empty', 'opt', 'star'):
             return False
         if node.t == 'apply':
+            if node.v == 'r___':
+                import pdb
+
+                pdb.set_trace()
             if node.v in ('any', 'r_any', 'end', 'r_end'):
                 return True
             # return self._can_fail(self.rules[node.v], inline=False)

@@ -97,18 +97,21 @@ Here are the basic rules:
       Match the next character in the string if it falls into the
       Unicode character category named `ident`.
 
-4.  There are additional operators that can be expressed in terms of the
-    primitives:
+4.  There are additional operators and terms that can be expressed in terms
+    of the primitives:
 
     * End:      `end`<br>
       Matches the end of the string. Equivalent to `~any`.
 
     * No-filler: `__`<br>
       Tells the generator to not insert filler before the next node
-      (see below for what filler is). This is equivalent to 
+      (see below for what filler is). This is equivalent to
       `~(%comment | %whitespace)`, but it is treated specially by the
       runtime in order to be more efficient by simply not inserting
-      the filler nodes at that point.
+      the filler nodes at that point. These terms cannot be used as
+      positional variables and the positional numbering will skip over
+      them. For example, `rule = foo __ bar` has positional variables `$1`
+      and `$2`, not `$1`, `$2`, and `$3`.
 
     * Plus:     `expr '+'`<br>
       Equivalent to `expr expr '*'`
@@ -193,7 +196,9 @@ will only match `foo(`. It is, however, an error to use `__` if you
 haven't set either `%whitespace` or `%comment`. (It is called a
 pseudo-rule because while it syntactically acts as a rule it is removed
 during semantic analysis and will never actually show up in a generated
-parser).
+parser). As noted above, `__` cannot be used as a positional variable
+and is not counted as one when numbering, i.e., `rule = foo __ bar`
+has positional variables `$1` and `$2`, not `$1`, `$2`, and `$3`.
 
 Floyd grammars themselves use the following definitions of whitespace
 and comments:
