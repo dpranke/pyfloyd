@@ -1010,6 +1010,62 @@ class PragmasMixin:
             """
         self.check(grammar, 'foo\nfoo\n', out=True)
 
+    def test_nofiller_both(self):
+        grammar = """\
+            %comment = '/*' ^.'*/'
+            %whitespace = ' '
+
+            grammar = (foo | bar) -> true
+                    |             -> false
+
+            foo    = 'foo' '1'
+
+            bar   = 'bar' __ '2'
+            """
+        self.check(grammar, 'foo/* */1', out=True)
+        self.check(grammar, 'foo 1', out=True)
+        self.check(grammar, 'foo /* */ 1', out=True)
+        self.check(grammar, 'bar2', out=True)
+        self.check(grammar, 'bar/* */2', out=False)
+
+    def test_nofiller_comment_only(self):
+        grammar = """\
+            %comment = '/*' ^.'*/'
+
+            grammar = (foo | bar) -> true
+                    |             -> false
+
+            foo    = 'foo' '1'
+
+            bar   = 'bar' __ '2'
+            """
+        self.check(grammar, 'foo/* */1', out=True)
+        self.check(grammar, 'bar2', out=True)
+        self.check(grammar, 'bar/* */2', out=False)
+
+    def test_nofiller_neither(self):
+        grammar = "grammar = 'foo' __ '1' -> true"
+        self.check
+            grammar,
+            'foo 1',
+            grammar_err="Errors were found:\n  <string>:1 Can't use '__' without %comment or %whitespace\n"
+        )
+
+    def test_nofiller_ws_only(self):
+        grammar = """\
+            %whitespace = ' '
+
+            grammar = (foo | bar) -> true
+                    |             -> false
+
+            foo    = 'foo' '1'
+
+            bar   = 'bar' __ '2'
+            """
+        self.check(grammar, 'foo 1', out=True)
+        self.check(grammar, 'bar2', out=True)
+        self.check(grammar, 'bar 2', out=False)
+
     def test_token(self):
         self.check(
             """\

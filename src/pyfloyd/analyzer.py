@@ -236,12 +236,20 @@ class _Analyzer:
         self.add_error(node, f'Unexpected AST node type {node.t} in %prec')
 
     def check_for_unknown_rules(self, node):
-        if (
+        if (node.t == 'apply' and
+            node.v == '__' and
+            not self.grammar.comment and
+            not self.grammar.whitespace):
+            self.add_error(
+                node, "Can't use '__' without %comment or %whitespace"
+            )
+        elif (
             node.t == 'apply'
             and node.v not in self.grammar.rules
-            and node.v not in ('any', 'end')
+            and node.v not in ('any', 'end', '__')
         ):
             self.add_error(node, f'Unknown rule "{node.v}"')
+
         for c in node.ch:
             self.check_for_unknown_rules(c)
 
@@ -675,13 +683,20 @@ def _add_filler_nodes(grammar, node):
         children = []
         if len(children) == 1 and node.ch[0].t == 'action':
             children.append(m_grammar.Node('apply', '%filler'))
-        for c in node.ch:
+        i = 0
+        while i < len(node.ch):
+            c = node.ch[i]
+            if c.t == 'apply' and c.v == '__' and i < len(node.ch) - 1:
+                children.append(node.ch[i+1])
+                i += 2
+                continue
             if should_fill(c):
                 children.append(m_grammar.Node('apply', '%filler'))
                 children.append(c)
             else:
                 sn = _add_filler_nodes(grammar, c)
                 children.append(sn)
+            i += 1
         return m_grammar.Node('seq', None, children)
     if should_fill(node):
         return m_grammar.Node(

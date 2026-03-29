@@ -103,6 +103,13 @@ Here are the basic rules:
     * End:      `end`<br>
       Matches the end of the string. Equivalent to `~any`.
 
+    * No-filler: `__`<br>
+      Tells the generator to not insert filler before the next node
+      (see below for what filler is). This is equivalent to 
+      `~(%comment | %whitespace)`, but it is treated specially by the
+      runtime in order to be more efficient by simply not inserting
+      the filler nodes at that point.
+
     * Plus:     `expr '+'`<br>
       Equivalent to `expr expr '*'`
 
@@ -143,6 +150,7 @@ Here are the basic rules:
       `expr`s (inclusive) in a row where n1 and n2 are both non-negative
       integers and `n2` >= `n1`.
 
+
 ## Filler (whitespace and comments)
 
 PEGs originally (and conventionally) don't distinguish between lexing and
@@ -170,9 +178,22 @@ So, the above grammar could be equivalently specified as:
 grammar     = 'foo'* 'bar' end
 ```
 
-If '%whitespace' is specified, then the parser will automatically
-define a `_ws` rule that matches the same thing. Similarly, the
-parser will define a '_comment' rules that matches comments.
+(Note that `%whitespace` and `%comment` can also be referred to as
+rules in the normal way).
+
+Sometimes, though, you *don't* want filler to be inserted between
+two terms; in this case you can specify the special "no-filler" pseudo-rule
+'__' in between the terms, e.g.:
+
+```
+open_paren  = 'foo' __ '('
+```
+
+will only match `foo(`. It is, however, an error to use `__` if you
+haven't set either `%whitespace` or `%comment`. (It is called a
+pseudo-rule because while it syntactically acts as a rule it is removed
+during semantic analysis and will never actually show up in a generated
+parser).
 
 Floyd grammars themselves use the following definitions of whitespace
 and comments:
