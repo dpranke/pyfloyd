@@ -157,10 +157,12 @@ succeed: [fn [val pos] [hl [call [op_name 'succeed'] [list val pos]] t_end]]
 
 break_if_failed: [fn [node] [if node.can_fail [t_if failed t_break]]]
 break_if_not_failed: [fn [node] [if node.can_fail
-                                    [t_if [hl t_not failed] t_break]]]
+                                    [t_if [hl t_not failed] t_break]
+                                    t_break]]
 return_if_failed: [fn [node] [if node.can_fail [t_if failed t_return]]]
 return_if_not_failed: [fn [node] [if node.can_fail
-                                     [t_if [hl t_not failed] t_return]]]
+                                     [t_if [hl t_not failed] t_return]
+                                     t_return]]
 
 # Helper methods that must be overridden in sub-grammars:
 
@@ -173,7 +175,7 @@ extern: null
 #
 
 #
-# 'generate' is invoked to generate the file from the AST. It 
+# 'generate' is invoked to generate the file from the AST. It
 # establishes the general layout of the file and defines the major
 # sections that a language needs to implement.
 #
@@ -251,7 +253,7 @@ n_count: [fn [node] [vl [t_assign 'vs' t_list_zero_any]
                         [t_while 'i < cmax'
                                  [vl [stmts node.child]
                                      [t_if failed
-                                           [vl [t_if 'i >= cmin' 
+                                           [vl [t_if 'i >= cmin'
                                                      [succeed 'vs' f_pos]]
                                                t_return]]
                                      [t_append 'vs' f_val]

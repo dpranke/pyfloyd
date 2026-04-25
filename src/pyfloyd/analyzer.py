@@ -20,6 +20,8 @@ from pyfloyd import grammar as m_grammar
 
 def analyze(
     ast,
+    text,
+    path,
     rewrite_subrules: bool,
     for_pretty_printing: bool = False,
     rewrite_filler: bool = True,
@@ -32,7 +34,7 @@ def analyze(
     optimizes what we can. Raises AnalysisError if there are any errors.
     """
 
-    g = m_grammar.Grammar(ast)
+    g = m_grammar.Grammar(ast, text, path)
 
     # Find whatever errors we can.
     a = _Analyzer(g)

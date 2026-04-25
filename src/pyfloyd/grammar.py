@@ -269,12 +269,7 @@ class Node:
         if self.attrs.kind == 'function':
             self.type = TD('func')
         elif self.attrs.kind in ('local', 'outer'):
-            try:
-                self.type = var_types[self.v]
-            except:
-                import pdb
-
-                pdb.set_trace()
+            self.type = var_types[self.v]
         else:
             assert self.attrs.kind == 'extern'
             if g.externs[self.v] == 'func':
@@ -307,9 +302,11 @@ class Node:
 
 
 class Grammar:
-    def __init__(self, ast: Node):
+    def __init__(self, ast: Node, text: str, path: str):
         assert isinstance(ast, Node)
         self.ast = ast
+        self.text = text
+        self.path = path
         self.errors: list[str] = []
         self.comment: Optional[Node] = None
         self.rules: dict[str, Node] = collections.OrderedDict()
@@ -356,6 +353,18 @@ class Grammar:
                 has_starting_rule = True
             self.rules[rule.v] = rule.child
 
+
+    def _offsets(self, pos: int) -> tuple[int, int]:
+        lineno = 1
+        colno = 1
+        for i in range(pos):
+            if self.text[i] == '\n':
+                lineno += 1
+                colno = 1
+            else:
+                colno += 1
+        return lineno, colno
+
     def node(self, cls, *args, **kwargs) -> Node:
         n = cls(*args, **kwargs)
         return self.update_node(n, True)
@@ -385,6 +394,13 @@ class Grammar:
         for c in node.ch:
             self._set_can_fail(c)
         node.can_fail = self._can_fail(node)
+        if node.t == 'choice':
+            for c in node.ch[:-1]:
+                if not c.can_fail:
+                    lineno, _ = self._offsets(node.pos)
+                    self.errors.append(
+                        f'{self.path}:{lineno} Branch of choice can never fail.'
+                    )
 
     def update_rules(self):
         # Update grammar.rules to match grammar.ast for rules in
@@ -408,10 +424,6 @@ class Grammar:
         if node.t in ('action', 'empty', 'opt', 'star'):
             return False
         if node.t == 'apply':
-            if node.v == 'r___':
-                import pdb
-
-                pdb.set_trace()
             if node.v in ('any', 'r_any', 'end', 'r_end'):
                 return True
             # return self._can_fail(self.rules[node.v], inline=False)

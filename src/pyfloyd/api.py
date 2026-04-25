@@ -127,6 +127,8 @@ def compile_to_parser(  # pylint: disable=redefined-builtin
         return CompiledResult(err=result.err, pos=result.pos)
     g = analyzer.analyze(
         result.val,
+        grammar,
+        path,
         rewrite_subrules=False,
         typecheck=typecheck,
         tokenize=tokenize,
@@ -190,6 +192,8 @@ def generate(
         return result
     grammar_obj = analyzer.analyze(
         result.val,
+        grammar,
+        path,
         rewrite_subrules=True,
         typecheck=typecheck,
         tokenize=tokenize,
@@ -281,6 +285,8 @@ def pretty_print(
         return None, result.err
     g = analyzer.analyze(
         result.val,
+        grammar,
+        path,
         for_pretty_printing=True,
         rewrite_subrules=False,
         rewrite_filler=rewrite_filler,
@@ -304,6 +310,8 @@ def dump_ast(
 
     g = analyzer.analyze(
         result.val,
+        grammar,
+        path,
         rewrite_subrules=rewrite_subrules,
     )
     return g.ast, None

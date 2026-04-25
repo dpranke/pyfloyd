@@ -285,6 +285,13 @@ class RulesMixin:
 
         self.check("grammar = 'foo' | 'bar'", 'bar')
 
+    def test_choice_can_never_fail(self):
+        self.check(
+            "grammar = 'foo'* | 'bar'",
+            '',
+            grammar_err=('Errors were found:\n'
+                         '  <string>:1 Branch of choice can never fail.\n'))
+
     def test_choice_with_rewind(self):
         self.check("grammar = 'a' 'b' | 'a' 'c'", 'ac')
 
