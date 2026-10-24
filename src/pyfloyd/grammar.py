@@ -54,6 +54,7 @@ class Node:
         v: Any,
         ch: Optional[list['Node']] = None,
         parser: Any = None,
+        pos: Optional[int] = None,
     ):
         self.t = t
         self.v = v
@@ -76,7 +77,11 @@ class Node:
         elif self.t == 'rule':
             self.attrs.vars = {}
         self.parser = parser
-        self.pos: Optional[int] = parser.pos() if parser else None
+        self.pos: Optional[int] = None
+        if pos is not None:
+            self.pos = pos
+        elif parser is not None:
+            self.pos = parser.pos()
 
     def __eq__(self, other) -> bool:
         assert isinstance(other, Node)
@@ -201,16 +206,18 @@ class Node:
         if len(params) and params[-1][0].startswith('*'):
             last = len(params) - 1
             if len(self.ch[1:]) < last:
-                g.errors.append(
+                g.add_error(
+                    self.pos,
                     f'{func_name}() takes at least {len(params)} '
-                    f'args, got {len(self.ch[1:])}.'
+                    f'args, got {len(self.ch[1:])}.',
                 )
         else:
             last = len(params)
             if len(self.ch[1:]) != last:
-                g.errors.append(
+                g.add_error(
+                    self.pos,
                     f'{func_name}() takes {len(params)} '
-                    f'args, got {len(self.ch[1:])}.'
+                    f'args, got {len(self.ch[1:])}.',
                 )
 
         for i, c in enumerate(self.ch[1 : last + 1]):
@@ -218,9 +225,10 @@ class Node:
             p_td = type_desc.from_str(p_type)
             assert c.type is not None
             if not type_desc.check_descs(p_td, c.type):
-                g.errors.append(
+                g.add_error(
+                    self.pos,
                     f'Expected arg #{i + 1} to {func_name}() to be '
-                    f'{p_type}, got {c.type.to_str()}.'
+                    f'{p_type}, got {c.type.to_str()}.',
                 )
         if last != len(params):
             p_type = params[last][1]
@@ -228,9 +236,10 @@ class Node:
             for i, c in enumerate(self.ch[last + 1 :]):
                 assert c.type is not None
                 if not type_desc.check_descs(p_td, c.type):
-                    g.errors.append(
+                    g.add_error(
+                        self.pos,
                         f'Expected arg #{last + 1 + i} to {func_name}() to be '
-                        f'{p_type}, got {c.type.to_str()}.'
+                        f'{p_type}, got {c.type.to_str()}.',
                     )
         self.type = TD(func['ret'])
         assert self.type is not None
@@ -280,7 +289,7 @@ class Node:
     def _infer_types_pred(self, g, var_types):
         del var_types
         if self.child.type['base'] != 'bool':
-            g.errors.append('Non-bool object passed to `?{}`.')
+            g.add_error(self.pos, 'Non-bool object passed to `?{}`.')
         self.type = TD('bool')
 
     def _infer_types_rule(self, g, var_types):
@@ -353,8 +362,7 @@ class Grammar:
                 has_starting_rule = True
             self.rules[rule.v] = rule.child
 
-
-    def _offsets(self, pos: int) -> tuple[int, int]:
+    def offsets(self, pos: int) -> tuple[int, int]:
         lineno = 1
         colno = 1
         for i in range(pos):
@@ -364,6 +372,13 @@ class Grammar:
             else:
                 colno += 1
         return lineno, colno
+
+    def add_error(self, pos, msg):
+        if pos is not None:
+            lineno, _ = self.offsets(pos)
+            self.errors.append(f'{self.path}:{lineno} {msg}')
+        else:
+            self.errors.append(msg)
 
     def node(self, cls, *args, **kwargs) -> Node:
         n = cls(*args, **kwargs)
@@ -397,9 +412,8 @@ class Grammar:
         if node.t == 'choice':
             for c in node.ch[:-1]:
                 if not c.can_fail:
-                    lineno, _ = self._offsets(node.pos)
-                    self.errors.append(
-                        f'{self.path}:{lineno} Branch of choice can never fail.'
+                    self.add_error(
+                        node.pos, 'Branch of choice can never fail.'
                     )
 
     def update_rules(self):
@@ -412,7 +426,7 @@ class Grammar:
         for rule_name in self.rules:
             if rule_name not in rules:
                 self.ast.ch.append(
-                    Node('rule', rule_name, [self.rules[rule_name]])
+                    Node('rule', rule_name, [self.rules[rule_name]], pos=0)
                 )
 
     # TODO: Figure out what to do with `inline`; it seems like there are

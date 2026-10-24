@@ -331,7 +331,7 @@ class _Analyzer:
                 continue
             name = f'${j}'
             if name in labels_needed:
-                node.ch[i] = m_grammar.Node('label', name, [c])
+                node.ch[i] = m_grammar.Node('label', name, [c], pos=node.pos)
             i += 1
             j += 1
 
@@ -466,7 +466,7 @@ def _rewrite_rules_for_tokens(grammar):
             '%comment',
         ):
             continue
-        rule.child = m_grammar.Node('rule_wrapper', rule.v, [rule.child])
+        rule.child = m_grammar.Node('rule_wrapper', rule.v, [rule.child], pos=rule.pos)
         grammar.rules[rule.v] = rule
 
 
@@ -485,10 +485,12 @@ def _rewrite_quals(grammar):
                         'e_call_infix',
                         None,
                         [r] + [rewrite_node(gc) for gc in c.ch],
+                        pos=c.pos
                     )
                 elif c.t == 'e_getitem':
                     r = m_grammar.Node(
-                        'e_getitem_infix', None, [r, rewrite_node(c.child)]
+                        'e_getitem_infix', None, [r, rewrite_node(c.child)],
+                        pos=c.pos
                     )
             return r
         for i, c in enumerate(node.ch):
@@ -504,7 +506,7 @@ def _rewrite_scopes(grammar):
         for i, c in enumerate(node.ch):
             node.ch[i] = rewrite_node(c)
         if node.t == 'seq' and any(c.t == 'label' for c in node.ch):
-            return m_grammar.Node('scope', None, [node])
+            return m_grammar.Node('scope', None, [node], pos=c.pos)
         return node
 
     for rule in grammar.ast.ch:
@@ -538,7 +540,7 @@ def _rewrite_recursion(grammar):
             if has_lr:
                 grammar.leftrec_rules.update(seen)
                 node_name = name + '#' + str(i + 1)
-                choices[i] = m_grammar.Node('leftrec', node_name, [choice])
+                choices[i] = m_grammar.Node('leftrec', node_name, [choice], pos=choice.pos)
                 choices[i].attrs.left_assoc = (
                     grammar.assoc.get(node_name, 'left') == 'left'
                 )
@@ -557,29 +559,30 @@ def _check_operator(grammar, name, choices):
         if len(choice.ch) not in (3, 4):
             return None
         if choice.ch[0] != m_grammar.Node(
-            'label', '$1', [m_grammar.Node('apply', name)]
-        ) and choice.ch[0] != m_grammar.Node('apply', name):
+            'label', '$1', [m_grammar.Node('apply', name, pos=-1)], pos=-1
+        ) and choice.ch[0] != m_grammar.Node('apply', name, pos=-1):
             return None
         if choice.ch[1].t != 'lit' or choice.ch[1].v not in grammar.prec:
             return None
         operator = choice.ch[1].v
         prec = grammar.prec[operator]
         if choice.ch[2] != m_grammar.Node(
-            'label', '$3', [m_grammar.Node('apply', name)]
-        ) and choice.ch[2] != m_grammar.Node('apply', name):
+            'label', '$3', [m_grammar.Node('apply', name, pos=-1)], pos=-1
+        ) and choice.ch[2] != m_grammar.Node('apply', name, pos=-1):
             return None
         if len(choice.ch) == 4 and choice.ch[3].t != 'action':
             return None
         if has_scope:
-            choice = m_grammar.Node('scope', None, [choice])
-        operators.append(m_grammar.Node('op', [operator, prec], [choice]))
+            choice = m_grammar.Node('scope', None, [choice], pos=choice.pos)
+        operators.append(m_grammar.Node('op', [operator, prec], [choice], pos=choice.pos))
     choice = choices[-1]
     if len(choice.ch) != 1:
         return None
     return m_grammar.Node(
         'choice',
         None,
-        [m_grammar.Node('operator', name, operators), choices[-1]],
+        [m_grammar.Node('operator', name, operators, pos=choice.pos), choice],
+        pos=choice.pos
     )
 
 
@@ -687,6 +690,7 @@ def _add_filler_rules(grammar):
             filler = m_grammar.Node(
                 'regexp',
                 f'(({grammar.whitespace.v})|({grammar.comment.v}))*',
+                pos=0
             )
         else:
             filler = m_grammar.Node(
@@ -702,24 +706,26 @@ def _add_filler_rules(grammar):
                         ],
                     )
                 ],
+                pos=0
             )
     elif grammar.comment:
         if grammar.comment.t == 'regexp':
-            filler = m_grammar.Node('regexp', f'({grammar.comment.v})*')
+            filler = m_grammar.Node('regexp', f'({grammar.comment.v})*', pos=0)
         else:
             filler = m_grammar.Node(
-                'star', None, [m_grammar.Node('apply', '%comment')]
+                'star', None, [m_grammar.Node('apply', '%comment', pos=0)],
+                pos=0
             )
     elif grammar.whitespace:
         if grammar.whitespace.t == 'regexp':
-            filler = m_grammar.Node('regexp', f'({grammar.whitespace.v})*')
+            filler = m_grammar.Node('regexp', f'({grammar.whitespace.v})*', pos=0)
         else:
             filler = m_grammar.Node(
-                'star', None, [m_grammar.Node('apply', '%whitespace')]
+                'star', None, [m_grammar.Node('apply', '%whitespace', pos=0)], pos=0
             )
     if filler:
         grammar.rules['%filler'] = m_grammar.Node(
-            'run', None, [m_grammar.Node('choice', None, [filler])]
+            'run', None, [m_grammar.Node('choice', None, [filler], pos=0)], pos=0
         )
 
 
@@ -748,7 +754,7 @@ def _add_filler_nodes(grammar, node):
     if node.t == 'seq':
         children = []
         if len(children) == 1 and node.ch[0].t == 'action':
-            children.append(m_grammar.Node('apply', '%filler'))
+            children.append(m_grammar.Node('apply', '%filler', pos=node.pos))
         i = 0
         while i < len(node.ch):
             c = node.ch[i]
@@ -757,22 +763,23 @@ def _add_filler_nodes(grammar, node):
                 i += 2
                 continue
             if should_fill(c):
-                children.append(m_grammar.Node('apply', '%filler'))
+                children.append(m_grammar.Node('apply', '%filler', pos=c.pos))
                 children.append(c)
             else:
                 sn = _add_filler_nodes(grammar, c)
                 children.append(sn)
             i += 1
-        return m_grammar.Node('seq', None, children)
+        return m_grammar.Node('seq', None, children, pos=node.pos)
     if should_fill(node):
         return m_grammar.Node(
             'paren',
             None,
             [
                 m_grammar.Node(
-                    'seq', None, [m_grammar.Node('apply', '%filler'), node]
+                    'seq', None, [m_grammar.Node('apply', '%filler', pos=node.pos), node], pos=node.pos
                 )
             ],
+            pos=node.pos
         )
 
     node.ch = [_add_filler_nodes(grammar, c) for c in node.ch]
@@ -826,9 +833,9 @@ class _SubRuleRewriter:
         rules = []
         for rule in self._grammar.rules:
             rules.append(
-                m_grammar.Node('rule', rule, [self._grammar.rules[rule]])
+                m_grammar.Node('rule', rule, [self._grammar.rules[rule]], pos=0)
             )
-        self._grammar.ast = m_grammar.Node('rules', None, rules)
+        self._grammar.ast = m_grammar.Node('rules', None, rules, pos=0)
 
     def _subrule(self) -> str:
         self._counter += 1
@@ -879,12 +886,12 @@ class _SubRuleRewriter:
     def _make_subrule(self, child):
         subnode_rule = self._subrule()
         self._subrules[subnode_rule] = self._walk(child)
-        return m_grammar.Node('apply', subnode_rule)
+        return m_grammar.Node('apply', subnode_rule, pos=child.pos)
 
     def _ty_apply(self, node):
         if node.v in ('any', 'end'):
             self._grammar.needed_builtin_rules.append(node.v)
-        return m_grammar.Node('apply', self._rule_fmt.format(rule_name=node.v))
+        return m_grammar.Node('apply', self._rule_fmt.format(rule_name=node.v), pos=node.pos)
 
     def _ty_ends_in(self, node):
         self._grammar.needed_builtin_rules.append('any')
