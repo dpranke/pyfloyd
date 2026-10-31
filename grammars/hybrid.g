@@ -91,6 +91,7 @@ seq            = expr ('\\'? expr)*         -> node([
 expr           = '->' e_expr                  -> node(['action', null, [$2]])
                | '?{' e_expr '}'              -> node(['pred', null, [$2]])
                | '={' e_expr '}'              -> node(['equals', null, [$2]])
+               | '{' e_expr '}'               -> node(['action', null, [$2]])
                | post_expr ':' ident          -> node(['label', $3, [$1]])
                | post_expr
 
@@ -167,9 +168,10 @@ e_slice        = '[' e_expr ':' e_expr ']'    -> node([
                                                      [node(['e_num', 0, []]), $3]
                                                  ])
 
-e_args         = e_pos_args ',' e_named_args  -> node(['e_args', null, $1 + $3])
+e_args         = e_pos_args ',' e_named_args ','?  -> node(['e_args', null, $1 + $3])
                | e_pos_args ','?              -> node(['e_args', null, $1])
                | e_named_args ','?            -> node(['e_args', null, $1])
+               |                              -> node(['e_args', null, []])
 
 e_pos_args     = e_pos_arg (',' e_pos_arg)*   -> cons($1, $2)
 

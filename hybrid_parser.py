@@ -728,6 +728,10 @@ class _Parser:
         if not self._state.failed:
             return
         self._o_restore(state)
+        self._s_expr_5()
+        if not self._state.failed:
+            return
+        self._o_restore(state)
         self._r_post_expr()
 
     def _s_expr_1(self):
@@ -787,6 +791,26 @@ class _Parser:
         )
 
     def _s_expr_4(self):
+        self._r__filler()
+        self._o_ch('{')
+        if self._state.failed:
+            return
+        self._r_e_expr()
+        if self._state.failed:
+            return
+        v__2 = self._state.val
+        if self._state.failed:
+            return
+        self._r__filler()
+        self._o_ch('}')
+        if self._state.failed:
+            return
+        self._o_succeed(
+            self._externs['node'](self, ['action', None, [v__2]]),
+            self._state.pos,
+        )
+
+    def _s_expr_5(self):
         self._r_post_expr()
         if self._state.failed:
             return
@@ -797,7 +821,7 @@ class _Parser:
         self._o_ch(':')
         if self._state.failed:
             return
-        self._s_expr_5()
+        self._s_expr_6()
         if self._state.failed:
             return
         v__3 = self._state.val
@@ -808,7 +832,7 @@ class _Parser:
             self._state.pos,
         )
 
-    def _s_expr_5(self):
+    def _s_expr_6(self):
         self._r__filler()
         self._r_ident()
 
@@ -1536,11 +1560,7 @@ class _Parser:
         if self._state.failed:
             return
         self._r_e_args()
-        if self._state.failed:
-            return
         v__2 = self._state.val
-        if self._state.failed:
-            return
         self._r__filler()
         self._o_ch(')')
         if self._state.failed:
@@ -1683,11 +1703,17 @@ class _Parser:
         if not self._state.failed:
             return
         self._o_restore(state)
-        self._s_e_args_2()
+        self._s_e_args_4()
         if not self._state.failed:
             return
         self._o_restore(state)
-        self._s_e_args_5()
+        self._s_e_args_7()
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._o_succeed(
+            self._externs['node'](self, ['e_args', None, []]), self._state.pos
+        )
 
     def _s_e_args_1(self):
         self._r_e_pos_args()
@@ -1706,58 +1732,71 @@ class _Parser:
         v__3 = self._state.val
         if self._state.failed:
             return
+        self._s_e_args_2()
         self._o_succeed(
             self._externs['node'](self, ['e_args', None, v__1 + v__3]),
             self._state.pos,
         )
 
     def _s_e_args_2(self):
+        state = self._state.copy()
+        self._s_e_args_3()
+        if self._state.failed:
+            self._o_succeed([], state.pos)
+        else:
+            self._o_succeed([self._state.val], self._state.pos)
+
+    def _s_e_args_3(self):
+        self._r__filler()
+        self._o_ch(',')
+
+    def _s_e_args_4(self):
         self._r_e_pos_args()
         if self._state.failed:
             return
         v__1 = self._state.val
         if self._state.failed:
             return
-        self._s_e_args_3()
+        self._s_e_args_5()
         self._o_succeed(
             self._externs['node'](self, ['e_args', None, v__1]),
             self._state.pos,
         )
 
-    def _s_e_args_3(self):
+    def _s_e_args_5(self):
         state = self._state.copy()
-        self._s_e_args_4()
+        self._s_e_args_6()
         if self._state.failed:
             self._o_succeed([], state.pos)
         else:
             self._o_succeed([self._state.val], self._state.pos)
 
-    def _s_e_args_4(self):
+    def _s_e_args_6(self):
         self._r__filler()
         self._o_ch(',')
 
-    def _s_e_args_5(self):
+    def _s_e_args_7(self):
         self._r_e_named_args()
         if self._state.failed:
             return
         v__1 = self._state.val
         if self._state.failed:
             return
-        self._s_e_args_6()
+        self._s_e_args_8()
         self._o_succeed(
             self._externs['node'](self, ['e_args', None, v__1]),
             self._state.pos,
         )
 
-    def _s_e_args_6(self):
+    def _s_e_args_8(self):
         state = self._state.copy()
-        self._s_e_args_7()
+        self._s_e_args_9()
         if self._state.failed:
             self._o_succeed([], state.pos)
         else:
             self._o_succeed([self._state.val], self._state.pos)
 
-    def _s_e_args_7(self):
+    def _s_e_args_9(self):
         self._r__filler()
         self._o_ch(',')
 
