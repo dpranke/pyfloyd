@@ -5,7 +5,7 @@
 
 %whitespace = /[ \t\n]+/
 
-%comment    = ';' (^'\n')* 
+%comment    = ';' (!'\n')*
 
 grammar     = (atom | list)* opt_end             -> $1
 
@@ -26,7 +26,7 @@ string      = '"' ch* '"'                        -> join('', $2)
 
 ch          = '\\\\'                             -> '\\'
             | '\\\n'                             -> '\n'
-            | ^'"'
+            | !'"'
 
 symbol      = /[a-zA-Z][a-zA-Z0-9_]*/            -> ['symbol', $1]
 
