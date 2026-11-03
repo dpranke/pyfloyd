@@ -9,7 +9,7 @@
 %whitespace = <(' ' | '\f' | '\n' | '\r' | '\t' | '\v')+>
 
 %comment    = <('//' | '#') [^\r\n]*>
-            | <'/*' ^.'*/'>
+            | <'/*' ...'*/'>
 
 %tokens     = escape hex ident int lit regexp set zpos
 
@@ -29,8 +29,10 @@ seq         = expr (expr)*                 -> node(['seq', null, cons($1, $2)])
             |                              -> node(['empty', null, []])
 
 expr        = '->' e_expr                  -> node(['action', null, [$2]])
+            | '{' e_expr '}'               -> node(['action', null, [$2]])
             | '?{' e_expr '}'              -> node(['pred', null, [$2]])
             | '={' e_expr '}'              -> node(['equals', null, [$2]])
+            | '++'                         -> node(['next_to', null, []])
             | post_expr ':' ident          -> node(['label', $3, [$1]])
             | post_expr
 
@@ -41,6 +43,7 @@ post_expr   = prim_expr '?'                -> node(['opt', null, [$1]])
             | prim_expr
 
 count       = '{' zpos ',' zpos '}'        -> [$2, $4]
+            | '{' zpos ',' '}'             -> [$2, 'Infinity']
             | '{' zpos '}'                 -> [$2, $2]
 
 prim_expr   = lit '..' lit                 -> node(['range', [$1, $3], []])
@@ -50,7 +53,9 @@ prim_expr   = lit '..' lit                 -> node(['range', [$1, $3], []])
             | set                          -> node(['set', $1, []])
             | regexp                       -> node(['regexp', $1, []])
             | '~' prim_expr                -> node(['not', null, [$2]])
+            | '!' prim_expr                -> node(['not', null, [$2]])
             | '^.' prim_expr               -> node(['ends_in', null, [$2]])
+            | '...' prim_expr              -> node(['ends_in', null, [$2]])
             | '^' prim_expr                -> node(['not_one', null, [$2]])
             | ident ~'='                   -> node(['apply', $1, []])
             | '(' choice ')'               -> node(['paren', null, [$2]])
@@ -59,9 +64,9 @@ prim_expr   = lit '..' lit                 -> node(['range', [$1, $3], []])
 lit         = squote sqchar* squote        -> cat($2)
             | dquote dqchar* dquote        -> cat($2)
 
-sqchar      = escape | ^squote
+sqchar      = escape | !squote any
 
-dqchar      = escape | ^dquote
+dqchar      = escape | !dquote any
 
 bslash      = '\x5C'
 
@@ -94,11 +99,11 @@ uni_name    = 'N{' /[A-Z][A-Z0-9]*(( [A-Z][A-Z0-9]*|(-[A-Z0-9]*)))*/ '}'
                                            -> ulookup($2)
 
 set         = '[' '^' set_char+ ']'        -> cat(scons($2, $3))
-            | '[' ~'^' set_char+ ']'       -> cat($3)
+            | '[' !'^' set_char+ ']'       -> cat($3)
 
 set_char    = '\\]'                        -> '\\]'
             | escape
-            | ^']'
+            | !']' any
 
 regexp      = '/' re_char+ '/'             -> cat($2)
 
