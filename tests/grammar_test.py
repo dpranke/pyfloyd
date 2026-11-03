@@ -1030,7 +1030,7 @@ class PragmasMixin:
 
             foo    = 'foo' '1'
 
-            bar   = 'bar' __ '2'
+            bar   = 'bar' ++ '2'
             """
         self.check(grammar, 'foo/* */1', out=True)
         self.check(grammar, 'foo 1', out=True)
@@ -1047,18 +1047,18 @@ class PragmasMixin:
 
             foo    = 'foo' '1'
 
-            bar   = 'bar' __ '2'
+            bar   = 'bar' ++ '2'
             """
         self.check(grammar, 'foo/* */1', out=True)
         self.check(grammar, 'bar2', out=True)
         self.check(grammar, 'bar/* */2', out=False)
 
     def test_nofiller_neither(self):
-        grammar = "grammar = 'foo' __ '1' -> true"
+        grammar = "grammar = 'foo' ++ '1' -> true"
         self.check(
             grammar,
             'foo 1',
-            grammar_err="Errors were found:\n  <string>:1 Can't use '__' without %comment or %whitespace\n",
+            grammar_err="Errors were found:\n  <string>:1 Can't use '++' without %comment or %whitespace\n",
         )
 
     def test_nofiller_ws_only(self):
@@ -1070,7 +1070,7 @@ class PragmasMixin:
 
             foo    = 'foo' '1'
 
-            bar   = 'bar' __ '2'
+            bar   = 'bar' ++ '2'
             """
         self.check(grammar, 'foo 1', out=True)
         self.check(grammar, 'bar2', out=True)

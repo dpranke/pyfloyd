@@ -25,20 +25,20 @@ id_continue = id_start | [0-9]
 
 choice      = seq ('|' seq)*               -> node(['choice', null, cons($1, $2)])
 
-seq         = expr (expr)*                 -> node(['seq', null, cons($1, $2)])
+seq         = expr ('\\'? expr)*           -> node(['seq', null, cons($1, $2)])
             |                              -> node(['empty', null, []])
 
 expr        = '->' e_expr                  -> node(['action', null, [$2]])
             | '{' e_expr '}'               -> node(['action', null, [$2]])
             | '?{' e_expr '}'              -> node(['pred', null, [$2]])
             | '={' e_expr '}'              -> node(['equals', null, [$2]])
-            | '++'                         -> node(['next_to', null, []])
+            | '++'                         -> node(['next_to', '++', []])
             | post_expr ':' ident          -> node(['label', $3, [$1]])
             | post_expr
 
 post_expr   = prim_expr '?'                -> node(['opt', null, [$1]])
             | prim_expr '*'                -> node(['star', null, [$1]])
-            | prim_expr '+'                -> node(['plus', null, [$1]])
+            | prim_expr !'++' '+'          -> node(['plus', null, [$1]])
             | prim_expr count              -> node(['count', $2, [$1]])
             | prim_expr
 

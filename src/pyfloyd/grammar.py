@@ -484,6 +484,7 @@ class Grammar:
             'ends_in',
             'equals',
             'lit',
+            'next_to',
             'not',
             'not_one',
             'plus',

@@ -1,136 +1,127 @@
 # This is the grammar for a Bargle grammar itself.
 
-%
-% DEFS
-%
+%externs = memoize                  -> true
+         | allow_unicode_escapes    -> true
+         | allow_unicode_categories -> true
+         | allow_unicode_names      -> true
+         | has_builtin_regexps      -> true
+         | node                     -> pfunc
 
-# Whether to memoize values in the parser
-const memoize: bool = true
+# %defs    = {
+#
+# # Whether to memoize values in the parser
+# const memoize: bool = true
+#
+# # Whether to allow unicode escapes with '\u'
+# const allow_unicode_escapes: bool = true
+#
+# # Whether to allow unicode categories with '\p{}'
+# const allow_unicode_categories: bool = true
+#
+# # Whether to allow unicode named entities with '\N{}' as part of an
+# # escape sequence
+# const allow_unicode_names: bool = true
+#
+# # If true, the parser has a built-in regexp engine compatible w/
+# # the Bargle regexp syntax and can take a whole string as a single node;
+# # If false, the parser will break down the regexp into an equivalent set of
+# # parse nodes.
+# const has_builtin_regexps: bool = true
+#
+# fn car(l: [value]): value { l[0] }
+#
+# fn cdr(l: [value]): [value] { l[1:] }
+#
+# fn cons(hd: value, tail: [value]): [value] { [hd] + tail }
+#
+# # Takes a string of hex digits and returns a string containing the
+# # corresponding Unicode code point. Even if the implementation sets
+# # `allow_unicode_escapes` to False, they should implement this
+# # and handle 1-2 character strings that are the hex equivalents of ascii
+# # characters, i.e. ([0-9a-fA-F] | [0-7][0-9a-fA-F])
+# fn hex2u(s: string): string { '' }
+#
+# # Takes a unicode character name and returns a string containing the
+# # corresponding Unicode code point. Not needed if `allow_unicode_names`
+# # is false.
+# fn name2u(s: string): string { '' }
+#
+# fn node(
+#     tag: string,
+#     children: [any] = [],
+#     val: any = null,
+# ): any { ['node', tag, val] + children }
+#
+# }
 
-# Whether to allow unicode escapes with '\u'
-const allow_unicode_escapes: bool = true
-
-# Whether to allow unicode categories with '\p{}'
-const allow_unicode_categories: bool = true
-
-# Whether to allow unicode named entities with '\N{}' as part of an
-# escape sequence
-const allow_unicode_names: bool = true
-
-# If true, the parser has a built-in regexp engine compatible w/
-# the Bargle regexp syntax and can take a whole string as a single node;
-# If false, the parser will break down the regexp into an equivalent set of
-# parse nodes.
-const has_builtin_regexps: bool = true
-
-fn car(l: [value]): value { l[0] }
-
-fn cdr(l: [value]): [value] { l[1:] }
-
-fn cons(hd: value, tail: [value]): [value] { [hd] + tail }
-
-# Takes a string of hex digits and returns a string containing the
-# corresponding Unicode code point. Even if the implementation sets
-# `allow_unicode_escapes` to False, they should implement this
-# and handle 1-2 character strings that are the hex equivalents of ascii
-# characters, i.e. ([0-9a-fA-F] | [0-7][0-9a-fA-F])
-fn hex2u(s: string): string { '' }
-
-# Takes a unicode character name and returns a string containing the
-# corresponding Unicode code point. Not needed if `allow_unicode_names`
-# is false.
-fn name2u(s: string): string { '' }
-
-fn node(
-    tag: string,
-    children: [any] = [],
-    val: any = null,
-): any { ['node', tag, val] + children }
-
-%
-% RULES
-%
+%tokens              = sp ws eol line_comment nested_comment
+                       ident string regexp set nn_integer positive_integer
 
 %whitespace          = ws
 
-%comment             = comment
+%comment             = line_comment | nested_comment
 
-grammar              = sections end                           -> $1
-                     | !(defs_delim | rules_delim) rules end  -> $2
-                     | !(defs_delim | rules_delim) seq end    -> $2
+grammar              = rule* end                -> node(['rules', null, $1])
 
-sections             = defs? \
-                       rules_delim? \
-                       rules \
-                       (tokens_delim rules)?    -> node(
-                                                   'sections',
-                                                   $4,
-                                                   val=[$1, $2, $5]
-                                                )
+rule                 = ident '=' choice         -> node(['rule', $1, [$3]])
 
-defs                 = defs_delim decl*
+choice               = seq ('|' seq)*           -> node(['choice', null, cons($1, $2)])
 
-rules                = rule*                    -> node('rules', $1)
-
-rule                 = ident '=' choice         -> node('rule', [$3], $1)
-
-choice               = seq ('|' seq)*           -> node('choice', [$1] + $2)
-
-seq                  = clause (bslash | clause)*   -> node('seq', [$1] + $2)
-                     |                          -> node('empty')
+seq                  = clause (bslash | clause)*  -> node(['seq', null, cons($1, $2)])
+                     |                            -> node(['empty', null, []])
 
 clause               = host_clause
                      | check_clause
                      | match_clause
                      | not_clause
+                     | next_to_clause
                      | ends_in_clause
                      | run_clause
                      | postfix_clause
 
 # Return the value of the Bargle expression. This always succeeds, and
 # consumes no input.
-host_clause          = '->' expr                -> node('expr', [$2])
-                     | '{' expr '}'             -> node('expr', [$2])
+host_clause          = '->' expr                -> node(['action', null, [$2]])
+                     | '{' decl* expr '}'       -> node(['action', null, [$3]])
 
 # Succeeds if the Bargle expression is true. This consumes no input.
-check_clause         = '?{' expr '}'            -> node('check', [$2])
+check_clause         = '?{' expr '}'            -> node(['pred', null, [$2]])
 
 # Check that the next input starts with the Bargle expression, and consume it.
-match_clause         = '={' expr '}'            -> node('match', [$2])
+match_clause         = '={' expr '}'            -> node(['equals', null, [$2]])
+
+next_to_clause       = '++'                     -> node(['next_to', null, []])
 
 # Check that the next input does not match the clause. This consumes no input.
-not_clause           = '!' simple_clause        -> node('not', [$2])
+not_clause           = '!' ++ simple_clause        -> node(['not', null, [$3]])
 
-ends_in_clause       = '...' simple_clause      -> node('ends_in', [$2])
+ends_in_clause       = '...' ++ simple_clause      -> node(['ends_in', null, [$3]])
 
-postfix_clause       = simple_clause post_op    -> node($2[0], [$1], $2[1])
+postfix_clause       = simple_clause ++ post_op    -> node([$3[0], $3[1], [$1]])
                      | simple_clause
 
-post_op              = ':' ident                -> ['label', $2]
+post_op              = ':' ++ ident             -> ['label', $3]
                      | '*'                      -> ['star', null]
                      | '+'                      -> ['plus', null]
                      | '?'                      -> ['opt', null]
                      | count
 
-count                = '{' nn_int ',' int '}'   -> ['count', [$2, $4]]
-                     | '{' nn_int ',' '}'       -> ['count', [$2, 'infinity']]
-                     | '{' int '}'              -> ['count', [$2, $2]]
+count                = '{' nn_integer ',' positive_integer '}'  -> ['count', [$2, $4]]
+                     | '{' nn_integer ',' '}'                   -> ['count', [$2, 'infinity']]
+                     | '{' positive_integer '}'                 -> ['count', [$2, $2]]
 
 simple_clause        = string
                      | set
                      | regexp
-                     | next_to
                      | ?{allow_unicode_categories} category
                      | apply
                      | parenthesized_clause
 
-next_to              = '++'                     -> node('next_to')
+apply                = ident !'='               -> node(['apply', $1, []])
 
-apply                = ident !'='               -> node('apply', val=$1)
+parenthesized_clause = '(' choice ')'           -> node(['paren', null, [$2]])
 
-parenthesized_clause = '(' choice ')'           -> node('paren', [$2])
-
-run_clause           = '<' choice '>'           -> node('run', [$2])
+run_clause           = '<' choice '>'           -> node(['run', null, [$2]])
 
 #
 # Bargle declarations
@@ -143,23 +134,23 @@ decl                 = constant_decl
                      | function_decl
 
 constant_decl        = 'const' ident ':' type '=' expr \
-                                                -> node('const', [$2, $4, $6])
+                                                -> node(['const', null, [$2, $4, $6]])
 
 enum_decl            = 'enum' ident '{' ident (',' ident)* ','? '}'
 
 function_decl        = 'fn' ident '(' params ')' (':' type)? expr \
-                                                -> node('fn', [$2, $4, $6, $8])
+                                                -> node(['fn', null, [$2, $4, $6, $7]])
 
 params               = param (',' param)* ','?  -> cons($1, $2)
 
 param                = ident ':' type ('=' expr)? \
-                                                -> node('param', [$1, $3, $4])
+                                                -> node(['param', null, [$1, $3, $4]])
 
-type           = 'bool'                         -> node('bool_type', null, [])
-               | 'string'                       -> node('string_type', null, [])
-               | 'value'                        -> node('value_type', null, [])
-               | 'any'                          -> node('any_type', null, [])
-               | '[' type ']'                   -> node('list_type', null, $2)
+type           = 'bool'                         -> node(['bool_type', null, []])
+               | 'string'                       -> node(['string_type', null, []])
+               | 'value'                        -> node(['value_type', null, []])
+               | 'any'                          -> node(['any_type', null, []])
+               | '[' type ']'                   -> node(['list_type', null, $2])
 
 #
 # Bargle expressions
@@ -180,25 +171,25 @@ exprs          = expr (',' expr)* ','?          -> cons($1, $2)
                |                                -> []
 
 add_expr       = compound_expr ('+' compound_expr)* \
-                                                -> node('add', cons($1, $2))
+                                                -> node(['add', null, cons($1, $2)])
 
 sub_expr       = compound_expr '-' compound_expr \
-                                                -> node('sub', [$1, $3])
+                                                -> node(['sub', null, [$1, $3]])
 
-equal_expr     = compound_expr '==' compound_expr \
-                                                -> node('equals', [$1, $3])
+equals_expr    = compound_expr '==' compound_expr \
+                                                -> node(['equals', null, [$1, $3]])
 
 
 not_equals_expr = compound_expr '!=' compound_expr \
-                                                -> node('not_equals', [$1, $3])
+                                                -> node(['not_equals', null, [$1, $3]])
 
 not_expr       = '!' compound_expr
 
 cond_expr      = compound_expr '?' compound_expr ':' compound_expr \
-                                                -> node('cond', [$1, $3, $5])
+                                                -> node(['cond', null, [$1, $3, $5]])
 
-compound_expr  = simple_expr post_op            -> node(
-                                                   car($2), cons($1, cdr($2))
+compound_expr  = primary_expr post_op            -> node(
+                                                   [car($2), null, cons($1, cdr($2))]
                                                 )
                | primary_expr
 
@@ -208,28 +199,27 @@ post_op        = '[' expr ':' (expr | -> 'inf') ']' \
                | '(' args ')'                   -> cons('call',  $2)
                | '.' ident                      -> ['field', $2]
 
-args           = positional_args named_args?    -> $1 + $2
+args           = positional_args named_args?    -> concat($1, $2)
                | named_args
 
-positional_args = expr (',' expr)* ','?         -> [$1] + $2
+positional_args = expr (',' expr)* ','?         -> cons($1, $2)
 
-named_args     = named_arg (',' named_arg)* ','? -> [$1] + $2
+named_args     = named_arg (',' named_arg)* ','? -> cons($1, $2)
 
-named_arg      = ident '=' expr                 -> node('named_arg', $4, val=$1)
+named_arg      = ident '=' expr                 -> node(['named_arg', $1, [$3]])
 
-primary_expr   = 'false'                        -> node('bool', val='false')
-               | 'null'                         -> node('null', val='null')
-               | 'true'                         -> node('bool', val='true')
-               | ident                          -> node('ident', val=$1)
-               | hex_number                     -> node('number', val=$1)
-               | integer                        -> node('number', val=$1)
-               | string                         -> node('string', val=$1)
-               | '(' expr ')'                   -> node('paren', [$2])
-               | '[' exprs ']'                  -> node('array', $2)
+primary_expr   = 'false'                        -> node(['bool', 'false', []])
+               | 'null'                         -> node(['null', 'null', []])
+               | 'true'                         -> node(['bool', 'true', []])
+               | ident                          -> node(['ident', $1, []])
+               | number                         -> node(['number', $1, []])
+               | string                         -> node(['string', $1, []])
+               | '(' expr ')'                   -> node(['paren', null, [$2]])
+               | '[' exprs ']'                  -> node(['array', null, $2])
 
-%
-% TOKENS
-%
+#
+# TOKENS
+#
 
 sp                 = [ \t]
 
@@ -241,25 +231,10 @@ line_comment       = ('#' | '//') ...(eol|end)
 
 nested_comment     = '/*' (nested_comment | (!'*/' any))* '*/'
 
-defs_delim         = '%' ' '* defs_literal ' '* '%'
-                   | '%' eol '%' ' '* defs_literal ' '* eol '%' eol
-
-defs_literal       = /[Dd][Ee][Ff][Ss]/
-
-rules_delim        = '%' ' '* rules_literal ' '* '%'
-                   | '%' eol '%' ' '* rules_literal ' '* eol '%' eol
-
-rules_literal      = /[Rr][Uu][Ll][Ee][Ss]/
-
-tokens_delim       = '%' ' '* tokens_literal ' '* '%'
-                   | '%' eol '%' ' '* tokens_literal ' '* eol '%' eol
-
-tokens_literal     = /[Tt][Oo][Kk][Ee][Nn][Ss]/
-
 ident              = /[_$a-zA-Z] [_a-zA-Z0-9]*/
 
-string             = <quote:q (bslash escape | !q any)* q> \
-                                                -> node('string', val=$1)
+string             = <quote:q (bslash escape | !(={q}) any)* ={q}> \
+                                                -> node(['lit', $1, []])
 
 bslash             = '\x5C'   # \ (backslash)
 
@@ -287,18 +262,18 @@ quote              = '\x27'  # ' (single quote)
                    | '\x22'  # " (double quote)
                    | '\x60'  # ` (backquote)
 
-hex_escape         = 'x' hex_char{2}            -> hextou($2)
-                   | 'x{' <hex_char+> '}'       -> hextou($2)
+hex_escape         = 'x' <hex{2}>          -> atou($2, 16)
+                   | 'x{' <hex+> '}'       -> atou($2, 16)
 
 # TODO: Handle surrogate pairs.
-unicode_escape     = 'u' hex_char{4}            -> hex2u($2)
-                   | 'U' hex_char{8}            -> hex2u($2)
-                   | 'u{' <hex_char+> '}'       -> hex2u($2)
+unicode_escape     = 'u' <hex{4}>            -> atou($2, 16)
+                   | 'U' <hex{8}>            -> atou($2, 16)
+                   | 'u{' <hex+> '}'       -> atou($2, 16)
 
 # This is the syntax for a Unicode character name as of Unicode 18.
 # (https://www.unicode.org/versions/Unicode18.0.0/core-spec/chapter-4/#G2082)
 unicode_name       = 'N{' <unicode_word (' ' unicode_word)*> '}' \
-                                                -> name2u($2)
+                                                -> ulookup($2)
 
 unicode_word       = [A-Z] ([A-Z0-9]* ('-' [A-Z0-9]+))*
 
@@ -319,8 +294,8 @@ unicode_word       = [A-Z] ([A-Z0-9]* ('-' [A-Z0-9]+))*
 regexp             = '/' parsed_regexp '/'      -> $2
 
 parsed_regexp      = ?{has_builtin_regexps} <pattern+>
-                                                -> node('regexp', val=$2)
-                   | pattern+                   -> node('seq', $1)
+                                                -> node(['regexp', $2, []])
+                   | pattern+                   -> node(['seq', $1, []])
 
 pattern            = single
                    | set
@@ -340,13 +315,13 @@ re_meta            = bslash
                    | '*' | '?' | '+' | '/'
 
 set                = '[' '^'? '-'? subset* '-'? ']' \
-                                                -> node(
+                                                -> node([
                                                        'set',
                                                        $2,
                                                        $3 + ($4 + $5)
-                                                   )
+                                                   ])
 
-subset             = safe_char '-' safe_char    -> node('range', val=[$1, $3])
+subset             = safe_char '-' safe_char    -> node(['range', [$1, $3], []])
                    | safe_char
 
 single             = escaped_re_meta
@@ -354,18 +329,18 @@ single             = escaped_re_meta
                    | escape
                    | safe_char
 
-star_group         = group '*'                  -> node('star', [$1])
+star_group         = group '*'                  -> node(['star', null, [$1]])
 
-plus_group         = group '+'                  -> node('plus', [$1])
+plus_group         = group '+'                  -> node(['plus', null, [$1]])
 
-opt_group          = group '?'                  -> node('opt', [$1])
+opt_group          = group '?'                  -> node(['opt', null, [$1]])
 
 group              = '(' pattern ('|' pattern)* ')' \
-                                                -> node('choice', [$1] + $2)
+                                                -> node(['choice', null, cons($2, $3)])
 
 safe_char          = !re_meta any
 
-category           = '\p{' category_name '}'    -> node('unicat', $2)
+category           = '\p{' category_name '}'    -> node('unicat', $2, [])
 
 # This must be one of the Unicode General_Category values defined in
 # https://www.unicode.org/versions/Unicode18.0.0/core-spec/chapter-4/#G134153
@@ -373,9 +348,45 @@ category           = '\p{' category_name '}'    -> node('unicat', $2)
 category_name      = [A-Z] [a-z]?
                    | [A-z] [a-z]* ('_' [A-Z] [a-z]*)*
 
+
+number             = hex_literal
+                   | binary_literal
+                   | octal_literal
+                   | nn_integer
+                   | float_keyword
+                   | float
+
+hex_literal        = '0x' hex hex_sep*
+
+hex                = [0-9a-fA-F]
+
+hex_sep            = '_'? hex
+
+# Octal literals and escapes may or may not b supported, but if they are
+# they are limited to representing only numbers in the range of [0, 256).
+octal_literal      = '0o' [0-7]{3}
+
+binary_literal     = <'0b' bin bin_sep*>
+
+bin                = [01]
+
+bin_sep            = '_'? bin
+
+float_keyword      = 'nan' | 'infinity' | '-infinity'
+
+float              = nn_integer frac? exp? ![eE]
+
+frac               = '.' digit digit_sep*
+
+exp                = [eE] ('-' | '+')? positive_integer
+
 # non-negative integer
-nn_int             = '0'
-                   | int
+nn_integer         = '0'
+                   | positive_integer
+
+digit              = [0-9]
+
+digit_sep          = [_0-9]
 
 # integer
-int                = [1-9] [_0-9]*
+positive_integer   = [1-9] [_0-9]*

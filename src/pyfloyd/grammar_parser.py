@@ -284,7 +284,20 @@ class _Parser:
         self._o_succeed(vs, self._state.pos)
 
     def _s_seq_3(self):
+        self._s_seq_4()
         self._o_memoize('r_expr', self._r_expr)
+
+    def _s_seq_4(self):
+        state = self._state.copy()
+        self._s_seq_5()
+        if self._state.failed:
+            self._o_succeed([], state.pos)
+        else:
+            self._o_succeed([self._state.val], self._state.pos)
+
+    def _s_seq_5(self):
+        self._o_memoize('r__filler', self._r__filler)
+        self._o_ch('\\')
 
     def _r_expr(self):
         state = self._state.copy()
@@ -396,7 +409,7 @@ class _Parser:
         if self._state.failed:
             return
         self._o_succeed(
-            self._externs['node'](self, ['next_to', None, []]), self._state.pos
+            self._externs['node'](self, ['next_to', '++', []]), self._state.pos
         )
 
     def _s_expr_6(self):
@@ -439,7 +452,7 @@ class _Parser:
         if not self._state.failed:
             return
         self._o_restore(state)
-        self._s_post_expr_4()
+        self._s_post_expr_6()
         if not self._state.failed:
             return
         self._o_restore(state)
@@ -483,6 +496,9 @@ class _Parser:
         v__1 = self._state.val
         if self._state.failed:
             return
+        self._s_post_expr_4()
+        if self._state.failed:
+            return
         self._o_memoize('r__filler', self._r__filler)
         self._o_ch('+')
         if self._state.failed:
@@ -493,6 +509,21 @@ class _Parser:
         )
 
     def _s_post_expr_4(self):
+        state = self._state.copy()
+        errpos = self._errpos
+        self._s_post_expr_5()
+        if self._state.failed:
+            self._o_succeed(None, state.pos)
+        else:
+            self._o_restore(state)
+            self._errpos = errpos
+            self._o_fail()
+
+    def _s_post_expr_5(self):
+        self._o_memoize('r__filler', self._r__filler)
+        self._o_str('++')
+
+    def _s_post_expr_6(self):
         self._o_memoize('r_prim_expr', self._r_prim_expr)
         if self._state.failed:
             return

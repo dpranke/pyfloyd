@@ -7,9 +7,7 @@
 # - 'decl' is short for 'declaration'
 # - 'stmt' is short for 'statement'
 
-%
-% DEFS
-%
+%defs       = {
 
 enum Dialect { Lower, Core, Middle, Upper }
 
@@ -32,9 +30,10 @@ enum Syntax { Module, Script, Interactive }
 
 const syntax: Syntax = Syntax.Module
 
-%
-% RULES
-%
+}
+
+%tokens           = sp ws eol line_comment nested_comment
+                    number nn_integer string ident keyword
 
 %whitespace       = ws
 
@@ -506,9 +505,9 @@ index_expr         = '[' expr ']'
 
 field_expr         = '.' ++ ident
 
-%
-% TOKENS
-%
+#
+# TOKENS
+#
 
 sp                 = / \t\r\n/
                    | ?{allow_reserved} ('\f' | '\v' | '\u2028' | '\u2029')
@@ -769,7 +768,6 @@ reserved_keywords  = 'ensure'
                    | 'post'
 
 
-keyword          = 'null'
 # An ASCII identifier is an ascii letter or an underscore followed by
 # zero or more ascii letters, digits, or underscores.
 ascii_ident      = [_a-zA-Z] [_a-zA-Z0-9]*

@@ -155,6 +155,8 @@ class _Analyzer:
         pragma = rule.v
         choice = rule.child
 
+        if rule.v == '%defs':
+            self._collect_defs(rule)
         if rule.v == '%externs':
             self._collect_externs(rule)
         elif rule.v == '%tokens':
@@ -181,6 +183,9 @@ class _Analyzer:
             self.grammar.assoc[operator] = direction
         else:
             self.add_error(rule, f'Unknown pragma "{pragma}"')
+
+    def _collect_defs(self, n):
+        pass
 
     def _collect_externs(self, n):
         assert n.child.t == 'choice'
@@ -239,13 +244,12 @@ class _Analyzer:
 
     def check_for_unknown_rules(self, node):
         if (
-            node.t == 'apply'
-            and node.v == '__'
+            ((node.t == 'apply' and node.v == '__') or node.t == 'next_to')
             and not self.grammar.comment
             and not self.grammar.whitespace
         ):
             self.add_error(
-                node, "Can't use '__' without %comment or %whitespace"
+                node, f"Can't use '{node.v}' without %comment or %whitespace"
             )
         elif (
             node.t == 'apply'
@@ -758,7 +762,8 @@ def _add_filler_nodes(grammar, node):
         i = 0
         while i < len(node.ch):
             c = node.ch[i]
-            if c.t == 'apply' and c.v == '__' and i < len(node.ch) - 1:
+            if (c.t == 'apply' and c.v == '__' and i < len(node.ch) - 1) or (
+                c.t == 'next_to' and i < len(node.ch) - 1):
                 children.append(node.ch[i + 1])
                 i += 2
                 continue
