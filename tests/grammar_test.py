@@ -1476,7 +1476,7 @@ class ErrorsMixin:
             'grammar = ?{1}',
             text='',
             grammar_err=(
-                'Errors were found:\n  Non-bool object passed to `?{}`.\n'
+                'Errors were found:\n  <string>:1 Non-bool object passed to `?{}`.\n'
             ),
         )
 
@@ -1485,7 +1485,7 @@ class ErrorsMixin:
             'grammar = -> join()',
             text='',
             grammar_err=(
-                'Errors were found:\n  join() takes 2 args, got 0.\n'
+                'Errors were found:\n  <string>:1 join() takes 2 args, got 0.\n'
             ),
         )
 
@@ -1495,8 +1495,8 @@ class ErrorsMixin:
             text='',
             grammar_err=(
                 'Errors were found:\n'
-                '  Expected arg #1 to join() to be str, got int.\n'
-                '  Expected arg #2 to join() to be list[str], got str.\n'
+                '  <string>:1 Expected arg #1 to join() to be str, got int.\n'
+                '  <string>:1 Expected arg #2 to join() to be list[str], got str.\n'
             ),
         )
 
