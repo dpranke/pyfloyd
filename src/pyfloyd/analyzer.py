@@ -166,8 +166,13 @@ class _Analyzer:
                     self.add_error(rule, f'Unknown token rule "{t}"')
         elif rule.v == '%whitespace':
             self.grammar.whitespace = choice
+            _collect_referenced_rules(self.grammar.filler_tokens, choice)
+            self.grammar.tokens.update(self.grammar.filler_tokens)
+
         elif rule.v == '%comment':
             self.grammar.comment = choice
+            _collect_referenced_rules(self.grammar.filler_tokens, choice)
+            self.grammar.tokens.update(self.grammar.filler_tokens)
         elif rule.v == '%prec':
             operators = set()
             for c in rule.child.ch:
@@ -186,6 +191,7 @@ class _Analyzer:
 
     def _collect_defs(self, n):
         pass
+
 
     def _collect_externs(self, n):
         assert n.child.t == 'choice'
@@ -510,7 +516,7 @@ def _rewrite_scopes(grammar):
         for i, c in enumerate(node.ch):
             node.ch[i] = rewrite_node(c)
         if node.t == 'seq' and any(c.t == 'label' for c in node.ch):
-            return m_grammar.Node('scope', None, [node], pos=c.pos)
+            return m_grammar.Node('scope', None, [node], pos=node.pos)
         return node
 
     for rule in grammar.ast.ch:
@@ -660,27 +666,22 @@ def _rewrite_filler(grammar):
 
     # Compute the transitive closure of all the token rules.
     grammar.subtokens = set(grammar.tokens)
-    _collect_subtokens(grammar, grammar.ast)
+    for rule in grammar.ast.ch:
+        if rule.v in grammar.subtokens:
+            _collect_referenced_rules(grammar.subtokens, rule)
 
     # Now rewrite all the rules to insert the filler nodes.
     grammar.ast = _add_filler_nodes(grammar, grammar.ast)
     grammar.update_rules()
 
 
-def _collect_subtokens(grammar, node):
-    # Collect the list of all rules reachable from this token rule:
-    # all of them should be treated as tokens as well.
-    if node.t == 'rules':
-        for rule in node.ch:
-            if rule.v in grammar.subtokens:
-                _collect_subtokens(grammar, rule)
-        return
-
-    if node.t == 'apply' and node.v not in m_grammar.BUILTIN_RULES:
-        grammar.subtokens.add(node.v)
-
-    for c in node.ch:
-        _collect_subtokens(grammar, c)
+def _collect_referenced_rules(st: set[str], n):
+    # Collect all of the names of rules reachable from this node and
+    # add them to the given set.
+    if n.t == 'apply' and n.v not in m_grammar.BUILTIN_RULES:
+        st.add(n.v)
+    for ch in n.ch:
+        _collect_referenced_rules(st, ch)
 
 
 def _add_filler_rules(grammar):
@@ -691,41 +692,37 @@ def _add_filler_rules(grammar):
     filler = None
     if grammar.whitespace and grammar.comment:
         if grammar.whitespace.t == 'regexp' and grammar.comment.t == 'regexp':
+            if grammar.filler_tokens:
+                grammar.single_fill = m_grammar.Node(
+                    'regexp',
+                    f'(({grammar.whitespace.v})|({grammar.comment.v}))',
+                    pos=0
+                )
             filler = m_grammar.Node(
                 'regexp',
                 f'(({grammar.whitespace.v})|({grammar.comment.v}))*',
                 pos=0
             )
         else:
-            filler = m_grammar.Node(
-                'star',
-                None,
-                [
-                    m_grammar.Node(
-                        'choice',
-                        None,
-                        [
-                            m_grammar.Node('apply', '%whitespace'),
-                            m_grammar.Node('apply', '%comment'),
-                        ],
-                    )
-                ],
-                pos=0
+            grammar.single_fill = m_grammar.Node('choice', None,
+                [m_grammar.Node('apply', '%whitespace'),
+                    m_grammar.Node('apply', '%comment')
+                ]
             )
+            filler = m_grammar.Node('star', None, [ grammar.single_fill], pos=0)
     elif grammar.comment:
+        grammar.single_fill = m_grammar.Node('apply', '%comment')
         if grammar.comment.t == 'regexp':
             filler = m_grammar.Node('regexp', f'({grammar.comment.v})*', pos=0)
         else:
-            filler = m_grammar.Node(
-                'star', None, [m_grammar.Node('apply', '%comment', pos=0)],
-                pos=0
-            )
+            filler = m_grammar.Node('star', None, [grammar.single_fill], pos=0)
     elif grammar.whitespace:
+        grammar.single_fill = m_grammar.Node('apply', '%whitespace')
         if grammar.whitespace.t == 'regexp':
             filler = m_grammar.Node('regexp', f'({grammar.whitespace.v})*', pos=0)
         else:
             filler = m_grammar.Node(
-                'star', None, [m_grammar.Node('apply', '%whitespace', pos=0)], pos=0
+                'star', None, [grammar.single_fill], pos=0
             )
     if filler:
         grammar.rules['%filler'] = m_grammar.Node(
@@ -735,56 +732,88 @@ def _add_filler_rules(grammar):
 
 def _add_filler_nodes(grammar, node):
     def should_fill(node):
-        if node.t in ('escape', 'lit', 'range', 'regexp', 'set'):
+        if node.t in ('action', 'empty', 'escape', 'lit', 'range', 'regexp', 'set'):
             return True
         if node.t == 'apply' and node.v in (
             '%comment',
             '%filler',
             '%whitespace',
         ):
-            return False
+             return False
         if node.t == 'apply' and (node.v == 'end' or node.v in grammar.tokens):
-            return True
-        if node.t == 'empty':
             return True
         return False
 
-    if node.t == 'rule' and node.v.startswith('%'):
-        # Don't mess with the pragmas.
-        return node
-    if node.t == 'rule' and node.v in grammar.subtokens:
-        # By definition we don't want to insert filler into token rules.
-        return node
-    if node.t == 'seq':
-        children = []
-        if len(children) == 1 and node.ch[0].t == 'action':
-            children.append(m_grammar.Node('apply', '%filler', pos=node.pos))
-        i = 0
-        while i < len(node.ch):
-            c = node.ch[i]
-            if (c.t == 'apply' and c.v == '__' and i < len(node.ch) - 1) or (
-                c.t == 'next_to' and i < len(node.ch) - 1):
-                children.append(node.ch[i + 1])
-                i += 2
-                continue
-            if should_fill(c):
-                children.append(m_grammar.Node('apply', '%filler', pos=c.pos))
-                children.append(c)
-            else:
-                sn = _add_filler_nodes(grammar, c)
-                children.append(sn)
-            i += 1
-        return m_grammar.Node('seq', None, children, pos=node.pos)
-    if should_fill(node):
+    def fill_without_token_node(node):
+        apply_v = m_grammar.Node('apply', node.v, pos=node.pos)
+        not_v = m_grammar.Node('not', None, [apply_v], pos=node.pos)
+        until_v = m_grammar.Node('star', None, [
+            m_grammar.Node('seq', None, [not_v, grammar.single_fill],
+                            pos=node.pos)
+            ]
+        )
+        return until_v
+
+    def fill_before_single_node(before_node, node):
         return m_grammar.Node(
             'paren',
             None,
             [
                 m_grammar.Node(
-                    'seq', None, [m_grammar.Node('apply', '%filler', pos=node.pos), node], pos=node.pos
+                    'seq',
+                    None,
+                    [
+                        # m_grammar.Node('apply', '%filler', pos=node.pos),
+                        before_node,
+                        node
+                    ],
+                    pos=node.pos
                 )
             ],
             pos=node.pos
+        )
+    if node.t == 'rule' and node.v.startswith('%'):
+        # Don't insert filler into any of the pragma rules
+        return node
+    if node.t == 'rule' and node.v in grammar.subtokens:
+        # Don't insert filler into any of the token rules themselves.
+        return node
+    if node.t == 'seq':
+        children = []
+        i = 0
+        while i < len(node.ch):
+            c = node.ch[i]
+
+            # implement '++' | '__' | next_to and don't fill
+            if (c.t == 'apply' and c.v == '__' and i < len(node.ch) - 1) or (
+                c.t == 'next_to' and i < len(node.ch) - 1):
+                children.append(node.ch[i + 1])
+                i += 2
+                continue
+
+            if c.t == 'apply' and c.v in grammar.filler_tokens:
+                children.append(fill_without_token_node(c))
+                children.append(c)
+                i += 1
+                continue
+
+            if should_fill(c):
+                children.append(m_grammar.Node('apply', '%filler', pos=c.pos))
+                children.append(c)
+                i += 1
+                continue
+
+            sn = _add_filler_nodes(grammar, c)
+            children.append(sn)
+            i += 1
+
+        return m_grammar.Node('seq', None, children, pos=node.pos)
+    if node.t == 'apply' and node.v in grammar.filler_tokens:
+        return fill_before_single_node(fill_without_token_node(node), node)
+    if should_fill(node):
+        return fill_before_single_node(
+            m_grammar.Node('apply', '%filler', pos=node.pos),
+            node
         )
 
     node.ch = [_add_filler_nodes(grammar, c) for c in node.ch]

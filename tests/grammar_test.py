@@ -1010,6 +1010,11 @@ class CommentsMixin:
 
 
 class PragmasMixin:
+    #
+    # This set of tests tests how filler injection works.
+    #
+
+    # This tests just %comment
     def test_comment(self):
         grammar = """\
             %tokens = foo
@@ -1020,6 +1025,104 @@ class PragmasMixin:
             """
         self.check(grammar, 'foo\nfoo\n', out=True)
 
+    # This next set tests how to control (or disable) filler injection
+    # by specifying one of the tokens in the filler
+    def test_disabling_filler_no_sp(self):
+        grammar = """\
+            %whitespace = sp | eol
+            grammar = 'foo' !sp 'bar' -> true
+                    | -> false
+            sp      = ' '
+            eol     = '\n'
+        """
+
+        # Any input where there is no space between foo and bar should
+        # pass; in between are okay, though.
+        self.check(grammar, 'foobar', out=True)
+        self.check(grammar, 'foo bar', out=False)
+        self.check(grammar, 'foo\nbar', out=True)
+        self.check(grammar, 'foo\n bar', out=False)
+        self.check(grammar, 'foo \nbar', out=False)
+
+    def test_disabling_filler_at_least_one_sp(self):
+        grammar = """\
+            %whitespace = sp | eol
+            grammar = 'foo' sp 'bar' -> true
+                    | -> false
+            sp      = ' '
+            eol     = '\n'
+        """
+
+        # Any input where there is at least one space should pass.
+        self.check(grammar, 'foobar', out=False)
+        self.check(grammar, 'foo bar', out=True)
+        self.check(grammar, 'foo \nbar', out=True)
+        self.check(grammar, 'foo\n bar', out=True)
+        self.check(grammar, 'foo\nbar', out=False)
+        self.check(grammar, 'foo  bar', out=True)
+        self.check(grammar, 'foo \n bar', out=True)
+
+    def test_filler_around_tokens(self):
+        # This tests that filler is injected before, in between, and after
+        # tokens
+        grammar = textwrap.dedent("""\
+            %tokens = foo
+            %whitespace = ' '
+
+            grammar = foo foo end -> true
+
+            foo     = 'foo'
+            """)
+        self.check(grammar, 'foofoo', out=True)
+        self.check(grammar, ' foo foo ', out=True)
+
+    def test_filler_between_tokens(self):
+        # This tests that filler is not injected in between parts of a token
+        # tokens and is not injected before subtokens that aren't declared
+        # as tokens themselves.
+        grammar = textwrap.dedent("""\
+            %tokens = foo
+            %whitespace = ' '
+
+            grammar = foo bar? end -> true
+
+            foo     = bar baz
+
+            bar     = 'bar'
+
+            baz     = 'baz'
+            """)
+        self.check(grammar, 'barbaz', out=True)
+        self.check(
+            grammar,
+            'bar baz',
+            out=None,
+            err='<string>:1 Unexpected " " at column 4'
+        )
+        self.check(grammar, ' barbaz ', out=True)
+        self.check(
+            grammar,
+            ' bar baz ',
+            out=None,
+            err='<string>:1 Unexpected " " at column 5'
+        )
+
+        # subtokens should not be filled unless they are also explicitly
+        # declared as tokens.
+        self.check(grammar, 'barbazbar', out=True)
+        self.check(
+            grammar,
+            'barbaz bar',
+            out=None,
+            err='<string>:1 Unexpected "b" at column 8'
+        )
+
+        grammar = grammar.replace('%tokens = foo', '%tokens = foo bar')
+        self.check(grammar, 'barbazbar', out=True)
+        self.check(grammar, 'barbaz bar', out=True)
+
+    # This set tests the '++' rule (next_to). There should be no filler
+    # at all in between the rules on each side of it.
     def test_nofiller_both(self):
         grammar = """\
             %comment = '/*' ^.'*/'
@@ -1076,6 +1179,9 @@ class PragmasMixin:
         self.check(grammar, 'bar2', out=True)
         self.check(grammar, 'bar 2', out=False)
 
+    #
+    # This next set tests the %token declaration
+    #
     def test_token(self):
         self.check(
             """\
@@ -1117,7 +1223,7 @@ class PragmasMixin:
             grammar_err='<string>:1 Unexpected "1" at column 11',
         )
 
-    def test_unknown(self):
+    def test_unknown_pragma(self):
         self.check(
             '%foo = end',
             '',
@@ -1130,17 +1236,6 @@ class PragmasMixin:
     def test_whitespace_chars(self):
         # self.check('g = \t\n\r { true }', '', out=True)
         self.check('g = \t\n\r -> true', '', out=True)
-
-    def test_whitespace(self):
-        grammar = textwrap.dedent("""\
-            %tokens = foo
-            %whitespace = ' '
-
-            grammar = foo foo end -> true
-
-            foo     = 'foo'
-            """)
-        self.check(grammar, 'foofoo', out=True)
 
     def test_whitespace_can_be_referenced(self):
         grammar = textwrap.dedent("""\

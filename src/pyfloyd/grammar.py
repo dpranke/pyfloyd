@@ -324,6 +324,8 @@ class Grammar:
         self.tokens: set[str] = set()
         self.subtokens: set[str] = set()
         self.whitespace: Optional[Node] = None
+        self.single_fill: Optional[Node] = None
+        self.filler_tokens: set[str] = set()
         self.assoc: dict[str, str] = {}
         self.prec: dict[str, int] = {}
         self.exception_needed: bool = False
