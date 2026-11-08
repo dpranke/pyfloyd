@@ -1025,6 +1025,77 @@ class PragmasMixin:
             """
         self.check(grammar, 'foo\nfoo\n', out=True)
 
+    def test_whitespace(self):
+        grammar = textwrap.dedent("""\
+            %whitespace = ' '
+            %tokens     = foo
+            grammar     = (foo | baz) end   -> true
+                        |                   -> false
+
+            foo         = 'foo' 'bar'
+
+            baz         = 'baz' 'quux'
+            """)
+        self.check(grammar, 'foobar', out=True)
+        self.check(grammar, ' foobar', out=True)
+        self.check(grammar, ' foobar ', out=True)
+
+        self.check(grammar, 'bazquux', out=True)
+        self.check(grammar, ' bazquux', out=True)
+        self.check(grammar, 'bazquux ', out=True)
+
+        # Check that you can *not* put a space between 'foo' and 'bar'
+        # because foo is a token, and that you *can* between 'baz' and 'quux'
+        # baz is not a token.
+        self.check(grammar, 'foo bar', out=False)
+        self.check(grammar, 'baz quux', out=True)
+
+    def test_filler_dag(self):
+        # Test that you can share subtokens between whitespace and
+        # comment rules
+        grammar = textwrap.dedent("""\
+            %whitespace = sp | eol
+            %comment    = line_comment
+            grammar     = 'foo' end -> true
+                        |           -> false
+            sp          = ' '
+            eol         = '\n'
+            line_comment = '#' ...(eol|end)
+            """)
+        self.check(grammar, 'foo', out=True)
+        self.check(grammar, 'foo \n', out=True)
+        self.check(grammar, 'foo # comment', out=True)
+        self.check(grammar, 'foo # comment\n', out=True)
+
+    def test_filler_sp_referenced_with_both(self):
+        # This tests that if you declare *both* whitespace and comments
+        # and refer to one of them directly, things still work right.
+        grammar = textwrap.dedent("""\
+            %whitespace = sp | eol
+            %comment    = line_comment
+            grammar     = 'foo' sp 'bar' end -> true
+                        |                    -> false
+            sp          = ' '
+            eol         = '\n'
+            line_comment = '#' ...(eol|end)
+            """)
+        self.check(grammar, 'foobar', out=False)
+        self.check(grammar, 'foo bar', out=True)
+        self.check(grammar, 'foo#comment\nbar', out=False)
+        self.check(grammar, 'foo#comment\n bar', out=True)
+
+    def test_whitespace_can_be_referenced(self):
+        grammar = textwrap.dedent("""\
+            %whitespace = ' '
+
+            %tokens     = foo
+
+            grammar     = foo  -> true
+
+            foo         = '"' %whitespace '"'
+            """)
+        self.check(grammar, '" "', out=True)
+
     # This next set tests how to control (or disable) filler injection
     # by specifying one of the tokens in the filler
     def test_disabling_filler_no_sp(self):
@@ -1237,17 +1308,6 @@ class PragmasMixin:
         # self.check('g = \t\n\r { true }', '', out=True)
         self.check('g = \t\n\r -> true', '', out=True)
 
-    def test_whitespace_can_be_referenced(self):
-        grammar = textwrap.dedent("""\
-            %whitespace = ' '
-
-            %tokens     = foo
-
-            grammar     = foo  -> true
-
-            foo         = '"' %whitespace '"'
-            """)
-        self.check(grammar, '" "', out=True)
 
     def test_externs(self):
         g = textwrap.dedent("""\

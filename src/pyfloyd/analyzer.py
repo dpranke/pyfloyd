@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
+import json
 from typing import Any
 
 from pyfloyd import functions
@@ -77,7 +79,6 @@ def analyze(
     # Rewrite any choice or seq nodes that only have one child.
     _rewrite_singles(g)
 
-    # Extract subnodes into their own rules to make codegen easier.
     if rewrite_subrules:
         # Extract subnodes into their own rules to make codegen easier.
         # Not needed when just interpreting the grammar.
@@ -516,7 +517,7 @@ def _rewrite_scopes(grammar):
         for i, c in enumerate(node.ch):
             node.ch[i] = rewrite_node(c)
         if node.t == 'seq' and any(c.t == 'label' for c in node.ch):
-            return m_grammar.Node('scope', None, [node], pos=node.pos)
+            return m_grammar.Node('scope', None, [node], pos=c.pos)
         return node
 
     for rule in grammar.ast.ch:
@@ -675,12 +676,12 @@ def _rewrite_filler(grammar):
     grammar.update_rules()
 
 
-def _collect_referenced_rules(st: set[str], n):
+def _collect_referenced_rules(st: set[str], node):
     # Collect all of the names of rules reachable from this node and
     # add them to the given set.
-    if n.t == 'apply' and n.v not in m_grammar.BUILTIN_RULES:
-        st.add(n.v)
-    for ch in n.ch:
+    if node.t == 'apply' and node.v not in m_grammar.BUILTIN_RULES:
+        st.add(node.v)
+    for ch in node.ch:
         _collect_referenced_rules(st, ch)
 
 
@@ -705,34 +706,41 @@ def _add_filler_rules(grammar):
             )
         else:
             grammar.single_fill = m_grammar.Node('choice', None,
-                [m_grammar.Node('apply', '%whitespace'),
+                [
+                    m_grammar.Node('apply', '%whitespace'),
                     m_grammar.Node('apply', '%comment')
                 ]
             )
-            filler = m_grammar.Node('star', None, [ grammar.single_fill], pos=0)
+            filler = m_grammar.Node(
+                'star',
+                None,
+                [m_grammar.Node('apply', '%singlefill')],
+                pos=0
+            )
     elif grammar.comment:
         grammar.single_fill = m_grammar.Node('apply', '%comment')
+        sfcopy = copy.deepcopy(grammar.single_fill)
         if grammar.comment.t == 'regexp':
             filler = m_grammar.Node('regexp', f'({grammar.comment.v})*', pos=0)
         else:
-            filler = m_grammar.Node('star', None, [grammar.single_fill], pos=0)
+            filler = m_grammar.Node('star', None, [sfcopy], pos=0)
     elif grammar.whitespace:
         grammar.single_fill = m_grammar.Node('apply', '%whitespace')
         if grammar.whitespace.t == 'regexp':
             filler = m_grammar.Node('regexp', f'({grammar.whitespace.v})*', pos=0)
         else:
             filler = m_grammar.Node(
-                'star', None, [grammar.single_fill], pos=0
+                'star', None, [m_grammar.Node('apply', '%singlefill')], pos=0
             )
+    if grammar.single_fill:
+        grammar.rules['%singlefill'] = grammar.single_fill
     if filler:
-        grammar.rules['%filler'] = m_grammar.Node(
-            'run', None, [m_grammar.Node('choice', None, [filler], pos=0)], pos=0
-        )
+        grammar.rules['%filler'] = m_grammar.Node('run', None, [filler])
 
 
 def _add_filler_nodes(grammar, node):
     def should_fill(node):
-        if node.t in ('action', 'empty', 'escape', 'lit', 'range', 'regexp', 'set'):
+        if node.t in ('empty', 'escape', 'lit', 'range', 'regexp', 'set'):
             return True
         if node.t == 'apply' and node.v in (
             '%comment',
@@ -747,9 +755,9 @@ def _add_filler_nodes(grammar, node):
     def fill_without_token_node(node):
         apply_v = m_grammar.Node('apply', node.v, pos=node.pos)
         not_v = m_grammar.Node('not', None, [apply_v], pos=node.pos)
+        sf = m_grammar.Node('apply', '%singlefill', pos=node.pos)
         until_v = m_grammar.Node('star', None, [
-            m_grammar.Node('seq', None, [not_v, grammar.single_fill],
-                            pos=node.pos)
+            m_grammar.Node('seq', None, [not_v, sf], pos=node.pos)
             ]
         )
         return until_v
@@ -759,16 +767,7 @@ def _add_filler_nodes(grammar, node):
             'paren',
             None,
             [
-                m_grammar.Node(
-                    'seq',
-                    None,
-                    [
-                        # m_grammar.Node('apply', '%filler', pos=node.pos),
-                        before_node,
-                        node
-                    ],
-                    pos=node.pos
-                )
+                m_grammar.Node('seq', None, [before_node, node], pos=node.pos)
             ],
             pos=node.pos
         )
@@ -1017,7 +1016,7 @@ def _rewrite_pragma_rules(grammar):
     for rule in grammar.ast.ch:
         if rule.v.startswith('%'):
             old_rule_name = rule.v
-            if rule.v in ('%comment', '%whitespace', '%filler'):
+            if rule.v in ('%comment', '%whitespace', '%filler', '%singlefill'):
                 rule.v = rule.v.replace('%', '_')
                 _rewrite(rule.child)
                 new_rules.append(rule)
