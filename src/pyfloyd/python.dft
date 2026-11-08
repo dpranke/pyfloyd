@@ -115,6 +115,10 @@ default_header: @"""
     Externs = dict[str, object] | None
 
     # pylint: disable=too-many-lines
+
+    # TODO: fix the generator to properly type externs. In the meantime
+    # disable this warning to prevent a typechecking error from pylint.
+    # pylint: disable=not-callable
     """
 
 main_header: @"""
