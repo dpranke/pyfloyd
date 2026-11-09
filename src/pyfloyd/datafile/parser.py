@@ -5,11 +5,15 @@
 #
 
 import re
-from typing import Any, Dict, NamedTuple, Optional
+from typing import NamedTuple
 
-Externs = Optional[Dict[str, Any]]
+Externs = dict[str, object] | None
 
 # pylint: disable=too-many-lines
+
+# TODO: fix the generator to properly type externs. In the meantime
+# disable this warning to prevent a typechecking error from pylint.
+# pylint: disable=not-callable
 
 
 class Result(NamedTuple):
@@ -22,9 +26,9 @@ class Result(NamedTuple):
     indicate the location of the farthest error in the text.
     """
 
-    val: Any = None
-    err: Optional[str] = None
-    pos: Optional[int] = None
+    val: object = None
+    err: str | None = None
+    pos: int | None = None
 
 
 def parse(
@@ -48,7 +52,7 @@ def parse(
 
 
 class _State:
-    def __init__(self, pos: int = 0, failed: bool = False, val: Any = None):
+    def __init__(self, pos: int = 0, failed: bool = False, val: object = None):
         self.pos = pos
         self.failed = failed
         self.val = val
@@ -1668,6 +1672,14 @@ class _Parser:
             if self._state.failed:
                 break
 
+    def _r__singlefill(self):
+        state = self._state.copy()
+        self._o_memoize('r__whitespace', self._r__whitespace)
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._o_memoize('r__comment', self._r__comment)
+
     def _r__filler(self):
         start = self._state.pos
         self._s__filler_1()
@@ -1678,20 +1690,12 @@ class _Parser:
         vs = []
         while True:
             state = self._state.copy()
-            self._s__filler_2()
+            self._o_memoize('r__singlefill', self._r__singlefill)
             if self._state.failed or self._state.pos == state.pos:
                 self._o_restore(state)
                 break
             vs.append(self._state.val)
         self._o_succeed(vs, self._state.pos)
-
-    def _s__filler_2(self):
-        state = self._state.copy()
-        self._o_memoize('r__whitespace', self._r__whitespace)
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._o_memoize('r__comment', self._r__comment)
 
     def _r_any(self):
         pos = self.pos()

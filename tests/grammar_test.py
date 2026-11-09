@@ -639,6 +639,13 @@ class ValuesMixin:
             ),
         )
 
+        self.check("""\
+            grammar = "-":d foo ={d} -> true
+            foo     = 'foo'
+            """,
+            "-foo-", out=True
+        )
+
     def test_label_nested_works(self):
         # Named variables defined in an outer sequence *should* be
         # visible in an inner sequence. This shows that either dynamically

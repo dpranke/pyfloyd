@@ -5,12 +5,16 @@
 #
 
 import re
-from typing import Any, Dict, NamedTuple, Optional
+from typing import NamedTuple
 import unicodedata
 
-Externs = Optional[Dict[str, Any]]
+Externs = dict[str, object] | None
 
 # pylint: disable=too-many-lines
+
+# TODO: fix the generator to properly type externs. In the meantime
+# disable this warning to prevent a typechecking error from pylint.
+# pylint: disable=not-callable
 
 
 class Result(NamedTuple):
@@ -23,9 +27,9 @@ class Result(NamedTuple):
     indicate the location of the farthest error in the text.
     """
 
-    val: Any = None
-    err: Optional[str] = None
-    pos: Optional[int] = None
+    val: object = None
+    err: str | None = None
+    pos: int | None = None
 
 
 def parse(
@@ -49,7 +53,7 @@ def parse(
 
 
 class _State:
-    def __init__(self, pos: int = 0, failed: bool = False, val: Any = None):
+    def __init__(self, pos: int = 0, failed: bool = False, val: object = None):
         self.pos = pos
         self.failed = failed
         self.val = val
@@ -680,11 +684,11 @@ class _Parser:
         if not self._state.failed:
             return
         self._o_restore(state)
-        self._s_prim_expr_21()
+        self._s_prim_expr_25()
         if not self._state.failed:
             return
         self._o_restore(state)
-        self._s_prim_expr_22()
+        self._s_prim_expr_26()
 
     def _s_prim_expr_1(self):
         self._s_prim_expr_2()
@@ -891,8 +895,16 @@ class _Parser:
 
     def _s_prim_expr_19(self):
         state = self._state.copy()
-        errpos = self._errpos
         self._s_prim_expr_20()
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._s_prim_expr_23()
+
+    def _s_prim_expr_20(self):
+        state = self._state.copy()
+        errpos = self._errpos
+        self._s_prim_expr_21()
         if self._state.failed:
             self._o_succeed(None, state.pos)
         else:
@@ -900,11 +912,37 @@ class _Parser:
             self._errpos = errpos
             self._o_fail()
 
-    def _s_prim_expr_20(self):
+    def _s_prim_expr_21(self):
+        state = self._state.copy()
+        errpos = self._errpos
+        self._s_prim_expr_22()
+        if self._state.failed:
+            self._o_succeed(None, state.pos)
+        else:
+            self._o_restore(state)
+            self._errpos = errpos
+            self._o_fail()
+
+    def _s_prim_expr_22(self):
+        self._o_memoize('r__filler', self._r__filler)
+        self._o_str('={')
+
+    def _s_prim_expr_23(self):
+        state = self._state.copy()
+        errpos = self._errpos
+        self._s_prim_expr_24()
+        if self._state.failed:
+            self._o_succeed(None, state.pos)
+        else:
+            self._o_restore(state)
+            self._errpos = errpos
+            self._o_fail()
+
+    def _s_prim_expr_24(self):
         self._o_memoize('r__filler', self._r__filler)
         self._o_ch('=')
 
-    def _s_prim_expr_21(self):
+    def _s_prim_expr_25(self):
         self._o_memoize('r__filler', self._r__filler)
         self._o_ch('(')
         if self._state.failed:
@@ -920,7 +958,7 @@ class _Parser:
             self._state.pos,
         )
 
-    def _s_prim_expr_22(self):
+    def _s_prim_expr_26(self):
         self._o_memoize('r__filler', self._r__filler)
         self._o_ch('<')
         if self._state.failed:
@@ -2269,6 +2307,14 @@ class _Parser:
             if self._state.failed:
                 break
 
+    def _r__singlefill(self):
+        state = self._state.copy()
+        self._o_memoize('r__whitespace', self._r__whitespace)
+        if not self._state.failed:
+            return
+        self._o_restore(state)
+        self._o_memoize('r__comment', self._r__comment)
+
     def _r__filler(self):
         start = self._state.pos
         self._s__filler_1()
@@ -2279,20 +2325,12 @@ class _Parser:
         vs = []
         while True:
             state = self._state.copy()
-            self._s__filler_2()
+            self._o_memoize('r__singlefill', self._r__singlefill)
             if self._state.failed or self._state.pos == state.pos:
                 self._o_restore(state)
                 break
             vs.append(self._state.val)
         self._o_succeed(vs, self._state.pos)
-
-    def _s__filler_2(self):
-        state = self._state.copy()
-        self._o_memoize('r__whitespace', self._r__whitespace)
-        if not self._state.failed:
-            return
-        self._o_restore(state)
-        self._o_memoize('r__comment', self._r__comment)
 
     def _r_any(self):
         pos = self.pos()

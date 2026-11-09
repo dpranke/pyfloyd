@@ -57,7 +57,7 @@ prim_expr   = lit '..' lit                 -> node(['range', [$1, $3], []])
             | '^.' prim_expr               -> node(['ends_in', null, [$2]])
             | '...' prim_expr              -> node(['ends_in', null, [$2]])
             | '^' prim_expr                -> node(['not_one', null, [$2]])
-            | ident ~'='                   -> node(['apply', $1, []])
+            | ident (~~'={' | ~'=')        -> node(['apply', $1, []])
             | '(' choice ')'               -> node(['paren', null, [$2]])
             | '<' choice '>'               -> node(['run', null, [$2]])
 
