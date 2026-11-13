@@ -55,7 +55,25 @@ class DatafileParseError(DatafileError):
 
 quote_tokens = ('```', '"""', "'''", '`', '"', "'")
 
-_bare_word_re = re.compile(r'^[^\\\s\[\]\(\)\{\}:\'"`]+$')
+# A word that the datafile grammar would tokenize as a bareword, i.e., a
+# non-empty run of characters that are neither punctuation nor whitespace
+# (see the `punct` rule in grammars/datafile.g) and that is not exactly
+# `true`, `false`, or `null` and does not begin with a number.
+_bare_word_re = re.compile(
+    r"^(?!(?:true|false|null)$)(?![+-]?[0-9])"
+    r"[^\\/#'\"`\[\](){}:=,\s]+$"
+)
+
+# A word that the datafile grammar would tokenize as a numword (a number
+# followed by one or more bareword characters), mirroring the `number`
+# rule in grammars/datafile.g.
+_numword_re = re.compile(
+    r"[-+]?(?:0b[01](?:_?[01])*|0o[0-7](?:_?[0-7])*"
+    r"|0x[0-9a-fA-F](?:_?[0-9a-fA-F])*"
+    r"|(?:0|[1-9](?:_?[0-9])*)(?:\.[0-9]?(?:_?[0-9])*)?"
+    r"(?:[eE][+-]?[0-9]?(?:_?[0-9])*)?)"
+    r"[^\\/#'\"`\[\](){}:=,\s]+"
+)
 
 _long_str_re = re.compile(r"^l'=+'")
 
@@ -696,6 +714,7 @@ class Encoder:
         separators: Optional[Tuple[str, str]] = None,
         default: Optional[Callable[[Any], Any]] = None,
         sort_keys: bool = False,
+        allow_numwords: bool = False,
         **kw,
     ):
         """Provides a class that may be overridden to customize the behavior
@@ -710,6 +729,7 @@ class Encoder:
         self.item_separator, self.kv_separator = separators
         self.default_fn = default or _raise_type_error
         self.sort_keys = sort_keys
+        self.allow_numwords = allow_numwords
 
     def default(self, obj: Any) -> Any:
         """Provides a last-ditch option to encode a value that the encoder
@@ -753,7 +773,7 @@ class Encoder:
             return s
 
         if as_key:
-            raise TypeError(f'Invalid key f{obj}')
+            raise TypeError(f'Invalid key: {obj!r}')
         return self._encode_non_basic_type(obj, seen, level)
 
     def _encode_basic_type(self, obj: Any, *, as_key: bool) -> Optional[str]:
@@ -790,9 +810,10 @@ class Encoder:
         return f'"{repr(obj)}"' if as_key else repr(obj)
 
     def _encode_str(self, obj: str, *, as_key: bool) -> str:
-        if as_key:
-            return obj
-        return encode_string(obj, self.ensure_ascii)
+        del as_key
+        return encode_string(
+            obj, self.ensure_ascii, allow_numwords=self.allow_numwords
+        )
 
     def _encode_non_basic_type(self, obj, seen: Set, level: int) -> str:
         # Basic types can't be recursive so we only check for circularity
@@ -927,10 +948,12 @@ class Encoder:
 
 
 def encode_string(
-    obj: str, ensure_ascii: bool = True, escape_newlines=False
+    obj: str, ensure_ascii: bool = True, escape_newlines=False,
+    allow_numwords: bool = False,
 ) -> str:
-    m = _bare_word_re.match(obj)
-    if m:
+    if allow_numwords and _numword_re.fullmatch(obj):
+        return obj
+    if _bare_word_re.match(obj):
         return obj
     return encode_quoted_string(obj, ensure_ascii, escape_newlines)
 
@@ -959,6 +982,10 @@ def encode_quoted_string(
             continue
 
         ch = s[i]
+        if ch == '\\':
+            ret.append('\\\\')
+            i += 1
+            continue
         o = ord(ch)
         if o < 32:
             ret.append(escape_char(ch))
