@@ -185,6 +185,16 @@ class Tests(unittest.TestCase):
         self.check("L'=='foo'=='", 'foo')
         self.check("L'=='f'='o'=='", "f'='o")
 
+    def test_invalid_number(self):
+        # The grammar's `exp` rule allows an exponent with no digits (e.g.,
+        # "2.5e"), so a number token can reach the float() conversion and
+        # fail there. That should be reported as a DatafileError, like any
+        # other invalid document, not escape as a raw ValueError.
+        for s in ('2.5e', '2e', '1e+', '2.5e+', '[2.5e]', '{k: 2.5e}'):
+            with self.assertRaises(datafile.DatafileError) as cm:
+                datafile.loads(s)
+            self.assertIn('Invalid number', str(cm.exception))
+
     def test_bare_word(self):
         self.check('foo', 'foo')
         self.check('@foo', '@foo')

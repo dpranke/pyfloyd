@@ -393,7 +393,10 @@ class Decoder:
         if s.startswith('0o'):
             return int(s, base=8)
         if '.' in s or 'e' in s or 'E' in s:
-            return float(s)
+            try:
+                return float(s)
+            except ValueError:
+                raise DatafileError(f'Invalid number "{val}"') from None
         return int(s)
 
     def parse_numword(self, val: str, as_key: bool) -> Any:
